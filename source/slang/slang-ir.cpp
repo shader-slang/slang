@@ -194,7 +194,7 @@ namespace Slang
     {
         for(auto dd : getDecorations())
         {
-            if(dd->op == decorationOp)
+            if(dd->getOp() == decorationOp)
                 return dd;
         }
         return nullptr;
@@ -222,7 +222,7 @@ namespace Slang
 
     IRIntegerValue getIntVal(IRInst* inst)
     {
-        switch (inst->op)
+        switch (inst->getOp())
         {
         default:
             SLANG_UNEXPECTED("needed a known integer value");
@@ -452,7 +452,7 @@ namespace Slang
         UInt stride = 1;
 
         auto operands = terminator->getOperands();
-        switch (terminator->op)
+        switch (terminator->getOp())
         {
         case kIROp_ReturnVal:
         case kIROp_ReturnVoid:
@@ -617,7 +617,7 @@ namespace Slang
 
     UInt IRUnconditionalBranch::getArgCount()
     {
-        switch(op)
+        switch(getOp())
         {
         case kIROp_unconditionalBranch:
             return getOperandCount() - 1;
@@ -633,7 +633,7 @@ namespace Slang
 
     IRUse* IRUnconditionalBranch::getArgs()
     {
-        switch(op)
+        switch(getOp())
         {
         case kIROp_unconditionalBranch:
             return getOperands() + 1;
@@ -751,7 +751,7 @@ namespace Slang
     bool isTerminatorInst(IRInst* inst)
     {
         if (!inst) return false;
-        return isTerminatorInst(inst->op);
+        return isTerminatorInst(inst->getOp());
     }
 
     //
@@ -1324,7 +1324,7 @@ namespace Slang
         IRInst* inst = (IRInst*)module->memoryArena.allocateAndZero(size);
 
         inst->operandCount = uint32_t(totalArgCount);
-        inst->op = op;
+        inst->m_op = op;
 
         return inst;
     }
@@ -1340,7 +1340,7 @@ namespace Slang
         IRInst* inst = (IRInst*)module->memoryArena.allocateAndZero(totalSizeInBytes);
 
         inst->operandCount = 0;
-        inst->op = op;
+        inst->m_op = op;
 
         return inst;
     }
@@ -1624,7 +1624,7 @@ namespace Slang
 
         inst->operandCount = (uint32_t)(fixedArgCount + varArgCount);
 
-        inst->op = op;
+        inst->m_op = op;
 
         inst->typeUse.init(inst, type);
 
@@ -1677,7 +1677,7 @@ namespace Slang
         // TODO: Do we need to run ctor after zeroing?
         new (inst) IRInst;
 
-        inst->op = op;
+        inst->m_op = op;
         if (type)
         {
             inst->typeUse.init(inst, type);
@@ -1854,7 +1854,7 @@ namespace Slang
 
     bool operator==(IRInstKey const& left, IRInstKey const& right)
     {
-        if(left.inst->op != right.inst->op) return false;
+        if(left.inst->getOp() != right.inst->getOp()) return false;
         if(left.inst->getFullType() != right.inst->getFullType()) return false;
         if(left.inst->operandCount != right.inst->operandCount) return false;
 
@@ -1872,7 +1872,7 @@ namespace Slang
 
     HashCode IRInstKey::getHashCode()
     {
-        auto code = Slang::getHashCode(inst->op);
+        auto code = Slang::getHashCode(inst->getOp());
         code = combineHash(code, Slang::getHashCode(inst->getFullType()));
         code = combineHash(code, Slang::getHashCode(inst->getOperandCount()));
 
@@ -1887,7 +1887,7 @@ namespace Slang
 
     UnownedStringSlice IRConstant::getStringSlice()
     {
-        assert(op == kIROp_StringLit);
+        assert(getOp() == kIROp_StringLit);
         // If the transitory decoration is set, then this is uses the transitoryStringVal for the text storage.
         // This is typically used when we are using a transitory IRInst held on the stack (such that it can be looked up in cached), 
         // that just points to a string elsewhere, and NOT the typical normal style, where the string is held after the instruction in memory.
@@ -1904,7 +1904,7 @@ namespace Slang
 
     bool IRConstant::isFinite() const
     {
-        SLANG_ASSERT(op == kIROp_FloatLit);
+        SLANG_ASSERT(getOp() == kIROp_FloatLit);
         
         // Lets check we can analyze as double, at least in principal
         SLANG_COMPILE_TIME_ASSERT(sizeof(IRFloatingPointValue) == sizeof(double));
@@ -1918,7 +1918,7 @@ namespace Slang
 
     IRConstant::FloatKind IRConstant::getFloatKind() const
     {
-        SLANG_ASSERT(op == kIROp_FloatLit);
+        SLANG_ASSERT(getOp() == kIROp_FloatLit);
 
         const uint64_t i = uint64_t(value.intVal);
         int e = int(i >> 52) & 0x7ff;
@@ -1942,12 +1942,12 @@ namespace Slang
             return true;
         }
         // Check the type and they are the same op & same type
-        if (op != rhs->op)
+        if (getOp() != rhs->getOp())
         {
             return false;
         }
 
-        switch (op)
+        switch (getOp())
         {
             case kIROp_BoolLit:
             case kIROp_FloatLit:
@@ -1981,10 +1981,10 @@ namespace Slang
 
     HashCode IRConstant::getHashCode()
     {
-        auto code = Slang::getHashCode(op);
+        auto code = Slang::getHashCode(getOp());
         code = combineHash(code, Slang::getHashCode(getFullType()));
 
-        switch (op)
+        switch (getOp())
         {
             case kIROp_BoolLit:
             case kIROp_FloatLit:
@@ -2036,7 +2036,7 @@ namespace Slang
         // Calculate the minimum object size (ie not including the payload of value)    
         const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
-        switch (keyInst.op)
+        switch (keyInst.getOp())
         {
         default:
             SLANG_UNEXPECTED("missing case for IR constant");
@@ -2045,19 +2045,19 @@ namespace Slang
             case kIROp_BoolLit:
             case kIROp_IntLit:
             {
-                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRIntegerValue)));
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.getOp(), keyInst.getFullType(), prefixSize + sizeof(IRIntegerValue)));
                 irValue->value.intVal = keyInst.value.intVal;
                 break; 
             }
             case kIROp_FloatLit:
             {
-                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(IRFloatingPointValue)));
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.getOp(), keyInst.getFullType(), prefixSize + sizeof(IRFloatingPointValue)));
                 irValue->value.floatVal = keyInst.value.floatVal;
                 break;
             }
             case kIROp_PtrLit:
             {
-                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), prefixSize + sizeof(void*)));
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.getOp(), keyInst.getFullType(), prefixSize + sizeof(void*)));
                 irValue->value.ptrVal = keyInst.value.ptrVal;
                 break;
             }
@@ -2068,7 +2068,7 @@ namespace Slang
                 const size_t sliceSize = slice.getLength();
                 const size_t instSize = prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize; 
 
-                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.op, keyInst.getFullType(), instSize));
+                irValue = static_cast<IRConstant*>(createInstWithSizeImpl(builder, keyInst.getOp(), keyInst.getFullType(), instSize));
 
                 IRConstant::StringValue& dstString = irValue->value.stringVal;
 
@@ -2096,7 +2096,7 @@ namespace Slang
     {
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = kIROp_BoolLit;
+        keyInst.m_op = kIROp_BoolLit;
         keyInst.typeUse.usedValue = getBoolType();
         keyInst.value.intVal = IRIntegerValue(inValue);
         return findOrEmitConstant(this, keyInst);
@@ -2106,7 +2106,7 @@ namespace Slang
     {
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = kIROp_IntLit;
+        keyInst.m_op = kIROp_IntLit;
         keyInst.typeUse.usedValue = type;
         keyInst.value.intVal = inValue;
         return findOrEmitConstant(this, keyInst);
@@ -2116,7 +2116,7 @@ namespace Slang
     {
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = kIROp_FloatLit;
+        keyInst.m_op = kIROp_FloatLit;
         keyInst.typeUse.usedValue = type;
         keyInst.value.floatVal = inValue;
         return findOrEmitConstant(this, keyInst);
@@ -2130,10 +2130,10 @@ namespace Slang
         // Mark that this is on the stack...
         IRDecoration stackDecoration;
         memset(&stackDecoration, 0, sizeof(stackDecoration));
-        stackDecoration.op = kIROp_TransitoryDecoration;
+        stackDecoration.m_op = kIROp_TransitoryDecoration;
         stackDecoration.insertAtEnd(&keyInst);
             
-        keyInst.op = kIROp_StringLit;
+        keyInst.m_op = kIROp_StringLit;
         keyInst.typeUse.usedValue = getStringType();
         
         IRConstant::StringSliceValue& dstSlice = keyInst.value.transitoryStringVal;
@@ -2149,7 +2149,7 @@ namespace Slang
 
         IRConstant keyInst;
         memset(&keyInst, 0, sizeof(keyInst));
-        keyInst.op = kIROp_PtrLit;
+        keyInst.m_op = kIROp_PtrLit;
         keyInst.typeUse.usedValue = type;
         keyInst.value.ptrVal = value;
         return (IRPtrLit*) findOrEmitConstant(this, keyInst);
@@ -2213,7 +2213,7 @@ namespace Slang
         SLANG_UNUSED(endCursor);
 
         new(inst) IRInst();
-        inst->op = op;
+        inst->m_op = op;
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t) operandCount;
 
@@ -2300,7 +2300,7 @@ namespace Slang
         SLANG_UNUSED(endCursor);
 
         new(inst) IRInst();
-        inst->op = op;
+        inst->m_op = op;
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t)operandCount;
 
@@ -2895,7 +2895,7 @@ namespace Slang
         // the emit logic, but this is a reasonably early place
         // to catch it.
         //
-        SLANG_ASSERT(witnessTableVal->op != kIROp_StructKey);
+        SLANG_ASSERT(witnessTableVal->getOp() != kIROp_StructKey);
 
         auto inst = createInst<IRLookupWitnessMethod>(
             this,
@@ -3157,7 +3157,7 @@ namespace Slang
                 //
                 auto concreteType = cast<IRType>(slotArgs[0]);
                 auto witnessTable = slotArgs[1];
-                if (slotArgs[0]->op == kIROp_DynamicType)
+                if (slotArgs[0]->getOp() == kIROp_DynamicType)
                     return value;
                 auto deref = emitGetValueFromBoundInterface(concreteType, value);
                 return emitMakeExistential(type, deref, witnessTable);
@@ -4369,7 +4369,7 @@ namespace Slang
         // the function returns the distinguished `Void` type,
         // since that is conceptually the same as "not returning
         // a value."
-        if(type->op == kIROp_VoidType)
+        if(type->getOp() == kIROp_VoidType)
             return false;
 
         return true;
@@ -4648,7 +4648,7 @@ namespace Slang
         // we would like to not apply that rule to
         // "nominal" types like `struct`s.
         //
-        switch( inst->op )
+        switch( inst->getOp() )
         {
         case kIROp_StructType:
         case kIROp_InterfaceType:
@@ -4785,7 +4785,7 @@ namespace Slang
         IRDumpContext*          context,
         IRGlobalValueWithCode*  code)
     {
-        auto opInfo = getIROpInfo(code->op);
+        auto opInfo = getIROpInfo(code->getOp());
 
         dumpIndent(context);
         dump(context, opInfo.name);
@@ -4831,7 +4831,7 @@ namespace Slang
 
         // Special case: make printing of `call` a bit
         // nicer to look at
-        if (inst->op == kIROp_Call && argCount > 0)
+        if (inst->getOp() == kIROp_Call && argCount > 0)
         {
             dump(context, " ");
             auto argVal = inst->getOperand(ii++);
@@ -4870,7 +4870,7 @@ namespace Slang
         IRDumpContext*  context,
         IRInst*         inst)
     {
-        auto opInfo = getIROpInfo(inst->op);
+        auto opInfo = getIROpInfo(inst->getOp());
 
         dumpIndent(context);
         dump(context, opInfo.name);
@@ -4933,7 +4933,7 @@ namespace Slang
             return;
         }
 
-        auto op = inst->op;
+        auto op = inst->getOp();
         auto opInfo = getIROpInfo(op);
 
         // Special-case the literal instructions.
@@ -4981,7 +4981,7 @@ namespace Slang
             return;
         }
 
-        auto op = inst->op;
+        auto op = inst->getOp();
 
         dumpIRDecorations(context, inst);
 
@@ -5172,8 +5172,8 @@ namespace Slang
             return false;
         }
 
-        const IROp opA = IROp(a->op & kIROpMeta_OpMask);
-        const IROp opB = IROp(b->op & kIROpMeta_OpMask);
+        const IROp opA = IROp(a->getOp() & kIROpMeta_OpMask);
+        const IROp opB = IROp(b->getOp() & kIROpMeta_OpMask);
 
         if (opA != opB)
         {
@@ -5562,7 +5562,7 @@ namespace Slang
         if(as<IRAttr>(this))
             return false;
 
-        switch(op)
+        switch(getOp())
         {
         // By default, assume that we might have side effects,
         // to safely cover all the instructions we haven't had time to think about.
@@ -5863,7 +5863,7 @@ namespace Slang
         // rules about when they are considered to have
         // a definition (e.g., a function must have a body).
         //
-        switch (val->op)
+        switch (val->getOp())
         {
         case kIROp_Func:
         case kIROp_Generic:
@@ -5901,13 +5901,13 @@ namespace Slang
 
     bool isPointerOfType(IRInst* ptrType, IRInst* elementType)
     {
-        return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) == elementType;
+        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) == elementType;
     }
 
     bool isPointerOfType(IRInst* ptrType, IROp opCode)
     {
-        return ptrType && ptrType->op == kIROp_PtrType && ptrType->getOperand(0) &&
-            ptrType->getOperand(0)->op == opCode;
+        return ptrType && ptrType->getOp() == kIROp_PtrType && ptrType->getOperand(0) &&
+            ptrType->getOperand(0)->getOp() == opCode;
     }
     bool isBuiltin(IRInst* inst)
     {

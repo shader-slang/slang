@@ -113,7 +113,7 @@ struct WrapStructuredBuffersContext
         // replacing one type A with another type B globally, and doing
         // so could affect any type that in turn referenced A...
         //
-        auto newStructuredBufferType = builder->getType(oldStructuredBufferType->op, wrapperStruct);
+        auto newStructuredBufferType = builder->getType(oldStructuredBufferType->getOp(), wrapperStruct);
         oldStructuredBufferType->replaceUsesWith(newStructuredBufferType);
 
         // Any values that used our old structured bufer type
@@ -280,7 +280,7 @@ struct WrapStructuredBuffersContext
                         // non-pointer case above, so please refer
                         // there if you want the comments.
 
-                        auto newResultType = builder->getPtrType(oldPtrType->op, wrapperStruct);
+                        auto newResultType = builder->getPtrType(oldPtrType->getOp(), wrapperStruct);
                         builder->setDataType(call, newResultType);
 
                         auto newVal = builder->emitFieldAddress(oldResultType, call, wrappedFieldKey);

@@ -214,7 +214,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
 
     SourceWriter* writer = getSourceWriter();
 
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_VectorType:
         {
@@ -289,7 +289,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
         }
         default:
         {
-            if (IRBasicType::isaImpl(type->op))
+            if (IRBasicType::isaImpl(type->getOp()))
             {
                 // Don't emit anything for built in types
                 return;
@@ -398,7 +398,7 @@ static UnownedStringSlice _getResourceTypePrefix(IROp op)
 
 SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_OutType:
         case kIROp_InOutType:
@@ -435,7 +435,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             else
             {             
                 out << "Vec";
-                UnownedStringSlice postFix = _getCTypeVecPostFix(elemType->op);
+                UnownedStringSlice postFix = _getCTypeVecPostFix(elemType->getOp());
 
                 out << postFix;
                 if (postFix.getLength() > 1)
@@ -461,7 +461,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
             else
             {
                 out << "Mat";
-                const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->op));
+                const UnownedStringSlice postFix = _getCTypeVecPostFix(_getCType(elementType->getOp()));
                 out  << postFix;
                 if (postFix.getLength() > 1)
                 {
@@ -540,22 +540,22 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
         }
         default:
         {
-            if (isNominalOp(type->op))
+            if (isNominalOp(type->getOp()))
             {
                 out << getName(type);
                 return SLANG_OK;
             }
 
-            if (IRBasicType::isaImpl(type->op))
+            if (IRBasicType::isaImpl(type->getOp()))
             {
-                out << getBuiltinTypeName(type->op);
+                out << getBuiltinTypeName(type->getOp());
                 return SLANG_OK;
             }
 
             if (auto texType = as<IRTextureTypeBase>(type))
             {
                 // We don't support TextureSampler, so ignore that
-                if (texType->op != kIROp_TextureSamplerType)
+                if (texType->getOp() != kIROp_TextureSamplerType)
                 {
                     return _calcCPPTextureTypeName(texType, out);   
                 }
@@ -563,7 +563,7 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 
             // If _getResourceTypePrefix returns something, we assume can output any specialization after it in order.
             {
-                UnownedStringSlice prefix = _getResourceTypePrefix(type->op);
+                UnownedStringSlice prefix = _getResourceTypePrefix(type->getOp());
                 if (prefix.getLength() > 0)
                 {
                     auto oldWriter = m_writer;
@@ -617,7 +617,7 @@ void CPPSourceEmitter::useType(IRType* type)
 
 static IRBasicType* _getElementType(IRType* type)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_VectorType:      type = static_cast<IRVectorType*>(type)->getElementType(); break;
         case kIROp_MatrixType:      type = static_cast<IRMatrixType*>(type)->getElementType(); break;
@@ -628,7 +628,7 @@ static IRBasicType* _getElementType(IRType* type)
 
 /* static */CPPSourceEmitter::TypeDimension CPPSourceEmitter::_getTypeDimension(IRType* type, bool vecSwap)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_PtrType:
         {
@@ -643,7 +643,7 @@ static IRBasicType* _getElementType(IRType* type)
         default: break;
     }
 
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_VectorType:
         {
@@ -750,7 +750,7 @@ void CPPSourceEmitter::_emitAryDefinition(const HLSLIntrinsic* specOp)
     writer->emit("\n{\n");
     writer->indent();
 
-    const bool hasReturnType = retType->op != kIROp_VoidType;
+    const bool hasReturnType = retType->getOp() != kIROp_VoidType;
 
     TypeDimension calcDim;
     if (hasReturnType)
@@ -838,7 +838,7 @@ void CPPSourceEmitter::_emitAnyAllDefinition(const UnownedStringSlice& funcName,
     IRType* retType = specOp->returnType;
     auto retTypeName = _getTypeName(retType);
 
-    IROp style = _getTypeStyle(elementType->op);
+    IROp style = _getTypeStyle(elementType->getOp());
 
     const TypeDimension dim = _getTypeDimension(paramType0, false);
 
@@ -1327,7 +1327,7 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
         case Op::Init:
         {
             IRType* retType = specOp->returnType;
-            if (IRBasicType::isaImpl(retType->op))
+            if (IRBasicType::isaImpl(retType->getOp()))
             {
                 SLANG_ASSERT(numOperands == 1);
                         
@@ -1368,7 +1368,7 @@ void CPPSourceEmitter::emitCall(const HLSLIntrinsic* specOp, IRInst* inst, const
                 writer->emit(".");
 
                 IRInst* irElementIndex = swizzleInst->getElementIndex(i);
-                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
                 IRConstant* irConst = (IRConstant*)irElementIndex;
                 UInt elementIndex = (UInt)irConst->value.intVal;
                 SLANG_RELEASE_ASSERT(elementIndex < 4);
@@ -1441,7 +1441,7 @@ HLSLIntrinsic* CPPSourceEmitter::_addIntrinsic(HLSLIntrinsic::Op op, IRType* ret
 
 SlangResult CPPSourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder)
 {
-    outBuilder << _getTypePrefix(type->op) << "_" << HLSLIntrinsic::getInfo(op).funcName;
+    outBuilder << _getTypePrefix(type->getOp()) << "_" << HLSLIntrinsic::getInfo(op).funcName;
     return SLANG_OK;   
 }
 
@@ -1677,7 +1677,7 @@ void CPPSourceEmitter::_emitWitnessTableDefinitions()
                 m_writer->emit(getName(witnessTableVal));
             }
             else if (entry->getSatisfyingVal() &&
-                     entry->getSatisfyingVal()->getDataType()->op == kIROp_RTTIHandleType)
+                     entry->getSatisfyingVal()->getDataType()->getOp() == kIROp_RTTIHandleType)
             {
                 m_writer->emit(",\n");
                 emitInstExpr(entry->getSatisfyingVal(), getInfo(EmitOp::General));
@@ -1739,7 +1739,7 @@ void CPPSourceEmitter::emitInterface(IRInterfaceType* interfaceType)
             m_writer->emit(getName(entry->getRequirementKey()));
             m_writer->emit(";\n");
         }
-        else if (entry->getRequirementVal()->op == kIROp_RTTIHandleType)
+        else if (entry->getRequirementVal()->getOp() == kIROp_RTTIHandleType)
         {
             m_writer->emit("TypeInfo* ");
             m_writer->emit(getName(entry->getRequirementKey()));
@@ -1768,7 +1768,7 @@ bool CPPSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* va
     SLANG_UNUSED(varDecl);
     SLANG_UNUSED(varType);
 
-    switch (varType->op)
+    switch (varType->getOp())
     {
         case kIROp_StructType:
         {
@@ -1795,7 +1795,7 @@ void CPPSourceEmitter::emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformP
     String name = getName(varDecl);
     auto elementType = type->getElementType();
 
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_ParameterBlockType:
         case kIROp_ConstantBufferType:
@@ -1921,7 +1921,7 @@ void CPPSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
 
 void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
-    if (inst->op == kIROp_FloatLit)
+    if (inst->getOp() == kIROp_FloatLit)
     {
         IRConstant* constantInst = static_cast<IRConstant*>(inst);
         switch (constantInst->getFloatKind())
@@ -1951,7 +1951,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 // If the literal is a float, then we need to add 'f' at end, as
                 // without literal suffix the value defaults to double.
                 IRType* type = constantInst->getDataType();
-                if (type && type->op == kIROp_FloatType)
+                if (type && type->getOp() == kIROp_FloatType)
                 {
                     m_writer->emitChar('f');
                 }
@@ -2024,7 +2024,7 @@ void CPPSourceEmitter::emitIntrinsicCallExprImpl(
 
         // If the first item is either a matrix or a vector, we use 'getAt' logic
         IRType* targetType = args[0].get()->getDataType();
-        if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
+        if (targetType->getOp() == kIROp_VectorType || targetType->getOp() == kIROp_MatrixType)
         {
             // Work out the intrinsic used
             HLSLIntrinsic intrinsic;
@@ -2124,7 +2124,7 @@ bool CPPSourceEmitter::_tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInf
     HLSLIntrinsic* specOp = m_intrinsicSet.add(inst);
     if (specOp)
     {
-        if (inst->op == kIROp_Call)
+        if (inst->getOp() == kIROp_Call)
         {
             IRCall* call = static_cast<IRCall*>(inst);
             emitCall(specOp, inst, call->getArgs(), int(call->getArgCount()), inOuterPrec);
@@ -2140,7 +2140,7 @@ bool CPPSourceEmitter::_tryEmitInstExprAsIntrinsic(IRInst* inst, const EmitOpInf
 
 bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         default:
         {
@@ -2259,7 +2259,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 // Types that aren't output have negative indices
 static Index _calcTypeOrder(IRType* a)
 {
-    switch (a->op)
+    switch (a->getOp())
     {
         case kIROp_FuncType:
         {
@@ -2342,7 +2342,7 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerPre
         return;
     }
 
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_Var:
         case kIROp_GlobalVar:
@@ -2540,7 +2540,7 @@ void CPPSourceEmitter::_emitForwardDeclarations(const List<EmitAction>& actions)
                 break;
 
             case EmitAction::Level::Definition:
-                if (_isVariable(action.inst->op) || _isFunction(action.inst->op))
+                if (_isVariable(action.inst->getOp()) || _isFunction(action.inst->getOp()))
                 {
                     // Don't emit functions or variables that have to be grouped into structures yet
                 }
@@ -2675,7 +2675,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
         // Output all the thread locals 
         for (auto action : actions)
         {
-            if (action.level == EmitAction::Level::Definition && action.inst->op == kIROp_GlobalVar)
+            if (action.level == EmitAction::Level::Definition && action.inst->getOp() == kIROp_GlobalVar)
             {
                 emitGlobalInst(action.inst);
             }
@@ -2684,7 +2684,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
         // Finally output the functions as methods on the context
         for (auto action : actions)
         {
-            if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+            if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->getOp()))
             {
                 emitGlobalInst(action.inst);
             }
@@ -2705,7 +2705,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
     for (auto action : actions)
     {
-        if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->op))
+        if (action.level == EmitAction::Level::Definition && _isFunction(action.inst->getOp()))
         {
             IRFunc* func = as<IRFunc>(action.inst);
 

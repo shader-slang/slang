@@ -98,12 +98,12 @@ struct HLSLIntrinsic
     static bool isTypeScalar(IRType* type)
     {
         // Strip off ptr if it's an operand type
-        if (type->op == kIROp_PtrType)
+        if (type->getOp() == kIROp_PtrType)
         {
             type = as<IRType>(type->getOperand(0));
         }
         // If any are vec or matrix, then we
-        return !(type->op == kIROp_MatrixType || type->op == kIROp_VectorType);
+        return !(type->getOp() == kIROp_MatrixType || type->getOp() == kIROp_VectorType);
     }
 
     bool isScalar() const

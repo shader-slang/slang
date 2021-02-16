@@ -65,7 +65,7 @@ struct HoistLocalTypesContext
         if (hoistable)
         {
             auto newType = builder.getType(
-                inst->op, mappedOperands.getCount(), mappedOperands.getArrayView().getBuffer());
+                inst->getOp(), mappedOperands.getCount(), mappedOperands.getArrayView().getBuffer());
             inst->transferDecorationsTo(newType);
             inst->replaceUsesWith(newType);
             inst->removeAndDeallocate();

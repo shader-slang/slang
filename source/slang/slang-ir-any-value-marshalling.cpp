@@ -107,7 +107,7 @@ namespace Slang
             IRInst* concreteTypedVar)
         {
             auto dataType = cast<IRPtrTypeBase>(concreteTypedVar->getDataType())->getValueType();
-            switch (dataType->op)
+            switch (dataType->getOp())
             {
             case kIROp_IntType:
             case kIROp_FloatType:
@@ -203,7 +203,7 @@ namespace Slang
         {
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
             {
-                switch (dataType->op)
+                switch (dataType->getOp())
                 {
                 case kIROp_IntType:
                 case kIROp_FloatType:
@@ -327,7 +327,7 @@ namespace Slang
         {
             virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
             {
-                switch (dataType->op)
+                switch (dataType->getOp())
                 {
                 case kIROp_IntType:
                 case kIROp_FloatType:

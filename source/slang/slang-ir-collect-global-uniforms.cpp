@@ -52,7 +52,7 @@ struct CollectGlobalUniformParametersContext
 
     IRGlobalParam* _getGlobalParamFromLayoutFieldKey(IRInst* key)
     {
-        switch (key->op)
+        switch (key->getOp())
         {
         case kIROp_GlobalParam:
             return cast<IRGlobalParam>(key);

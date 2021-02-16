@@ -163,7 +163,7 @@ namespace Slang
             }
             else
             {
-                if (call->getDataType()->op == kIROp_VoidType)
+                if (call->getDataType()->getOp() == kIROp_VoidType)
                     builder->emitReturn();
                 else
                     builder->emitReturn(call);
