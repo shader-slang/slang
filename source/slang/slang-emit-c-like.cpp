@@ -1989,7 +1989,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     // Specially handle params. The issue here is around PHI nodes, and that they do not
     // have source loc information, by default, but we don't want to force an update of a
     // a line number.
-    if (inst->op == kIROp_Param)
+    if (inst->getOp() == kIROp_Param)
     {
         m_writer->advanceToSourceLocationIfValid(inst->sourceLoc);
     }
