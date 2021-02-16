@@ -192,7 +192,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 }
 
                 // We only need to output a cast if the underlying type is half.
-                if (underlyingType && underlyingType->op == kIROp_HalfType)
+                if (underlyingType && underlyingType->getOp() == kIROp_HalfType)
                 {
                     m_emitter->emitSimpleType(elementType);
                     m_writer->emit("(");
@@ -332,7 +332,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto arg = m_args[argIndex].get();
-            if (arg->op == kIROp_ImageSubscript)
+            if (arg->getOp() == kIROp_ImageSubscript)
             {
                 m_writer->emit("imageA");
             }
@@ -357,7 +357,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto arg = m_args[argIndex].get();
-            if (arg->op == kIROp_ImageSubscript)
+            if (arg->getOp() == kIROp_ImageSubscript)
             {
                 if (m_emitter->getSourceLanguage() == SourceLanguage::GLSL)
                 {
@@ -389,7 +389,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                         elementCount = getIntVal(coordsVecType->getElementCount());
                     }
 
-                    SLANG_ASSERT(coordsType->op == kIROp_UIntType);
+                    SLANG_ASSERT(coordsType->getOp() == kIROp_UIntType);
 
                     if (elementCount > 1)
                     {
@@ -479,7 +479,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             auto argType = arg->getDataType();
 
             const char* str = "";
-            switch (argType->op)
+            switch (argType->getOp())
             {
 #define CASE(OP, STR) \
                     case kIROp_##OP: str = #STR; break

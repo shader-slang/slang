@@ -269,7 +269,7 @@ struct SynthesizeActiveMaskForModuleContext
         // instructions. When we find one we mark the function
         // that contains it.
 
-        if( inst->op == kIROp_WaveGetActiveMask )
+        if( inst->getOp() == kIROp_WaveGetActiveMask )
         {
             markInstUsingActiveMask(inst);
         }
@@ -642,7 +642,7 @@ struct SynthesizeActiveMaskForFunctionContext
         {
             for( auto inst : block->getOrdinaryInsts() )
             {
-                if( inst->op == kIROp_WaveGetActiveMask )
+                if( inst->getOp() == kIROp_WaveGetActiveMask )
                 {
                     m_blocksNeedingActiveMask.Add(block);
                     break;
@@ -1027,7 +1027,7 @@ struct SynthesizeActiveMaskForFunctionContext
         {
             nextInst = inst->getNextInst();
 
-            if( inst->op == kIROp_WaveGetActiveMask )
+            if( inst->getOp() == kIROp_WaveGetActiveMask )
             {
                 inst->replaceUsesWith(activeMaskOnRegionEntry);
                 inst->removeAndDeallocate();
@@ -1042,7 +1042,7 @@ struct SynthesizeActiveMaskForFunctionContext
         //
         auto terminator = regionEntry->getTerminator();
         SLANG_ASSERT(terminator);
-        switch( terminator->op )
+        switch( terminator->getOp() )
         {
             // There are some cases of terminator instructions that
             // we explicit do not or cannot handle.
@@ -1896,7 +1896,7 @@ struct SynthesizeActiveMaskForFunctionContext
 
             IRInst* newTerminator = builder.emitIntrinsicInst(
                 terminator->getFullType(),
-                terminator->op,
+                terminator->getOp(),
                 newOperands.getCount(),
                 newOperands.getBuffer());
 

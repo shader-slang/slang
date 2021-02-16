@@ -190,7 +190,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             IRInst* srcInst = m_insts[i];
             Ser::Inst& dstInst = m_serialData->m_insts[i];
 
-            dstInst.m_op = uint16_t(srcInst->op & kIROpMeta_OpMask);
+            dstInst.m_op = uint16_t(srcInst->getOp() & kIROpMeta_OpMask);
             dstInst.m_payloadType = PayloadType::Empty;
             
             dstInst.m_resultTypeIndex = getInstIndex(srcInst->getFullType());
@@ -198,7 +198,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             IRConstant* irConst = as<IRConstant>(srcInst);
             if (irConst)
             {
-                switch (srcInst->op)
+                switch (srcInst->getOp())
                 {
                     // Special handling for the ir const derived types
                     case kIROp_StringLit:
@@ -245,7 +245,7 @@ Result IRSerialWriter::write(IRModule* module, SerialSourceLocWriter* sourceLocW
             if (textureBase)
             {
                 dstInst.m_payloadType = PayloadType::OperandAndUInt32;
-                dstInst.m_payload.m_operandAndUInt32.m_uint32 = uint32_t(srcInst->op) >> kIROpMeta_OtherShift;
+                dstInst.m_payload.m_operandAndUInt32.m_uint32 = uint32_t(srcInst->getOp()) >> kIROpMeta_OtherShift;
                 dstInst.m_payload.m_operandAndUInt32.m_operand = getInstIndex(textureBase->getElementType());
                 continue;
             }
@@ -793,7 +793,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
 
             // Reintroduce the texture type bits into the the
             const uint32_t other = srcInst.m_payload.m_operandAndUInt32.m_uint32;
-            inst->op = IROp(uint32_t(inst->op) | (other << kIROpMeta_OtherShift));
+            inst->m_op = IROp(uint32_t(inst->getOp()) | (other << kIROpMeta_OtherShift));
 
             insts[i] = inst;
         }

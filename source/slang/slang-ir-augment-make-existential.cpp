@@ -40,7 +40,7 @@ struct AugmentMakeExistentialContext
 
     void processInst(IRInst* inst)
     {
-        switch (inst->op)
+        switch (inst->getOp())
         {
         case kIROp_MakeExistential:
             processMakeExistential((IRMakeExistential*)inst);

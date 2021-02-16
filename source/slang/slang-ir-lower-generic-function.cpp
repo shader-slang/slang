@@ -54,11 +54,11 @@ namespace Slang
             {
                 if (genericChild == func)
                     continue;
-                if (genericChild->op == kIROp_ReturnVal)
+                if (genericChild->getOp() == kIROp_ReturnVal)
                     continue;
                 // Process all generic parameters and local type definitions.
                 auto clonedChild = cloneInst(&cloneEnv, &builder, genericChild);
-                if (clonedChild->op == kIROp_Param)
+                if (clonedChild->getOp() == kIROp_Param)
                 {
                     auto paramType = clonedChild->getFullType();
                     auto loweredParamType = sharedContext->lowerType(&builder, paramType);
@@ -176,7 +176,7 @@ namespace Slang
                     {
                         loweredVal = lowerGenericFuncType(&builder, genericFuncType);
                     }
-                    else if (requirementVal->op == kIROp_AssociatedType)
+                    else if (requirementVal->getOp() == kIROp_AssociatedType)
                     {
                         loweredVal = builder.getRTTIHandleType();
                     }
@@ -201,7 +201,7 @@ namespace Slang
         {
             auto type = inst->getDataType();
             if (!type) return false;
-            return type->op == kIROp_TypeKind;
+            return type->getOp() == kIROp_TypeKind;
         }
 
         // Lower items in a witness table. This triggers lowering of generic functions,
@@ -228,7 +228,7 @@ namespace Slang
                 if (auto genericVal = as<IRGeneric>(entry->getSatisfyingVal()))
                 {
                     // Lower generic functions in witness table.
-                    if (findGenericReturnVal(genericVal)->op == kIROp_Func)
+                    if (findGenericReturnVal(genericVal)->getOp() == kIROp_Func)
                     {
                         auto loweredFunc = lowerGenericFunction(genericVal);
                         entry->satisfyingVal.set(loweredFunc);
@@ -270,7 +270,7 @@ namespace Slang
             // translate it into call(gFunc, args, Targs).
             IRInst* loweredFunc = nullptr;
             auto funcToSpecialize = specializeInst->getBase();
-            if (funcToSpecialize->op == kIROp_Generic)
+            if (funcToSpecialize->getOp() == kIROp_Generic)
             {
                 loweredFunc = lowerGenericFunction(funcToSpecialize);
                 if (loweredFunc != funcToSpecialize)

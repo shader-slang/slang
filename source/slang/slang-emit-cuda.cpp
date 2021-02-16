@@ -123,7 +123,7 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
     {
         case Op::FRem:
         {
-            if (type->op == kIROp_FloatType || type->op == kIROp_DoubleType)
+            if (type->getOp() == kIROp_FloatType || type->getOp() == kIROp_DoubleType)
             {
                 funcName = HLSLIntrinsic::getInfo(op).funcName;
             }
@@ -135,7 +135,7 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
     if (funcName.getLength())
     {
         outBuilder << funcName;
-        if (type->op == kIROp_FloatType)
+        if (type->getOp() == kIROp_FloatType)
         {
             outBuilder << "f";
         }
@@ -158,7 +158,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     // We allow C source, because if we need a name 
     SLANG_ASSERT(target == CodeGenTarget::CUDASource);
 
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_HalfType:
         {
@@ -170,7 +170,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         {
             auto vecType = static_cast<IRVectorType*>(type);
             auto vecCount = int(getIntVal(vecType->getElementCount()));
-            const IROp elemType = vecType->getElementType()->op;
+            const IROp elemType = vecType->getElementType()->getOp();
 
             UnownedStringSlice prefix = getVectorPrefix(elemType);
             if (prefix.getLength() <= 0)
@@ -206,28 +206,28 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 #endif
         default:
         {
-            if (isNominalOp(type->op))
+            if (isNominalOp(type->getOp()))
             {
                 out << getName(type);
                 return SLANG_OK;
             }
 
-            if (IRBasicType::isaImpl(type->op))
+            if (IRBasicType::isaImpl(type->getOp()))
             {
-                out << getBuiltinTypeName(type->op);
+                out << getBuiltinTypeName(type->getOp());
                 return SLANG_OK;
             }
 
             if (auto texType = as<IRTextureTypeBase>(type))
             {
                 // We don't support TextureSampler, so ignore that
-                if (texType->op != kIROp_TextureSamplerType)
+                if (texType->getOp() != kIROp_TextureSamplerType)
                 {
                     return _calcCUDATextureTypeName(texType, out);
                 }
             }
 
-            switch (type->op)
+            switch (type->getOp())
             {
                 case kIROp_SamplerStateType:                    out << "SamplerState"; return SLANG_OK;
                 case kIROp_SamplerComparisonStateType:          out << "SamplerComparisonState"; return SLANG_OK;
@@ -393,12 +393,12 @@ static bool _areEquivalent(IRType* a, IRType* b)
     {
         return true;
     }
-    if (a->op != b->op)
+    if (a->getOp() != b->getOp())
     {
         return false;
     }
 
-    switch (a->op)
+    switch (a->getOp())
     {
         case kIROp_VectorType:
         {
@@ -426,7 +426,7 @@ void CUDASourceEmitter::_emitInitializerListValue(IRType* dstType, IRInst* value
 {
     // When constructing a matrix or vector from a single value this is handled by the default path
 
-    switch (value->op)
+    switch (value->getOp())
     {
         case kIROp_Construct:
         case kIROp_MakeMatrix:
@@ -521,7 +521,7 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
 
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch(inst->op)
+    switch(inst->getOp())
     {
         case kIROp_Construct:
         {
@@ -529,7 +529,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // On CUDA some of the built in types can't be used as constructors directly
 
             IRType* type = inst->getDataType();
-            if (auto basicType = as<IRBasicType>(type) && !_isSingleNameBasicType(type->op))
+            if (auto basicType = as<IRBasicType>(type) && !_isSingleNameBasicType(type->getOp()))
             {
                 m_writer->emit("(");
                 emitType(inst->getDataType());
@@ -615,7 +615,7 @@ void CUDASourceEmitter::emitLayoutDirectivesImpl(TargetRequest* targetReq)
 
 void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
 {
-    m_writer->emit(getVectorPrefix(elementType->op));
+    m_writer->emit(getVectorPrefix(elementType->getOp()));
     m_writer->emit(elementCount);
 }
 
