@@ -27,8 +27,6 @@ public:
     struct SubObjectRangeInfo
     {
         RefPtr<GraphicsCommonShaderObjectLayout> layout;
-        //        Index                       baseIndex;
-        //        Index                       count;
         Index bindingRangeIndex;
     };
 
@@ -741,12 +739,141 @@ public:
 
         auto subObject = static_cast<GraphicsCommonShaderObject*>(object);
 
-        auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+        auto bindingRangeIndex = offset.bindingRangeIndex;
+        auto& bindingRange = layout->getBindingRange(bindingRangeIndex);
 
-        // TODO: Is this reasonable to store the base index directly in the binding range?
         m_objects[bindingRange.baseIndex + offset.bindingArrayIndex] = subObject;
 
+        // If the range being assigned into represents an interface/existential-type leaf field,
+        // then we need to consider how the `object` being assigned here affects specialization.
+        // We may also need to assign some data from the sub-object into the ordinary data
+        // buffer for the parent object.
+        //
+        if( bindingRange.bindingType == slang::BindingType::ExistentialValue )
+        {
+            // A leaf field of interface type is laid out inside of the parent object
+            // as a tuple of `(RTTI, WitnessTable, Payload)`. The layout of these fields
+            // is a contract between the compiler and any runtime system, so we will
+            // need to rely on details of the binary layout.
+
+            // The first field of the tuple (offset zero) is the run-time type information (RTTI)
+            // ID for the concrete type being stored into the field.
+            //
+            // TODO: We need to be able to gather the RTTI type ID from `object` and then
+            // use `setData(offset, &TypeID, sizeof(TypeID))`.
+
+            // The second field of the tuple (offset 8) is the ID of the "witness" for the
+            // conformance of the concrete type to the interface used by this field.
+            //
+            // The concrete type doing the conforming will come from `object`, while the type
+            // being conformed to will be the leaf type of the field, which can be queried
+            // as a type layout from the Slang reflection information:
+            //
+            auto leafTypeLayout = layout->getElementTypeLayout()->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+            //
+            // TODO: In order to set the witness-table field here we would need to:
+            //
+            // * Look up the conformance witness using the Slang refelction API. We probably
+            //   need to cache those lookups.
+            //
+            // * Query the Slang reflection API for the ID of that conformance. This probably
+            //   also needs caching.
+            //
+            // * Write the ID of the witness using `setData(offset+8, &WitnessID, sizeof(WitnessID))`
+
+            // The third field of the tuple (offset 16) is the "payload" that is supposed to
+            // hold the data for a value of the given concrete type.
+            //
+            // There are two cases we need to consider here for how the payload might be used:
+            //
+            // * If the concrete type of the value being bound is one that can "fit" into the
+            //   available payload space,  then it should be stored in the payload.
+            //
+            // * If the concrete type of the value cannot fit in the payload space, then it
+            //   will need to be stored somewhere else.
+            //
+            if(_doesValueFitInExistentialPayload(subObject, leafTypeLayout))
+            {
+                // If the value can fit in the payload area, then we will go ahead and copy
+                // its bytes into that area.
+                //
+                auto payloadOffset = offset;
+                payloadOffset.uniformOffset += 16;
+                setData(payloadOffset, subObject->m_ordinaryData.getBuffer(), subObject->m_ordinaryData.getCount());
+            }
+            else
+            {
+                // If the value does *not *fit in the payload area, then there is nothing
+                // we can do at this point (beyond saving a reference to the sub-object, which
+                // was handled above).
+                //
+                // Once all the sub-objects have been set into the parent object, we can
+                // compute a specialized layout for it, and that specialized layout can tell
+                // us where the data for these sub-objects has been laid out.
+            }
+        }
+
         return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+    bool _doesValueFitInExistentialPayload(
+        GraphicsCommonShaderObject*     object,
+        slang::TypeLayoutReflection*    existentialFieldLayout)
+    {
+        // Our task here is to figure out if the value of `object` can fit
+        // into an existential-type leaf field defined by `existentialFieldLayout`.
+
+        // We can start by asking how many bytes the concrete type of the object consumes.
+        //
+        auto concreteTypeLayout = object->getElementTypeLayout();
+        auto concreteValueSize = concreteTypeLayout->getSize();
+
+        // We can also compute how many bytes the existential-type field consumes,
+        // but we need to remember that the *payload* part of that field comes after
+        // the header with RTTI and witness-table IDs, so the payload is 16 bytes
+        // smaller than the entire field.
+        //
+        auto existentialValueSize = existentialFieldLayout->getSize();
+        auto existentialPayloadSize = existentialValueSize - 16;
+
+        // If the concrete type consumes more ordinary bytes than we have in the payload,
+        // it cannot possibly fit.
+        //
+        if(concreteValueSize > existentialPayloadSize)
+            return false;
+
+        // It is possible that the ordinary bytes of `concreteTypeLayout` can fit
+        // in the payload, but that type might also use storage other than ordinary
+        // bytes. In that case, the value would *not* fit, because all the non-ordinary
+        // data can't fit in the payload at all.
+        //
+        auto categoryCount = concreteTypeLayout->getCategoryCount();
+        for(unsigned int i = 0; i < categoryCount; ++i)
+        {
+            auto category = concreteTypeLayout->getCategoryByIndex(i);
+            switch(category)
+            {
+            // We want to ignore any ordinary/uniform data usage, since that
+            // was already checked above.
+            //
+            case slang::ParameterCategory::Uniform:
+                break;
+
+            // Any other kind of data consumed means the value cannot possibly fit.
+            default:
+                return false;
+
+            // TODO: Are there any cases of resource usage that need to be ignored here?
+            // E.g., if the sub-object contains its own existential-type fields (which
+            // get reflected as consuming "existential value" storage) should that be
+            // ignored?
+            }
+        }
+
+        // If we didn't reject the concrete type above for either its ordinary
+        // data or some use of non-ordinary data, then it seems like it must fit.
+        //
+        return true;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -977,7 +1104,10 @@ protected:
     }
 
         /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given `offset`
-    Result _writeOrdinaryData(char* dest, size_t destSize)
+    Result _writeOrdinaryData(
+        char*                               dest,
+        size_t                              destSize,
+        GraphicsCommonShaderObjectLayout*   specializedLayout)
     {
         auto src = m_ordinaryData.getBuffer();
         auto srcSize = size_t(m_ordinaryData.getCount());
@@ -986,17 +1116,92 @@ protected:
 
         memcpy(dest, src, srcSize);
 
-        // TODO: In the case where this object has any sub-objects of
+        // In the case where this object has any sub-objects of
         // existential/interface type, we need to recurse on those objects
-        // so that they write their state into either the "any-value"
-        // region or the appropriate "pending" allocation.
+        // that need to write their state into an appropriate "pending" allocation.
         //
-        // Note: it is possible that writes into the "any-value" region
-        // could be handled directly as part of `setObject` calls instead,
-        // to avoid handling them here.
+        // Note: Any values that could fit into the "payload" included
+        // in the existential-type field itself will have already been
+        // written as part of `setObject()`. This loop only needs to handle
+        // those sub-objects that do not "fit."
+        //
+        // An implementers looking at this code might wonder if things could be changed
+        // so that *all* writes related to sub-objects for interface-type fields could
+        // be handled in this one location, rather than having some in `setObject()` and
+        // others handled here.
+        //
+        Index subObjectRangeCounter;
+        for( auto const& subObjectRangeInfo : specializedLayout->getSubObjectRanges() )
+        {
+            Index subObjectRangeIndex = subObjectRangeCounter++;
+            auto const& bindingRangeInfo = specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
+
+            // We only need to handle sub-object ranges for interface/existential-type fields,
+            // because fields of constant-buffer or parameter-block type are responsible for
+            // the ordinary/uniform data of their own existential/interface-type sub-objects.
+            //
+            if(bindingRangeInfo.bindingType != slang::BindingType::ExistentialValue)
+                continue;
+
+            // Each sub-object range represents a single "leaf" field, but might be nested
+            // under zero or more outer arrays, such that the number of existential values
+            // in the same range can be one or more.
+            //
+            auto count = bindingRangeInfo.count;
+
+            // We are not concerned with the case where the existential value(s) in the range
+            // git into the payload part of the leaf field.
+            //
+            // In the case where the value didn't fit, the Slang layout strategy would have
+            // considered the requirements of the value as a "pending" allocation, and would
+            // allocate storage for the ordinary/uniform part of that pending allocation inside
+            // of the parent object's type layout.
+            //
+            // Here we assume that the Slang reflection API can provide us with a single byte
+            // offset and stride for the location of the pending data allocation in the specialized
+            // type layout, which will store the values for this sub-object range.
+            //
+            // TODO: The reflection API functions we are assuming here haven't been implemented
+            // yet, so the functions being called here are stubs.
+            //
+            // TODO: It might not be that a single sub-object range can reliably map to a single
+            // contiguous array with a single stride; we need to carefully consider what the layout
+            // logic does for complex cases with multiple layers of nested arrays and structures.
+            //
+            size_t subObjectRangePendingDataOffset = _getSubObjectRangePendingDataOffset(specializedLayout, subObjectRangeIndex);
+            size_t subObjectRangePendingDataStride = _getSubObjectRangePendingDataStride(specializedLayout, subObjectRangeIndex);
+
+            // If the range doesn't actually need/use the "pending" allocation at all, then
+            // we need to detect that case and skip such ranges.
+            //
+            // TODO: This should probably be handled on a per-object basis by caching a "does it fit?"
+            // bit as part of the information for bound sub-objects, given that we already
+            // compute the "does it fit?" status as part of `setObject()`.
+            //
+            if(subObjectRangePendingDataOffset == 0)
+                continue;
+
+            for( Slang::Index i = 0; i < count; ++i )
+            {
+                auto subObject = m_objects[bindingRangeInfo.baseIndex + i];
+
+                RefPtr<GraphicsCommonShaderObjectLayout> subObjectLayout;
+                SLANG_RETURN_ON_FAIL(subObject->_getSpecializedLayout(subObjectLayout.writeRef()));
+
+                auto subObjectOffset = subObjectRangePendingDataOffset + i*subObjectRangePendingDataStride;
+
+                subObject->_writeOrdinaryData(dest + subObjectOffset, destSize - subObjectOffset, subObjectLayout);
+            }
+        }
 
         return SLANG_OK;
     }
+
+    // As discussed in `_writeOrdinaryData()`, these methods are just stubs waiting for
+    // the "flat" Slang refelction information to provide access to the relevant data.
+    //
+    size_t _getSubObjectRangePendingDataOffset(GraphicsCommonShaderObjectLayout* specializedLayout, Index subObjectRangeIndex) { return 0; }
+    size_t _getSubObjectRangePendingDataStride(GraphicsCommonShaderObjectLayout* specializedLayout, Index subObjectRangeIndex) { return 0; }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
     Result _ensureOrdinaryDataBufferCreatedIfNeeded()
@@ -1024,7 +1229,10 @@ protected:
         // For now we just make the simple assumption described above despite
         // knowing that it is false.
         //
-        auto specializedOrdinaryDataSize = m_ordinaryData.getCount();
+        RefPtr<GraphicsCommonShaderObjectLayout> specializedLayout;
+        SLANG_RETURN_ON_FAIL(_getSpecializedLayout(specializedLayout.writeRef()));
+
+        auto specializedOrdinaryDataSize = specializedLayout->getElementTypeLayout()->getSize();
         if(specializedOrdinaryDataSize == 0)
             return SLANG_OK;
 
@@ -1045,7 +1253,7 @@ protected:
         // don't need or want to inline it into this call site.
         //
         char* dest = (char*)renderer->map(m_ordinaryDataBuffer, MapFlavor::HostWrite);
-        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize));
+        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize, specializedLayout));
         renderer->unmap(m_ordinaryDataBuffer);
 
         return SLANG_OK;
@@ -1249,6 +1457,26 @@ public:
         ///
         /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
     ComPtr<IBufferResource> m_ordinaryDataBuffer;
+
+
+    Result _getSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout)
+    {
+        if(!m_specializedLayout)
+        {
+            ExtendedShaderObjectType extendedType;
+            SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
+
+            auto renderer = getRenderer();
+            RefPtr<ShaderObjectLayoutBase> layout;
+            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+
+            m_specializedLayout = static_cast<GraphicsCommonShaderObjectLayout*>(layout.detach());
+        }
+        *outLayout = RefPtr<GraphicsCommonShaderObjectLayout>(m_specializedLayout).detach();
+        return SLANG_OK;
+    }
+
+    RefPtr<GraphicsCommonShaderObjectLayout> m_specializedLayout;
 };
 
 class EntryPointVars : public GraphicsCommonShaderObject

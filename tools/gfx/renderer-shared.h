@@ -365,6 +365,10 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) SLANG_OVERRIDE;
 
+    Result getShaderObjectLayout(
+        slang::TypeReflection*      type,
+        ShaderObjectLayoutBase**    outLayout);
+
 protected:
     // Retrieves the currently bound unspecialized pipeline.
     // If the bound pipeline is not created from a Slang component, an implementation should return null.
@@ -377,10 +381,6 @@ protected:
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) = 0;
-
-    Result getShaderObjectLayout(
-        slang::TypeReflection*      type,
-        ShaderObjectLayoutBase**    outLayout);
 
     virtual Result createShaderObject(
         ShaderObjectLayoutBase* layout,
