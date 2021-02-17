@@ -27,8 +27,6 @@ public:
     struct SubObjectRangeInfo
     {
         RefPtr<GraphicsCommonShaderObjectLayout> layout;
-        //        Index                       baseIndex;
-        //        Index                       count;
         Index bindingRangeIndex;
     };
 
@@ -521,8 +519,13 @@ public:
 
     struct Builder : Super::Builder
     {
-        Builder(IRenderer* renderer)
-            : Super::Builder(static_cast<RendererBase*>(renderer))
+        Builder(
+            RendererBase*               renderer,
+            slang::IComponentType*      program,
+            slang::ProgramLayout*       programLayout)
+            : Super::Builder(renderer)
+            , m_program(program)
+            , m_programLayout(programLayout)
         {}
 
         Result build(GraphicsCommonProgramLayout** outLayout)
@@ -560,7 +563,9 @@ public:
             m_entryPoints.add(info);
         }
 
-        List<EntryPointInfo> m_entryPoints;
+        slang::IComponentType*  m_program;
+        slang::ProgramLayout*   m_programLayout;
+        List<EntryPointInfo>    m_entryPoints;
     };
 
     Slang::Int getRenderTargetCount() { return m_renderTargetCount; }
@@ -583,6 +588,37 @@ public:
 
     List<EntryPointInfo> const& getEntryPoints() const { return m_entryPoints; }
 
+    static Result create(
+        RendererBase*                   renderer,
+        slang::IComponentType*          program,
+        slang::ProgramLayout*           programLayout,
+        GraphicsCommonProgramLayout**   outLayout)
+    {
+        GraphicsCommonProgramLayout::Builder builder(renderer, program, programLayout);
+        builder.addGlobalParams(programLayout->getGlobalParamsVarLayout());
+
+        SlangInt entryPointCount = programLayout->getEntryPointCount();
+        for (SlangInt e = 0; e < entryPointCount; ++e)
+        {
+            auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
+
+            EntryPointLayout::Builder entryPointBuilder(renderer);
+            entryPointBuilder.addEntryPointParams(slangEntryPoint);
+
+            RefPtr<EntryPointLayout> entryPointLayout;
+            SLANG_RETURN_ON_FAIL(entryPointBuilder.build(entryPointLayout.writeRef()));
+
+            builder.addEntryPoint(entryPointLayout);
+        }
+
+        SLANG_RETURN_ON_FAIL(builder.build(outLayout));
+
+        return SLANG_OK;
+    }
+
+    slang::IComponentType* getSlangProgram() const { return m_program; }
+    slang::ProgramLayout* getSlangProgramLayout() const { return m_programLayout; }
+
 protected:
     Result _init(Builder const* builder)
     {
@@ -590,6 +626,8 @@ protected:
 
         SLANG_RETURN_ON_FAIL(Super::_init(builder));
 
+        m_program = builder->m_program;
+        m_programLayout = builder->m_programLayout;
         m_entryPoints = builder->m_entryPoints;
 
         List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
@@ -658,6 +696,9 @@ protected:
         return SLANG_OK;
     }
 #endif
+
+    ComPtr<slang::IComponentType>   m_program;
+    slang::ProgramLayout*           m_programLayout = nullptr;
 
     List<EntryPointInfo> m_entryPoints;
     gfx::UInt m_renderTargetCount = 0;
@@ -741,10 +782,97 @@ public:
 
         auto subObject = static_cast<GraphicsCommonShaderObject*>(object);
 
-        auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+        auto bindingRangeIndex = offset.bindingRangeIndex;
+        auto& bindingRange = layout->getBindingRange(bindingRangeIndex);
 
-        // TODO: Is this reasonable to store the base index directly in the binding range?
         m_objects[bindingRange.baseIndex + offset.bindingArrayIndex] = subObject;
+
+        // If the range being assigned into represents an interface/existential-type leaf field,
+        // then we need to consider how the `object` being assigned here affects specialization.
+        // We may also need to assign some data from the sub-object into the ordinary data
+        // buffer for the parent object.
+        //
+        if( bindingRange.bindingType == slang::BindingType::ExistentialValue )
+        {
+            // A leaf field of interface type is laid out inside of the parent object
+            // as a tuple of `(RTTI, WitnessTable, Payload)`. The layout of these fields
+            // is a contract between the compiler and any runtime system, so we will
+            // need to rely on details of the binary layout.
+
+            // We start by querying the layout/type of the concrete value that the application
+            // is trying to store into the field, and also the layout/type of the leaf
+            // existential-type field itself.
+            //
+            auto concreteTypeLayout = subObject->getElementTypeLayout();
+            auto concreteType = concreteTypeLayout->getType();
+            //
+            auto existentialTypeLayout = layout->getElementTypeLayout()->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+            auto existentialType = existentialTypeLayout->getType();
+
+            // The first field of the tuple (offset zero) is the run-time type information (RTTI)
+            // ID for the concrete type being stored into the field.
+            //
+            // TODO: We need to be able to gather the RTTI type ID from `object` and then
+            // use `setData(offset, &TypeID, sizeof(TypeID))`.
+
+            // The second field of the tuple (offset 8) is the ID of the "witness" for the
+            // conformance of the concrete type to the interface used by this field.
+            //
+            auto witnessTableOffset = offset;
+            witnessTableOffset.uniformOffset += 8;
+            //
+            // Conformances of a type to an interface are computed and then stored by the
+            // Slang runtime, so we can look up the ID for this particular conformance (which
+            // will create it on demand).
+            //
+            ComPtr<slang::ISession> slangSession;
+            SLANG_RETURN_ON_FAIL(getRenderer()->getSlangSession(slangSession.writeRef()));
+            //
+            // Note: If the type doesn't actually conform to the required interface for
+            // this sub-object range, then this is the point where we will detect that
+            // fact and error out.
+            //
+            uint32_t conformanceID = 0xFFFFFFFF;
+            SLANG_RETURN_ON_FAIL(slangSession->getTypeConformanceWitnessSequentialID(
+                concreteType, existentialType, &conformanceID));
+            //
+            // Once we have the conformance ID, then we can write it into the object
+            // at the required offset.
+            //
+            SLANG_RETURN_ON_FAIL(setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
+
+            // The third field of the tuple (offset 16) is the "payload" that is supposed to
+            // hold the data for a value of the given concrete type.
+            //
+            auto payloadOffset = offset;
+            payloadOffset.uniformOffset += 16;
+
+            // There are two cases we need to consider here for how the payload might be used:
+            //
+            // * If the concrete type of the value being bound is one that can "fit" into the
+            //   available payload space,  then it should be stored in the payload.
+            //
+            // * If the concrete type of the value cannot fit in the payload space, then it
+            //   will need to be stored somewhere else.
+            //
+            if(_doesValueFitInExistentialPayload(concreteTypeLayout, existentialTypeLayout))
+            {
+                // If the value can fit in the payload area, then we will go ahead and copy
+                // its bytes into that area.
+                //
+                setData(payloadOffset, subObject->m_ordinaryData.getBuffer(), subObject->m_ordinaryData.getCount());
+            }
+            else
+            {
+                // If the value does *not *fit in the payload area, then there is nothing
+                // we can do at this point (beyond saving a reference to the sub-object, which
+                // was handled above).
+                //
+                // Once all the sub-objects have been set into the parent object, we can
+                // compute a specialized layout for it, and that specialized layout can tell
+                // us where the data for these sub-objects has been laid out.
+            }
+        }
 
         return SLANG_E_NOT_IMPLEMENTED;
     }
@@ -833,10 +961,18 @@ public:
         // The following logic is built on the assumption that all fields that involve existential types (and
         // therefore require specialization) will results in a sub-object range in the type layout.
         // This allows us to simply scan the sub-object ranges to find out all specialization arguments.
-        for (Index subObjIndex = 0; subObjIndex < subObjectRanges.getCount(); subObjIndex++)
+        Index subObjectRangeCount = subObjectRanges.getCount();
+        for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; subObjectRangeIndex++)
         {
-            // Retrieve the corresponding binding range of the sub object.
-            auto bindingRange = getLayout()->getBindingRange(subObjectRanges[subObjIndex].bindingRangeIndex);
+            auto const& subObjectRange = subObjectRanges[subObjectRangeIndex];
+            auto const& bindingRange = getLayout()->getBindingRange(subObjectRange.bindingRangeIndex);
+
+            Index count = bindingRange.count;
+            SLANG_ASSERT(count == 1);
+
+            Index subObjectIndexInRange = 0;
+            auto subObject = m_objects[bindingRange.baseIndex + subObjectIndexInRange];
+
             switch (bindingRange.bindingType)
             {
             case slang::BindingType::ExistentialValue:
@@ -847,10 +983,8 @@ public:
                 // type argument will simply be the ordinary type. But if the sub object's type is itself a specialized
                 // type, we need to make sure to use that type as the specialization argument.
 
-                // TODO: need to implement the case where the field is an array of existential values.
-                SLANG_ASSERT(bindingRange.count == 1);
                 ExtendedShaderObjectType specializedSubObjType;
-                SLANG_RETURN_ON_FAIL(m_objects[subObjIndex]->getSpecializedShaderObjectType(&specializedSubObjType));
+                SLANG_RETURN_ON_FAIL(subObject->getSpecializedShaderObjectType(&specializedSubObjType));
                 args.add(specializedSubObjType);
                 break;
             }
@@ -860,7 +994,7 @@ public:
                 // `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where `SomeStruct` is a struct type
                 // (not directly an interface type). In this case, we just recursively collect the specialization arguments
                 // from the bound sub object.
-                SLANG_RETURN_ON_FAIL(m_objects[subObjIndex]->collectSpecializationArgs(args));
+                SLANG_RETURN_ON_FAIL(subObject->collectSpecializationArgs(args));
                 // TODO: we need to handle the case where the field is of the form `ParameterBlock<IFoo>`. We should treat
                 // this case the same way as the `ExistentialValue` case here, but currently we lack a mechanism to distinguish
                 // the two scenarios.
@@ -977,7 +1111,10 @@ protected:
     }
 
         /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given `offset`
-    Result _writeOrdinaryData(char* dest, size_t destSize)
+    Result _writeOrdinaryData(
+        char*                               dest,
+        size_t                              destSize,
+        GraphicsCommonShaderObjectLayout*   specializedLayout)
     {
         auto src = m_ordinaryData.getBuffer();
         auto srcSize = size_t(m_ordinaryData.getCount());
@@ -986,17 +1123,92 @@ protected:
 
         memcpy(dest, src, srcSize);
 
-        // TODO: In the case where this object has any sub-objects of
+        // In the case where this object has any sub-objects of
         // existential/interface type, we need to recurse on those objects
-        // so that they write their state into either the "any-value"
-        // region or the appropriate "pending" allocation.
+        // that need to write their state into an appropriate "pending" allocation.
         //
-        // Note: it is possible that writes into the "any-value" region
-        // could be handled directly as part of `setObject` calls instead,
-        // to avoid handling them here.
+        // Note: Any values that could fit into the "payload" included
+        // in the existential-type field itself will have already been
+        // written as part of `setObject()`. This loop only needs to handle
+        // those sub-objects that do not "fit."
+        //
+        // An implementers looking at this code might wonder if things could be changed
+        // so that *all* writes related to sub-objects for interface-type fields could
+        // be handled in this one location, rather than having some in `setObject()` and
+        // others handled here.
+        //
+        Index subObjectRangeCounter = 0;
+        for( auto const& subObjectRangeInfo : specializedLayout->getSubObjectRanges() )
+        {
+            Index subObjectRangeIndex = subObjectRangeCounter++;
+            auto const& bindingRangeInfo = specializedLayout->getBindingRange(subObjectRangeInfo.bindingRangeIndex);
+
+            // We only need to handle sub-object ranges for interface/existential-type fields,
+            // because fields of constant-buffer or parameter-block type are responsible for
+            // the ordinary/uniform data of their own existential/interface-type sub-objects.
+            //
+            if(bindingRangeInfo.bindingType != slang::BindingType::ExistentialValue)
+                continue;
+
+            // Each sub-object range represents a single "leaf" field, but might be nested
+            // under zero or more outer arrays, such that the number of existential values
+            // in the same range can be one or more.
+            //
+            auto count = bindingRangeInfo.count;
+
+            // We are not concerned with the case where the existential value(s) in the range
+            // git into the payload part of the leaf field.
+            //
+            // In the case where the value didn't fit, the Slang layout strategy would have
+            // considered the requirements of the value as a "pending" allocation, and would
+            // allocate storage for the ordinary/uniform part of that pending allocation inside
+            // of the parent object's type layout.
+            //
+            // Here we assume that the Slang reflection API can provide us with a single byte
+            // offset and stride for the location of the pending data allocation in the specialized
+            // type layout, which will store the values for this sub-object range.
+            //
+            // TODO: The reflection API functions we are assuming here haven't been implemented
+            // yet, so the functions being called here are stubs.
+            //
+            // TODO: It might not be that a single sub-object range can reliably map to a single
+            // contiguous array with a single stride; we need to carefully consider what the layout
+            // logic does for complex cases with multiple layers of nested arrays and structures.
+            //
+            size_t subObjectRangePendingDataOffset = _getSubObjectRangePendingDataOffset(specializedLayout, subObjectRangeIndex);
+            size_t subObjectRangePendingDataStride = _getSubObjectRangePendingDataStride(specializedLayout, subObjectRangeIndex);
+
+            // If the range doesn't actually need/use the "pending" allocation at all, then
+            // we need to detect that case and skip such ranges.
+            //
+            // TODO: This should probably be handled on a per-object basis by caching a "does it fit?"
+            // bit as part of the information for bound sub-objects, given that we already
+            // compute the "does it fit?" status as part of `setObject()`.
+            //
+            if(subObjectRangePendingDataOffset == 0)
+                continue;
+
+            for( Slang::Index i = 0; i < count; ++i )
+            {
+                auto subObject = m_objects[bindingRangeInfo.baseIndex + i];
+
+                RefPtr<GraphicsCommonShaderObjectLayout> subObjectLayout;
+                SLANG_RETURN_ON_FAIL(subObject->_getSpecializedLayout(subObjectLayout.writeRef()));
+
+                auto subObjectOffset = subObjectRangePendingDataOffset + i*subObjectRangePendingDataStride;
+
+                subObject->_writeOrdinaryData(dest + subObjectOffset, destSize - subObjectOffset, subObjectLayout);
+            }
+        }
 
         return SLANG_OK;
     }
+
+    // As discussed in `_writeOrdinaryData()`, these methods are just stubs waiting for
+    // the "flat" Slang refelction information to provide access to the relevant data.
+    //
+    size_t _getSubObjectRangePendingDataOffset(GraphicsCommonShaderObjectLayout* specializedLayout, Index subObjectRangeIndex) { return 0; }
+    size_t _getSubObjectRangePendingDataStride(GraphicsCommonShaderObjectLayout* specializedLayout, Index subObjectRangeIndex) { return 0; }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
     Result _ensureOrdinaryDataBufferCreatedIfNeeded()
@@ -1024,7 +1236,10 @@ protected:
         // For now we just make the simple assumption described above despite
         // knowing that it is false.
         //
-        auto specializedOrdinaryDataSize = m_ordinaryData.getCount();
+        RefPtr<GraphicsCommonShaderObjectLayout> specializedLayout;
+        SLANG_RETURN_ON_FAIL(_getSpecializedLayout(specializedLayout.writeRef()));
+
+        auto specializedOrdinaryDataSize = specializedLayout->getElementTypeLayout()->getSize();
         if(specializedOrdinaryDataSize == 0)
             return SLANG_OK;
 
@@ -1045,7 +1260,7 @@ protected:
         // don't need or want to inline it into this call site.
         //
         char* dest = (char*)renderer->map(m_ordinaryDataBuffer, MapFlavor::HostWrite);
-        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize));
+        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize, specializedLayout));
         renderer->unmap(m_ordinaryDataBuffer);
 
         return SLANG_OK;
@@ -1249,6 +1464,40 @@ public:
         ///
         /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
     ComPtr<IBufferResource> m_ordinaryDataBuffer;
+
+        /// Get the layout of this shader object with specialization arguments considered
+        ///
+        /// This operation should only be called after the shader object has been
+        /// fully filled in and finalized.
+        ///
+    Result _getSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout)
+    {
+        if(!m_specializedLayout)
+        {
+            SLANG_RETURN_ON_FAIL(_createSpecializedLayout(m_specializedLayout.writeRef()));
+        }
+        *outLayout = RefPtr<GraphicsCommonShaderObjectLayout>(m_specializedLayout).detach();
+        return SLANG_OK;
+    }
+
+        /// Create the layout for this shader object with specialization arguments considered
+        ///
+        /// This operation is virtual so that it can be customized by `ProgramVars`.
+        ///
+    virtual Result _createSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout)
+    {
+        ExtendedShaderObjectType extendedType;
+        SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
+
+        auto renderer = getRenderer();
+        RefPtr<ShaderObjectLayoutBase> layout;
+        SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+
+        *outLayout = static_cast<GraphicsCommonShaderObjectLayout*>(layout.detach());
+        return SLANG_OK;
+    }
+
+    RefPtr<GraphicsCommonShaderObjectLayout> m_specializedLayout;
 };
 
 class EntryPointVars : public GraphicsCommonShaderObject
@@ -1370,6 +1619,86 @@ protected:
         return SLANG_OK;
     }
 
+    virtual Result _createSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout)
+    {
+        ExtendedShaderObjectTypeList specializationArgs;
+        SLANG_RETURN_ON_FAIL(collectSpecializationArgs(specializationArgs));
+
+        // Note: There is an important policy decision being made here that we need
+        // to approach carefully.
+        //
+        // We are doing two different things that affect the layout of a program:
+        //
+        // 1. We are *composing* one or more pieces of code (notably the shared global/module
+        //    stuff and the per-entry-point stuff).
+        //
+        // 2. We are *specializing* code that includes generic/existential parameters
+        //    to concrete types/values.
+        //
+        // We need to decide the relative *order* of these two steps, because of how it impacts
+        // layout. The layout for `specialize(compose(A,B), X, Y)` is potentially different
+        // form that of `compose(specialize(A,X), speciealize(B,Y))`, even when both are
+        // semantically equivalent programs.
+        //
+        // Right now we are using the first option: we are first generating a full composition
+        // of all the code we plan to use (global scope plus all entry points), and then
+        // specializing it to the concatenated specialization argumenst for all of that.
+        //
+        // In some cases, though, this model isn't appropriate. For example, when dealing with
+        // ray-tracing shaders and local root signatures, we really want the parameters of each
+        // entry point (actually, each entry-point *group*) to be allocated distinct storage,
+        // which really means we want to compute something like:
+        //
+        //      SpecializedGlobals = specialize(compose(ModuleA, ModuleB, ...), X, Y, ...)
+        //
+        //      SpecializedEP1 = compose(SpecializedGlobals, specialize(EntryPoint1, T, U, ...))
+        //      SpecializedEP2 = compose(SpecializedGlobals, specialize(EntryPoint2, A, B, ...))
+        //
+        // Note how in this case all entry points agree on the layout for the shared/common
+        // parmaeters, but their layouts are also independent of one another.
+        //
+        // Furthermore, in this example, loading another entry point into the system would not
+        // rquire re-computing the layouts (or generated kernel code) for any of the entry points
+        // that had already been loaded (in contrast to a compose-then-specialize approach).
+        //
+        ComPtr<slang::IComponentType> specializedComponentType;
+        ComPtr<slang::IBlob> diagnosticBlob;
+        auto result = getLayout()->getSlangProgram()->specialize(
+            specializationArgs.components.getArrayView().getBuffer(),
+            specializationArgs.getCount(),
+            specializedComponentType.writeRef(),
+            diagnosticBlob.writeRef());
+
+        // TODO: print diagnostic message via debug output interface.
+
+        if (result != SLANG_OK)
+            return result;
+
+        auto slangSpecializedLayout = specializedComponentType->getLayout();
+        RefPtr<GraphicsCommonProgramLayout> specializedLayout;
+        GraphicsCommonProgramLayout::create(getRenderer(), specializedComponentType, slangSpecializedLayout, specializedLayout.writeRef());
+
+        // Note: Computing the layout for the specialized program will have also computed
+        // the layouts for the entry points, and we really need to attach that information
+        // to them so that they don't go and try to compute their own specializations.
+        //
+        // TODO: Well, if we move to the specialization model described above then maybe
+        // we *will* want entry points to do their own specialization work...
+        //
+        auto entryPointCount = m_entryPoints.getCount();
+        for(Index i = 0; i < entryPointCount; ++i)
+        {
+            auto entryPointInfo = specializedLayout->getEntryPoint(i);
+            auto entryPointVars = m_entryPoints[i];
+
+            entryPointVars->m_specializedLayout = entryPointInfo.layout;
+        }
+
+        *outLayout = specializedLayout.detach();
+        return SLANG_OK;
+    }
+
+
     List<RefPtr<EntryPointVars>> m_entryPoints;
 };
 
@@ -1423,26 +1752,8 @@ Result GraphicsAPIRenderer::initProgramCommon(
         return SLANG_FAIL;
 
     RefPtr<GraphicsCommonProgramLayout> programLayout;
-    {
-        GraphicsCommonProgramLayout::Builder builder(this);
-        builder.addGlobalParams(slangReflection->getGlobalParamsVarLayout());
+    SLANG_RETURN_ON_FAIL(GraphicsCommonProgramLayout::create(this, slangProgram, slangReflection, programLayout.writeRef()));
 
-        SlangInt entryPointCount = slangReflection->getEntryPointCount();
-        for (SlangInt e = 0; e < entryPointCount; ++e)
-        {
-            auto slangEntryPoint = slangReflection->getEntryPointByIndex(e);
-
-            EntryPointLayout::Builder entryPointBuilder(this);
-            entryPointBuilder.addEntryPointParams(slangEntryPoint);
-
-            RefPtr<EntryPointLayout> entryPointLayout;
-            SLANG_RETURN_ON_FAIL(entryPointBuilder.build(entryPointLayout.writeRef()));
-
-            builder.addEntryPoint(entryPointLayout);
-        }
-
-        SLANG_RETURN_ON_FAIL(builder.build(programLayout.writeRef()));
-    }
     program->slangProgram = slangProgram;
     program->m_layout = programLayout;
 
