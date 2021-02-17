@@ -1,7 +1,7 @@
 Interfaces and Generics
 ===========================
 
-This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how do they relate to similar features in other languages, how are they parsed and translated by the compiler, and how examples on how these features simplifies and modularizes shader code.
+This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how do they relate to similar features in other languages, how are they parsed and translated by the compiler, and show examples on how these features simplifies and modularizes shader code.
 
 Interfaces
 ----------
@@ -421,7 +421,7 @@ Note that the biggest difference between C++ templates and generics is that temp
 Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`, except that Slang currently does not support the more general `where` clause in these languages. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
 
 Generic Value Parameters
-==========================
+-------------------------------
 
 So far we have demonstrated generics with _type parameters_. Additionally, Slang also supports generic _value_ parameters.
 The following listing shows an example of generic value parameters.
@@ -440,3 +440,239 @@ Note that the builtin `vector<float, N>` type also has an generic value paramete
 > other types cannot be used in a generic value parameter. Computations in a type
 > expression are not supported, for example, `vector<float, 1+1>` is not allowed.
 
+
+Interface-typed Values
+-------------------------------
+
+So far we have been using interfaces as constraints to generic type parameters. For example, the following listing defines a generic function with a type parameter `TTransform` constrained by interface `ITransform`:
+
+```C#
+interface ITransform
+{
+    int compute(MyObject obj);
+}
+
+// Defining a generic method:
+int apply<TTransform : ITransform>(TTransform transform, MyObject object)
+{
+    return transform.compute(object);
+}
+```
+
+While Slang's syntax for defining generic methods bears similarity to generics in C#/Java and templates in C++ and should be easy to users who are familiar with these languages, codebases that make heavy use of generics can quickly become verbose and difficult to read. To reduce the amount of boilerplate, Slang supports an alternate way to define the `apply` method by using the interface type `ITransform` as parameter type directly:
+
+```C#
+// A method that is equivalent to `apply` but uses simpler syntax:
+int apply_simple(ITransform transform, MyObject object)
+{
+    return transform.compute(object);
+}
+```
+
+Instead of defining a generic type parameter `TTransform` and a method parameter `transform` that has `TTransform` type, you can simply define the same `apply` function like a normal method, with a `transform` parameter whose type is an interface. From the Slang compiler's view, `apply` and `apply_simple` will be compiled to the same target code.
+
+In addition to parameters, Slang allows variables, and function return values to have an interface type as well:
+```C#
+ITransform test(ITransform arg)
+{
+    ITransform v = arg;
+    return v;
+}
+```
+
+### Restrictions and Caveats
+
+The Slang compiler always attempts to determine the actual type of an interface-typed value at compile time and specialize the code with the actual type. As long as the compiler can successfully determine the actual type, code that uses interface-typed values are equivalent to code written in the generics syntax. However, when interface types are used in function return values, the compiler will not be able to trivially propagate type information. For example:
+```C#
+ITransform getTransform(int x)
+{
+    if (x == 0)
+    {
+        Type1Transform rs = {};
+        return rs;
+    }
+    else
+    {
+        Type2Transform rs = {};
+        return rs;
+    }
+}
+```
+In this example, the actual type of the return value is dependent on the value of `x`, which may not be known at compile time. This means that the concrete type of the return value at invocation sites of `getTransform` may not be statically determinable. When the Slang compiler cannot infer the concrete type of an interface-type value, it will generate code that performs a dynamic dispatch based on the concrete type of the value at runtime, which may introduce performance overhead. Note that this behavior applies to function return values in the form of `out` parameters as well:
+
+```C#
+void getTransform(int x, out ITransform transform)
+{
+    if (x == 0)
+    {
+        Type1Transform rs = {};
+        transform = rs;
+    }
+    else
+    {
+        Type2Transform rs = {};
+        transform = rs;
+    }
+}
+```
+This `getTransform` definition can also result in dynamic dispatch code since the type of `transform` may not be statically determinable.
+
+When the compiler is generating dynamic dispatch code for interface-typed values, it requires the concrete type of the interface-typed value to be free of any opaque-typed fields (e.g. resources and buffer types). A compiler error will generated upon such attempts:
+```C#
+struct MyTransform : ITransform
+{
+    StructuredBuffer<int> buffer;
+    int compute(MyObject obj)
+    {
+        return buffer[0];
+    }
+}
+
+ITransform getTransform(int x)
+{
+    MyTransform rs;
+    // Error: cannot use an opaque value as an interface-typed return value.
+    return rs;
+}
+```
+
+Assigning different values to a mutable interface-typed variable also undermines the compiler's ability to statically determine the type of the variable, and is not supported by the Slang compiler today:
+```C#
+void test(int x)
+{
+    ITransform t = Type1Transform();
+    // Do something ...
+    // Assign a different type of transform to `t`:
+    // (Not supported by Slang today)
+    t = Type2Transform();
+    // Do something else...
+}
+```
+
+In general, if the use of interface-typed values is restricted to function parameters only, then the all code that involves interface-typed values will be compiled the same way as if the code is written using standard generics syntax.
+
+
+Extending a Type with Additional Interface Conformances
+-----------------------------
+In the previous chapter, we introduced the `extension` feature that lets you define new members to an existing type in a separate location outside the original definition of the type. 
+
+`extensions` can be used to make an existing type conform to additional interfaces. Suppose we have an interface `IFoo` and a type `MyObject` that implements the interface:
+
+```C#
+interface IFoo
+{
+    int foo();
+};
+
+struct MyObject : IFoo
+{
+    int foo() { return 0; }
+}
+```
+
+Now we introduce another interface, `IBar`:
+```C#
+interface IBar
+{
+    float bar();
+}
+```
+
+We can define an `extension` to make `MyObject` conform to `IBar` as well:
+```C#
+extension MyObject : IBar
+{
+    float bar() { return 1.0f }
+}
+```
+
+With this extension, we can use `MyObject` in places that expects an `IBar` as well:
+```C#
+void use(IBar b)
+{
+    b.bar();
+}
+
+void test()
+{
+    MyObject obj;
+    use(obj); // OK, `MyObject` is extended to conform to `IBar`.
+}
+```
+
+You may define more than one interface conformances in a single `extension`:
+```C#
+interface IBar2
+{
+    float bar2();
+}
+extension MyObject : IBar, IBar2
+{
+    float bar() { return 1.0f }
+    float bar2() { return 2.0f }
+}
+```
+
+Extensions to Interfaces
+-----------------------------
+
+In addtion to extending ordinary types, you can define extensions on interfaces as well:
+```C#
+// An example interface.
+interface IFoo
+{
+    int foo();
+}
+
+// Extending `IFoo` with a new method requirement
+// with a default implementation.
+extension IFoo
+{
+    int bar() { return 0; }
+}
+
+int use(IFoo foo)
+{
+    // With the extension, all uses of `IFoo` typed values
+    // can assume there is a `bar` method.
+    return foo.bar();
+}
+```
+
+Although the syntax of above listing suggests that we are extending an interface with additional requirements, this interpretation does not make logical sense in many ways. Consider a type `MyType` that exists before the extension is defined:
+```C#
+struct MyType : IFoo
+{
+    int foo() { return 0; }
+}
+```
+
+If we extend the `IFoo` with new requirements, the existing `MyType` definition would become invalid since `MyType` no longer provides implementations to all interface requirements. Instead, what an `extension` on an interface `IFoo` means is that for all types that conforms to the `IFoo` interface and does not have a `bar` method defined, add a `bar` method defined in this extension to that type so that all `IFoo` typed values have a `bar` method defined. If a type already defines a matching `bar` method, then the existing method will always override the default method provided in the extension:
+
+```C#
+interface IFoo
+{
+    int foo();
+}
+struct MyFoo1 : IFoo
+{
+    int foo() { return 0; }
+}
+extension IFoo
+{
+    int bar() { return 0; }
+}
+struct MyFoo2 : IFoo
+{
+    int foo() { return 0; }
+    int bar() { return 1; }
+}
+void test()
+{
+    MyFoo1 f1;
+    MyFoo2 f2;
+    int a = f1.bar(); // a == 0, calling the method in the extension.
+    int b = f2.bar(); // b == 1, calling the existing method in `MyFoo2`.
+}
+```
+This feature is similar to extension traits in Rust.
