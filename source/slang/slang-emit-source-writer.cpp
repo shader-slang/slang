@@ -261,10 +261,9 @@ void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocatio
 
 void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
-    if (sourceLocation == m_nextSourceLoc ||
-        getLineDirectiveMode() == LineDirectiveMode::None)
+    if (getLineDirectiveMode() == LineDirectiveMode::None)
     {
-        // If the same, or line directives aren't being output, then nothing needs to be done
+        // Ignore if we aren't outputting directives 
         return;
     }
     
@@ -276,6 +275,19 @@ void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
         // * The nextSourceLoc is valid
         // * The line number on the output is different from that location
         m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextSourceLoc.isValid() && m_nextHumaneSourceLocation.line != m_loc.line);
+        return;
+    }
+
+    // Even if the source location is the same, we still want to trigger output, as long
+    // as we have a valid line location.
+    if (sourceLocation == m_nextSourceLoc)
+    {
+        // This is important because we can end up with many instructions with the same source location - for example
+        // when we have [__unsafeForceInlineEarly] all the inlined instructions get the same location.
+        // When we output lines of source, the target sources line numbers change, therefore we need to
+        // output  the same #line directive multiple times.
+     
+        m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextHumaneSourceLocation.line > 0);
         return;
     }
 
