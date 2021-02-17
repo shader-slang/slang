@@ -143,7 +143,7 @@ struct AssociatedTypeLookupSpecializationContext
         builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
         builder.setInsertBefore(inst);
         auto witnessTableArg = inst->getWitnessTable();
-        if (witnessTableArg->getDataType()->op == kIROp_WitnessTableType)
+        if (witnessTableArg->getDataType()->getOp() == kIROp_WitnessTableType)
         {
             witnessTableArg = builder.emitGetSequentialIDInst(witnessTableArg);
         }
@@ -155,7 +155,7 @@ struct AssociatedTypeLookupSpecializationContext
 
     void processGetSequentialIDInst(IRGetSequentialID* inst)
     {
-        if (inst->getRTTIOperand()->getDataType()->op == kIROp_WitnessTableIDType)
+        if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_WitnessTableIDType)
         {
             inst->replaceUsesWith(inst->getRTTIOperand());
             inst->removeAndDeallocate();
@@ -179,7 +179,7 @@ struct AssociatedTypeLookupSpecializationContext
             sharedContext->workListSet.Remove(inst);
 
             func(inst);
-            if (inst->op == kIROp_lookup_interface_method)
+            if (inst->getOp() == kIROp_lookup_interface_method)
             {
                 processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
             }
@@ -196,7 +196,7 @@ struct AssociatedTypeLookupSpecializationContext
         // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized functions.
         workOnModule([this](IRInst* inst)
         {
-            if (inst->op == kIROp_lookup_interface_method)
+            if (inst->getOp() == kIROp_lookup_interface_method)
             {
                 processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
             }
@@ -205,7 +205,7 @@ struct AssociatedTypeLookupSpecializationContext
         // Replace all direct uses of IRWitnessTables with its sequential ID.
         workOnModule([this](IRInst* inst)
         {
-            if (inst->op == kIROp_WitnessTable)
+            if (inst->getOp() == kIROp_WitnessTable)
             {
                 auto seqId = inst->findDecoration<IRSequentialIDDecoration>();
                 SLANG_ASSERT(seqId);
@@ -232,7 +232,7 @@ struct AssociatedTypeLookupSpecializationContext
         // Replace all `IRWitnessTableType`s with `IRWitnessTableIDType`.
         for (auto globalInst : sharedContext->module->getGlobalInsts())
         {
-            if (globalInst->op == kIROp_WitnessTableType)
+            if (globalInst->getOp() == kIROp_WitnessTableType)
             {
                 IRBuilder builder;
                 builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
@@ -243,7 +243,7 @@ struct AssociatedTypeLookupSpecializationContext
                 for (auto use = globalInst->firstUse; use; use = nextUse)
                 {
                     nextUse = use->nextUse;
-                    if (use->getUser()->op == kIROp_WitnessTable)
+                    if (use->getUser()->getOp() == kIROp_WitnessTable)
                         continue;
                     use->set(witnessTableIDType);
                 }
@@ -253,7 +253,7 @@ struct AssociatedTypeLookupSpecializationContext
         // `GetSequentialID(WitnessTableIDOperand)` becomes just `WitnessTableIDOperand`.
         workOnModule([this](IRInst* inst)
         {
-            if (inst->op == kIROp_GetSequentialID)
+            if (inst->getOp() == kIROp_GetSequentialID)
             {
                 processGetSequentialIDInst(cast<IRGetSequentialID>(inst));
             }

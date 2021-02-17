@@ -280,7 +280,7 @@ struct DeadCodeEliminationContext
         // There are a few special cases of "structural" instructions
         // that we don't want to eliminate, so we'll check for those next.
         //
-        switch( inst->op )
+        switch( inst->getOp() )
         {
             // Function parameters obviously shouldn't get eliminated,
             // even if nothing references them, and block parameters

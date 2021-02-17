@@ -76,7 +76,7 @@ struct SpecializationContext
         // can't mark an interface as used until its requirements are
         // used, etc.
         //
-        if(inst->op == kIROp_InterfaceRequirementEntry)
+        if(inst->getOp() == kIROp_InterfaceRequirementEntry)
             return true;
 
         return fullySpecializedInsts.Contains(inst);
@@ -396,7 +396,7 @@ struct SpecializationContext
         // since values are an important class of instruction we want
         // to deduplicate.
 
-        switch(inst->op)
+        switch(inst->getOp())
         {
         default:
             // The default case is that an instruction can
@@ -476,7 +476,7 @@ struct SpecializationContext
     void maybeSpecializeInst(
         IRInst*                     inst)
     {
-        switch(inst->op)
+        switch(inst->getOp())
         {
         default:
             // By default we assume that specialization is
@@ -1135,7 +1135,7 @@ struct SpecializationContext
             // we can simply check if the `concreteType` is a compile-time
             // constant value.
             //
-            if(concreteType->op == kIROp_ExtractExistentialType)
+            if(concreteType->getOp() == kIROp_ExtractExistentialType)
                 return false;
 
             return true;
@@ -1822,7 +1822,7 @@ struct SpecializationContext
                 slotOperands.add(wrapInst->getSlotOperand(ii));
             }
 
-            auto elementPtrType = builder.getPtrType(ptrType->op, elementType);
+            auto elementPtrType = builder.getPtrType(ptrType->getOp(), elementType);
             auto newElementAddr = builder.emitElementAddress(elementPtrType, val, index);
 
             auto newWrapExistentialInst = builder.emitWrapExistential(
@@ -1921,7 +1921,7 @@ struct SpecializationContext
                 type->getExistentialArgs());
 
             auto newPtrLikeType = builder.getType(
-                baseType->op,
+                baseType->getOp(),
                 1,
                 &wrappedElementType);
             addUsersToWorkList(type);
@@ -2049,7 +2049,7 @@ struct SpecializationContext
             {
                 next = inst->getNextInst();
 
-                switch(inst->op)
+                switch(inst->getOp())
                 {
                 default:
                     break;

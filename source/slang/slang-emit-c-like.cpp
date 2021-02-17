@@ -274,7 +274,7 @@ void CLikeSourceEmitter::_emitUnsizedArrayType(IRUnsizedArrayType* arrayType, ED
 
 void CLikeSourceEmitter::_emitType(IRType* type, EDeclarator* declarator)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
     default:
         emitSimpleType(type);
@@ -774,7 +774,7 @@ void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
 
 void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
-    switch(inst->op)
+    switch(inst->getOp())
     {
     case kIROp_IntLit:
     {
@@ -880,7 +880,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     // Certain opcodes should never/always be folded in
-    switch( inst->op )
+    switch( inst->getOp() )
     {
     default:
         break;
@@ -935,7 +935,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     if(as<IRAttr>(inst))
         return true;
 
-    switch( inst->op )
+    switch( inst->getOp() )
     {
     default:
         break;
@@ -1078,7 +1078,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // definition for certain types on certain targets (e.g. `out TriangleStream<T>`
     // for GLSL), so we check this only after all those special cases are
     // considered.
-    if (inst->op == kIROp_undefined)
+    if (inst->getOp() == kIROp_undefined)
         return false;
 
     // Okay, at this point we know our instruction must have a single use.
@@ -1186,7 +1186,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
         // emit its name. i.e. *&var ==> var.
         // We apply this peep hole optimization here to reduce the clutter of
         // resulting code.
-        if (inst->op == kIROp_Var)
+        if (inst->getOp() == kIROp_Var)
         {
             m_writer->emit(getName(inst));
             return;
@@ -1230,7 +1230,7 @@ void CLikeSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const&  outerP
         return;
     }
 
-    switch(inst->op)
+    switch(inst->getOp())
     {
     case kIROp_Var:
     case kIROp_GlobalVar:
@@ -1503,7 +1503,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
 {
     EmitOpInfo outerPrec = inOuterPrec;
     bool needClose = false;
-    switch(inst->op)
+    switch(inst->getOp())
     {
     case kIROp_GlobalHashedStringLiterals:
         /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
@@ -1617,7 +1617,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_Geq:
     case kIROp_Leq:
     {
-        const auto emitOp = getEmitOpForOp(inst->op);
+        const auto emitOp = getEmitOpForOp(inst->getOp());
 
         auto prec = getInfo(emitOp);
         needClose = maybeEmitParens(outerPrec, prec);
@@ -1645,7 +1645,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_Or:
     case kIROp_Mul:
     {
-        const auto emitOp = getEmitOpForOp(inst->op);
+        const auto emitOp = getEmitOpForOp(inst->getOp());
         const auto info = getInfo(emitOp);
 
         needClose = maybeEmitParens(outerPrec, info);
@@ -1663,12 +1663,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     {        
         IRInst* operand = inst->getOperand(0);
 
-        const auto emitOp = getEmitOpForOp(inst->op);
+        const auto emitOp = getEmitOpForOp(inst->getOp());
         const auto prec = getInfo(emitOp);
 
         needClose = maybeEmitParens(outerPrec, prec);
 
-        switch (inst->op)
+        switch (inst->getOp())
         {
             case kIROp_BitNot:
             {
@@ -1744,7 +1744,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         else
         {
-            if (inst->op == kIROp_getElementPtr && doesTargetSupportPtrTypes())
+            if (inst->getOp() == kIROp_getElementPtr && doesTargetSupportPtrTypes())
             {
                 const auto info = getInfo(EmitOp::Prefix);
                 needClose = maybeEmitParens(outerPrec, info);
@@ -1784,7 +1784,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             for (Index ee = 0; ee < elementCount; ++ee)
             {
                 IRInst* irElementIndex = ii->getElementIndex(ee);
-                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
                 IRConstant* irConst = (IRConstant*)irElementIndex;
 
                 UInt elementIndex = (UInt)irConst->value.intVal;
@@ -1988,7 +1988,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     m_writer->advanceToSourceLocation(inst->sourceLoc);
 
-    switch(inst->op)
+    switch(inst->getOp())
     {
     default:
         emitInstResultDecl(inst);
@@ -2057,7 +2057,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 IRInst* irElementIndex = ii->getElementIndex(ee);
-                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
                 IRConstant* irConst = (IRConstant*)irElementIndex;
 
                 UInt elementIndex = (UInt)irConst->value.intVal;
@@ -2088,7 +2088,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 IRInst* irElementIndex = ii->getElementIndex(ee);
-                SLANG_RELEASE_ASSERT(irElementIndex->op == kIROp_IntLit);
+                SLANG_RELEASE_ASSERT(irElementIndex->getOp() == kIROp_IntLit);
                 IRConstant* irConst = (IRConstant*)irElementIndex;
 
                 UInt elementIndex = (UInt)irConst->value.intVal;
@@ -2398,7 +2398,7 @@ void CLikeSourceEmitter::emitRegion(Region* inRegion)
                 // them into the current block.
                 //
                 m_writer->advanceToSourceLocation(terminator->sourceLoc);
-                switch(terminator->op)
+                switch(terminator->getOp())
                 {
                 default:
                     // Don't do anything with the terminator, and assume
@@ -2898,6 +2898,9 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     }
 
     m_writer->emit("struct ");
+
+    emitPostKeywordTypeAttributes(structType);
+
     m_writer->emit(getName(structType));
     m_writer->emit("\n{\n");
     m_writer->indent();
@@ -3228,7 +3231,7 @@ void CLikeSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     m_writer->advanceToSourceLocation(inst->sourceLoc);
 
-    switch(inst->op)
+    switch(inst->getOp())
     {
     case kIROp_GlobalHashedStringLiterals:
         /* Don't need to to output anything for this instruction - it's used for reflecting string literals that
@@ -3301,7 +3304,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 
     UInt operandCount = inst->operandCount;
     auto requiredLevel = EmitAction::Definition;
-    if (inst->op == kIROp_InterfaceType)
+    if (inst->getOp() == kIROp_InterfaceType)
         requiredLevel = EmitAction::ForwardDeclaration;
 
     for(UInt ii = 0; ii < operandCount; ++ii)
@@ -3327,7 +3330,7 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
 void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst* inst, EmitAction::Level requiredLevel)
 {
     // Skip certain instructions that don't affect output.
-    switch(inst->op)
+    switch(inst->getOp())
     {
     case kIROp_Generic:
         return;
@@ -3370,7 +3373,7 @@ void CLikeSourceEmitter::ensureGlobalInst(ComputeEmitActionsContext* ctx, IRInst
     ctx->mapInstToLevel[inst] = requiredLevel;
 
     // Skip instructions that don't correspond to an independent entity in output.
-    switch (inst->op)
+    switch (inst->getOp())
     {
     case kIROp_InterfaceRequirementEntry:
         return;

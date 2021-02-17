@@ -1913,6 +1913,11 @@ ${{{{
 
 }}}}
 
+// Bit cast
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitCast))
+T bit_cast(U value);
 
 // Specialized function
 
@@ -2093,3 +2098,6 @@ attribute_syntax [__requiresNVAPI] : RequiresNVAPIAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [noinline] : NoInlineAttribute;
+
+__attributeTarget(StructDecl)
+attribute_syntax [payload] : PayloadAttribute;

@@ -614,7 +614,7 @@ struct ResourceOutputSpecializationPass
         // At the very least, we expect them to be operations with
         // the same opcode.
         //
-        if(value->op != representative->op)
+        if(value->getOp() != representative->getOp())
             return SLANG_FAIL;
 
         // Furthermore, only certain instructions are amenable to
@@ -628,7 +628,7 @@ struct ResourceOutputSpecializationPass
         // Each supported instruction opcode might introduce new
         // constraints on how `value` and `representative` must match.
         //
-        switch( value->op )
+        switch( value->getOp() )
         {
         default:
             // Any opcode we do not specifically enable should cause
@@ -1030,7 +1030,7 @@ struct ResourceOutputSpecializationPass
         // value in the context of the caller.
         //
         auto representative = info.representative;
-        switch( representative->op )
+        switch( representative->getOp() )
         {
         default:
             // Because we only allow certain instructions when specializing

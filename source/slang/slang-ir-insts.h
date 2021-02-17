@@ -575,6 +575,30 @@ struct IRSemanticDecoration : public IRDecoration
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
 };
 
+struct IRStageAccessDecoration : public IRDecoration
+{
+    IR_PARENT_ISA(StageAccessDecoration)
+
+    Int getStageCount() { return (Int) getOperandCount(); }
+    IRStringLit* getStageOperand(Int index) { return cast<IRStringLit>(getOperand(index)); }
+    UnownedStringSlice getStageName(Int index) { return getStageOperand(index)->getStringSlice(); }
+};
+
+struct IRStageReadAccessDecoration : public IRStageAccessDecoration
+{
+    IR_LEAF_ISA(StageReadAccessDecoration)
+};
+
+struct IRStageWriteAccessDecoration : public IRStageAccessDecoration
+{
+    IR_LEAF_ISA(StageWriteAccessDecoration)
+};
+
+struct IRPayloadDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(PayloadDecoration)
+};
+
     /// An attribute that can be attached to another instruction as an operand.
     ///
     /// Attributes serve a similar role to decorations, in that both are ways

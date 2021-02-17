@@ -362,6 +362,18 @@ namespace Slang
         }
     }
 
+    void String::appendRepeatedChar(char chr, Index count)
+    {
+        SLANG_ASSERT(count >= 0);
+        if (count > 0)
+        { 
+            char* chars = prepareForAppend(count);
+            // Set all space to repeated chr. 
+            ::memset(chars, chr, sizeof(char) * count);
+            appendInPlace(chars, count);
+        }
+    }
+
     void String::appendChar(char c)
     {
         const auto oldLength = getLength();

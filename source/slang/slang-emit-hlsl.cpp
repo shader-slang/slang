@@ -414,7 +414,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
 
 bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_Construct:
         case kIROp_makeVector:
@@ -577,7 +577,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 }
             }
 
-            if( elementType->op == kIROp_UIntType )
+            if( elementType->getOp() == kIROp_UIntType )
             {
                 // If we are in the case that can use `Load`/`Load2`/`Load3`/`Load4`,
                 // then we will always prefer to use it.
@@ -620,7 +620,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     elementCount = elementCountInst->getValue();
                 }
             }
-            if( elementType->op == kIROp_UIntType )
+            if( elementType->getOp() == kIROp_UIntType )
             {
                 auto outerPrec = inOuterPrec;
                 auto prec = getInfo(EmitOp::Postfix);
@@ -695,7 +695,7 @@ void HLSLSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* d
 
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    switch( decoration->op )
+    switch( decoration->getOp() )
     {
     case kIROp_NoInlineDecoration:
         m_writer->emit("[noinline]\n");
@@ -709,7 +709,7 @@ void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 
 void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_FloatLit:
         {
@@ -745,7 +745,7 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
 void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_VoidType:
         case kIROp_BoolType:
@@ -761,7 +761,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_DoubleType:
         case kIROp_HalfType:
         {
-            m_writer->emit(getDefaultBuiltinTypeName(type->op));
+            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
         case kIROp_StructType:
@@ -793,7 +793,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             auto samplerStateType = cast<IRSamplerStateTypeBase>(type);
 
-            switch (samplerStateType->op)
+            switch (samplerStateType->getOp())
             {
                 case kIROp_SamplerStateType:			m_writer->emit("SamplerState");			break;
                 case kIROp_SamplerComparisonStateType:	m_writer->emit("SamplerComparisonState");	break;
@@ -827,7 +827,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        switch (structuredBufferType->op)
+        switch (structuredBufferType->getOp())
         {
             case kIROp_HLSLStructuredBufferType:                    m_writer->emit("StructuredBuffer");                   break;
             case kIROp_HLSLRWStructuredBufferType:                  m_writer->emit("RWStructuredBuffer");                 break;
@@ -848,7 +848,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     }
     else if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type))
     {
-        switch (type->op)
+        switch (type->getOp())
         {
             case kIROp_HLSLByteAddressBufferType:                   m_writer->emit("ByteAddressBuffer");                  break;
             case kIROp_HLSLRWByteAddressBufferType:                 m_writer->emit("RWByteAddressBuffer");                break;
@@ -882,7 +882,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     // HACK: As a fallback for HLSL targets, assume that the name of the
     // instruction being used is the same as the name of the HLSL type.
     {
-        auto opInfo = getIROpInfo(type->op);
+        auto opInfo = getIROpInfo(type->getOp());
         m_writer->emit(opInfo.name);
         UInt operandCount = type->getOperandCount();
         if (operandCount)
@@ -915,6 +915,11 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
         return;
     }
 
+    if( auto readAccessSemantic = inst->findDecoration<IRStageReadAccessDecoration>())
+        _emitStageAccessSemantic(readAccessSemantic, "read");
+    if( auto writeAccessSemantic = inst->findDecoration<IRStageWriteAccessDecoration>())
+        _emitStageAccessSemantic(writeAccessSemantic, "write");
+
     if (auto layoutDecoration = inst->findDecoration<IRLayoutDecoration>())
     {
         auto layout = layoutDecoration->getLayout();
@@ -932,11 +937,37 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst)
     }
 }
 
+void HLSLSourceEmitter::_emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name)
+{
+    Int stageCount = decoration->getStageCount();
+    if(stageCount == 0)
+        return;
+
+    m_writer->emit(" : ");
+    m_writer->emit(name);
+    m_writer->emit("(");
+    for( Int i = 0; i < stageCount; ++i )
+    {
+        if(i != 0) m_writer->emit(", ");
+        m_writer->emit(decoration->getStageName(i));
+    }
+    m_writer->emit(")");
+}
+
+void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
+{
+    if( auto payloadDecoration = inst->findDecoration<IRPayloadDecoration>() )
+    {
+        m_writer->emit("[payload] ");
+    }
+}
+
+
 void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
     if (auto decor = param->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
     {
-        switch (decor->op)
+        switch (decor->getOp())
         {
             case kIROp_TriangleInputPrimitiveTypeDecoration:             m_writer->emit("triangle "); break;
             case kIROp_PointInputPrimitiveTypeDecoration:                m_writer->emit("point "); break;
@@ -970,7 +1001,7 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
 
     for (auto dd : varInst->getDecorations())
     {
-        if (dd->op != kIROp_InterpolationModeDecoration)
+        if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;

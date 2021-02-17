@@ -100,6 +100,10 @@ namespace Slang
         {
             return slice.m_begin >= m_begin && slice.m_end <= m_end; 
         }
+        bool isMemoryContained(const char* pos) const
+        {
+            return pos >= m_begin && pos <= m_end;
+        }
 
         Index getLength() const
         {
@@ -438,6 +442,9 @@ namespace Slang
 
             /// Append a character (to remove ambiguity with other integral types)
         void appendChar(char chr);
+
+            /// Append the specified char count times
+        void appendRepeatedChar(char chr, Index count);
 
         String(const char* str)
         {

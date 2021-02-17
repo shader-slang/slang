@@ -24,7 +24,7 @@ HLSLIntrinsicSet::HLSLIntrinsicSet(IRTypeSet* typeSet, HLSLIntrinsicOpLookup* lo
 
 static IRBasicType* _getElementType(IRType* type)
 {
-    switch (type->op)
+    switch (type->getOp())
     {
         case kIROp_VectorType:      type = static_cast<IRVectorType*>(type)->getElementType(); break;
         case kIROp_MatrixType:      type = static_cast<IRMatrixType*>(type)->getElementType(); break;
@@ -63,7 +63,7 @@ void HLSLIntrinsicSet::_calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, 
             // TODO(JS):
             // HACK! GetAt can be from getElementPtr or from getElement. Get element ptr means the return type will be
             // a pointer. We don't want to deal with that, so strip it
-            if (returnType->op == kIROp_PtrType)
+            if (returnType->getOp() == kIROp_PtrType)
             {
                 returnType = as<IRType>(returnType->getOperand(0));
             }
@@ -73,7 +73,7 @@ void HLSLIntrinsicSet::_calcIntrinsic(HLSLIntrinsic::Op op, IRType* returnType, 
             {
                 IRType* argType = inArgs[i];
 
-                if (argType->op == kIROp_PtrType)
+                if (argType->getOp() == kIROp_PtrType)
                 {
                     argType = as<IRType>(argType->getOperand(0));
                 }
@@ -210,7 +210,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
 
     {
         // See if we can just directly convert
-        Op op = HLSLIntrinsicOpLookup::getOpForIROp(inst->op);
+        Op op = HLSLIntrinsicOpLookup::getOpForIROp(inst->getOp());
 
 
         // HACK: some cases we want to stop handling via the synthesis
@@ -231,7 +231,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
 //        case Op::All:
             {
                 IRType* srcType = inst->getOperand(0)->getDataType();
-                switch( srcType->op )
+                switch( srcType->getOp() )
                 {
                 default:
                     break;
@@ -253,7 +253,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
     }
 
     // All the special cases
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_constructVectorFromScalar:
         {
@@ -266,7 +266,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             IRType* dstType = inst->getDataType();
             IRType* srcType = inst->getOperand(0)->getDataType();
 
-            if ((dstType->op == kIROp_VectorType || dstType->op == kIROp_MatrixType) &&
+            if ((dstType->getOp() == kIROp_VectorType || dstType->getOp() == kIROp_MatrixType) &&
                 inst->getOperandCount() == 1)
             {
                 if (as<IRBasicType>(srcType))
@@ -284,7 +284,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             else
             {
                 // If we are constructing a basic type, we don't need an Op::Init
-                if (!IRBasicType::isaImpl(dstType->op))
+                if (!IRBasicType::isaImpl(dstType->getOp()))
                 {
                     // Emit the 'init' intrinsic
                     calcIntrinsic(Op::Init, inst, inst->getOperandCount(), out);
@@ -331,7 +331,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
                 if (!as<IRBasicType>(dstType))
                 {
                     // If it's a scalar make sure we have construct from scalar, because we will want to use that
-                    SLANG_ASSERT(dstType->op == kIROp_VectorType);
+                    SLANG_ASSERT(dstType->getOp() == kIROp_VectorType);
                     IRType* argTypes[] = { baseType };
                     calcIntrinsic(Op::ConstructFromScalar, inst->getDataType(), argTypes, 1,  out);
                     return SLANG_OK;
@@ -353,7 +353,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
         {
             IRInst* target = inst->getOperand(0);
             IRType* targetType = target->getDataType();
-            if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
+            if (targetType->getOp() == kIROp_VectorType || targetType->getOp() == kIROp_MatrixType)
             {
                 // Specially handle this
                 calcIntrinsic(Op::GetAt, inst, out);
@@ -369,7 +369,7 @@ SlangResult HLSLIntrinsicSet::makeIntrinsic(IRInst* inst, HLSLIntrinsic& out)
             if (auto ptrType = as<IRPtrType>(targetType))
             {
                 targetType = as<IRType>(ptrType->getOperand(0));
-                if (targetType->op == kIROp_VectorType || targetType->op == kIROp_MatrixType)
+                if (targetType->getOp() == kIROp_VectorType || targetType->getOp() == kIROp_MatrixType)
                 {
                     // Specially handle this
                     calcIntrinsic(Op::GetAt, inst, out);
@@ -533,7 +533,7 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpFromTargetDecoration(IRInst* inIns
 
 HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IRInst* inst)
 {
-    switch (inst->op)
+    switch (inst->getOp())
     {
         case kIROp_Call:
         {
@@ -541,7 +541,7 @@ HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IRInst* inst)
         }
         default: break;
     }
-    return getOpForIROp(inst->op);
+    return getOpForIROp(inst->getOp());
 }
 
 /* static */HLSLIntrinsic::Op HLSLIntrinsicOpLookup::getOpForIROp(IROp op)

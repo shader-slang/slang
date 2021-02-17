@@ -222,7 +222,7 @@ IRType* cloneType(
 
 IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 {
-    switch (originalValue->op)
+    switch (originalValue->getOp())
     {
     case kIROp_StructType:
     case kIROp_Func:
@@ -280,7 +280,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             UInt argCount = originalValue->getOperandCount();
             IRInst* clonedValue = builder->createIntrinsicInst(
                 cloneType(this, originalValue->getFullType()),
-                originalValue->op,
+                originalValue->getOp(),
                 argCount, nullptr);
             registerClonedValue(this, clonedValue, originalValue);
             for (UInt aa = 0; aa < argCount; ++aa)
@@ -432,14 +432,14 @@ static void cloneExtraDecorations(
     {
         for(auto decoration : sym->irGlobalValue->getDecorations())
         {
-            switch(decoration->op)
+            switch(decoration->getOp())
             {
             default:
                 break;
 
             case kIROp_BindExistentialSlotsDecoration:
             case kIROp_LayoutDecoration:
-                if(!clonedInst->findDecorationImpl(decoration->op))
+                if(!clonedInst->findDecorationImpl(decoration->getOp()))
                 {
                     cloneInst(context, builder, decoration);
                 }
@@ -1059,7 +1059,7 @@ IRInst* cloneInst(
     IRInst*                         originalInst,
     IROriginalValuesForClone const& originalValues)
 {
-    switch (originalInst->op)
+    switch (originalInst->getOp())
     {
         // We need to special-case any instruction that is not
         // allocated like an ordinary `IRInst` with trailing args.
@@ -1103,7 +1103,7 @@ IRInst* cloneInst(
     UInt argCount = originalInst->getOperandCount();
     IRInst* clonedInst = builder->createIntrinsicInst(
         cloneType(context, originalInst->getFullType()),
-        originalInst->op,
+        originalInst->getOp(),
         argCount, nullptr);
     registerClonedValue(context, clonedInst, originalValues);
     auto oldBuilder = context->builder;
@@ -1493,7 +1493,7 @@ LinkedIR linkIR(
     {
         for( auto decoration : irModule->getModuleInst()->getDecorations() )
         {
-            switch( decoration->op )
+            switch( decoration->getOp() )
             {
             case kIROp_NVAPISlotDecoration:
                 {

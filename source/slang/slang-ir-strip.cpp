@@ -11,7 +11,7 @@ static bool _shouldStripInst(
     IRInst*                 inst,
     IRStripOptions const&   options)
 {
-    switch( inst->op )
+    switch( inst->getOp() )
     {
     default:
         return false;

@@ -77,12 +77,18 @@ static Result _calcNaturalArraySizeAndAlignment(
     return SLANG_OK;
 }
 
+IRIntegerValue getIntegerValueFromInst(IRInst* inst)
+{
+    SLANG_ASSERT(inst->getOp() == kIROp_IntLit);
+    return as<IRIntLit>(inst)->value.intVal;
+}
+
 static Result _calcNaturalSizeAndAlignment(
     TargetRequest*      target, 
     IRType*             type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
-    switch( type->op )
+    switch( type->getOp() )
     {
 
 #define CASE(TYPE, SIZE, ALIGNMENT)                                 \
@@ -192,6 +198,24 @@ static Result _calcNaturalSizeAndAlignment(
         }
         break;
 
+    case kIROp_MatrixType:
+        {
+            auto matType = cast<IRMatrixType>(type);
+            auto rowCount = getIntegerValueFromInst(matType->getRowCount());
+            auto colCount = getIntegerValueFromInst(matType->getColumnCount());
+            SharedIRBuilder sharedBuilder;
+            sharedBuilder.module = type->getModule();
+            sharedBuilder.session = sharedBuilder.module->getSession();
+
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedBuilder;
+
+            return _calcNaturalArraySizeAndAlignment(
+                target, matType->getElementType(),
+                builder.getIntValue(builder.getUIntType(), rowCount * colCount),
+                outSizeAndAlignment);
+        }
+        break;
     default:
         break;
     }

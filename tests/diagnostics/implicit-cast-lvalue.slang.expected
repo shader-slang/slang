@@ -1,6 +1,8 @@
 result code = -1
 standard error = {
 tests/diagnostics/implicit-cast-lvalue.slang(14): error 30047: argument passed to parameter '0' must be l-value.
+    a(y);
+      ^
 tests/diagnostics/implicit-cast-lvalue.slang(14): note 30048: argument was implicitly cast from 'int' to 'uint', and Slang does not support using an implicit cast as an l-value
 }
 standard output = {
