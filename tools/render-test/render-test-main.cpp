@@ -720,7 +720,6 @@ void RenderTestApp::renderFrame()
     applyBinding(pipelineType);
 
 	m_renderer->draw(3);
-    m_renderer->presentFrame();
 }
 
 void RenderTestApp::runCompute()
