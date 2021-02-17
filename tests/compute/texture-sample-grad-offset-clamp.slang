@@ -5,7 +5,7 @@
 //TEST_INPUT: Sampler:name=samplerState
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name=outputBuffer
 
-Texture2D t2D;
+Texture2D  t2D;
 SamplerState samplerState;
 RWStructuredBuffer<float> outputBuffer;
 
