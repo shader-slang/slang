@@ -20,10 +20,12 @@ private:
 class GraphicsAPIRenderer : public RendererBase
 {
 public:
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
-        slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) SLANG_OVERRIDE;
+    virtual Result createShaderObjectLayout(
+        slang::TypeLayoutReflection*    typeLayout,
+        ShaderObjectLayoutBase**        outLayout) SLANG_OVERRIDE;
+    virtual Result createShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject**         outObject) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(
         IShaderProgram* program,
         IShaderObject** outObject) SLANG_OVERRIDE;

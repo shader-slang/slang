@@ -26,7 +26,7 @@ public:
 
     struct SubObjectRangeInfo
     {
-        ComPtr<GraphicsCommonShaderObjectLayout> layout;
+        RefPtr<GraphicsCommonShaderObjectLayout> layout;
         //        Index                       baseIndex;
         //        Index                       count;
         Index bindingRangeIndex;
@@ -317,7 +317,7 @@ public:
         SlangResult build(GraphicsCommonShaderObjectLayout** outLayout)
         {
             auto layout =
-                ComPtr<GraphicsCommonShaderObjectLayout>(new GraphicsCommonShaderObjectLayout());
+                RefPtr<GraphicsCommonShaderObjectLayout>(new GraphicsCommonShaderObjectLayout());
             SLANG_RETURN_ON_FAIL(layout->_init(this));
 
             *outLayout = layout.detach();
@@ -980,7 +980,7 @@ protected:
     Result _writeOrdinaryData(char* dest, size_t destSize)
     {
         auto src = m_ordinaryData.getBuffer();
-        auto srcSize = m_ordinaryData.getCount();
+        auto srcSize = size_t(m_ordinaryData.getCount());
 
         SLANG_ASSERT(srcSize <= destSize);
 
@@ -1374,8 +1374,9 @@ protected:
 };
 
 
-Result SLANG_MCALL GraphicsAPIRenderer::createShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout)
+Result GraphicsAPIRenderer::createShaderObjectLayout(
+    slang::TypeLayoutReflection* typeLayout,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<GraphicsCommonShaderObjectLayout> layout;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObjectLayout::createForElementType(
@@ -1384,8 +1385,9 @@ Result SLANG_MCALL GraphicsAPIRenderer::createShaderObjectLayout(
     return SLANG_OK;
 }
 
-Result SLANG_MCALL
-    GraphicsAPIRenderer::createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject)
+Result GraphicsAPIRenderer::createShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
 {
     RefPtr<GraphicsCommonShaderObject> shaderObject;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObject::create(this,
