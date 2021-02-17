@@ -39,8 +39,6 @@ void computeMain(vector<uint,3> dispatchThreadID_0 : SV_DISPATCHTHREADID)
 
     int index_0 = pos_0.x + pos_0.y * int(4);
     outputBuffer_0[(uint) index_0] = index_0;
-
-#line 18
     return;
 }
 
