@@ -30,6 +30,8 @@
 #include "slang-serialize-ir.h"
 #include "slang-serialize-container.h"
 
+#include "slang-doc.h"
+
 #include "slang-check-impl.h"
 
 #include "../../slang-tag-version.h"
@@ -1635,6 +1637,13 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
                 File::writeAllText(fileName, writer.getContent());
             }
+        }
+
+        if (shouldDocument)
+        {
+            RefPtr<Documentation> documentation(new Documentation);
+
+            documentation->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
         }
 
 #if 0

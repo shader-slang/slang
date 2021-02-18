@@ -1522,6 +1522,7 @@ namespace Slang
         bool shouldValidateIR = false;
 
         bool shouldDumpAST = false;
+        bool shouldDocument = false;
 
             /// If true will after lexical analysis output the hierarchy of includes to stdout
         bool outputIncludes = false;

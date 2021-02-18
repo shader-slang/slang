@@ -78,7 +78,8 @@ namespace Slang
         SourceView*     inSourceView,
         DiagnosticSink* inSink,
         NamePool*       inNamePool,
-        MemoryArena*    inMemoryArena)
+        MemoryArena*    inMemoryArena,
+        LexerFlags      flags)
     {
         m_sourceView  = inSourceView;
         m_sink        = inSink;
@@ -95,7 +96,7 @@ namespace Slang
         m_startLoc = inSourceView->getRange().begin;
 
         m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-        m_lexerFlags = 0;
+        m_lexerFlags = flags;
     }
 
     Lexer::~Lexer()
@@ -1231,11 +1232,31 @@ namespace Slang
                 continue;
 
             case TokenType::WhiteSpace:
-            case TokenType::LineComment:
-            case TokenType::BlockComment:
+            {
                 flags |= TokenFlag::AfterWhitespace;
                 continue;
+            }
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+            {
+                flags |= TokenFlag::AfterWhitespace;
+                if (flags & kLexerFlag_TokenizeComments)
+                {
+                    // We don't break here, and use the normal token adding logic
+                    // because we want the behavior to be identical (in terms of flags etc)
+                    // as if TokenizeComments is not enabled
+                    char const* textEnd = m_cursor;
 
+                    token.type =  tokenType;
+                    token.flags = m_tokenFlags;
+                    token.setContent(UnownedStringSlice(textBegin, textEnd));
+
+                    return token;
+                }
+
+                continue;
+            }
+            
             // We don't want to skip the end-of-file token, but we *do*
             // want to make sure it has appropriate flags to make our life easier
             case TokenType::EndOfFile:

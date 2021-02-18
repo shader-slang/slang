@@ -139,6 +139,9 @@ struct SourceRange
         /// Get the offset of a loc in this range
     int getOffset(SourceLoc loc) const { SLANG_ASSERT(contains(loc)); return int(loc.getRaw() - begin.getRaw()); }
 
+        /// Convert an offset to a loc
+    SourceLoc getSourceLocFromOffset(uint32_t offset) const { SLANG_ASSERT(offset <= getSize()); return begin + Int(offset); }
+
     SourceRange()
     {}
 
