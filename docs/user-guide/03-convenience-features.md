@@ -2,7 +2,7 @@
 
 This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users. 
 
-## Type Inference in Varaible Definitions
+## Type Inference in Variable Definitions
 Slang supports automatic variable type inference:
 ```C#
 var a = 1; // OK, `a` is an `int`.
