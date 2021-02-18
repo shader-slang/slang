@@ -1109,7 +1109,7 @@ void constructSSA(ConstructSSAContext* context)
         }
     }
 
-    // Some blocks may now need to pass along arguments to their sucessor,
+    // Some blocks may now need to pass along arguments to their successor,
     // which have been stored into the `SSABlockInfo::successorArgs` field.
     for(auto bb : globalVal->getBlocks())
     {
@@ -1155,6 +1155,9 @@ void constructSSA(ConstructSSAContext* context)
         // Transfer decorations (a terminator should have no children) over to the new instruction.
         //
         oldTerminator->transferDecorationsTo(newTerminator);
+
+        // Copy the source location of the old terminator to the new terminator
+        newTerminator->sourceLoc = oldTerminator->sourceLoc;
 
         // A terminator better not have uses, so we shouldn't have
         // to replace them.

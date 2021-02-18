@@ -357,6 +357,7 @@ SlangResult _assignVarsFromLayout(
 
                 IResourceView::Desc viewDesc;
                 viewDesc.type = IResourceView::Type::ShaderResource;
+                viewDesc.format = texture->getDesc()->format;
                 auto textureView = renderer->createTextureView(
                     texture,
                     viewDesc);
