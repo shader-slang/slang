@@ -840,14 +840,6 @@ struct ShaderOffset
     SlangInt bindingArrayIndex = 0;
 };
 
-class IShaderObjectLayout : public ISlangUnknown
-{};
-#define SLANG_UUID_IShaderObjectLayout                                                 \
-    {                                                                                 \
-        0x27f3f67e, 0xa49d, 0x4aae, { 0xa6, 0xd, 0xfa, 0xc2, 0x6b, 0x1c, 0x10, 0x7c } \
-    }
-
-
 class IShaderObject : public ISlangUnknown
 {
 public:
@@ -1039,8 +1031,6 @@ struct GraphicsPipelineStateDesc
     IPipelineLayout* pipelineLayout = nullptr;
 
     IInputLayout*        inputLayout;
-    UInt                framebufferWidth;
-    UInt                framebufferHeight;
     UInt                renderTargetCount = 0; // Only used if `pipelineLayout` is non-null
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
@@ -1222,22 +1212,12 @@ public:
         return layout;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
-        slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) = 0;
 
-    inline ComPtr<IShaderObjectLayout> createShaderObjectLayout(slang::TypeLayoutReflection* typeLayout)
-    {
-        ComPtr<IShaderObjectLayout> layout;
-        SLANG_RETURN_NULL_ON_FAIL(createShaderObjectLayout(typeLayout, layout.writeRef()));
-        return layout;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) = 0;
-
-    inline ComPtr<IShaderObject> createShaderObject(IShaderObjectLayout* layout)
+    inline ComPtr<IShaderObject> createShaderObject(slang::TypeReflection* type)
     {
         ComPtr<IShaderObject> object;
-        SLANG_RETURN_NULL_ON_FAIL(createShaderObject(layout, object.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createShaderObject(type, object.writeRef()));
         return object;
     }
 

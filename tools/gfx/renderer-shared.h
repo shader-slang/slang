@@ -129,7 +129,7 @@ struct ExtendedShaderObjectTypeList
     }
 };
 
-class ShaderObjectLayoutBase : public IShaderObjectLayout, public Slang::RefObject
+class ShaderObjectLayoutBase : public Slang::RefObject
 {
 protected:
     RendererBase* m_renderer;
@@ -137,9 +137,6 @@ protected:
     ShaderComponentID m_componentID = 0;
 
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    IShaderObjectLayout* getInterface(const Slang::Guid& guid);
-
     RendererBase* getRenderer() { return m_renderer; }
 
     slang::TypeLayoutReflection* getElementTypeLayout()
@@ -163,6 +160,7 @@ protected:
 
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
+
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     IShaderObject* getInterface(const Slang::Guid& guid);
@@ -355,6 +353,7 @@ protected:
 // Responsible for shader compilation, specialization and caching.
 class RendererBase : public Slang::RefObject, public IRenderer
 {
+    friend class ShaderObjectBase;
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
 
@@ -364,6 +363,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) SLANG_OVERRIDE;
     IRenderer* getInterface(const Slang::Guid& guid);
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) SLANG_OVERRIDE;
+
 protected:
     // Retrieves the currently bound unspecialized pipeline.
     // If the bound pipeline is not created from a Slang component, an implementation should return null.
@@ -371,6 +372,21 @@ protected:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
     Result maybeSpecializePipeline(ShaderObjectBase* inRootShaderObject);
+
+
+    virtual Result createShaderObjectLayout(
+        slang::TypeLayoutReflection* typeLayout,
+        ShaderObjectLayoutBase** outLayout) = 0;
+
+    Result getShaderObjectLayout(
+        slang::TypeReflection*      type,
+        ShaderObjectLayoutBase**    outLayout);
+
+    virtual Result createShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject**         outObject) = 0;
+
+
 protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle);
 protected:
@@ -378,6 +394,8 @@ protected:
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;
+
+    Slang::Dictionary<slang::TypeReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
 };
 
 }

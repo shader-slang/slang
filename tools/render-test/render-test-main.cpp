@@ -357,6 +357,7 @@ SlangResult _assignVarsFromLayout(
 
                 IResourceView::Desc viewDesc;
                 viewDesc.type = IResourceView::Type::ShaderResource;
+                viewDesc.format = texture->getDesc()->format;
                 auto textureView = renderer->createTextureView(
                     texture,
                     viewDesc);
@@ -396,14 +397,13 @@ SlangResult _assignVarsFromLayout(
         case ShaderInputType::Object:
             {
                 auto typeName = entry.objectDesc.typeName;
-                slang::TypeLayoutReflection* slangTypeLayout = nullptr;
+                slang::TypeReflection* slangType = nullptr;
                 if(typeName.getLength() != 0)
                 {
                     // If the input line specified the name of the type
                     // to allocate, then we use it directly.
                     //
-                    auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
-                    slangTypeLayout = slangReflection->getTypeLayout(slangType);
+                    slangType = slangReflection->findTypeByName(typeName.getBuffer());
                 }
                 else
                 {
@@ -411,7 +411,7 @@ SlangResult _assignVarsFromLayout(
                     // then we will infer the type from the type of the
                     // value pointed to by `entryCursor`.
                     //
-                    slangTypeLayout = entryCursor.getTypeLayout();
+                    auto slangTypeLayout = entryCursor.getTypeLayout();
                     switch(slangTypeLayout->getKind())
                     {
                     default:
@@ -427,11 +427,11 @@ SlangResult _assignVarsFromLayout(
                         slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                         break;
                     }
+                    slangType = slangTypeLayout->getType();
                 }
 
-                ComPtr<IShaderObjectLayout> shaderObjectLayout = renderer->createShaderObjectLayout(slangTypeLayout);
                 ComPtr<IShaderObject> shaderObject =
-                    renderer->createShaderObject(shaderObjectLayout);
+                    renderer->createShaderObject(slangType);
 
                 entryCursor.setObject(shaderObject);
             }

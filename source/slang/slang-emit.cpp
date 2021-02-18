@@ -136,7 +136,11 @@ static void dumpIRIfEnabled(
     if(compileRequest->shouldDumpIR)
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(irModule, &writer, label);
+
+        IRDumpOptions options;
+        options.sourceManager = compileRequest->getSourceManager();
+
+        dumpIR(irModule, options, label, &writer);
     }
 }
 

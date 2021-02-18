@@ -2,6 +2,35 @@
 
 This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users. 
 
+## Type Inference in Variable Definitions
+Slang supports automatic variable type inference:
+```C#
+var a = 1; // OK, `a` is an `int`.
+var b = float3(0, 1, 2); // OK, `b` is a `float3`.
+```
+Automatic type inference require an initialization expression to present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result a compiler error:
+```C#
+var a; // Error, cannot infer the type of `a`.
+```
+
+You may use the `var` keyword to define a variable in a modern syntax:
+```C#
+var a : int = 1; // OK.
+var b : int; // OK.
+```
+
+## Immutable Values
+The `var` syntax and the traditional C-style variable definition introduces a _mutable_ variable whose value can be changed after its definition. If you wish to introduce an immutable or constant value, you may use the `let` keyword:
+```rust
+let a = 5; // OK, `a` is `int`.
+let b : int = 5; // OK.
+```
+Attempting to change an immutable value will result in a compiler error:
+```rust
+let a = 5;
+a = 6; // Error, `a` is immutable.
+```
+
 ## Member functions
 
 Slang supports defining member functions in `struct`s. For example, it is allowed to write:
@@ -225,6 +254,40 @@ If a base type is marked as `[sealed]`, then inheritance from the type is not al
 ### Limitations
 
 Please note that the support for inheritance is currently very limited. Common features that comes with inheritance, such as `virtual` functions and multiple inheritance are not supported by the Slang compiler. Implicit down-casting to the base type and use the result as a `mutable` argument in a function call is also not supported.
+
+Extensions
+--------------------
+Slang allows defining additional members for a type outside its initial definition. For example, suppose we already have a type defined:
+
+```C#
+struct MyType
+{
+    int field;
+    int get() { return field; }
+}
+```
+
+You can extend `MyType` with new members:
+```C#
+extension MyType
+{
+    float newField;
+    float getNewField() { return newField; }
+}
+```
+
+All locations that sees the definition of the `extension` can access the new members:
+
+```C#
+void test()
+{
+    MyType t;
+    t.newField = 1.0;
+    float val = t.getNewField();
+}
+```
+
+This feature is similar to extensions in Swift and partial classes in C#.
 
 Modules
 -------

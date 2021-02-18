@@ -40,6 +40,8 @@ interpretation for that lex/parse.
 
 struct PathInfo
 {
+    typedef PathInfo ThisType;
+
         /// To be more rigorous about where a path comes from, the type identifies what a paths origin is
     enum class Type : uint8_t
     {
@@ -59,8 +61,14 @@ struct PathInfo
         /// True if has a found path that has originated from a file (as opposed to string or some other origin)
     SLANG_FORCE_INLINE bool hasFileFoundPath() const { return (type == Type::Normal || type == Type::FoundPath) && foundPath.getLength() > 0; }
 
+    bool operator==(const ThisType& rhs) const;
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         /// Returns the 'most unique' identity for the path. If has a 'uniqueIdentity' returns that, else the foundPath, else "".
     const String getMostUniqueIdentity() const;
+
+        /// Append to out, how to display the path 
+    void appendDisplayName(StringBuilder& out) const;
 
     // So simplify construction. In normal usage it's safer to use make methods over constructing directly.
     static PathInfo makeUnknown() { return PathInfo { Type::Unknown, String(), String() }; }

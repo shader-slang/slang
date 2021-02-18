@@ -21,6 +21,61 @@ const String PathInfo::getMostUniqueIdentity() const
     }
 }
 
+bool PathInfo::operator==(const ThisType& rhs) const
+{
+    // They must be the same type
+    if (type != rhs.type)
+    {
+        return false;
+    }
+
+    switch (type)
+    {
+        case Type::TokenPaste:
+        case Type::TypeParse:
+        case Type::Unknown:
+        case Type::CommandLine:
+        {
+            return true;
+        }
+        case Type::Normal:
+        {
+            return foundPath == rhs.foundPath && uniqueIdentity == rhs.uniqueIdentity;
+        }
+        case Type::FromString:
+        case Type::FoundPath:
+        {
+            // Only have a found path
+            return foundPath == rhs.foundPath;
+        }
+        default: break;
+    }
+
+    return false;
+}
+
+void PathInfo::appendDisplayName(StringBuilder& out) const
+{
+    switch (type)
+    {
+        case Type::TokenPaste:      out << "[Token Paste]"; break;
+        case Type::TypeParse:       out << "[Type Parse]"; break;
+        case Type::Unknown:         out << "[Unknown]"; break;
+        case Type::CommandLine:     out << "[Command Line]"; break;
+        case Type::Normal:          
+        case Type::FromString:
+        case Type::FoundPath:
+        {
+            // TODO(JS): We might want to escape the path here if necessary
+            out.appendChar('"');
+            out << foundPath;
+            out.appendChar('"');
+            break;
+        }
+        default: break;
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceView !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 int SourceView::findEntryIndex(SourceLoc sourceLoc) const

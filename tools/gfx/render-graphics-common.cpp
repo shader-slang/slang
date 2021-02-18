@@ -26,7 +26,7 @@ public:
 
     struct SubObjectRangeInfo
     {
-        ComPtr<GraphicsCommonShaderObjectLayout> layout;
+        RefPtr<GraphicsCommonShaderObjectLayout> layout;
         //        Index                       baseIndex;
         //        Index                       count;
         Index bindingRangeIndex;
@@ -317,7 +317,7 @@ public:
         SlangResult build(GraphicsCommonShaderObjectLayout** outLayout)
         {
             auto layout =
-                ComPtr<GraphicsCommonShaderObjectLayout>(new GraphicsCommonShaderObjectLayout());
+                RefPtr<GraphicsCommonShaderObjectLayout>(new GraphicsCommonShaderObjectLayout());
             SLANG_RETURN_ON_FAIL(layout->_init(this));
 
             *outLayout = layout.detach();
@@ -702,13 +702,29 @@ public:
     }
 
     SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size) SLANG_OVERRIDE
+        setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
     {
-        IRenderer* renderer = getRenderer();
+        Index offset = inOffset.uniformOffset;
+        Index size = inSize;
 
-        char* dest = (char*)renderer->map(m_buffer, MapFlavor::HostWrite);
-        memcpy(dest + offset.uniformOffset, data, size);
-        renderer->unmap(m_buffer);
+        char* dest = m_ordinaryData.getBuffer();
+        Index availableSize = m_ordinaryData.getCount();
+
+        // TODO: We really should bounds-check access rather than silently ignoring sets
+        // that are too large, but we have several test cases that set more data than
+        // an object actually stores on several targets...
+        //
+        if(offset < 0)
+        {
+            size += offset;
+            offset = 0;
+        }
+        if((offset + size) >= availableSize)
+        {
+            size = availableSize - offset;
+        }
+
+        memcpy(dest + offset, data, size);
 
         return SLANG_OK;
     }
@@ -864,22 +880,19 @@ protected:
         m_layout = layout;
 
         // If the layout tells us that there is any uniform data,
-        // then we need to allocate a constant buffer to hold that data.
+        // then we will allocate a CPU memory buffer to hold that data
+        // while it is being set from the host.
         //
-        // TODO: Do we need to allocate a shadow copy for use from
-        // the CPU?
-        //
-        // TODO: When/where do we bind this constant buffer into
-        // a descriptor set for later use?
+        // Once the user is done setting the parameters/fields of this
+        // shader object, we will produce a GPU-memory version of the
+        // uniform data (which includes values from this object and
+        // any existential-type sub-objects).
         //
         size_t uniformSize = layout->getElementTypeLayout()->getSize();
         if (uniformSize)
         {
-            IBufferResource::Desc bufferDesc;
-            bufferDesc.init(uniformSize);
-            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
-                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, m_buffer.writeRef()));
+            m_ordinaryData.setCount(uniformSize);
+            memset(m_ordinaryData.getBuffer(), 0, uniformSize);
         }
 
 #if 0
@@ -963,16 +976,113 @@ protected:
         return SLANG_OK;
     }
 
+        /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given `offset`
+    Result _writeOrdinaryData(char* dest, size_t destSize)
+    {
+        auto src = m_ordinaryData.getBuffer();
+        auto srcSize = size_t(m_ordinaryData.getCount());
+
+        SLANG_ASSERT(srcSize <= destSize);
+
+        memcpy(dest, src, srcSize);
+
+        // TODO: In the case where this object has any sub-objects of
+        // existential/interface type, we need to recurse on those objects
+        // so that they write their state into either the "any-value"
+        // region or the appropriate "pending" allocation.
+        //
+        // Note: it is possible that writes into the "any-value" region
+        // could be handled directly as part of `setObject` calls instead,
+        // to avoid handling them here.
+
+        return SLANG_OK;
+    }
+
+        /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
+    Result _ensureOrdinaryDataBufferCreatedIfNeeded()
+    {
+        // If we have already created a buffer to hold ordinary data, then we should
+        // simply re-use that buffer rather than re-create it.
+        //
+        // TODO: Simply re-using the buffer without any kind of validation checks
+        // means that we are assuming that users cannot or will not perform any `set`
+        // operations on a shader object once an operation has requested this buffer
+        // be created. We need to enforce that rule if we want to rely on it.
+        //
+        if( m_ordinaryDataBuffer )
+            return SLANG_OK;
+
+        // Computing the size of the ordinary data buffer is *not* just as simple
+        // as using the size of the `m_ordinayData` array that we store. The reason
+        // for the added complexity is that interface-type fields may lead to the
+        // storage being specialized such that it needs extra appended data to
+        // store the concrete values that logically belong in those interface-type
+        // fields but wouldn't fit in the fixed-size allocation we gave them.
+        //
+        // TODO: We need to actually implement that logic by using reflection
+        // data computed for the specialized type of this shader object.
+        // For now we just make the simple assumption described above despite
+        // knowing that it is false.
+        //
+        auto specializedOrdinaryDataSize = m_ordinaryData.getCount();
+        if(specializedOrdinaryDataSize == 0)
+            return SLANG_OK;
+
+        // Once we have computed how large the buffer should be, we can allocate
+        // it using the existing public `IRenderer` API.
+        //
+        IRenderer* renderer = getRenderer();
+        IBufferResource::Desc bufferDesc;
+        bufferDesc.init(specializedOrdinaryDataSize);
+        bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+        SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
+            IResource::Usage::ConstantBuffer, bufferDesc, nullptr, m_ordinaryDataBuffer.writeRef()));
+
+        // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
+        //
+        // Note that `_writeOrdinaryData` is potentially recursive in the case
+        // where this object contains interface/existential-type fields, so we
+        // don't need or want to inline it into this call site.
+        //
+        char* dest = (char*)renderer->map(m_ordinaryDataBuffer, MapFlavor::HostWrite);
+        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize));
+        renderer->unmap(m_ordinaryDataBuffer);
+
+        return SLANG_OK;
+    }
+
+        /// Bind the buffer for ordinary/uniform data, if needed
+    Result _bindOrdinaryDataBufferIfNeeded(IDescriptorSet* descriptorSet, Index* ioBaseRangeIndex, Index subObjectRangeArrayIndex)
+    {
+        // We are going to need to tweak the base binding range index
+        // used for descriptor-set writes if and only if we actually
+        // bind a buffer for ordinary data.
+        //
+        auto& baseRangeIndex = *ioBaseRangeIndex;
+
+        // We start by ensuring that the buffer is created, if it is needed.
+        //
+        SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded());
+
+        // If we did indeed need/create a buffer, then we must bind it into
+        // the given `descriptorSet` and update the base range index for
+        // subsequent binding operations to account for it.
+        //
+        if (m_ordinaryDataBuffer)
+        {
+            descriptorSet->setConstantBuffer(baseRangeIndex, subObjectRangeArrayIndex, m_ordinaryDataBuffer);
+            baseRangeIndex++;
+        }
+
+        return SLANG_OK;
+    }
+
     Result _bindIntoDescriptorSet(
         IDescriptorSet* descriptorSet, Index baseRangeIndex, Index subObjectRangeArrayIndex)
     {
         GraphicsCommonShaderObjectLayout* layout = getLayout();
 
-        if (m_buffer)
-        {
-            descriptorSet->setConstantBuffer(baseRangeIndex, subObjectRangeArrayIndex, m_buffer);
-            baseRangeIndex++;
-        }
+        _bindOrdinaryDataBufferIfNeeded(descriptorSet, &baseRangeIndex, subObjectRangeArrayIndex);
 
         for (auto bindingRangeInfo : layout->getBindingRanges())
         {
@@ -1052,11 +1162,8 @@ public:
     {
         GraphicsCommonShaderObjectLayout* layout = getLayout();
 
-        if (m_buffer)
-        {
-            // TODO: look up binding infor for default constant buffer...
-            descriptorSets[0]->setConstantBuffer(0, 0, m_buffer);
-        }
+        Index baseRangeIndex = 0;
+        _bindOrdinaryDataBufferIfNeeded(descriptorSets[0], &baseRangeIndex, 0);
 
         // Fill in the descriptor sets based on binding ranges
         //
@@ -1121,7 +1228,8 @@ public:
         return SLANG_OK;
     }
 
-    ComPtr<IBufferResource> m_buffer;
+        /// Any "ordinary" / uniform data for this object
+    List<char> m_ordinaryData;
 
     List<ComPtr<IResourceView>> m_resourceViews;
 
@@ -1134,8 +1242,13 @@ public:
     };
     List<CombinedTextureSamplerSlot> m_combinedTextureSamplers;
 
-    //    List<RefPtr<DescriptorSet>> m_descriptorSets;
     List<RefPtr<GraphicsCommonShaderObject>> m_objects;
+
+        /// A constant buffer used to stored ordinary data for this object
+        /// and existential-type sub-objects.
+        ///
+        /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
+    ComPtr<IBufferResource> m_ordinaryDataBuffer;
 };
 
 class EntryPointVars : public GraphicsCommonShaderObject
@@ -1261,8 +1374,9 @@ protected:
 };
 
 
-Result SLANG_MCALL GraphicsAPIRenderer::createShaderObjectLayout(
-    slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout)
+Result GraphicsAPIRenderer::createShaderObjectLayout(
+    slang::TypeLayoutReflection* typeLayout,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<GraphicsCommonShaderObjectLayout> layout;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObjectLayout::createForElementType(
@@ -1271,8 +1385,9 @@ Result SLANG_MCALL GraphicsAPIRenderer::createShaderObjectLayout(
     return SLANG_OK;
 }
 
-Result SLANG_MCALL
-    GraphicsAPIRenderer::createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject)
+Result GraphicsAPIRenderer::createShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
 {
     RefPtr<GraphicsCommonShaderObject> shaderObject;
     SLANG_RETURN_ON_FAIL(GraphicsCommonShaderObject::create(this,

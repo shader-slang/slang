@@ -152,19 +152,19 @@ void SourceWriter::emit(Name* name)
 
 void SourceWriter::emit(const NameLoc& nameAndLoc)
 {
-    advanceToSourceLocation(nameAndLoc.loc);
+    advanceToSourceLocationIfValid(nameAndLoc.loc);
     emit(getText(nameAndLoc.name));
 }
 
 void SourceWriter::emit(const StringSliceLoc& nameAndLoc)
 {
-    advanceToSourceLocation(nameAndLoc.loc);
+    advanceToSourceLocationIfValid(nameAndLoc.loc);
     emit(nameAndLoc.name);
 }
 
 void SourceWriter::emitName(Name* name, const SourceLoc& locIn)
 {
-    advanceToSourceLocation(locIn);
+    advanceToSourceLocationIfValid(locIn);
     emit(name);
 }
 
@@ -251,19 +251,58 @@ void SourceWriter::emit(double value)
     emit(stream.str().c_str());
 }
 
-void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
+void SourceWriter::advanceToSourceLocationIfValid(const SourceLoc& sourceLocation)
 {
-    advanceToSourceLocation(getSourceManager()->getHumaneLoc(sourceLocation));
+    if (sourceLocation.isValid())
+    {
+        advanceToSourceLocation(sourceLocation);
+    }
 }
 
-void SourceWriter::advanceToSourceLocation(const HumaneSourceLoc& sourceLocation)
+void SourceWriter::advanceToSourceLocation(const SourceLoc& sourceLocation)
 {
-    // Skip invalid locations
-    if (sourceLocation.line <= 0)
+    if (getLineDirectiveMode() == LineDirectiveMode::None)
+    {
+        // Ignore if we aren't outputting directives 
         return;
+    }
+    
+    if (!sourceLocation.isValid())
+    {
+        // If it's not valid, we will just keep the current location.
 
-    m_needToUpdateSourceLocation = true;
-    m_nextSourceLocation = sourceLocation;
+        // The question now is if we want to trigger outputting the source location again. We do so if
+        // * The nextSourceLoc is valid
+        // * The line number on the output is different from that location
+        m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextSourceLoc.isValid() && m_nextHumaneSourceLocation.line != m_loc.line);
+        return;
+    }
+
+    // Even if the source location is the same, we still want to trigger output, as long
+    // as we have a valid line location.
+    if (sourceLocation == m_nextSourceLoc)
+    {
+        // This is important because we can end up with many instructions with the same source location - for example
+        // when we have [__unsafeForceInlineEarly] all the inlined instructions get the same location.
+        // When we output lines of source, the target sources line numbers change, therefore we need to
+        // output  the same #line directive multiple times.
+     
+        m_needToUpdateSourceLocation = m_needToUpdateSourceLocation || (m_nextHumaneSourceLocation.line > 0);
+        return;
+    }
+
+    // Workout the humane source location.
+    const HumaneSourceLoc humaneSourceLoc = getSourceManager()->getHumaneLoc(sourceLocation);
+
+    // If the location is valid, mark need to update, and the new location
+    if (humaneSourceLoc.line > 0)
+    {
+        m_needToUpdateSourceLocation = true;        
+        m_nextHumaneSourceLocation = humaneSourceLoc;
+    }
+
+    // Either way set this as the current source location.
+    m_nextSourceLoc = sourceLocation;
 }
 
 void SourceWriter::_flushSourceLocationChange()
@@ -276,7 +315,7 @@ void SourceWriter::_flushSourceLocationChange()
     // advances the location, and outputting text is what
     // triggers this flush operation.
     m_needToUpdateSourceLocation = false;
-    _emitLineDirectiveIfNeeded(m_nextSourceLocation);
+    _emitLineDirectiveIfNeeded(m_nextHumaneSourceLocation);
 }
 
 void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceLoc& sourceLocation)
