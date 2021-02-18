@@ -1,7 +1,7 @@
 // surface.h
 #pragma once
 
-#include "render.h"
+#include "slang-gfx.h"
 
 namespace gfx {
 

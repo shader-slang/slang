@@ -1,7 +1,7 @@
 // model.h
 #pragma once
 
-#include "tools/gfx/render.h"
+#include "slang-gfx.h"
 #include "vector-math.h"
 #include "slang-com-ptr.h"
 #include <vector>

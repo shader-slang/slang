@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/gfx/render.h"
+#include "slang-gfx.h"
 
 namespace gfx
 {
