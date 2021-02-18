@@ -196,16 +196,12 @@ int main()
 
     // Next, we create a shader object that represents the transformer we want to use.
     // To do so, we first need to lookup for the `AddTransformer` type defined in the shader code.
-    ComPtr<gfx::IShaderObject> transformer;
-    ComPtr<gfx::IShaderObjectLayout> transformerObjectLayout;
-    slang::TypeLayoutReflection* addTransformerTypeLayout = slangReflection->getTypeLayout(
-        slangReflection->findTypeByName("AddTransformer"));
+    slang::TypeReflection* addTransformerType = slangReflection->findTypeByName("AddTransformer");
 
     // Now we can use this type to create a shader object that can be bound to the root object.
-    SLANG_RETURN_ON_FAIL(renderer->createShaderObjectLayout(
-        addTransformerTypeLayout, transformerObjectLayout.writeRef()));
+    ComPtr<gfx::IShaderObject> transformer;
     SLANG_RETURN_ON_FAIL(
-        renderer->createShaderObject(transformerObjectLayout, transformer.writeRef()));
+        renderer->createShaderObject(addTransformerType, transformer.writeRef()));
     // Set the `c` field of the `AddTransformer`.
     float c = 1.0f;
     gfx::ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));

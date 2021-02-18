@@ -21,7 +21,6 @@ const Slang::Guid GfxGUID::IID_IResource = SLANG_UUID_IResource;
 const Slang::Guid GfxGUID::IID_IBufferResource = SLANG_UUID_IBufferResource;
 const Slang::Guid GfxGUID::IID_ITextureResource = SLANG_UUID_ITextureResource;
 const Slang::Guid GfxGUID::IID_IRenderer = SLANG_UUID_IRenderer;
-const Slang::Guid GfxGUID::IID_IShaderObjectLayout = SLANG_UUID_IShaderObjectLayout;
 const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 gfx::StageType translateStage(SlangStage slangStage)
@@ -216,6 +215,30 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::getSlangSession(slang::ISession*
     return SLANG_OK;
 }
 
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(slang::TypeReflection* type, IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, shaderObjectLayout.writeRef()));
+    return createShaderObject(shaderObjectLayout, outObject);
+}
+
+Result RendererBase::getShaderObjectLayout(
+    slang::TypeReflection*      type,
+    ShaderObjectLayoutBase**    outLayout)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    if( !m_shaderObjectLayoutCache.TryGetValue(type, shaderObjectLayout) )
+    {
+        auto typeLayout = slangContext.session->getTypeLayout(type);
+        SLANG_RETURN_ON_FAIL(createShaderObjectLayout(typeLayout, shaderObjectLayout.writeRef()));
+        m_shaderObjectLayoutCache.Add(type, shaderObjectLayout);
+    }
+    *outLayout = shaderObjectLayout.detach();
+    return SLANG_OK;
+}
+
+
+
 ShaderComponentID ShaderCache::getComponentId(slang::TypeReflection* type)
 {
     ComponentKey key;
@@ -361,13 +384,6 @@ Result ShaderBinary::writeToBlob(ISlangBlob** outBlob)
     RefPtr<RawBlob> blob = new RawBlob(outStream.getContents().getBuffer(), outStream.getContents().getCount());
     *outBlob = blob.detach();
     return SLANG_OK;
-}
-
-IShaderObjectLayout* ShaderObjectLayoutBase::getInterface(const Slang::Guid& guid)
-{
-    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObjectLayout)
-        return static_cast<IShaderObjectLayout*>(this);
-    return nullptr;
 }
 
 void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout)

@@ -1348,8 +1348,9 @@ private:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObjectLayout(
-        slang::TypeLayoutReflection* typeLayout, IShaderObjectLayout** outLayout) override
+    virtual Result createShaderObjectLayout(
+        slang::TypeLayoutReflection*    typeLayout,
+        ShaderObjectLayoutBase**        outLayout) override
     {
         RefPtr<CUDAShaderObjectLayout> cudaLayout;
         cudaLayout = new CUDAShaderObjectLayout(this, typeLayout);
@@ -1357,9 +1358,11 @@ private:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createShaderObject(IShaderObjectLayout* layout, IShaderObject** outObject) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject**         outObject) override
     {
+
         RefPtr<CUDAShaderObject> result = new CUDAShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, dynamic_cast<CUDAShaderObjectLayout*>(layout)));
         *outObject = result.detach();
