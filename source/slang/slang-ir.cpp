@@ -4307,8 +4307,10 @@ namespace Slang
     {
         StringBuilder*  builder = nullptr;
         int             indent  = 0;
-        IRDumpMode      mode    = IRDumpMode::Simplified;
 
+        IRDumpOptions   options;
+        PathInfo        lastPathInfo = PathInfo::makeUnknown();
+        
         Dictionary<IRInst*, String> mapValueToName;
         Dictionary<String, UInt>    uniqueNameCounters;
         UInt                        uniqueIDCounter = 1;
@@ -4393,7 +4395,7 @@ namespace Slang
         // a nice-to-have rather than a maintenance problem
         // waiting to happen.
 
-        // Allow an empty nam
+        // Allow an empty name
         // Special case a name that is the empty string, just in case.
         if(name.getLength() == 0)
         {
@@ -4636,7 +4638,7 @@ namespace Slang
         // in the "detailed" mode, so that we always
         // accurately reflect the structure of the IR.
         //
-        if(context->mode == IRDumpMode::Detailed)
+        if(context->options.mode == IRDumpOptions::Mode::Detailed)
             return false;
 
         if(as<IRConstant>(inst))
@@ -5044,6 +5046,49 @@ namespace Slang
 
         dumpIndent(context);
         dumpInstBody(context, inst);
+
+        // Output the originating source location
+        {
+            SourceManager* sourceManager = context->options.sourceManager;
+            if (sourceManager && context->options.flags & IRDumpOptions::Flag::SourceLocations)
+            {
+                StringBuilder buf;
+                buf << " loc: ";
+
+                // Output the line number information
+                if (inst->sourceLoc.isValid())
+                {
+                    // Might want to output actual, but nominal is okay for default
+                    const SourceLocType sourceLocType = SourceLocType::Nominal;
+
+                    // Get the source location
+                    const HumaneSourceLoc humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, sourceLocType);
+                    if (humaneLoc.line >= 0)
+                    {
+                        buf << humaneLoc.line << "," << humaneLoc.column;
+
+                        if (humaneLoc.pathInfo != context->lastPathInfo)
+                        {
+                            buf << " ";
+                            // Output the the location
+                            humaneLoc.pathInfo.appendDisplayName(buf);
+                            context->lastPathInfo = humaneLoc.pathInfo;
+                        }
+                    }
+                    else
+                    {
+                        buf << "not found";
+                    }
+                }
+                else
+                {
+                    buf << "na";
+                }
+
+                dump(context, buf.getUnownedSlice());
+            }
+        }
+
         dump(context, "\n");
     }
 
@@ -5057,24 +5102,24 @@ namespace Slang
         }
     }
 
-    void printSlangIRAssembly(StringBuilder& builder, IRModule* module, IRDumpMode mode)
+    void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options)
     {
         IRDumpContext context;
         context.builder = &builder;
         context.indent = 0;
-        context.mode = mode;
-
+        context.options = options;
+        
         dumpIRModule(&context, module);
     }
 
-    void dumpIR(IRInst* globalVal, ISlangWriter* writer, IRDumpMode mode)
+    void dumpIR(IRInst* globalVal, const IRDumpOptions& options, ISlangWriter* writer)
     {
         StringBuilder sb;
 
         IRDumpContext context;
         context.builder = &sb;
         context.indent = 0;
-        context.mode = mode;
+        context.options = options;
 
         dumpInst(&context, globalVal);
 
@@ -5082,9 +5127,9 @@ namespace Slang
         writer->flush();
     }
 
-    void dumpIR(IRModule* module, ISlangWriter* slangWriter, char const* label)
+    void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, ISlangWriter* inWriter)
     {
-        WriterHelper writer(slangWriter);
+        WriterHelper writer(inWriter);
 
         if (label)
         {
@@ -5093,7 +5138,7 @@ namespace Slang
             writer.put(":\n");
         }
 
-        dumpIR(module, slangWriter, IRDumpMode::Simplified);
+        dumpIR(module, options, inWriter);
 
         if (label)
         {
@@ -5101,16 +5146,16 @@ namespace Slang
         }
     }
 
-    String getSlangIRAssembly(IRModule* module, IRDumpMode mode)
+    String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options)
     {
         StringBuilder sb;
-        printSlangIRAssembly(sb, module, mode);
+        printSlangIRAssembly(sb, module, options);
         return sb;
     }
 
-    void dumpIR(IRModule* module, ISlangWriter* writer, IRDumpMode mode)
+    void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* writer)
     {
-        String ir = getSlangIRAssembly(module, mode);
+        String ir = getSlangIRAssembly(module, options);
         writer->write(ir.getBuffer(), ir.getLength());
         writer->flush();
     }

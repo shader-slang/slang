@@ -55,7 +55,8 @@ public:
 
         /// Move the current source location to that specified
     void advanceToSourceLocation(const SourceLoc& sourceLocation);
-    void advanceToSourceLocation(const HumaneSourceLoc& sourceLocation);
+        /// Only advances if the sourceLocation is valid
+    void advanceToSourceLocationIfValid(const SourceLoc& sourceLocation);
 
         /// Get the content as a string
     String getContent() { return m_builder.ProduceString(); }
@@ -96,9 +97,12 @@ protected:
 
     // Current source position for tracking purposes...
     HumaneSourceLoc m_loc;
-    HumaneSourceLoc m_nextSourceLocation;
-    bool m_needToUpdateSourceLocation = false;
 
+    SourceLoc m_nextSourceLoc;
+    HumaneSourceLoc m_nextHumaneSourceLocation;
+    
+    bool m_needToUpdateSourceLocation = false;
+   
     // Are we at the start of a line, so that we should indent
     // before writing any other text?
     bool m_isAtStartOfLine = true;

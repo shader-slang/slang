@@ -557,6 +557,16 @@ namespace Slang
         return false;
     }
 
+    bool AdvanceIf(Parser* parser, TokenType tokenType, Token* outToken)
+    {
+        if (parser->LookAheadToken(tokenType))
+        {
+            *outToken = parser->ReadToken();
+            return true;
+        }
+        return false;
+    }
+
     // Consume a token and return true it if matches, otherwise false
     bool AdvanceIf(Parser* parser, char const* text)
     {
@@ -585,6 +595,24 @@ namespace Slang
         if (parser->tokenReader.peekTokenType() == TokenType::EndOfFile)
         {
             parser->ReadToken(tokenType);
+            return true;
+        }
+        return false;
+    }
+
+    bool AdvanceIfMatch(Parser* parser, TokenType tokenType, Token* outToken)
+    {
+        // If we've run into a syntax error, but haven't recovered inside
+        // the block, then try to recover here.
+        if (parser->isRecovering)
+        {
+            TryRecoverBefore(parser, tokenType);
+        }
+        if (AdvanceIf(parser, tokenType, outToken))
+            return true;
+        if (parser->tokenReader.peekTokenType() == TokenType::EndOfFile)
+        {
+            *outToken = parser->ReadToken(tokenType);
             return true;
         }
         return false;
@@ -3925,7 +3953,9 @@ namespace Slang
         {
             FillPosition(blockStatement);
         }
-        while (!AdvanceIfMatch(this, TokenType::RBrace))
+
+        Token closingBraceToken;
+        while (!AdvanceIfMatch(this, TokenType::RBrace, &closingBraceToken))
         {
             auto stmt = ParseStatement();
             if(stmt)
@@ -3951,6 +3981,9 @@ namespace Slang
             TryRecover(this);
         }
         PopScope();
+
+        // Save the closing braces source loc
+        blockStatement->closingSourceLoc = closingBraceToken.loc;
 
         if(!body)
         {

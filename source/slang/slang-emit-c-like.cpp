@@ -323,9 +323,9 @@ void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAn
 {
     if (nameAndLoc)
     {
-        // TODO(JS): No call to the previous version of this method was passing in a typeLoc, so disabled for
-        // now for simplicity
-        //m_writer->advanceToSourceLocation(typeLoc);
+        // We advance here, such that if there is a #line directive to output it will
+        // be done so before the type name appears.
+        m_writer->advanceToSourceLocationIfValid(nameAndLoc->loc);
 
         EDeclarator nameDeclarator;
         nameDeclarator.flavor = EDeclarator::Flavor::Name;
@@ -1986,7 +1986,16 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         return;
     }
 
-    m_writer->advanceToSourceLocation(inst->sourceLoc);
+    // Specially handle params. The issue here is around PHI nodes, and that they do not
+    // have source loc information, by default, but we don't want to force outputting a #line.
+    if (inst->getOp() == kIROp_Param)
+    {
+        m_writer->advanceToSourceLocationIfValid(inst->sourceLoc);
+    }
+    else
+    {
+         m_writer->advanceToSourceLocation(inst->sourceLoc);
+    }
 
     switch(inst->getOp())
     {
@@ -2694,6 +2703,7 @@ void CLikeSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     auto name = getName(func);
 
     emitFuncDecorations(func);
+
     emitType(resultType, name);
     emitSimpleFuncParamsImpl(func);
     emitSemantics(func);

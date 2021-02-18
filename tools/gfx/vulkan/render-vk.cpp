@@ -249,6 +249,14 @@ public:
         }
     public:
         VkSampler m_sampler;
+        const VulkanApi* m_api;
+        SamplerStateImpl(const VulkanApi* api)
+            : m_api(api)
+        {}
+        ~SamplerStateImpl()
+        {
+            m_api->vkDestroySampler(m_api->m_device, m_sampler, nullptr);
+        }
     };
 
     class ResourceViewImpl : public IResourceView, public RefObject
@@ -268,17 +276,26 @@ public:
             TexelBuffer,
             PlainBuffer,
         };
+    public:
+        ResourceViewImpl(ViewType viewType, const VulkanApi* api)
+            : m_type(viewType), m_api(api)
+        {
+        }
         ViewType            m_type;
+        const VulkanApi* m_api;
     };
 
     class TextureResourceViewImpl : public ResourceViewImpl
     {
     public:
-        TextureResourceViewImpl()
+        TextureResourceViewImpl(const VulkanApi* api)
+            : ResourceViewImpl(ViewType::Texture, api)
         {
-            m_type = ViewType::Texture;
         }
-
+        ~TextureResourceViewImpl()
+        {
+            m_api->vkDestroyImageView(m_api->m_device, m_view, nullptr);
+        }
         RefPtr<TextureResourceImpl> m_texture;
         VkImageView                 m_view;
         VkImageLayout               m_layout;
@@ -287,11 +304,14 @@ public:
     class TexelBufferResourceViewImpl : public ResourceViewImpl
     {
     public:
-        TexelBufferResourceViewImpl()
+        TexelBufferResourceViewImpl(const VulkanApi* api)
+            : ResourceViewImpl(ViewType::TexelBuffer, api)
         {
-            m_type = ViewType::TexelBuffer;
         }
-
+        ~TexelBufferResourceViewImpl()
+        {
+            m_api->vkDestroyBufferView(m_api->m_device, m_view, nullptr);
+        }
         RefPtr<BufferResourceImpl>  m_buffer;
         VkBufferView m_view;
     };
@@ -299,11 +319,10 @@ public:
     class PlainBufferResourceViewImpl : public ResourceViewImpl
     {
     public:
-        PlainBufferResourceViewImpl()
+        PlainBufferResourceViewImpl(const VulkanApi* api)
+            : ResourceViewImpl(ViewType::PlainBuffer, api)
         {
-            m_type = ViewType::PlainBuffer;
         }
-
         RefPtr<BufferResourceImpl>  m_buffer;
         VkDeviceSize                offset;
         VkDeviceSize                size;
@@ -1989,7 +2008,7 @@ Result VKRenderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
 
-    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
+    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl(&m_api);
     samplerImpl->m_sampler = sampler;
     *outSampler = samplerImpl.detach();
     return SLANG_OK;
@@ -1997,8 +2016,60 @@ Result VKRenderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
 
 Result VKRenderer::createTextureView(ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
-    assert(!"unimplemented");
-    return SLANG_FAIL;
+    auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
+    RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(&m_api);
+    view->m_texture = resourceImpl;
+    VkImageViewCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.flags = 0;
+    createInfo.format = VulkanUtil::getVkFormat(desc.format);
+    createInfo.image = resourceImpl->m_image;
+    createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
+    switch (resourceImpl->getType())
+    {
+    case IResource::Type::Texture1D:
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_1D;
+        break;
+    case IResource::Type::Texture2D:
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        break;
+    case IResource::Type::Texture3D:
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
+        break;
+    case IResource::Type::TextureCube:
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        break;
+    default:
+        SLANG_UNIMPLEMENTED_X("Unknown Texture type.");
+        break;
+    }
+    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    createInfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    switch (desc.type)
+    {
+    case IResourceView::Type::DepthStencil:
+        view->m_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        break;
+    case IResourceView::Type::RenderTarget:
+        view->m_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        break;
+    case IResourceView::Type::ShaderResource:
+        view->m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        break;
+    case IResourceView::Type::UnorderedAccess:
+        view->m_layout = VK_IMAGE_LAYOUT_GENERAL;
+        break;
+    default:
+        SLANG_UNIMPLEMENTED_X("Unknown TextureViewDesc type.");
+        break;
+    }
+    m_api.vkCreateImageView(m_device, &createInfo, nullptr, &view->m_view);
+    *outView = view.detach();
+    return SLANG_OK;
 }
 
 Result VKRenderer::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
@@ -2041,7 +2112,7 @@ Result VKRenderer::createBufferView(IBufferResource* buffer, IResourceView::Desc
         {
             // Buffer usage that doesn't involve formatting doesn't
             // require a view in Vulkan.
-            RefPtr<PlainBufferResourceViewImpl> viewImpl = new PlainBufferResourceViewImpl();
+            RefPtr<PlainBufferResourceViewImpl> viewImpl = new PlainBufferResourceViewImpl(&m_api);
             viewImpl->m_buffer = resourceImpl;
             viewImpl->offset = 0;
             viewImpl->size = size;
@@ -2065,7 +2136,7 @@ Result VKRenderer::createBufferView(IBufferResource* buffer, IResourceView::Desc
             VkBufferView view;
             SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
 
-            RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl();
+            RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl(&m_api);
             viewImpl->m_buffer = resourceImpl;
             viewImpl->m_view = view;
             *outView = viewImpl.detach();
@@ -2698,7 +2769,6 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourc
             VkDescriptorImageInfo imageInfo = {};
             imageInfo.imageView = textureViewImpl->m_view;
             imageInfo.imageLayout = textureViewImpl->m_layout;
-            //            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
             VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
             writeInfo.dstSet = m_descriptorSet;
@@ -2762,7 +2832,16 @@ void VKRenderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerS
     auto boundObjectIndex = rangeInfo.arrayIndex + index;
     auto descriptorType = rangeInfo.vkDescriptorType;
 
-    // TODO: Actually bind it!
+    VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writeInfo.dstSet = m_descriptorSet;
+    writeInfo.dstBinding = uint32_t(bindingIndex);
+    writeInfo.dstArrayElement = uint32_t(index);
+    writeInfo.descriptorCount = 1;
+    writeInfo.descriptorType = descriptorType;
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.sampler = static_cast<SamplerStateImpl*>(sampler)->m_sampler;
+    writeInfo.pImageInfo = &imageInfo;
+    m_renderer->m_api.vkUpdateDescriptorSets(m_renderer->m_device, 1, &writeInfo, 0, nullptr);
 
     m_boundObjects[boundObjectIndex] = dynamic_cast<RefObject*>(sampler);
 }
@@ -2885,9 +2964,6 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
 
-    const int width = int(desc.framebufferWidth);
-    const int height = int(desc.framebufferHeight);
-
     // Shader Stages
     //
     // Currently only handles vertex/fragment.
@@ -2932,14 +3008,16 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     VkViewport viewport = {};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float)width;
-    viewport.height = (float)height;
+    // We are using dynamic viewport and scissor state.
+    // Here we specify an arbitrary size, actual viewport will be set at `beginRenderPass` time.
+    viewport.width = 16.0f;
+    viewport.height = 16.0f;
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
     VkRect2D scissor = {};
     scissor.offset = { 0, 0 };
-    scissor.extent = { uint32_t(width), uint32_t(height) };
+    scissor.extent = { uint32_t(16), uint32_t(16) };
 
     VkPipelineViewportStateCreateInfo viewportState = {};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -2978,6 +3056,12 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
+    dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicStateInfo.dynamicStateCount = 2;
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT , VK_DYNAMIC_STATE_SCISSOR};
+    dynamicStateInfo.pDynamicStates = dynamicStates;
+
     VkGraphicsPipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -2993,6 +3077,7 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     pipelineInfo.renderPass = m_renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    pipelineInfo.pDynamicState = &dynamicStateInfo;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api.vkCreateGraphicsPipelines(m_device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline));

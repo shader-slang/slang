@@ -1358,6 +1358,16 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
                         sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY, ";
                         sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+
+                        sb << "__glsl_extension(GL_ARB_sparse_texture_clamp)";
+                        sb << "__target_intrinsic(glsl, \"$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z\")\n";
+                        sb << "T SampleGrad(SamplerState s, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " gradX, ";
+                        sb << "float" << kBaseTextureTypes[tt].coordCount << " gradY, ";
+                        sb << "constexpr int" << kBaseTextureTypes[tt].coordCount << " offset, ";
+                        sb << "float lodClamp);\n";
+
                     }
 
                     // `SampleLevel`

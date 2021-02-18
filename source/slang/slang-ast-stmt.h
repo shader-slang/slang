@@ -28,6 +28,9 @@ class BlockStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(BlockStmt)
 
+        /// TODO(JS): Having ranges of sourcelocs might be a good addition to AST nodes in general.
+    SourceLoc closingSourceLoc;         ///< The source location of the closing brace
+
     Stmt* body = nullptr;
 };
 
