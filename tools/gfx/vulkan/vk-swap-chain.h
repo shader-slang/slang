@@ -44,6 +44,7 @@ struct VulkanSwapChain
             m_depthFormatTypeless = Format::Unknown;
             m_depthFormat = Format::Unknown;
             m_textureDepthFormat = Format::Unknown;
+            m_imageCount = 2;
         }
 
         Format m_format;
@@ -51,6 +52,7 @@ struct VulkanSwapChain
         Format m_depthFormatTypeless;
         Format m_depthFormat;
         Format m_textureDepthFormat;
+        uint32_t m_imageCount;
     };
 
     struct Image

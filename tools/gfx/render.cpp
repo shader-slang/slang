@@ -25,6 +25,7 @@ static const uint8_t s_formatSize[] = {
     uint8_t(sizeof(float) * 1), // R_Float32,
 
     uint8_t(sizeof(uint32_t)), // RGBA_Unorm_UInt8,
+    uint8_t(sizeof(uint32_t)), // BGRA_Unorm_UInt8,
 
     uint8_t(sizeof(uint16_t)), // R_UInt16,
     uint8_t(sizeof(uint32_t)), // R_UInt32,
@@ -85,30 +86,30 @@ extern "C"
         }
     }
 
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
     {
         switch (desc->rendererType)
         {
 #if SLANG_WINDOWS_FAMILY
         case RendererType::DirectX11:
             {
-                return createD3D11Renderer(desc, windowHandle, outRenderer);
+                return createD3D11Renderer(desc, outRenderer);
             }
         case RendererType::DirectX12:
             {
-                return createD3D12Renderer(desc, windowHandle, outRenderer);
+                return createD3D12Renderer(desc, outRenderer);
             }
         case RendererType::OpenGl:
             {
-                return createGLRenderer(desc, windowHandle, outRenderer);
+                return createGLRenderer(desc, outRenderer);
             }
         case RendererType::Vulkan:
             {
-                return createVKRenderer(desc, windowHandle, outRenderer);
+                return createVKRenderer(desc, outRenderer);
             }
         case RendererType::CUDA:
             {
-                return createCUDARenderer(desc, windowHandle, outRenderer);
+                return createCUDARenderer(desc, outRenderer);
             }
 #endif
 

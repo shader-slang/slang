@@ -83,7 +83,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
         VkFormat format = formats[i];
         if (_indexOfFormat(surfaceFormats, format) >= 0)
         {
-            m_format =  format;
+            m_format = format;
         }
     }
 
@@ -94,10 +94,12 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 
     // Save the desc
     m_desc = desc;
-
     SLANG_RETURN_ON_FAIL(_createSwapChain());
 
-    m_desc = desc;
+    if (descIn.m_format == Format::RGBA_Unorm_UInt8 && m_format == VK_FORMAT_B8G8R8A8_UNORM)
+    {
+        m_desc.m_format = Format::BGRA_Unorm_UInt8;
+    }
     return SLANG_OK;
 }
 
@@ -245,7 +247,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
     VkSwapchainCreateInfoKHR swapchainDesc = {};
     swapchainDesc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchainDesc.surface = m_surface;
-    swapchainDesc.minImageCount = 3;
+    swapchainDesc.minImageCount = m_desc.m_imageCount;
     swapchainDesc.imageFormat = m_format;
     swapchainDesc.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     swapchainDesc.imageExtent = imageExtent;
@@ -262,7 +264,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
 
     uint32_t numSwapChainImages = 0;
     m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);
-
+    m_desc.m_imageCount = numSwapChainImages;
     {
         List<VkImage> images;
         images.setCount(numSwapChainImages);
@@ -397,7 +399,7 @@ void VulkanSwapChain::present(bool vsync)
         return;
     }
 
-    VkSemaphore endFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::EndFrame);
+    VkSemaphore endFrameSemaphore = m_deviceQueue->getSemaphore(VulkanDeviceQueue::EventType::EndFrame);
 
     m_deviceQueue->flushStepA();
 
@@ -408,9 +410,11 @@ void VulkanSwapChain::present(bool vsync)
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &m_swapChain;
     presentInfo.pImageIndices = swapChainIndices;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &endFrameSemaphore;
-
+    if (endFrameSemaphore != VK_NULL_HANDLE)
+    {
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &endFrameSemaphore;
+    }
     VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->getQueue(), &presentInfo);
 
     m_deviceQueue->makeCompleted(VulkanDeviceQueue::EventType::EndFrame);

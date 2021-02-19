@@ -126,7 +126,7 @@ gfx::IRenderer* createRenderer(
     rendererDesc.rendererType = gfx::RendererType::DirectX11;
     rendererDesc.width = windowWidth;
     rendererDesc.height = windowHeight;
-    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(window), gRenderer.writeRef());
+    Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if (SLANG_FAILED(res)) return nullptr;
     return gRenderer;
 }
@@ -196,7 +196,7 @@ gfx::IDescriptorSet* buildDescriptorSet(
     // Once we have the descriptor set layout, we can allocate
     // and fill in a descriptor set to hold our parameters.
     //
-    gDescriptorSet = renderer->createDescriptorSet(descriptorSetLayout);
+    gDescriptorSet = renderer->createDescriptorSet(descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
     if(!gDescriptorSet) return nullptr;
 
     // Once we have the bufferResource created, we can fill in

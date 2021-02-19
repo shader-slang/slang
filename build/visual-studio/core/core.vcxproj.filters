@@ -156,6 +156,9 @@
     <ClInclude Include="..\..\..\source\core\slang-uint-set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-virtual-object-pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-visual-studio-compiler-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
