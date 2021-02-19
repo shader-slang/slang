@@ -17,7 +17,7 @@
 // layer, just to keep the examples short and to the point.
 //
 #include "graphics-app-framework/model.h"
-#include "gfx/render.h"
+#include "slang-gfx.h"
 #include "graphics-app-framework/vector-math.h"
 #include "graphics-app-framework/window.h"
 #include "graphics-app-framework/gui.h"

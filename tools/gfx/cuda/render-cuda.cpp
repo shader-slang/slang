@@ -1358,7 +1358,7 @@ private:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+    virtual Result createShaderObject(
         ShaderObjectLayoutBase* layout,
         IShaderObject**         outObject) override
     {

@@ -4,7 +4,7 @@
 #include "vk-api.h"
 #include "vk-device-queue.h"
 
-#include "../render.h"
+#include "slang-gfx.h"
 
 #include "core/slang-list.h"
 

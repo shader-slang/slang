@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tools/gfx/render.h"
+#include "slang-gfx.h"
 #include "slang-context.h"
 #include "core/slang-basic.h"
 

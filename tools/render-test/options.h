@@ -12,7 +12,7 @@
 
 #include "../../source/core/slang-process-util.h"
 
-#include "render.h"
+#include "../../slang-gfx.h"
 
 namespace renderer_test {
 
