@@ -172,6 +172,11 @@ public:
         /// Note that this is lazily evaluated - the line breaks are only calculated on the first request 
     const List<uint32_t>& getLineBreakOffsets();
 
+        /// Returns true if the offset is on the specified line
+        /// NOTE! If offsets are not fully setup (because we have source), will only be correct for lines that have offsets
+        /// Clamps line indices which are out of range
+    bool isOffsetOnLine(uint32_t offset, Index lineIndex);
+
         /// Set the line break offsets
     void setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets);
 

@@ -279,6 +279,32 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     return m_lineBreakOffsets;
 }
 
+bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
+{
+    const List<uint32_t>& offsets = getLineBreakOffsets();
+    const Index count = offsets.getCount();
+
+    lineIndex = (lineIndex < 0) ? 0 : lineIndex;
+
+    if (lineIndex >= count - 1)
+    {
+        // Handle case of no lines
+        if (count == 0)
+        {
+            return offset == 0;
+        }
+        // Must be greater than last entry
+        return offset > offsets[count - 1];
+    }
+    else
+    {
+        // If it's on this line it has to be within the range
+        const uint32_t startOffset = offsets[lineIndex];
+        const uint32_t endOffset = offsets[lineIndex + 1];
+        return offset >= startOffset && offset <= endOffset;
+    }
+}
+
 int SourceFile::calcLineIndexFromOffset(int offset)
 {
     SLANG_ASSERT(UInt(offset) <= getContentSize());
