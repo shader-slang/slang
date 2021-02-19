@@ -115,6 +115,8 @@ protected:
         /// Only works on 'after' locations, and will return -1 if not found
     Index _findAfterIndex(const FindInfo& info, Location location);
 
+    static bool _isLineIndexOk(SourceView* sourceView, MarkupType type, Location location, const Token& tok, Index lineIndex);
+
     void _addDecl(Decl* decl);
     void _addDeclRec(Decl* decl);
     void _findDecls(ModuleDecl* moduleDecl);
@@ -337,7 +339,7 @@ Index DocumentationContext::_findAfterIndex(const FindInfo& info, Location locat
     return -1;
 }
 
-static int _findLineIndex(SourceFile* sourceFile, Index lineIndex, uint32_t offset)
+static Index _findLineIndex(SourceFile* sourceFile, Index lineIndex, uint32_t offset)
 {
     const List<uint32_t>& offsets = sourceFile->getLineBreakOffsets();
     const Index searchSize = 10;
@@ -373,18 +375,6 @@ static int _findLineIndex(SourceFile* sourceFile, Index lineIndex, uint32_t offs
     // Do it the slower way
     return sourceFile->calcLineIndexFromOffset(offset);
 }
-
-bool _isLineOk(SourceView* sourceView, DocumentationContext::Location location, const Token& tok, Index lineIndex)
-{
-    SourceFile* sourceFile = sourceView->getSourceFile();
-    const auto& locRange = sourceView->getRange();
-
-    int offset = locRange.getOffset(tok.loc);
-
-
-
-}
-
 
 bool DocumentationContext::_isLineOrderingOk(const FindInfo& info, const FoundMarkup& found, Index lineIndex)
 {
@@ -441,6 +431,28 @@ bool DocumentationContext::_isLineOrderingOk(const FindInfo& info, const FoundMa
     return true;
 }
 
+/* static */bool DocumentationContext::_isLineIndexOk(SourceView* sourceView, MarkupType type, Location location, const Token& tok, Index lineIndex)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    const auto& locRange = sourceView->getRange();
+
+    int offset = locRange.getOffset(tok.loc);
+
+    auto const flags = getFlags(type);
+
+    if (flags & MarkupFlag::IsBlock)
+    {
+        // Either the start or the end of the block have to be on the specified line
+        return sourceFile->isOffsetOnLine(offset, lineIndex) || sourceFile->isOffsetOnLine(offset + tok.charsCount, lineIndex);
+    }
+    else
+    {
+        // Has to be exactly on the specified line
+        return sourceFile->isOffsetOnLine(offset, lineIndex);
+    }
+}
+
+
 SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
 {
     out.reset();
@@ -449,7 +461,7 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
     const Index tokIndex = info.declTokenIndex;
 
     // The line index that the markoff starts from 
-    Index lineIndex = info.declLineIndex - 1;
+    Index lineIndex = -1; 
     // The token stream search direction, valid values are -1 and 1
     Index searchDirection = 0;
     // The starting token index
@@ -457,6 +469,7 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
 
     if (location == Location::Before)
     {
+        lineIndex = info.declLineIndex - 1;
         startIndex = tokIndex - 1;
         searchDirection = -1;
     }
@@ -496,6 +509,14 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
         return SLANG_E_NOT_FOUND;
     }
 
+    Index currentLineIndex = lineIndex;
+
+    // The token still isn't accepted, unless it's on the expected line
+    if (_isLineIndexOk(info.sourceView, type, location, toks[startIndex], currentLineIndex))
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
     Index endIndex = startIndex + searchDirection;
 
     // If it's multiline, so look for the end index
@@ -506,13 +527,19 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
         // For now we don't bother
         while (endIndex >= 0 && endIndex < toks.getCount())
         {
+            // Do we find a token of the right type?
             if (findMarkupType(toks[endIndex + searchDirection]) != type)
             {
                 break;
             }
 
+            // Is it on the right line?
+            if (_isLineIndexOk(info.sourceView, type, location, toks[startIndex], currentLineIndex + searchDirection))
+            {
+                break;
+            }
 
-
+            currentLineIndex += searchDirection;
             endIndex += searchDirection;
         }
     }
