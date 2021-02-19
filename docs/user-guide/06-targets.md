@@ -129,7 +129,7 @@ Each stage has its own slots of the following types:
 
 * **Constant bufffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
 
-* **Shader resourcee views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
+* **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
 
 * **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
 
@@ -233,11 +233,11 @@ Vulkan is a cross-platform GPU API for graphics and compute with a detailed spec
 In contrast with OpenGL, Vulkan focuses on providing explicit control over as many aspects of GPU work as possible.
 In contrast with OpenCL, Vulkan focuses first and foremost on the needs of real-time graphics developers.
 
-Vulkan requires kernels to be compiled to the SPIR-V intemediate language.
+Vulkan requires kernels to be compiled to the SPIR-V intermediate language.
 SPIR-V is a simple and extensible binary program format with a detailed specification; it is largely unrelated to earlier "SPIR" formats that were LLVM-based and loosely specified.
 The SPIR-V format does not require signing or hashing, and is explicitly designed to allow many different tools to produce and manipulate the format.
 Drivers that consume SPIR-V are expected to perform validation at load time.
-Some choices in the SPIR-V encoding are heavily influences by specific design choices in the GLSL language, and may require non-GLSL compilers to transform code to match GLSL idioms.
+Some choices in the SPIR-V encoding are heavily influenced by specific design choices in the GLSL language, and may require non-GLSL compilers to transform code to match GLSL idioms.
 
 ### Pipelines
 
@@ -247,7 +247,7 @@ Vulkan includes rasterization, compute, and ray tracing pipelines with the same 
 
 Like D3D12, Vulkan uess blocks (called "descriptor sets") to organize groups of bindings for opaque types (textures, buffers, samplers).
 Similar to D3D12, a Vulkan pipeline supports a limited number of slots for passing blocks to the pipeline, and these slots are shared across all stages.
-Vulkan also supports a limited number of bytes reserved for passing root constnats (called "push constants").
+Vulkan also supports a limited number of bytes reserved for passing root constants (called "push constants").
 Vulkan uses pipeline layouts to describe configurations of usage for blocks and root constants.
 
 High-level-language shader parameters are bound to a combination of a "binding" and a "set" for Vulkan, which are superficially similar to the reigsters and spaces of D3D12.
@@ -308,7 +308,7 @@ CUDA and OptiX allow kernels to be loaded as GPU-specific binaries, or using the
 
 CUDA supports a compute pipeline that is similar to D3D12 or Vulkan, with additional features.
 
-OptiX introduced the style or ray tracing pipeline adopted by D3D12 and Vulkan, and thus uses the same basic stages.
+OptiX introduced the style of ray tracing pipeline adopted by D3D12 and Vulkan, and thus uses the same basic stages.
 
 The CUDA system does not currently expose a rasterization pipeline.
 
@@ -356,7 +356,7 @@ Summary
 -------
 
 This chapter has reviewed the main target platforms supported by the Slang compiler and runtime system.
-A key point to take away is that there is great variation in the capabilities of these system.
+A key point to take away is that there is great variation in the capabilities of these systems.
 Even superficially similar graphics APIs have complicated differences in their parameter-passing mechanisms that must be accounted for by application programmers and GPU compilers.
 
 In the next chapter, we will discuss how the Slang compiler adapts to the different capabilities and rules of these platforms when laying out shader parameters in memory and then binding those parameters to the mechanisms defined by each platform.
