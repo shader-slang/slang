@@ -96,9 +96,6 @@ protected:
         /// returns SLANG_E_NOT_FOUND if not found, SLANG_OK on success else an error
     SlangResult _findMarkup(const FindInfo& info, Location location, FoundMarkup& out);
 
-        /// True if the line ordering is appropriate (no gaps, starts appropriately)
-    bool _isLineOrderingOk(const FindInfo& info, const FoundMarkup& found, Index lineIndex);
-
         /// Locations are processed in order, and the first successful used. If found in another location will issue a warning.
         /// returns SLANG_E_NOT_FOUND if not found, SLANG_OK on success else an error
     SlangResult _findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex);
@@ -115,7 +112,8 @@ protected:
         /// Only works on 'after' locations, and will return -1 if not found
     Index _findAfterIndex(const FindInfo& info, Location location);
 
-    static bool _isLineIndexOk(SourceView* sourceView, MarkupType type, Location location, const Token& tok, Index lineIndex);
+        /// True if the tok is 'on' lineIndex. Interpretation of 'on' depends on the markup type.
+    static bool _isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex);
 
     void _addDecl(Decl* decl);
     void _addDeclRec(Decl* decl);
@@ -339,104 +337,10 @@ Index DocumentationContext::_findAfterIndex(const FindInfo& info, Location locat
     return -1;
 }
 
-static Index _findLineIndex(SourceFile* sourceFile, Index lineIndex, uint32_t offset)
-{
-    const List<uint32_t>& offsets = sourceFile->getLineBreakOffsets();
-    const Index searchSize = 10;
-    const uint32_t lineOffset = offsets[lineIndex];
-
-    if (offset > lineOffset)
-    {
-        Index lastLine = lineIndex - searchSize;
-        lastLine = (lastLine < 0) ? 0 : lastLine;
-        // Search for first line where the offset is less
-        for (Index i = lineIndex - 1; i >= lastLine; --i)
-        {
-            if (offsets[i] < offset)
-            {
-                return i + 1;
-            }
-        }
-    }
-    else
-    {
-        Index lastLine = lineIndex + searchSize;
-        lastLine = (lastLine > offsets.getCount()) ? offsets.getCount() : lastLine;
-
-        // Search for first line where it is greater
-        for (Index i = lineIndex + 1; i < lastLine; ++i)
-        {
-            if (offsets[i] > offset)
-            {
-                return i - 1;
-            }
-        }
-    }
-    // Do it the slower way
-    return sourceFile->calcLineIndexFromOffset(offset);
-}
-
-bool DocumentationContext::_isLineOrderingOk(const FindInfo& info, const FoundMarkup& found, Index lineIndex)
-{
-    const Index toksCount = found.range.getCount();
-    if (toksCount <= 0)
-    {
-        return false;
-    }
-
-    const MarkupFlags flags = getFlags(found.type);  
-    if ((flags & MarkupFlag::IsMultiToken) && toksCount > 1)
-    {
-        return false;
-    }
-
-    SourceView* sourceView = info.sourceView;
-    SourceFile* sourceFile = sourceView->getSourceFile();
-    const auto& locRange = sourceView->getRange();
-
-    if (flags & MarkupFlag::IsBlock)
-    {
-        Token& tok = info.tokenList->m_tokens[found.range.start];
-        int offset = locRange.getOffset(tok.loc);
-
-        if (found.location == Location::Before)
-        {
-            // The end of the token should be on the line before
-            return sourceFile->isOffsetOnLine(offset + tok.charsCount, lineIndex - 1);
-        }
-        else
-        {
-            // Has to start on the same line
-            return sourceFile->isOffsetOnLine(offset, lineIndex);
-        }
-    }
-    else
-    {
-        for (Index i = 0; i < toksCount; ++i)
-        {
-            const Token& tok = info.tokenList->m_tokens[found.range.start + i];
-            int offset = locRange.getOffset(tok.loc);
-
-            // If before, all lines have to be one line before
-            // If after all lines start on lineIndex
-            const Index expectedLineIndex = (found.location == Location::Before) ? ((lineIndex - toksCount) + i) : (lineIndex + i);
-
-            if (!sourceFile->isOffsetOnLine(offset, lineIndex + i))
-            {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
-/* static */bool DocumentationContext::_isLineIndexOk(SourceView* sourceView, MarkupType type, Location location, const Token& tok, Index lineIndex)
+/* static */bool DocumentationContext::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
-    const auto& locRange = sourceView->getRange();
-
-    int offset = locRange.getOffset(tok.loc);
+    const int offset = sourceView->getRange().getOffset(tok.loc);
 
     auto const flags = getFlags(type);
 
@@ -509,39 +413,48 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
         return SLANG_E_NOT_FOUND;
     }
 
-    Index currentLineIndex = lineIndex;
+    Index expectedLineIndex = lineIndex;
 
     // The token still isn't accepted, unless it's on the expected line
-    if (_isLineIndexOk(info.sourceView, type, location, toks[startIndex], currentLineIndex))
+    if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    Index endIndex = startIndex + searchDirection;
+    Index endIndex = startIndex;
 
     // If it's multiline, so look for the end index
     if (flags & MarkupFlag::IsMultiToken)
     {
         // TODO(JS):
-        // We should probably do the work here to confirm that these are on separate lines, and ideally with the same indentation.
-        // For now we don't bother
-        while (endIndex >= 0 && endIndex < toks.getCount())
+        // We should probably do the work here to confirm  indentation - but that
+        // requires knowing something about tabs, so for now we leave.
+
+        while (true)
         {
+            endIndex += searchDirection;
+            expectedLineIndex += searchDirection;
+
+            if (endIndex < 0 || endIndex >= toks.getCount())
+            {
+                break;
+            }
+
             // Do we find a token of the right type?
-            if (findMarkupType(toks[endIndex + searchDirection]) != type)
+            if (findMarkupType(toks[endIndex]) != type)
             {
                 break;
             }
 
             // Is it on the right line?
-            if (_isLineIndexOk(info.sourceView, type, location, toks[startIndex], currentLineIndex + searchDirection))
+            if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
             {
                 break;
             }
-
-            currentLineIndex += searchDirection;
-            endIndex += searchDirection;
         }
+
+        // Fix the end index (it's the last one that worked)
+        endIndex -= searchDirection;
     }
 
     // Put start < end order
@@ -549,11 +462,15 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
     {
         Swap(endIndex, startIndex);
     }
+    // The range excludes end so increase
+    endIndex++;
 
     // Okay we've found the markup
     out.type = type;
     out.location = location;
     out.range = IndexRange{ startIndex, endIndex };
+
+    SLANG_ASSERT(out.range.getCount() > 0);
 
     return SLANG_OK;
 }
