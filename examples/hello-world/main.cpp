@@ -32,7 +32,7 @@
 // with Slang may depend on an application/engine making certain
 // design choices in their abstraction layer.
 //
-#include "gfx/render.h"
+#include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
 #include "tools/graphics-app-framework/window.h"
 #include "slang-com-ptr.h"

@@ -1,7 +1,7 @@
 // gui.h
 #pragma once
 
-#include "tools/gfx/render.h"
+#include "slang-gfx.h"
 #include "vector-math.h"
 #include "window.h"
 #include "slang-com-ptr.h"

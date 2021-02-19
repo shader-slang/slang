@@ -50,10 +50,12 @@ jobs:
           7z a "$binArchive" slang-com-helper.h
           7z a "$binArchive" slang-com-ptr.h
           7z a "$binArchive" slang-tag-version.h
+          7z a "$srcArchive" slang-gfx.h
           7z a "$binArchive" prelude\*.h
           7z a "$binArchive" bin\*\*\slang.dll
           7z a "$binArchive" bin\*\*\slang.lib
           7z a "$binArchive" bin\*\*\slang-glslang.dll
+          7z a "$binArchive" bin\*\*\gfx.dll
           7z a "$binArchive" bin\*\*\slangc.exe
           7z a "$binArchive" docs\*.md
 
@@ -64,6 +66,7 @@ jobs:
           7z a "$srcArchive" slang-com-helper.h
           7z a "$srcArchive" slang-com-ptr.h
           7z a "$srcArchive" slang-tag-version.h
+          7z a "$srcArchive" slang-gfx.h
           7z a "$srcArchive" prelude\*.h
           7z a "$srcArchive" source\*\*.h
           7z a "$srcArchive" source\*\*.cpp
