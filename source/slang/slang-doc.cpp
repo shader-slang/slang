@@ -19,7 +19,7 @@ namespace Slang {
 
 */
 
-class DocumentationContext 
+class MarkupExtractor 
 {
 public:
 
@@ -87,7 +87,7 @@ public:
         Index declLineIndex;            ///< The line number for the decl
     };
 
-    SlangResult extract(Documentation* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
+    SlangResult extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
 
     static MarkupFlags getFlags(MarkupType type);
     static MarkupType findMarkupType(const Token& tok);
@@ -121,7 +121,7 @@ protected:
     
     List<Decl*> m_decls;
 
-    Documentation* m_doc;
+    ModuleMarkup* m_doc;
     ModuleDecl* m_moduleDecl;
     SourceManager* m_sourceManager;
     DiagnosticSink* m_sink;
@@ -142,7 +142,7 @@ We probably don't care for example about variable/type declarations in a functio
 
 */
 
-void DocumentationContext::_addDecl(Decl* decl)
+void MarkupExtractor::_addDecl(Decl* decl)
 {
     if (!decl->loc.isValid())
     {
@@ -151,7 +151,7 @@ void DocumentationContext::_addDecl(Decl* decl)
     m_decls.add(decl);
 }
 
-void DocumentationContext::_addDeclRec(Decl* decl)
+void MarkupExtractor::_addDeclRec(Decl* decl)
 {
 #if 0
     if (CallableDecl* callableDecl = as<CallableDecl>(decl))
@@ -181,7 +181,7 @@ void DocumentationContext::_addDeclRec(Decl* decl)
     }
 }
 
-void DocumentationContext::_findDecls(ModuleDecl* moduleDecl)
+void MarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
 {
     for (Decl* decl : moduleDecl->members)
     {
@@ -219,7 +219,7 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     return -1;
 }
 
-/* static */DocumentationContext::MarkupFlags DocumentationContext::getFlags(MarkupType type)
+/* static */MarkupExtractor::MarkupFlags MarkupExtractor::getFlags(MarkupType type)
 {
     switch (type)
     {
@@ -236,7 +236,7 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     }
 }
 
-/* static */DocumentationContext::MarkupType DocumentationContext::findMarkupType(const Token& tok)
+/* static */MarkupExtractor::MarkupType MarkupExtractor::findMarkupType(const Token& tok)
 {
     switch (tok.type)
     {
@@ -270,7 +270,7 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     return MarkupType::None;
 }
 
-SlangResult DocumentationContext::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
+SlangResult MarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
 {
     SLANG_UNUSED(info);
     SLANG_UNUSED(foundMarkup);
@@ -279,7 +279,7 @@ SlangResult DocumentationContext::_extractMarkup(const FindInfo& info, const Fou
     return SLANG_FAIL;
 }
 
-Index DocumentationContext::_findStartIndex(const FindInfo& info, Location location)
+Index MarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 {
     Index openParensCount = 0;
     Index openBracketCount = 0;
@@ -375,7 +375,7 @@ Index DocumentationContext::_findStartIndex(const FindInfo& info, Location locat
     return -1;
 }
 
-/* static */bool DocumentationContext::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
+/* static */bool MarkupExtractor::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     const int offset = sourceView->getRange().getOffset(tok.loc);
@@ -395,7 +395,7 @@ Index DocumentationContext::_findStartIndex(const FindInfo& info, Location locat
 }
 
 
-SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
+SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
 {
     out.reset();
 
@@ -498,7 +498,7 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
     return SLANG_OK;
 }
 
-SlangResult DocumentationContext::_findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex)
+SlangResult MarkupExtractor::_findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex)
 {
     Index i = 0;
     for (; i < locCount; ++i)
@@ -513,7 +513,7 @@ SlangResult DocumentationContext::_findFirstMarkup(const FindInfo& info, const L
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult DocumentationContext::_findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out)
+SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out)
 {
     Index foundIndex;
     SLANG_RETURN_ON_FAIL(_findFirstMarkup(info, locs, locCount, out, foundIndex));
@@ -531,7 +531,7 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, const Locati
     return SLANG_OK;
 }
 
-SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
+SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
 {
     if (auto paramDecl = as<ParamDecl>(decl))
     {
@@ -555,7 +555,7 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Decl* decl, 
     }
 }
 
-SlangResult DocumentationContext::extract(Documentation* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+SlangResult MarkupExtractor::extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
 {
     m_doc = doc;
     m_moduleDecl = moduleDecl;
@@ -698,7 +698,7 @@ SlangResult DocumentationContext::extract(Documentation* doc, ModuleDecl* module
                     SLANG_RETURN_ON_FAIL(_extractMarkup(findInfo, foundMarkup, buf));
 
                     // Add to the documentation
-                    Documentation::Entry& docEntry = m_doc->addEntry(entry.decl);
+                    ModuleMarkup::Entry& docEntry = m_doc->addEntry(entry.decl);
                     docEntry.m_markup = buf;
                 }
                 else if (res != SLANG_E_NOT_FOUND)
@@ -712,11 +712,11 @@ SlangResult DocumentationContext::extract(Documentation* doc, ModuleDecl* module
     return SLANG_OK;
 }
 
-SlangResult Documentation::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+SlangResult ModuleMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
 {
     m_moduleDecl = moduleDecl;
 
-    DocumentationContext context;
+    MarkupExtractor context;
     return context.extract(this, moduleDecl, sourceManager, sink);
 }
 

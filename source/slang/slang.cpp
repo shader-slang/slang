@@ -1641,9 +1641,9 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
         if (shouldDocument)
         {
-            RefPtr<Documentation> documentation(new Documentation);
+            RefPtr<ModuleMarkup> markup(new ModuleMarkup);
 
-            documentation->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
+            markup->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
         }
 
 #if 0
