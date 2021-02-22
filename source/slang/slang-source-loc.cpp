@@ -310,11 +310,10 @@ UnownedStringSlice SourceFile::getLineContainingOffset(uint32_t offset)
 
 bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
 {
+    SLANG_ASSERT(lineIndex >= 0);
+
     const List<uint32_t>& offsets = getLineBreakOffsets();
     const Index count = offsets.getCount();
-
-    // Clamp minimum line index
-    lineIndex = (lineIndex < 0) ? 0 : lineIndex;
 
     if (lineIndex >= count - 1)
     {
@@ -340,43 +339,8 @@ bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
         const uint32_t startOffset = offsets[lineIndex];
         const uint32_t endOffset = offsets[lineIndex + 1];
 
-#if 0
-        if (hasContent())
-        {
-            const UnownedStringSlice content = getContent();
-            const Index lineLength = endOffset - startOffset;
-            UnownedStringSlice line = content.subString(startOffset, lineLength);
-
-            // The line contains a CR/LF, if the offset is within that (or after it)
-            // then it's arguably not on that line
-
-            const char* begin = line.begin();
-            const char* end = line.end();
-
-            if (end > begin)
-            {
-                const char c = end[-1];
-                // If last char is CR/LF move back a char
-                if (c == '\n' || c == '\r')
-                {
-                    --end;
-                    // If next char is a match for the CR/LF pair move back an extra char.
-                    end -= Index((end > begin) && (c ^ end[-1]) == ('\r' ^ '\n'));
-                }
-            }
-            line = line.head(Index(end - begin));
-
-            return offset >= startOffset && offset <= startOffset + line.getLength();
-        }
-        else
-#endif
         // If it's not at end offset, it can be argued, that it's all part of the same line
-
-        {
-            // We assume the last character in the span will be the CR. We can't know for sure, because we
-            // don't have the content to test against
-            return offset >= startOffset && offset < endOffset;
-        }
+        return offset >= startOffset && offset < endOffset;
     }
 }
 
