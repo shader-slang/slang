@@ -1943,6 +1943,18 @@ __target_intrinsic(cuda, " @ ")
 __target_intrinsic(cpp, " @ ")
 int __SyntaxError();
 
+/// Mark beginning of "interlocked" operations in a fragment shader.
+__target_intrinsic(glsl, "beginInvocationInterlockARB")
+__glsl_extension(GL_ARB_fragment_shader_interlock)
+__glsl_version(420)
+void beginInvocationInterlock() {}
+
+/// Mark end of "interlocked" operations in a fragment shader.
+__target_intrinsic(glsl, "endInvocationInterlockARB")
+__glsl_extension(GL_ARB_fragment_shader_interlock)
+__glsl_version(420)
+void endInvocationInterlock() {}
+
 // Operators to apply to `enum` types
 
 __generic<E : __EnumType>
