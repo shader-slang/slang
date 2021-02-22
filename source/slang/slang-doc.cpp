@@ -205,6 +205,10 @@ void MarkupExtractor::_addDecl(Decl* decl)
 
 void MarkupExtractor::_addDeclRec(Decl* decl)
 {
+    // Just add.
+    // There may be things we don't want to add, but just add them all of now
+    _addDecl(decl);
+
 #if 0
     if (CallableDecl* callableDecl = as<CallableDecl>(decl))
     {
@@ -217,19 +221,11 @@ void MarkupExtractor::_addDeclRec(Decl* decl)
     if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
     {
         // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
-        _addDecl(decl);
-
         // Now add what the container contains
         for (Decl* childDecl : containerDecl->members)
         {
             _addDeclRec(childDecl);
         }
-    }
-    else 
-    {
-        // Just add.
-        // There may be things we don't want to add, but just add them all of now
-        _addDecl(decl);
     }
 }
 
@@ -237,7 +233,7 @@ void MarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
 {
     for (Decl* decl : moduleDecl->members)
     {
-        _addDecl(decl);
+        _addDeclRec(decl);
     }
 }
 
@@ -922,6 +918,76 @@ SlangResult ModuleMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceM
 
     MarkupExtractor context;
     return context.extract(this, moduleDecl, sourceManager, sink);
+}
+
+/* static */SlangResult DocumentationUtil::writeMarkdown(ModuleMarkup* markup, StringBuilder& out)
+{
+    for (const auto& entry : markup->getEntries())
+    {
+        NodeBase* node = entry.m_node;
+        Decl* decl = as<Decl>(node);
+        if (!decl)
+        {
+            continue;
+        }
+
+        // Skip these they will be output as part of their respective 'containers'
+        if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl))
+        {
+            continue;
+        }
+
+        if (CallableDecl* callableDecl = as<CallableDecl>(decl))
+        {
+            out << entry.m_markup;
+
+            // There's code to output sigs in the SemanticsVisitor - we probably need to extract that functionality
+            // out so can be used here
+
+            //   String declString = getDeclSignatureString(item);
+
+            auto params = callableDecl->getParameters();
+            //const auto& returnType = callableDecl->returnType;
+
+            // Let's see if we can get markup on the parameters            
+            for (auto param : params)
+            {
+                ModuleMarkup::Entry* paramEntry = markup->getEntry(param);
+
+                if (paramEntry)
+                {
+                    out << paramEntry->m_markup;
+
+                    auto type = param->getType();
+
+                    if (type)
+                    {
+                        out << type->toString();
+                    }
+
+                    Name* name = param->getName();
+                    if (name)
+                    {
+                        out << " ";
+                        out << name->text;
+                    }
+                    out << "\n\n";
+                }
+            }
+        }
+        else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
+        {
+
+        }
+        else if (StructDecl* structDecl = as<StructDecl>(decl))
+        {
+        }
+        else if (ClassDecl* classDecl = as<ClassDecl>(decl))
+        {
+        }
+    }
+
+    return SLANG_OK;
 }
 
 } // namespace Slang

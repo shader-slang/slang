@@ -19,8 +19,11 @@ public:
 
         /// Adds an entry, returns the reference to pre-existing node if there is one
     Entry& addEntry(NodeBase* base);
-        /// Get's an entry for a node. Returns nullptr if there is no markup.
+        /// Gets an entry for a node. Returns nullptr if there is no markup.
     Entry* getEntry(NodeBase* base);
+
+        /// Get list of all of the entries in source order
+    const List<Entry>& getEntries() const { return m_entries; }
 
         /// Given a module extracts all the associated markup.
     SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
@@ -56,6 +59,11 @@ SLANG_INLINE ModuleMarkup::Entry* ModuleMarkup::getEntry(NodeBase* base)
     Index* indexPtr = m_entryMap.TryGetValue(base);
     return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
 }
+
+struct DocumentationUtil
+{
+    static SlangResult writeMarkdown(ModuleMarkup* markup, StringBuilder& out);
+};
 
 } // namespace Slang
 

@@ -1642,8 +1642,21 @@ void FrontEndCompileRequest::parseTranslationUnit(
         if (shouldDocument)
         {
             RefPtr<ModuleMarkup> markup(new ModuleMarkup);
-
             markup->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
+
+            // Extract to a file
+
+            const String& path = sourceFile->getPathInfo().foundPath;
+            if (path.getLength())
+            {
+                String fileName = Path::getFileNameWithoutExt(path);
+                fileName.append(".md");
+
+                StringBuilder buf;
+                DocumentationUtil::writeMarkdown(markup, buf);
+
+                File::writeAllText(fileName, buf);
+            }
         }
 
 #if 0
