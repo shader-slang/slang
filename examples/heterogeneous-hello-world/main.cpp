@@ -33,7 +33,7 @@
 // design choices in their abstraction layer.
 //
 #include "slang-com-ptr.h"
-#include "gfx/render.h"
+#include "slang-gfx.h"
 #include "tools/graphics-app-framework/window.h"
 #include "../../prelude/slang-cpp-types.h"
 #include "source/core/slang-basic.h"

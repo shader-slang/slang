@@ -5,7 +5,7 @@
 #include <slang-com-ptr.h>
 using Slang::ComPtr;
 
-#include "gfx/render.h"
+#include "slang-gfx.h"
 #include "tools/graphics-app-framework/window.h"
 #include "source/core/slang-basic.h"
 using namespace gfx;

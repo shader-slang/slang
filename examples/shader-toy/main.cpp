@@ -19,7 +19,7 @@ using Slang::ComPtr;
 // this layer is *not* required or assumed when using the Slang language,
 // compiler, and API.
 //
-#include "gfx/render.h"
+#include "slang-gfx.h"
 #include "tools/graphics-app-framework/window.h"
 #include "source/core/slang-basic.h"
 

@@ -9,7 +9,7 @@
 
 #include "bind-location.h"
 
-#include "render.h"
+#include "slang-gfx.h"
 
 namespace renderer_test {
 
