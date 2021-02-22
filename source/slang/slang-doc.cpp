@@ -8,17 +8,11 @@ namespace Slang {
 /* TODO(JS):
 
 * If Decls hand SourceRange, then we could use the range to simplify getting the Post markup, as will be trivial to get to the 'end'
-* Need a mechanism to extract the markup
-** Need to handle preceeding * in some markup styles
-* Still need a way to check that markup line numbers, such that block markup is on preceeding lines
-** May want to handle the case that indentation is the same - we have to probably ignore if we have tabs tho
+* Need to handle preceeding * in some markup styles
 * If we want to be able to disable markup we need a mechanism to do this. Probably define source ranges.
 
 * Need a way to take the extracted markup and produce suitable markdown
 ** This will need to display the decoration appropriately
-
-* We will probably want to output the declarations in *source* order
-
 */
 
 class MarkupExtractor 
@@ -129,21 +123,6 @@ protected:
     SourceManager* m_sourceManager;
     DiagnosticSink* m_sink;
 };
-
-
-/*
-EnumDecl
-    EnumCaseDecl
-
-StructDecl
-ClassDecl
-
-The decls in general in slang-ast-decl.h
-
-We mainly care about decls that are in 'global' scope.
-We probably don't care for example about variable/type declarations in a function.
-
-*/
 
 /* static */UnownedStringSlice MarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
 {
