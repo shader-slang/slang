@@ -177,6 +177,9 @@ public:
         /// Clamps line indices which are out of range
     bool isOffsetOnLine(uint32_t offset, Index lineIndex);
 
+        /// Get the line containing the offset - only works if content is available. If not will return slice with nullptrs.
+    UnownedStringSlice getLineContainingOffset(uint32_t offset);
+
         /// Set the line break offsets
     void setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets);
 

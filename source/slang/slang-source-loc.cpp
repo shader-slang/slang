@@ -279,6 +279,35 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     return m_lineBreakOffsets;
 }
 
+UnownedStringSlice SourceFile::getLineContainingOffset(uint32_t offset)
+{
+    const UnownedStringSlice content = getContent();
+    if (content.getLength() == 0)
+    {
+        return UnownedStringSlice();
+    }
+
+    const Index lineIndex = calcLineIndexFromOffset(offset);
+    const List<uint32_t>& offsets = getLineBreakOffsets();
+    const Index count = offsets.getCount();
+
+    UnownedStringSlice line;
+
+    const char*const text = content.begin();
+
+    if (lineIndex >= count - 1)
+    {
+        return UnownedStringSlice(text + offsets[lineIndex], content.end());
+    }
+    else
+    {
+        const uint32_t startOffset = offsets[lineIndex];
+        const uint32_t endOffset = offsets[lineIndex + 1];
+
+        return UnownedStringSlice(text + startOffset, text + endOffset);
+    }
+}
+
 bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
 {
     const List<uint32_t>& offsets = getLineBreakOffsets();

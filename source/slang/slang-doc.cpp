@@ -1,6 +1,8 @@
 // slang-doc.cpp
 #include "slang-doc.h"
 
+#include "../core/slang-string-util.h"
+
 namespace Slang {
 
 /* TODO(JS):
@@ -91,6 +93,7 @@ public:
 
     static MarkupFlags getFlags(MarkupType type);
     static MarkupType findMarkupType(const Token& tok);
+    static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
 
 protected:
         /// returns SLANG_E_NOT_FOUND if not found, SLANG_OK on success else an error
@@ -141,6 +144,55 @@ We mainly care about decls that are in 'global' scope.
 We probably don't care for example about variable/type declarations in a function.
 
 */
+
+/* static */UnownedStringSlice MarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
+{
+    switch (type)
+    {
+        case MarkupType::BlockBefore:
+        {
+            if (comment.startsWith(UnownedStringSlice::fromLiteral("/**")) ||
+                comment.startsWith(UnownedStringSlice::fromLiteral("/*!")))
+            {
+                /// /**  */ or /*!  */.
+                return comment.tail(3);
+            }
+            return comment;
+        }   
+        case MarkupType::BlockAfter:
+        {
+            
+            if (comment.startsWith(UnownedStringSlice::fromLiteral("/**<")) ||
+                comment.startsWith(UnownedStringSlice::fromLiteral("/*!<")))
+            {
+                /// /*!< */ or /**< */
+                return comment.tail(4);
+            }
+            return comment;
+        }
+
+        case MarkupType::LineBangBefore:
+        {
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//!")) ? comment.tail(3) : comment;
+        }
+        case MarkupType::LineSlashBefore:
+        {
+            return comment.startsWith(UnownedStringSlice::fromLiteral("///")) ? comment.tail(3) : comment;
+        }
+
+        case MarkupType::LineBangAfter:
+        {
+            /// //!< Can be multiple lines
+            return comment.startsWith(UnownedStringSlice::fromLiteral("//!<")) ? comment.tail(4) : comment;
+        }
+        case MarkupType::LineSlashAfter:
+        {
+            return comment.startsWith(UnownedStringSlice::fromLiteral("///<")) ? comment.tail(4) : comment;
+        }
+        default: break;
+    }
+    return comment;
+}
 
 void MarkupExtractor::_addDecl(Decl* decl)
 {
@@ -270,13 +322,162 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     return MarkupType::None;
 }
 
+static Index _calcWhitespaceIndent(const UnownedStringSlice& line)
+{
+    // TODO(JS): For now we ignore tabs and just work out indentation based on spaces/assume ASCII
+    Index indent = 0;
+    const Index count = line.getLength();
+    for (; indent < count && line[indent] == ' '; indent++);
+    return indent;
+}
+
+static Index _calcIndent(const UnownedStringSlice& line)
+{
+    // TODO(JS): For now we just assume no tabs, and that every char is ASCII
+    return line.getLength();
+}
+
+static void _appendUnindenttedLine(const UnownedStringSlice& line, Index maxIndent, StringBuilder& out)
+{
+    Index indent = _calcWhitespaceIndent(line);
+
+    // We want to remove indenting remove no more than maxIndent
+    if (maxIndent >= 0)
+    {
+        indent = (indent > maxIndent) ? maxIndent : indent;
+    }
+
+    // Remove the indenting, and append to out
+    out.append(line.tail(indent));
+}
+
 SlangResult MarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
 {
-    SLANG_UNUSED(info);
-    SLANG_UNUSED(foundMarkup);
+    SourceView* sourceView = info.sourceView;
+    SourceFile* sourceFile = sourceView->getSourceFile();
 
-    SLANG_UNUSED(out);
-    return SLANG_FAIL;
+    // Here we want to produce the text that is implied by the markup tokens.
+    // We want to removing surrounding markup, and to also keep appropriate indentation
+    
+    switch (foundMarkup.type)
+    {
+        case MarkupType::BlockBefore:
+        case MarkupType::BlockAfter:
+        {
+            // We should only have a single line
+            SLANG_ASSERT(foundMarkup.range.getCount() == 1);
+
+            const auto& tok = info.tokenList->m_tokens[foundMarkup.range.start];
+            uint32_t offset = sourceView->getRange().getOffset(tok.loc);
+
+            const UnownedStringSlice startLine = sourceFile->getLineContainingOffset(offset);
+
+            UnownedStringSlice content = tok.getContent();
+
+            // Split into lines
+            List<UnownedStringSlice> lines;
+
+            StringUtil::calcLines(content, lines);
+
+            Index maxIndent = -1;
+
+            StringBuilder unindentedLine;
+
+            const Index linesCount = lines.getCount();
+            for (Index i = 0; i < linesCount; ++i)
+            {
+                UnownedStringSlice line = lines[i];
+                unindentedLine.Clear();
+
+                if (i == 0)
+                {
+                    if (startLine.isMemoryContained(line.begin()))
+                    {
+                        // For now we'll ignore tabs, and that the indent amount is, the amount of *byte*
+                        // NOTE! This is only appropriate for ASCII without tabs.
+                        maxIndent = _calcIndent(UnownedStringSlice(startLine.begin(), line.begin()));
+
+                        // Let's strip the start stuff
+                        line = removeStart(foundMarkup.type, line);
+                    }
+                }
+
+                if (i == linesCount - 1)
+                {
+                    SLANG_ASSERT(line.tail(line.getLength() - 2) == UnownedStringSlice::fromLiteral("*/"));
+                    // Remove the */ at the end of the line
+                    line = line.head(line.getLength() - 2);
+                }
+
+                if (i > 0)
+                {
+                    _appendUnindenttedLine(line, maxIndent, unindentedLine);
+                }
+                else
+                {
+                    unindentedLine.append(line);
+                }
+                
+                // If the first or last line are all white space, just ignore them
+                if ((i == linesCount - 1 || i == 0) && unindentedLine.getUnownedSlice().trim().getLength() == 0)
+                {
+                    continue;
+                }
+
+                out.append(unindentedLine);
+                out.appendChar('\n');
+            }
+
+            break;
+        }
+        case MarkupType::LineBangBefore:      
+        case MarkupType::LineSlashBefore:
+        case MarkupType::LineBangAfter:
+        case MarkupType::LineSlashAfter:
+        {
+            // Holds the lines extracted, they may have some white space indenting (like the space at the start of //) 
+            List<UnownedStringSlice> lines;
+
+            const auto& range = foundMarkup.range;
+            for (Index i = range.start; i < range.end; ++ i)
+            {
+                const auto& tok = info.tokenList->m_tokens[i];
+                UnownedStringSlice line = tok.getContent();
+                line = removeStart(foundMarkup.type, line);
+
+                // If the first or last line are all white space, just ignore them
+                if ((i == range.start || i == range.end - 1) && line.trim().getLength() == 0)
+                {
+                    continue;
+                }
+                lines.add(line);
+            }
+
+            if (lines.getCount() == 0)
+            {
+                // If there are no lines, theres no content
+                return SLANG_OK;
+            }
+
+            Index minIndent = 0x7fffffff;
+            for (const auto& line : lines)
+            {
+                const Index indent = _calcWhitespaceIndent(line);
+                minIndent = (indent < minIndent) ? indent : minIndent;
+            }
+
+            for (const auto& line : lines)
+            {
+                _appendUnindenttedLine(line, minIndent, out);
+                out.appendChar('\n');
+            }
+
+            break;
+        }
+        default:    return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
 }
 
 Index MarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
@@ -519,12 +720,15 @@ SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, const Location* l
     SLANG_RETURN_ON_FAIL(_findFirstMarkup(info, locs, locCount, out, foundIndex));
 
     // Lets see if the remaining ones match
-    for (Index i = foundIndex + 1; i < locCount; ++i)
     {
-        SlangResult res = _findMarkup(info, locs[i], out);
-        if (SLANG_SUCCEEDED(res))
+        FoundMarkup otherMarkup;
+        for (Index i = foundIndex + 1; i < locCount; ++i)
         {
-            // TODO(JS): Warning found markup in another location
+            SlangResult res = _findMarkup(info, locs[i], otherMarkup);
+            if (SLANG_SUCCEEDED(res))
+            {
+                // TODO(JS): Warning found markup in another location
+            }
         }
     }
 
