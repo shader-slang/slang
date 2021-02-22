@@ -284,6 +284,7 @@ bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
     const List<uint32_t>& offsets = getLineBreakOffsets();
     const Index count = offsets.getCount();
 
+    // Clamp minimum line index
     lineIndex = (lineIndex < 0) ? 0 : lineIndex;
 
     if (lineIndex >= count - 1)
@@ -293,15 +294,60 @@ bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
         {
             return offset == 0;
         }
-        // Must be greater than last entry
-        return offset > offsets[count - 1];
+
+        const uint32_t lastLineOffset = offsets[count - 1];
+        if (hasContent())
+        {
+            return offset >= lastLineOffset && offset <= getContent().getLength();
+        }
+        else
+        {
+            return offset >= lastLineOffset;
+        }
     }
     else
     {
         // If it's on this line it has to be within the range
         const uint32_t startOffset = offsets[lineIndex];
         const uint32_t endOffset = offsets[lineIndex + 1];
-        return offset >= startOffset && offset <= endOffset;
+
+#if 0
+        if (hasContent())
+        {
+            const UnownedStringSlice content = getContent();
+            const Index lineLength = endOffset - startOffset;
+            UnownedStringSlice line = content.subString(startOffset, lineLength);
+
+            // The line contains a CR/LF, if the offset is within that (or after it)
+            // then it's arguably not on that line
+
+            const char* begin = line.begin();
+            const char* end = line.end();
+
+            if (end > begin)
+            {
+                const char c = end[-1];
+                // If last char is CR/LF move back a char
+                if (c == '\n' || c == '\r')
+                {
+                    --end;
+                    // If next char is a match for the CR/LF pair move back an extra char.
+                    end -= Index((end > begin) && (c ^ end[-1]) == ('\r' ^ '\n'));
+                }
+            }
+            line = line.head(Index(end - begin));
+
+            return offset >= startOffset && offset <= startOffset + line.getLength();
+        }
+        else
+#endif
+        // If it's not at end offset, it can be argued, that it's all part of the same line
+
+        {
+            // We assume the last character in the span will be the CR. We can't know for sure, because we
+            // don't have the content to test against
+            return offset >= startOffset && offset < endOffset;
+        }
     }
 }
 

@@ -75,28 +75,29 @@ namespace Slang
     // Lexer
 
     void Lexer::initialize(
-        SourceView*     inSourceView,
-        DiagnosticSink* inSink,
-        NamePool*       inNamePool,
-        MemoryArena*    inMemoryArena,
-        LexerFlags      flags)
+        SourceView*     sourceView,
+        DiagnosticSink* sink,
+        NamePool*       namePool,
+        MemoryArena*    memoryArena,
+        OptionFlags     optionFlags)
     {
-        m_sourceView  = inSourceView;
-        m_sink        = inSink;
-        m_namePool    = inNamePool;
-        m_memoryArena = inMemoryArena;
+        m_sourceView  = sourceView;
+        m_sink        = sink;
+        m_namePool    = namePool;
+        m_memoryArena = memoryArena;
 
-        auto content = inSourceView->getContent();
+        auto content = sourceView->getContent();
         
         m_begin   = content.begin();
         m_cursor  = content.begin();
         m_end     = content.end();
 
         // Set the start location
-        m_startLoc = inSourceView->getRange().begin;
+        m_startLoc = sourceView->getRange().begin;
 
         m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-        m_lexerFlags = flags;
+        m_lexerFlags = 0;
+        m_optionFlags = optionFlags;
     }
 
     Lexer::~Lexer()
@@ -1240,7 +1241,7 @@ namespace Slang
             case TokenType::LineComment:
             {
                 flags |= TokenFlag::AfterWhitespace;
-                if (flags & kLexerFlag_TokenizeComments)
+                if (m_optionFlags & OptionFlag::TokenizeComments)
                 {
                     // We don't break here, and use the normal token adding logic
                     // because we want the behavior to be identical (in terms of flags etc)

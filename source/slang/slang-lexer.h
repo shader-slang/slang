@@ -94,17 +94,25 @@ namespace Slang
         kLexerFlag_ExpectFileName           = 1 << 1, ///< Support `<>` style strings for file paths
         kLexerFlag_IgnoreInvalid            = 1 << 2, ///< Suppress errors about invalid/unsupported characters
         kLexerFlag_ExpectDirectiveMessage   = 1 << 3, ///< Don't lexer ordinary tokens, and instead consume rest of line as a string
-        kLexerFlag_TokenizeComments         = 1 << 4, ///< If set comments will be output to the token stream        
     };
 
     struct Lexer
     {
+        typedef uint32_t OptionFlags;
+        struct OptionFlag
+        {
+            enum Enum : OptionFlags
+            {
+                TokenizeComments         = 1 << 0, ///< If set comments will be output to the token stream
+            };
+        };
+
         void initialize(
             SourceView*     sourceView,
             DiagnosticSink* sink,
             NamePool*       namePool,
             MemoryArena*    memoryArena,
-            LexerFlags      flags = 0);
+            OptionFlags     optionFlags = 0);
 
         ~Lexer();
 
@@ -136,6 +144,7 @@ namespace Slang
 
         TokenFlags      m_tokenFlags;
         LexerFlags      m_lexerFlags;
+        OptionFlags     m_optionFlags;
 
         MemoryArena*    m_memoryArena;
     };

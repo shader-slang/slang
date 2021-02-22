@@ -109,8 +109,8 @@ protected:
     SlangResult _extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out);
 
         /// Given a location, try to find the first token index that could potentially be markup
-        /// Only works on 'after' locations, and will return -1 if not found
-    Index _findAfterIndex(const FindInfo& info, Location location);
+        /// Will return -1 if not found
+    Index _findStartIndex(const FindInfo& info, Location location);
 
         /// True if the tok is 'on' lineIndex. Interpretation of 'on' depends on the markup type.
     static bool _isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex);
@@ -279,15 +279,18 @@ SlangResult DocumentationContext::_extractMarkup(const FindInfo& info, const Fou
     return SLANG_FAIL;
 }
 
-Index DocumentationContext::_findAfterIndex(const FindInfo& info, Location location)
+Index DocumentationContext::_findStartIndex(const FindInfo& info, Location location)
 {
     Index openParensCount = 0;
+    Index openBracketCount = 0;
 
     const TokenList& toks = *info.tokenList;
     const Index tokIndex = info.declTokenIndex;
 
+    Index direction = (location == Location::Before) ? -1 : 1;
+
     const Index count = toks.m_tokens.getCount();
-    for (Index i = tokIndex; i < count; ++i)
+    for (Index i = tokIndex; i >= 0 && i < count; i += direction)
     {
         const Token& tok = toks.m_tokens[i];
 
@@ -296,6 +299,16 @@ Index DocumentationContext::_findAfterIndex(const FindInfo& info, Location locat
             case TokenType::LParent:
             {
                 ++openParensCount;
+                break;
+            }
+            case TokenType::RBracket:
+            {
+                openBracketCount += Index(location == Location::Before);
+                break;
+            }
+            case TokenType::LBracket:
+            {
+                openBracketCount -= Index(location == Location::Before);
                 break;
             }
             case TokenType::RParent:
@@ -322,11 +335,36 @@ Index DocumentationContext::_findAfterIndex(const FindInfo& info, Location locat
                 }
                 break;
             }
+            case TokenType::RBrace:
+            {
+                // If we haven't hit a candidate yet before hitting } it's not going to work
+                if (location == Location::Before)
+                {
+                    return -1;
+                }
+                break;
+            }
             case TokenType::Semicolon:
             {
+                // If we haven't hit a candidate yet it's not going to work
+                if (location == Location::Before)
+                {
+                    return -1;
+                }
+
                 if (openParensCount == 0 && location == Location::AfterSemicolon)
                 {
                     return i + 1;
+                }
+                break;
+            }
+            case TokenType::LineComment:
+            case TokenType::BlockComment:
+            {
+                // We hit a comment this could be the markup
+                if (location == Location::Before && openParensCount == 0 && openBracketCount == 0)
+                {
+                    return i;
                 }
                 break;
             }
@@ -364,68 +402,53 @@ SlangResult DocumentationContext::_findMarkup(const FindInfo& info, Location loc
     const auto& toks = info.tokenList->m_tokens;
     const Index tokIndex = info.declTokenIndex;
 
-    // The line index that the markoff starts from 
-    Index lineIndex = -1; 
-    // The token stream search direction, valid values are -1 and 1
-    Index searchDirection = 0;
     // The starting token index
-    Index startIndex = -1;
-
-    if (location == Location::Before)
+    Index startIndex = _findStartIndex(info, location);
+    if (startIndex <= 0)
     {
-        lineIndex = info.declLineIndex - 1;
-        startIndex = tokIndex - 1;
-        searchDirection = -1;
-    }
-    else
-    {
-        startIndex = _findAfterIndex(info, location);
-        if (startIndex <= 0)
-        {
-            return SLANG_E_NOT_FOUND;
-        }
-
-        SourceView* sourceView = info.sourceView;
-        SourceFile* sourceFile = sourceView->getSourceFile();
-
-        // Let's relookup the line index
-        const int offset = sourceView->getRange().getOffset(toks[startIndex - 1].loc);
-        lineIndex = sourceFile->calcLineIndexFromOffset(offset);
-
-        searchDirection = 1;
+        return SLANG_E_NOT_FOUND;
     }
 
-    SLANG_ASSERT(searchDirection == -1 || searchDirection == 1);
-    SLANG_ASSERT(startIndex > 0);
+    SourceView* sourceView = info.sourceView;
+    SourceFile* sourceFile = sourceView->getSourceFile();
+
+    // Let's lookup the line index where this occurred
+    const int startOffset = sourceView->getRange().getOffset(toks[startIndex - 1].loc);
+
+    // The line index that the markoff starts from 
+    Index lineIndex = sourceFile->calcLineIndexFromOffset(startOffset);
     if (lineIndex < 0)
     {
         return SLANG_E_NOT_FOUND;
     }
+
+    const Index searchDirection = (location == Location::Before) ? -1 : 1;
     
     // Get the type and flags
     const MarkupType type = findMarkupType(toks[startIndex]);
     const MarkupFlags flags = getFlags(type);
 
     const MarkupFlag::Enum requiredFlag = (location == Location::Before) ? MarkupFlag::Before : MarkupFlag::After;
-
     if ((flags & requiredFlag) == 0)
     {
         return SLANG_E_NOT_FOUND;
     }
 
-    Index expectedLineIndex = lineIndex;
-
+#if 0
     // The token still isn't accepted, unless it's on the expected line
     if (_isTokenOnLineIndex(info.sourceView, type, toks[startIndex], expectedLineIndex))
     {
         return SLANG_E_NOT_FOUND;
     }
+#endif
 
     Index endIndex = startIndex;
 
     // If it's multiline, so look for the end index
     if (flags & MarkupFlag::IsMultiToken)
     {
+        Index expectedLineIndex = lineIndex;
+
         // TODO(JS):
         // We should probably do the work here to confirm  indentation - but that
         // requires knowing something about tabs, so for now we leave.
@@ -638,7 +661,7 @@ SlangResult DocumentationContext::extract(Documentation* doc, ModuleDecl* module
 
                 // Run the lexer
                 Lexer lexer;
-                lexer.initialize(sourceView, sink, &namePool, &memoryArena, kLexerFlag_TokenizeComments);
+                lexer.initialize(sourceView, sink, &namePool, &memoryArena, Lexer::OptionFlag::TokenizeComments);
 
                 // Lex everything
                 tokens = lexer.lexAllTokens();
