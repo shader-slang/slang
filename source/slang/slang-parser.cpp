@@ -180,11 +180,19 @@ namespace Slang
 
     // Forward Declarations
 
-        /// Parse declarations making up the body of `parent`, up to the matching `closingToken`
+    enum class MatchedTokenType
+    {
+        Parentheses,
+        SquareBrackets,
+        CurlyBraces,
+        File,
+    };
+
+        /// Parse declarations making up the body of `parent`, up to a matching token for `matchType`
     static void parseDecls(
-        Parser*         parser,
-        ContainerDecl*  parent,
-        TokenType	    closingToken);
+        Parser*             parser,
+        ContainerDecl*      parent,
+        MatchedTokenType    matchType);
 
         /// Parse a body consisting of declarations enclosed in `{}`, as the children of `parent`.
     static void parseDeclBody(
@@ -211,6 +219,8 @@ namespace Slang
     static void parseModernParamList(
         Parser*         parser,
         CallableDecl*   decl);
+
+    static TokenType peekTokenType(Parser* parser);
 
     //
 
@@ -578,44 +588,126 @@ namespace Slang
         return false;
     }
 
+        /// Information on how to parse certain pairs of matches tokens
+    struct MatchedTokenInfo
+    {
+            /// The token type that opens the pair
+        TokenType openTokenType;
+
+            /// The token type that closes the pair
+        TokenType closeTokenType;
+
+            /// A list of token types that should lead the parser
+            /// to abandon its search for a matchign closing token
+            /// (terminated by `TokenType::EndOfFile`).
+        TokenType const* bailAtCloseTokens;
+    };
+    static const TokenType kMatchedToken_BailAtEOF[] = { TokenType::EndOfFile };
+    static const TokenType kMatchedToken_BailAtCurlyBraceOrEOF[] = { TokenType::RBrace, TokenType::EndOfFile };
+    static const MatchedTokenInfo kMatchedTokenInfos[] =
+    {
+        { TokenType::LParent,   TokenType::RParent,     kMatchedToken_BailAtCurlyBraceOrEOF },
+        { TokenType::LBracket,  TokenType::RBracket,    kMatchedToken_BailAtCurlyBraceOrEOF },
+        { TokenType::LBrace,    TokenType::RBrace,      kMatchedToken_BailAtEOF },
+        { TokenType::Unknown,   TokenType::EndOfFile,   kMatchedToken_BailAtEOF },
+    };
+
+        /// Expect to enter a matched region starting with `tokenType`
+        ///
+        /// Returns `true` on a match and `false` if a region is not entered.
+    bool beginMatch(Parser* parser, MatchedTokenType type)
+    {
+        auto& info = kMatchedTokenInfos[int(type)];
+        bool result = peekTokenType(parser) == info.openTokenType;
+        parser->ReadToken(info.openTokenType);
+        return result;
+    }
+
     // Consume a token and return true if it matches, otherwise check
     // for end-of-file and expect that token (potentially producing
     // an error) and return true to maintain forward progress.
     // Otherwise return false.
-    bool AdvanceIfMatch(Parser* parser, TokenType tokenType)
+    bool AdvanceIfMatch(Parser* parser, MatchedTokenType type, Token* outToken)
     {
-        // If we've run into a syntax error, but haven't recovered inside
-        // the block, then try to recover here.
+        // The behavior of the seatch for a match can depend on the
+        // type of matches tokens we are parsing.
+        //
+        auto& info = kMatchedTokenInfos[int(type)];
+
+        // First, if the parser is already in a state where it is recovering
+        // from an earlier syntax error, we want to give it a fighting chance
+        // to recover here, because we know a token type we are looking for.
+        //
+        // Basically, if the parser can skip ahead some number of tokens to
+        // find a token of the correct type to close this matched list, then
+        // we would like to do so.
+        //
+        // Note: this behavior does not mean that any syntax error in a list
+        // will automatically skip the remainder of the list. The reason is
+        // that most syntax lists have a separate or terminator (e.g., a
+        // comma or semicolon), and reading in a separator will also serve
+        // to recover the parser. The case here is only going to come up
+        // when the lookahead for a separator/terminator already failed.
+        //
         if (parser->isRecovering)
         {
-            TryRecoverBefore(parser, tokenType);
+            TryRecoverBefore(parser, info.closeTokenType);
         }
-        if (AdvanceIf(parser, tokenType))
+
+        // If the result of our recovery effort is that we are looking
+        // at the token type we wanted, we can consume it and return,
+        // with the parser happily recovered.
+        //
+        if (AdvanceIf(parser, info.closeTokenType, outToken))
             return true;
-        if (parser->tokenReader.peekTokenType() == TokenType::EndOfFile)
+
+        // Otherwise, we know that we haven't yet recovered.
+        // The challenge here is that `AdvanceIfMatch()` is almost always
+        // called in a loop, and we need that loop to terminate at
+        // some point.
+        //
+        // Each of the types of matched tokens is assocaited with a
+        // list of token types where we should "bail" from our search
+        // for a closing token and exit a nested construct.
+        // In the simplest terms, when looking for `)` or `]` we will
+        // bail on a `}` or end-of-file, while when looking for a `}`
+        // we will only bail on an end-of-file.
+        //
+        auto nextTokenType = parser->tokenReader.peekTokenType();
+        for(auto bailAtTokenTypePtr = info.bailAtCloseTokens;; bailAtTokenTypePtr++)
         {
-            parser->ReadToken(tokenType);
-            return true;
+            auto bailAtTokenType = *bailAtTokenTypePtr;
+            if(nextTokenType == bailAtTokenType)
+            {
+                // If we are going to bail out of the loop here, then
+                // we make sure to try to read the token type we were
+                // originally looking for, even though we know it will
+                // fail.
+                //
+                // If we are already in recovery mode, this will do nothing.
+                // If we *aren't* in recovery mode, this step is what leads
+                // the parser to output an error message like "expected
+                // a `)`, found a `}`" which is pretty much exactly what
+                // we want.
+                //
+                *outToken = parser->ReadToken(info.closeTokenType);
+                return true;
+            }
+
+            // The list of token types that should cause us to "bail" on
+            // our search is always terminated by the EOF token type, so
+            // we don't want to read past that one.
+            //
+            if(bailAtTokenType == TokenType::EndOfFile)
+                break;
         }
         return false;
     }
 
-    bool AdvanceIfMatch(Parser* parser, TokenType tokenType, Token* outToken)
+    bool AdvanceIfMatch(Parser* parser, MatchedTokenType type)
     {
-        // If we've run into a syntax error, but haven't recovered inside
-        // the block, then try to recover here.
-        if (parser->isRecovering)
-        {
-            TryRecoverBefore(parser, tokenType);
-        }
-        if (AdvanceIf(parser, tokenType, outToken))
-            return true;
-        if (parser->tokenReader.peekTokenType() == TokenType::EndOfFile)
-        {
-            *outToken = parser->ReadToken(tokenType);
-            return true;
-        }
-        return false;
+        Token ignored;
+        return AdvanceIfMatch(parser, type, &ignored);
     }
 
     NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
@@ -766,7 +858,7 @@ namespace Slang
             {
                 // HLSL-style `[name(arg0, ...)]` attribute
 
-                while (!AdvanceIfMatch(parser, TokenType::RParent))
+                while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                 {
                     auto arg = parser->ParseArgExpr();
                     if (arg)
@@ -774,7 +866,7 @@ namespace Slang
                         modifier->args.add(arg);
                     }
 
-                    if (AdvanceIfMatch(parser, TokenType::RParent))
+                    if (AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                         break;
 
                     parser->ReadToken(TokenType::Comma);
@@ -783,7 +875,7 @@ namespace Slang
             AddModifier(ioModifierLink, modifier);
 
 
-            if (AdvanceIfMatch(parser, TokenType::RBracket))
+            if (AdvanceIfMatch(parser, MatchedTokenType::SquareBrackets))
                 break;
 
             parser->ReadToken(TokenType::Comma);
@@ -1271,7 +1363,7 @@ namespace Slang
             return;
         }
 
-        while (!AdvanceIfMatch(parser, TokenType::RParent))
+        while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
             AddMember(decl, parser->ParseParameter());
             if (AdvanceIf(parser, TokenType::RParent))
@@ -1861,7 +1953,7 @@ namespace Slang
         TaggedUnionTypeExpr* taggedUnionType = parser->astBuilder->create<TaggedUnionTypeExpr>();
 
         parser->ReadToken(TokenType::LParent);
-        while(!AdvanceIfMatch(parser, TokenType::RParent))
+        while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
             auto caseType = parser->ParseTypeExp();
             taggedUnionType->caseTypes.add(caseType);
@@ -2241,13 +2333,13 @@ namespace Slang
 
         for(;;)
         {
-            if(AdvanceIfMatch(parser, TokenType::RParent))
+            if(AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                 break;
 
             auto stageName = parser->ReadToken(TokenType::Identifier);
             semantic->stageNameTokens.add(stageName);
 
-            if(AdvanceIfMatch(parser, TokenType::RParent))
+            if(AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                 break;
 
             expect(parser, TokenType::Comma);
@@ -2830,7 +2922,7 @@ namespace Slang
         if( AdvanceIf(parser, TokenType::LBrace) )
         {
             // We want to parse nested "accessor" declarations
-            while( !AdvanceIfMatch(parser, TokenType::RBrace) )
+            while( !AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces) )
             {
                 auto accessor = parseAccessorDecl(parser);
                 AddMember(decl, accessor);
@@ -3041,7 +3133,7 @@ namespace Slang
     {
         parser->ReadToken(TokenType::LParent);
 
-        while (!AdvanceIfMatch(parser, TokenType::RParent))
+        while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
             AddMember(decl, parseModernParamDecl(parser));
             if (AdvanceIf(parser, TokenType::RParent))
@@ -3237,13 +3329,13 @@ namespace Slang
         AttributeDecl* attrDecl = parser->astBuilder->create<AttributeDecl>();
         if(AdvanceIf(parser, TokenType::LParent))
         {
-            while(!AdvanceIfMatch(parser, TokenType::RParent))
+            while(!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
             {
                 auto param = parseAttributeParamDecl(parser);
 
                 AddMember(attrDecl, param);
 
-                if(AdvanceIfMatch(parser, TokenType::RParent))
+                if(AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
                     break;
 
                 expect(parser, TokenType::Comma);
@@ -3422,11 +3514,11 @@ namespace Slang
 
 
     static void parseDecls(
-        Parser*         parser,
-        ContainerDecl*  containerDecl,
-        TokenType       closingToken)
+        Parser*             parser,
+        ContainerDecl*      containerDecl,
+        MatchedTokenType    matchType)
     {
-        while(!AdvanceIfMatch(parser, closingToken))
+        while(!AdvanceIfMatch(parser, matchType))
         {
             ParseDecl(parser, containerDecl);
         }
@@ -3439,7 +3531,7 @@ namespace Slang
         parser->PushScope(parent);
 
         parser->ReadToken(TokenType::LBrace);
-        parseDecls(parser, parent, TokenType::RBrace);
+        parseDecls(parser, parent, MatchedTokenType::CurlyBraces);
 
         parser->PopScope();
     }
@@ -3471,7 +3563,7 @@ namespace Slang
             program->loc = tokenReader.peekLoc();
         }
 
-        parseDecls(this, program, TokenType::EndOfFile);
+        parseDecls(this, program, MatchedTokenType::File);
         PopScope();
 
         SLANG_RELEASE_ASSERT(currentScope == outerScope);
@@ -3561,7 +3653,7 @@ namespace Slang
             parseOptionalInheritanceClause(parser, decl);
             parser->ReadToken(TokenType::LBrace);
 
-            while(!AdvanceIfMatch(parser, TokenType::RBrace))
+            while(!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces))
             {
                 EnumCaseDecl* caseDecl = parseEnumCaseDecl(parser);
                 AddMember(decl, caseDecl);
@@ -3941,13 +4033,20 @@ namespace Slang
 
     Stmt* Parser::parseBlockStatement()
     {
+        if(!beginMatch(this, MatchedTokenType::CurlyBraces))
+        {
+            auto emptyStmt = astBuilder->create<EmptyStmt>();
+            FillPosition(emptyStmt);
+            return emptyStmt;
+        }
+
         ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
         BlockStmt* blockStatement = astBuilder->create<BlockStmt>();
         blockStatement->scopeDecl = scopeDecl;
         pushScopeAndSetParent(scopeDecl);
-        ReadToken(TokenType::LBrace);
 
         Stmt* body = nullptr;
+
 
         if(!tokenReader.isAtEnd())
         {
@@ -3955,7 +4054,7 @@ namespace Slang
         }
 
         Token closingBraceToken;
-        while (!AdvanceIfMatch(this, TokenType::RBrace, &closingBraceToken))
+        while (!AdvanceIfMatch(this, MatchedTokenType::CurlyBraces, &closingBraceToken))
         {
             auto stmt = ParseStatement();
             if(stmt)
@@ -4890,7 +4989,7 @@ namespace Slang
 
                 for(;;)
                 {
-                    if(AdvanceIfMatch(parser, TokenType::RBrace))
+                    if(AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces))
                         break;
 
                     auto expr = parser->ParseArgExpr();
@@ -4899,7 +4998,7 @@ namespace Slang
                         initExpr->args.add(expr);
                     }
 
-                    if(AdvanceIfMatch(parser, TokenType::RBrace))
+                    if(AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces))
                         break;
 
                     parser->ReadToken(TokenType::Comma);
@@ -5622,7 +5721,7 @@ namespace Slang
         listBuilder.add(parser->astBuilder->create<GLSLLayoutModifierGroupBegin>());
         
         parser->ReadToken(TokenType::LParent);
-        while (!AdvanceIfMatch(parser, TokenType::RParent))
+        while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
         {
             auto nameAndLoc = expectIdentifier(parser);
             const String& nameText = nameAndLoc.name->text;
