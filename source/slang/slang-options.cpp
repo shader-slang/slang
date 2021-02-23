@@ -531,6 +531,10 @@ struct OptionsParser
                 {
                     requestImpl->getFrontEndReq()->shouldDumpAST = true;
                 }
+                else if (argStr == "-doc")
+                {
+                    requestImpl->getFrontEndReq()->shouldDocument = true;
+                }
                 else if (argStr == "-dump-repro")
                 {
                     SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->m_dumpRepro));

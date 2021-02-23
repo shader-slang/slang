@@ -30,6 +30,8 @@
 #include "slang-serialize-ir.h"
 #include "slang-serialize-container.h"
 
+#include "slang-doc.h"
+
 #include "slang-check-impl.h"
 
 #include "../../slang-tag-version.h"
@@ -1634,6 +1636,26 @@ void FrontEndCompileRequest::parseTranslationUnit(
                 fileName.append(".slang-ast");
 
                 File::writeAllText(fileName, writer.getContent());
+            }
+        }
+
+        if (shouldDocument)
+        {
+            RefPtr<DocMarkup> markup(new DocMarkup);
+            markup->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
+
+            // Extract to a file
+
+            const String& path = sourceFile->getPathInfo().foundPath;
+            if (path.getLength())
+            {
+                String fileName = Path::getFileNameWithoutExt(path);
+                fileName.append(".md");
+
+                StringBuilder buf;
+                DocumentationUtil::writeMarkdown(markup, buf);
+
+                File::writeAllText(fileName, buf);
             }
         }
 

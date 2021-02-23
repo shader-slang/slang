@@ -139,6 +139,9 @@ struct SourceRange
         /// Get the offset of a loc in this range
     int getOffset(SourceLoc loc) const { SLANG_ASSERT(contains(loc)); return int(loc.getRaw() - begin.getRaw()); }
 
+        /// Convert an offset to a loc
+    SourceLoc getSourceLocFromOffset(uint32_t offset) const { SLANG_ASSERT(offset <= getSize()); return begin + Int(offset); }
+
     SourceRange()
     {}
 
@@ -156,6 +159,7 @@ struct SourceRange
     SourceLoc end;
 };
 
+
 // Pre-declare
 struct SourceManager;
 
@@ -165,9 +169,44 @@ class SourceFile
 {
 public:
 
+    struct OffsetRange
+    {
+            /// We need a value to indicate an invalid range. We can't use 0 as that is valid for an offset range
+            /// We can't use a negative number, and don't want to make signed so we get the full 32-bits.
+            /// So we just use the max value as invalid
+        static const uint32_t kInvalid = 0xffffffff;
+
+            /// True if the range is valid
+        SLANG_FORCE_INLINE bool isValid() const { return end >= start && start != kInvalid; }
+            /// True if offset is within range (inclusively)
+        SLANG_FORCE_INLINE bool containsInclusive(uint32_t offset) const { return offset >= start && offset <= end; }
+
+            /// Get the count
+        SLANG_FORCE_INLINE uint32_t getCount() const { return end - start; }
+
+            /// Return an invalid range. 
+        static OffsetRange makeInvalid() { return OffsetRange{ kInvalid, kInvalid }; }
+
+        uint32_t start;
+        uint32_t end;
+    };
+
         /// Returns the line break offsets (in bytes from start of content)
         /// Note that this is lazily evaluated - the line breaks are only calculated on the first request 
     const List<uint32_t>& getLineBreakOffsets();
+
+        /// Returns true if the offset is on the specified line
+        /// NOTE! If offsets are not fully setup (because we don't have source), will only be correct for lines that have offsets
+    bool isOffsetOnLine(uint32_t offset, Index lineIndex);
+
+        /// Get the line containing the offset. Requires that content is available, else will return an empty slice. 
+    UnownedStringSlice getLineContainingOffset(uint32_t offset);
+
+        /// Get the line at the specified line index. Requires that content is available, else will return an empty slice. 
+    UnownedStringSlice getLineAtIndex(Index lineIndex);
+
+        /// Get the offset range at the specified line index. Works without content.
+    OffsetRange getOffsetRangeAtLineIndex(Index lineIndex);
 
         /// Set the line break offsets
     void setLineBreakOffsets(const uint32_t* offsets, UInt numOffsets);

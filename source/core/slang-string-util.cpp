@@ -360,6 +360,28 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
+/* static */UnownedStringSlice StringUtil::trimEndOfLine(const UnownedStringSlice& line)
+{
+    // Strip CR/LF from end of line if present
+
+    const char* begin = line.begin();
+    const char* end = line.end();
+
+    if (end > begin)
+    {
+        const char c = end[-1];
+        // If last char is CR/LF move back a char
+        if (c == '\n' || c == '\r')
+        {
+            --end;
+            // If next char is a match for the CR/LF pair move back an extra char.
+            end -= Index((end > begin) && (c ^ end[-1]) == ('\r' ^ '\n'));
+        }
+    }
+
+    return line.head(Index(end - begin));
+}
+
 /* static */bool StringUtil::areLinesEqual(const UnownedStringSlice& inA, const UnownedStringSlice& inB)
 {
     UnownedStringSlice a(inA), b(inB), lineA, lineB;
