@@ -1641,7 +1641,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
 
         if (shouldDocument)
         {
-            RefPtr<ModuleMarkup> markup(new ModuleMarkup);
+            RefPtr<DocMarkup> markup(new DocMarkup);
             markup->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
 
             // Extract to a file

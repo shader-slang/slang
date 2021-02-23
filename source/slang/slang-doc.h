@@ -8,7 +8,7 @@
 namespace Slang {
 
 /* Holds the documentation markup that is associated with each node (typically a decl) from a module */
-class ModuleMarkup : public RefObject
+class DocMarkup : public RefObject
 {
 public:
     struct Entry
@@ -39,7 +39,7 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-SLANG_INLINE ModuleMarkup::Entry& ModuleMarkup::addEntry(NodeBase* base)
+SLANG_INLINE DocMarkup::Entry& DocMarkup::addEntry(NodeBase* base)
 {
     const Index count = m_entries.getCount();
     const Index index = m_entryMap.GetOrAddValue(base, count);
@@ -54,7 +54,7 @@ SLANG_INLINE ModuleMarkup::Entry& ModuleMarkup::addEntry(NodeBase* base)
 }
 
 // ---------------------------------------------------------------------------
-SLANG_INLINE ModuleMarkup::Entry* ModuleMarkup::getEntry(NodeBase* base)
+SLANG_INLINE DocMarkup::Entry* DocMarkup::getEntry(NodeBase* base)
 {
     Index* indexPtr = m_entryMap.TryGetValue(base);
     return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
@@ -62,7 +62,7 @@ SLANG_INLINE ModuleMarkup::Entry* ModuleMarkup::getEntry(NodeBase* base)
 
 struct DocumentationUtil
 {
-    static SlangResult writeMarkdown(ModuleMarkup* markup, StringBuilder& out);
+    static SlangResult writeMarkdown(DocMarkup* markup, StringBuilder& out);
 };
 
 } // namespace Slang

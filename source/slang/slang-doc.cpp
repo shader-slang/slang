@@ -15,7 +15,9 @@ namespace Slang {
 ** This will need to display the decoration appropriately
 */
 
-class MarkupExtractor 
+/* Extracts 'markup' from comments in Slang source core. The comments are extracted and associated in declarations. The association
+is held in DocMarkup type. The comment style follows the doxygen style */
+class DocMarkupExtractor 
 {
 public:
 
@@ -83,7 +85,7 @@ public:
         Index declLineIndex;            ///< The line number for the decl
     };
 
-    SlangResult extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
+    SlangResult extract(DocMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
 
     static MarkupFlags getFlags(MarkupType type);
     static MarkupType findMarkupType(const Token& tok);
@@ -118,13 +120,13 @@ protected:
     
     List<Decl*> m_decls;
 
-    ModuleMarkup* m_doc;
+    DocMarkup* m_doc;
     ModuleDecl* m_moduleDecl;
     SourceManager* m_sourceManager;
     DiagnosticSink* m_sink;
 };
 
-/* static */UnownedStringSlice MarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
+/* static */UnownedStringSlice DocMarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
 {
     switch (type)
     {
@@ -173,7 +175,7 @@ protected:
     return comment;
 }
 
-void MarkupExtractor::_addDecl(Decl* decl)
+void DocMarkupExtractor::_addDecl(Decl* decl)
 {
     if (!decl->loc.isValid())
     {
@@ -182,7 +184,7 @@ void MarkupExtractor::_addDecl(Decl* decl)
     m_decls.add(decl);
 }
 
-void MarkupExtractor::_addDeclRec(Decl* decl)
+void DocMarkupExtractor::_addDeclRec(Decl* decl)
 {
     // Just add.
     // There may be things we don't want to add, but just add them all of now
@@ -208,7 +210,7 @@ void MarkupExtractor::_addDeclRec(Decl* decl)
     }
 }
 
-void MarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
+void DocMarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
 {
     for (Decl* decl : moduleDecl->members)
     {
@@ -246,7 +248,7 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     return -1;
 }
 
-/* static */MarkupExtractor::MarkupFlags MarkupExtractor::getFlags(MarkupType type)
+/* static */DocMarkupExtractor::MarkupFlags DocMarkupExtractor::getFlags(MarkupType type)
 {
     switch (type)
     {
@@ -263,7 +265,7 @@ static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
     }
 }
 
-/* static */MarkupExtractor::MarkupType MarkupExtractor::findMarkupType(const Token& tok)
+/* static */DocMarkupExtractor::MarkupType DocMarkupExtractor::findMarkupType(const Token& tok)
 {
     switch (tok.type)
     {
@@ -326,7 +328,7 @@ static void _appendUnindenttedLine(const UnownedStringSlice& line, Index maxInde
     out.append(line.tail(indent));
 }
 
-SlangResult MarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
+SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out)
 {
     SourceView* sourceView = info.sourceView;
     SourceFile* sourceFile = sourceView->getSourceFile();
@@ -455,7 +457,7 @@ SlangResult MarkupExtractor::_extractMarkup(const FindInfo& info, const FoundMar
     return SLANG_OK;
 }
 
-Index MarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
+Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 {
     Index openParensCount = 0;
     Index openBracketCount = 0;
@@ -551,7 +553,7 @@ Index MarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
     return -1;
 }
 
-/* static */bool MarkupExtractor::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
+/* static */bool DocMarkupExtractor::_isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex)
 {
     SourceFile* sourceFile = sourceView->getSourceFile();
     const int offset = sourceView->getRange().getOffset(tok.loc);
@@ -571,7 +573,7 @@ Index MarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 }
 
 
-SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
 {
     out.reset();
 
@@ -674,7 +676,7 @@ SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Location location
     return SLANG_OK;
 }
 
-SlangResult MarkupExtractor::_findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex)
+SlangResult DocMarkupExtractor::_findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex)
 {
     Index i = 0;
     for (; i < locCount; ++i)
@@ -689,7 +691,7 @@ SlangResult MarkupExtractor::_findFirstMarkup(const FindInfo& info, const Locati
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out)
 {
     Index foundIndex;
     SLANG_RETURN_ON_FAIL(_findFirstMarkup(info, locs, locCount, out, foundIndex));
@@ -710,7 +712,7 @@ SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, const Location* l
     return SLANG_OK;
 }
 
-SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
+SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
 {
     if (auto paramDecl = as<ParamDecl>(decl))
     {
@@ -734,7 +736,7 @@ SlangResult MarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, Found
     }
 }
 
-SlangResult MarkupExtractor::extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
 {
     m_doc = doc;
     m_moduleDecl = moduleDecl;
@@ -877,7 +879,7 @@ SlangResult MarkupExtractor::extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, 
                     SLANG_RETURN_ON_FAIL(_extractMarkup(findInfo, foundMarkup, buf));
 
                     // Add to the documentation
-                    ModuleMarkup::Entry& docEntry = m_doc->addEntry(entry.decl);
+                    DocMarkup::Entry& docEntry = m_doc->addEntry(entry.decl);
                     docEntry.m_markup = buf;
                 }
                 else if (res != SLANG_E_NOT_FOUND)
@@ -891,15 +893,15 @@ SlangResult MarkupExtractor::extract(ModuleMarkup* doc, ModuleDecl* moduleDecl, 
     return SLANG_OK;
 }
 
-SlangResult ModuleMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
 {
     m_moduleDecl = moduleDecl;
 
-    MarkupExtractor context;
+    DocMarkupExtractor context;
     return context.extract(this, moduleDecl, sourceManager, sink);
 }
 
-/* static */SlangResult DocumentationUtil::writeMarkdown(ModuleMarkup* markup, StringBuilder& out)
+/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, StringBuilder& out)
 {
     for (const auto& entry : markup->getEntries())
     {
@@ -931,7 +933,7 @@ SlangResult ModuleMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceM
             // Let's see if we can get markup on the parameters            
             for (auto param : params)
             {
-                ModuleMarkup::Entry* paramEntry = markup->getEntry(param);
+                DocMarkup::Entry* paramEntry = markup->getEntry(param);
 
                 if (paramEntry)
                 {

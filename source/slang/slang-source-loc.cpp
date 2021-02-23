@@ -279,69 +279,53 @@ const List<uint32_t>& SourceFile::getLineBreakOffsets()
     return m_lineBreakOffsets;
 }
 
-UnownedStringSlice SourceFile::getLineContainingOffset(uint32_t offset)
+SourceFile::OffsetRange SourceFile::getOffsetRangeAtLineIndex(Index lineIndex)
 {
-    const UnownedStringSlice content = getContent();
-    if (content.getLength() == 0)
-    {
-        return UnownedStringSlice();
-    }
-
-    const Index lineIndex = calcLineIndexFromOffset(offset);
     const List<uint32_t>& offsets = getLineBreakOffsets();
     const Index count = offsets.getCount();
 
-    UnownedStringSlice line;
-
-    const char*const text = content.begin();
-
     if (lineIndex >= count - 1)
     {
-        return UnownedStringSlice(text + offsets[lineIndex], content.end());
+        // Work out the line start
+        const uint32_t offsetEnd = uint32_t(getContentSize());
+        const uint32_t offsetStart = (lineIndex >= count) ? offsetEnd : offsets[lineIndex];
+        // The line is the span from start, to the end of the content
+        return OffsetRange{ offsetStart, offsetEnd };
     }
     else
     {
-        const uint32_t startOffset = offsets[lineIndex];
-        const uint32_t endOffset = offsets[lineIndex + 1];
-
-        return UnownedStringSlice(text + startOffset, text + endOffset);
+        const uint32_t offsetStart = offsets[lineIndex];
+        const uint32_t offsetEnd = offsets[lineIndex + 1];
+        return OffsetRange { offsetStart, offsetEnd };
     }
+}
+
+UnownedStringSlice SourceFile::getLineAtIndex(Index lineIndex)
+{
+    const OffsetRange range = getOffsetRangeAtLineIndex(lineIndex);
+
+    if (range.isValid() && hasContent())
+    {
+        const UnownedStringSlice content = getContent();
+        SLANG_ASSERT(range.end <= uint32_t(content.getLength()));
+
+        const char*const text = content.begin();
+        return UnownedStringSlice(text + range.start, text + range.end);
+    }
+
+    return UnownedStringSlice();
+}
+
+UnownedStringSlice SourceFile::getLineContainingOffset(uint32_t offset)
+{
+    const Index lineIndex = calcLineIndexFromOffset(offset);
+    return getLineAtIndex(lineIndex);
 }
 
 bool SourceFile::isOffsetOnLine(uint32_t offset, Index lineIndex)
 {
-    SLANG_ASSERT(lineIndex >= 0);
-
-    const List<uint32_t>& offsets = getLineBreakOffsets();
-    const Index count = offsets.getCount();
-
-    if (lineIndex >= count - 1)
-    {
-        // Handle case of no lines
-        if (count == 0)
-        {
-            return offset == 0;
-        }
-
-        const uint32_t lastLineOffset = offsets[count - 1];
-        if (hasContent())
-        {
-            return offset >= lastLineOffset && offset <= getContent().getLength();
-        }
-        else
-        {
-            return offset >= lastLineOffset;
-        }
-    }
-    else
-    {
-        // If it's on this line it has to be within the range
-        const uint32_t startOffset = offsets[lineIndex];
-        const uint32_t endOffset = offsets[lineIndex + 1];
-
-        // If it's not at end offset, it can be argued, that it's all part of the same line
-        return offset >= startOffset && offset < endOffset;
-    }
+    const OffsetRange range = getOffsetRangeAtLineIndex(lineIndex);
+    return range.isValid() && range.containsInclusive(offset);
 }
 
 int SourceFile::calcLineIndexFromOffset(int offset)
