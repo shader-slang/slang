@@ -1805,6 +1805,61 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     MATRIX_MAP_UNARY(T, N, M, fwidth, x);
 }
 
+/// Get the value of a vertex attribute at a specific vertex.
+///
+/// The `GetAttributeAtVertex()` function can be used in a fragment shader
+/// to get the value of the given `attribute` at the vertex of the primitive
+/// that corresponds to the given `vertexIndex`.
+///
+/// Note that the `attribute` must have been a declared varying input to
+/// the fragment shader with the `nointerpolation` modifier.
+///
+/// This function can be applied to scalars, vectors, and matrices of
+/// built-in scalar types.
+///
+/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
+///
+__generic<T : __BuiltinType>
+[__readNone]
+T GetAttributeAtVertex(T attribute, uint vertexIndex);
+
+/// Get the value of a vertex attribute at a specific vertex.
+///
+/// The `GetAttributeAtVertex()` function can be used in a fragment shader
+/// to get the value of the given `attribute` at the vertex of the primitive
+/// that corresponds to the given `vertexIndex`.
+///
+/// Note that the `attribute` must have been a declared varying input to
+/// the fragment shader with the `nointerpolation` modifier.
+///
+/// This function can be applied to scalars, vectors, and matrices of
+/// built-in scalar types.
+///
+/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
+///
+__generic<T : __BuiltinType, let N : int>
+[__readNone]
+vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex);
+
+/// Get the value of a vertex attribute at a specific vertex.
+///
+/// The `GetAttributeAtVertex()` function can be used in a fragment shader
+/// to get the value of the given `attribute` at the vertex of the primitive
+/// that corresponds to the given `vertexIndex`.
+///
+/// Note that the `attribute` must have been a declared varying input to
+/// the fragment shader with the `nointerpolation` modifier.
+///
+/// This function can be applied to scalars, vectors, and matrices of
+/// built-in scalar types.
+///
+/// Note: these functions are not curently implemented for Vulkan/SPIR-V output.
+///
+__generic<T : __BuiltinType, let N : int, let M : int>
+[__readNone]
+matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex);
+
+
 // Get number of samples in render target
 uint GetRenderTargetSampleCount();
 
