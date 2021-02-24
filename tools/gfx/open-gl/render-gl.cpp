@@ -1045,8 +1045,14 @@ GLRenderer::~GLRenderer()
     // We can destroy things whilst in this state
     m_currentPipelineState.setNull();
     m_currentFramebuffer.setNull();
-    glDeleteVertexArrays(1, &m_vao);
-    wglDeleteContext(m_glContext);
+    if (glDeleteVertexArrays)
+    {
+        glDeleteVertexArrays(1, &m_vao);
+    }
+    if (m_glContext)
+    {
+        wglDeleteContext(m_glContext);
+    }
     destroyWindow(m_windowHandle);
 
     // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no
@@ -1140,25 +1146,30 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
     MAP_WGL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
 #undef LOAD_GL_EXTENSION_FUNC
 
-    if (wglCreateContextAttribsARB)
-    {
-        wglMakeCurrent(m_hdc, 0);
-        wglDeleteContext(m_glContext);
-        m_glContext = 0;
-        HGLRC newGLContext = createGLContext(m_hdc);
+    wglMakeCurrent(m_hdc, 0);
+    wglDeleteContext(m_glContext);
+    m_glContext = 0;
 
-        if (newGLContext == NULL)
-        {
-            return SLANG_FAIL;
-        }
-        wglMakeCurrent(m_hdc, newGLContext);
-        m_glContext = newGLContext;
+    if (!wglCreateContextAttribsARB)
+    {
+        return SLANG_FAIL;
     }
+
+    m_glContext = createGLContext(m_hdc);
+
+    if (m_glContext == NULL)
+    {
+        return SLANG_FAIL;
+    }
+    wglMakeCurrent(m_hdc, m_glContext);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
     glViewport(0, 0, desc.width, desc.height);
+
+    if (!glGenVertexArrays)
+        return SLANG_FAIL;
 
     glGenVertexArrays(1, &m_vao);
 

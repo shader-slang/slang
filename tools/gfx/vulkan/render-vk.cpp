@@ -1258,7 +1258,8 @@ SlangResult VKRenderer::initialize(const Desc& desc)
     }
 #endif
 
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+    if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS)
+        return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
 #if ENABLE_VALIDATION_LAYER

@@ -314,28 +314,38 @@ void TestReporter::_addResult(const TestInfo& info)
 
     m_testInfos.add(info);
 
-    //    printf("OUTPUT_MODE: %d\n", options.outputMode);
+    auto defaultOutputFunc = [](const TestInfo& info)
+    {
+        char const* resultString = "UNEXPECTED";
+        switch (info.testResult)
+        {
+        case TestResult::Fail:
+            resultString = "FAILED";
+            break;
+        case TestResult::Pass:
+            resultString = "passed";
+            break;
+        case TestResult::Ignored:
+            resultString = "ignored";
+            break;
+        default:
+            assert(!"unexpected");
+            break;
+        }
+
+        StringBuilder buffer;
+        if (info.executionTime > 0.0f)
+        {
+            _appendTime(info.executionTime, buffer);
+        }
+        printf("%s test: '%S' %s\n", resultString, info.name.toWString().begin(), buffer.getBuffer());
+    };
+
     switch (m_outputMode)
     {
         default:
         {
-            char const* resultString = "UNEXPECTED";
-            switch (info.testResult)
-            {
-                case TestResult::Fail:      resultString = "FAILED";  break;
-                case TestResult::Pass:      resultString = "passed";  break;
-                case TestResult::Ignored:   resultString = "ignored"; break;
-                default:
-                    assert(!"unexpected");
-                    break;
-            }
-
-            StringBuilder buffer;
-            if (info.executionTime > 0.0f)
-            {
-                _appendTime(info.executionTime, buffer);
-            }
-            printf("%s test: '%S' %s\n", resultString, info.name.toWString().begin(), buffer.getBuffer());
+            defaultOutputFunc(info);
             break;
         }
         case TestOutputMode::TeamCity:
@@ -464,7 +474,7 @@ void TestReporter::_addResult(const TestInfo& info)
                     exeRes.standardError.begin());
 #endif
             }
-
+            defaultOutputFunc(info);
             break;
         }
     }
