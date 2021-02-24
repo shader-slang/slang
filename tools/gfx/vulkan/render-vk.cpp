@@ -355,7 +355,6 @@ public:
     public:
         VulkanSwapChain m_swapChain;
         ISwapchain::Desc m_desc;
-        bool m_vsync = true;
         ShortList<RefPtr<TextureResourceImpl>> m_images;
         VKRenderer* m_renderer;
         uint32_t m_currentImageIndex = 0;
@@ -370,7 +369,7 @@ public:
             swapchainDesc.m_imageCount = desc.imageCount;
             swapchainDesc.init();
             swapchainDesc.m_format = desc.format;
-
+            swapchainDesc.m_vsync = desc.enableVSync;
 #if SLANG_WINDOWS_FAMILY
             VulkanSwapChain::WinPlatformDesc winPlatformDesc;
             winPlatformDesc.m_hinstance = ::GetModuleHandle(nullptr);
@@ -395,14 +394,12 @@ public:
                     m_swapChain.getHeight(),
                     1);
                 RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc, gfx::IResource::Usage::RenderTarget, &renderer->m_api);
-                image->m_image = images[i].m_image;
+                image->m_image = images[i];
                 image->m_imageMemory = 0;
                 image->m_vkformat = m_swapChain.getVkFormat();
                 image->m_isWeakImageReference = true;
                 m_images.add(image);
             }
-            if (m_desc.isFullSpeed)
-                m_vsync = false;
             return SLANG_OK;
         }
 
@@ -418,7 +415,7 @@ public:
         }
         virtual SLANG_NO_THROW Result present()
         {
-            m_swapChain.present(m_vsync);
+            m_swapChain.present(m_desc.enableVSync);
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW uint32_t acquireNextImage()
@@ -927,6 +924,8 @@ public:
     VulkanDeviceQueue m_deviceQueue;
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
+    List<VkViewport> m_viewports;
+    List<VkRect2D> m_scissorRects;
 
     Desc m_desc;
 
@@ -1010,25 +1009,15 @@ Result VKRenderer::_beginPass()
     m_api.vkCmdBeginRenderPass(cmdBuffer, &renderPassBegin, VK_SUBPASS_CONTENTS_INLINE);
 
     // Set up scissor and viewport
+    if (m_scissorRects.getCount())
     {
-        VkRect2D rects[kMaxRenderTargets] = {};
-        VkViewport viewports[kMaxRenderTargets] = {};
-        for (int i = 0; i < numRenderTargets; ++i)
-        {
-            rects[i] = VkRect2D{ 0, 0, uint32_t(width), uint32_t(height) };
-
-            VkViewport& dstViewport = viewports[i];
-
-            dstViewport.x = 0.0f;
-            dstViewport.y = 0.0f;
-            dstViewport.width = float(width);
-            dstViewport.height = float(height);
-            dstViewport.minDepth = 0.0f;
-            dstViewport.maxDepth = 1.0f;
-        }
-
-        m_api.vkCmdSetScissor(cmdBuffer, 0, numRenderTargets, rects);
-        m_api.vkCmdSetViewport(cmdBuffer, 0, numRenderTargets, viewports);
+        m_api.vkCmdSetScissor(
+            cmdBuffer, 0, (uint32_t)m_scissorRects.getCount(), m_scissorRects.getBuffer());
+    }
+    if (m_viewports.getCount())
+    {
+        m_api.vkCmdSetViewport(
+            cmdBuffer, 0, (uint32_t)m_viewports.getCount(), m_viewports.getBuffer());
     }
 
     return SLANG_OK;
@@ -2541,11 +2530,11 @@ void VKRenderer::setViewports(UInt count, Viewport const* viewports)
     static const int kMaxViewports = 8; // TODO: base on device caps
     assert(count <= kMaxViewports);
 
-    VkViewport vkViewports[kMaxViewports];
+    m_viewports.setCount(count);
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
-        auto& vkViewport = vkViewports[ii];
+        auto& vkViewport = m_viewports[ii];
 
         vkViewport.x        = inViewport.originX;
         vkViewport.y        = inViewport.originY;
@@ -2556,7 +2545,7 @@ void VKRenderer::setViewports(UInt count, Viewport const* viewports)
     }
 
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
-    m_api.vkCmdSetViewport(commandBuffer, 0, uint32_t(count), vkViewports);
+    m_api.vkCmdSetViewport(commandBuffer, 0, uint32_t(count), m_viewports.getBuffer());
 }
 
 void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
@@ -2564,20 +2553,21 @@ void VKRenderer::setScissorRects(UInt count, ScissorRect const* rects)
     static const int kMaxScissorRects = 8; // TODO: base on device caps
     assert(count <= kMaxScissorRects);
 
-    VkRect2D vkRects[kMaxScissorRects];
+    m_scissorRects.setCount(count);
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
-        auto& vkRect = vkRects[ii];
+        auto& vkRect = m_scissorRects[ii];
 
         vkRect.offset.x         = int32_t(inRect.minX);
         vkRect.offset.y         = int32_t(inRect.minY);
         vkRect.extent.width     = uint32_t(inRect.maxX - inRect.minX);
         vkRect.extent.height    = uint32_t(inRect.maxY - inRect.minY);
+
     }
 
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
-    m_api.vkCmdSetScissor(commandBuffer, 0, uint32_t(count), vkRects);
+    m_api.vkCmdSetScissor(commandBuffer, 0, uint32_t(count), m_scissorRects.getBuffer());
 }
 
 void VKRenderer::setPipelineState(IPipelineState* state)

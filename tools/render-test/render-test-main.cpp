@@ -931,6 +931,13 @@ Result RenderTestApp::update()
     {
         static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
         m_renderer->setFramebuffer(m_framebuffer);
+
+        gfx::Viewport viewport = {};
+        viewport.maxZ = 1.0f;
+        viewport.extentX = (float)gWindowWidth;
+        viewport.extentY = (float)gWindowHeight;
+        m_renderer->setViewportAndScissor(viewport);
+
         m_renderer->setClearColor(kClearColor);
         m_renderer->clearFrame();
         renderFrame();
@@ -1333,8 +1340,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     {
         IRenderer::Desc desc = {};
         desc.rendererType = options.rendererType;
-        desc.width = gWindowWidth;
-        desc.height = gWindowHeight;
         desc.adapter = options.adapter.getBuffer();
 
         List<const char*> requiredFeatureList;

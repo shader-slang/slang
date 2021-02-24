@@ -443,13 +443,7 @@ protected:
             swapChainDesc.SampleDesc.Count = 1;
             swapChainDesc.Windowed = TRUE;
 
-            if (desc.isFullSpeed)
-            {
-                m_hasVsync = false;
-                m_allowFullScreen = false;
-            }
-
-            if (!m_hasVsync)
+            if (!desc.enableVSync)
             {
                 swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
             }
@@ -460,7 +454,7 @@ protected:
                 m_renderer->m_commandQueue, &swapChainDesc, swapChain.writeRef()));
             SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
 
-            if (!m_hasVsync)
+            if (!desc.enableVSync)
             {
                 m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
@@ -547,8 +541,6 @@ protected:
     public:
         D3D12Renderer* m_renderer = nullptr;
         ISwapchain::Desc m_desc;
-        bool m_hasVsync = false;
-        bool m_allowFullScreen = false;
         HANDLE m_swapChainWaitableObject = nullptr;
         ComPtr<IDXGISwapChain3> m_swapChain;
         uint32_t m_renderTargetIndex;
@@ -895,7 +887,7 @@ protected:
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
-    D3D12_VIEWPORT m_viewport = {};
+    D3D12_VIEWPORT m_viewports[kMaxRTVCount] = {};
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
@@ -905,7 +897,7 @@ protected:
     ComPtr<ID3D12CommandQueue> m_commandQueue;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
 
-    D3D12_RECT m_scissorRect = {};
+    D3D12_RECT m_scissorRects[kMaxRTVCount] = {};
 
     UINT m_rtvDescriptorSize = 0;
 
@@ -1126,9 +1118,6 @@ void D3D12Renderer::_resetCommandList()
 
     ID3D12GraphicsCommandList* commandList = getCommandList();
     commandList->Reset(frame.m_commandAllocator, nullptr);
-    // Set necessary state.
-    commandList->RSSetViewports(1, &m_viewport);
-    commandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
 void D3D12Renderer::beginFrame()
@@ -1632,23 +1621,6 @@ Result D3D12Renderer::initialize(const Desc& desc)
 
     m_desc = desc;
 
-    // set viewport
-    {
-        m_viewport.Width = float(m_desc.width);
-        m_viewport.Height = float(m_desc.height);
-        m_viewport.MinDepth = 0;
-        m_viewport.MaxDepth = 1;
-        m_viewport.TopLeftX = 0;
-        m_viewport.TopLeftY = 0;
-    }
-
-    {
-        m_scissorRect.left = 0;
-        m_scissorRect.top = 0;
-        m_scissorRect.right = m_desc.width;
-        m_scissorRect.bottom = m_desc.height;
-    }
-
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -1706,13 +1678,6 @@ Result D3D12Renderer::createFrameResources()
         FrameInfo& frame = m_frameInfos[i];
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
     }
-
-    m_viewport.Width = static_cast<float>(m_desc.width);
-    m_viewport.Height = static_cast<float>(m_desc.height);
-    m_viewport.MaxDepth = 1.0f;
-
-    m_scissorRect.right = static_cast<LONG>(m_desc.width);
-    m_scissorRect.bottom = static_cast<LONG>(m_desc.height);
 
     return SLANG_OK;
 }
@@ -1887,11 +1852,11 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
         heapProps.VisibleNodeMask = 1;
 
         D3D12_CLEAR_VALUE clearValue;
-        D3D12_CLEAR_VALUE* pClearValue = &clearValue;
+        D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
                                    D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
         {
-            pClearValue = nullptr;
+            clearValuePtr = nullptr;
         }
         clearValue.Format = pixelFormat;
         memcpy(clearValue.Color, descIn.optimalClearValue, sizeof(clearValue.Color));
@@ -1901,7 +1866,7 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
             D3D12_HEAP_FLAG_NONE,
             resourceDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
-            pClearValue));
+            clearValuePtr));
 
         texture->m_resource.setDebugName(L"Texture");
     }
@@ -2684,13 +2649,11 @@ void D3D12Renderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, 
 void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
 {
     static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxViewports);
-
-    D3D12_VIEWPORT dxViewports[kMaxViewports];
+    assert(count <= kMaxViewports && count <= kMaxRTVCount);
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
-        auto& dxViewport = dxViewports[ii];
+        auto& dxViewport = m_viewports[ii];
 
         dxViewport.TopLeftX = inViewport.originX;
         dxViewport.TopLeftY = inViewport.originY;
@@ -2699,20 +2662,18 @@ void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
         dxViewport.MinDepth = inViewport.minZ;
         dxViewport.MaxDepth = inViewport.maxZ;
     }
-
-    m_commandList->RSSetViewports(UINT(count), dxViewports);
+    m_commandList->RSSetViewports(UINT(count), m_viewports);
 }
 
 void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
 {
     static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxScissorRects);
+    assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
 
-    D3D12_RECT dxRects[kMaxScissorRects];
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
-        auto& dxRect = dxRects[ii];
+        auto& dxRect = m_scissorRects[ii];
 
         dxRect.left     = LONG(inRect.minX);
         dxRect.top      = LONG(inRect.minY);
@@ -2720,7 +2681,7 @@ void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
         dxRect.bottom   = LONG(inRect.maxY);
     }
 
-    m_commandList->RSSetScissorRects(UINT(count), dxRects);
+    m_commandList->RSSetScissorRects(UINT(count), m_scissorRects);
 }
 
 void D3D12Renderer::setPipelineState(IPipelineState* state)

@@ -113,8 +113,6 @@ Result execute()
 {
     IRenderer::Desc rendererDesc;
     rendererDesc.rendererType = gfx::RendererType::DirectX11;
-    rendererDesc.width = 4;
-    rendererDesc.height = 4;
     Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 

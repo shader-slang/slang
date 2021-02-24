@@ -2057,8 +2057,6 @@ Result initialize()
 
     IRenderer::Desc rendererDesc = {};
     rendererDesc.rendererType = gfx::RendererType::DirectX11;
-    rendererDesc.width = gWindowWidth;
-    rendererDesc.height = gWindowHeight;
     gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
 
     InputElementDesc inputElements[] = {
@@ -2262,6 +2260,13 @@ void renderFrame()
     //
     auto frameIndex = gSwapchain->acquireNextImage();
     gRenderer->setFramebuffer(gFramebuffers[frameIndex]);
+
+    gfx::Viewport viewport = {};
+    viewport.maxZ = 1.0f;
+    viewport.extentX = (float)gWindowWidth;
+    viewport.extentY = (float)gWindowHeight;
+    gRenderer->setViewportAndScissor(viewport);
+
     static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
     gRenderer->setClearColor(kClearColor);
     gRenderer->clearFrame();

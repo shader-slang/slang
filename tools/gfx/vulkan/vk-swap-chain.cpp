@@ -123,61 +123,6 @@ void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
 #endif
 }
 
-SlangResult VulkanSwapChain::_createFrameBuffers(VkRenderPass renderPass)
-{
-    assert(renderPass != VK_NULL_HANDLE);
-
-    for (Index i = 0; i < m_images.getCount(); ++i)
-    {
-        Image& image = m_images[i];
-        VkImageView attachments[] =
-        {
-            image.m_imageView
-        };
-
-        VkFramebufferCreateInfo framebufferInfo = {};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = m_width;
-        framebufferInfo.height = m_height;
-        framebufferInfo.layers = 1;
-
-        SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateFramebuffer(m_api->m_device, &framebufferInfo, nullptr, &image.m_frameBuffer));
-    }
-
-    return SLANG_OK;
-}
-
-void VulkanSwapChain::_destroyFrameBuffers()
-{
-    for (Index i = 0; i < m_images.getCount(); ++i)
-    {
-        Image& image = m_images[i];
-        if (image.m_frameBuffer != VK_NULL_HANDLE)
-        {
-            m_api->vkDestroyFramebuffer(m_api->m_device, image.m_frameBuffer, nullptr);
-            image.m_frameBuffer = VK_NULL_HANDLE;
-        }
-    }
-}
-
-SlangResult VulkanSwapChain::createFrameBuffers(VkRenderPass renderPass)
-{
-    if (m_renderPass != VK_NULL_HANDLE)
-    {
-        _destroyFrameBuffers();
-        m_renderPass = VK_NULL_HANDLE;
-    }
-    if (renderPass != VK_NULL_HANDLE)
-    {
-        SLANG_RETURN_ON_FAIL(_createFrameBuffers(renderPass));
-    }
-    m_renderPass = renderPass;
-    return SLANG_OK;
-}
-
 SlangResult VulkanSwapChain::_createSwapChain()
 {
     if (hasValidSwapChain())
@@ -217,7 +162,7 @@ SlangResult VulkanSwapChain::_createSwapChain()
     {
         int numCheckPresentOptions = 3;
         VkPresentModeKHR presentOptions[] = { VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_FIFO_KHR };
-        if (m_vsync)
+        if (m_desc.m_vsync)
         {
             presentOptions[0] = VK_PRESENT_MODE_FIFO_KHR;
             presentOptions[1] = VK_PRESENT_MODE_IMMEDIATE_KHR;
@@ -274,45 +219,9 @@ SlangResult VulkanSwapChain::_createSwapChain()
         m_images.setCount(numSwapChainImages);
         for (int i = 0; i < int(numSwapChainImages); ++i)
         {
-            Image& dstImage = m_images[i];
-            dstImage.m_image = images[i];
-
+            m_images[i] = images[i];
         }
     }
-
-    {
-        VkImageViewCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format = m_format;
-
-        createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel = 0;
-        createInfo.subresourceRange.levelCount = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount = 1;
-
-        for (int i = 0; i < int(numSwapChainImages); ++i)
-        {
-            Image& image = m_images[i];
-
-            createInfo.image = image.m_image;
-
-            SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateImageView(m_api->m_device, &createInfo, nullptr, &image.m_imageView));
-        }
-    }
-
-    if (m_renderPass != VK_NULL_HANDLE)
-    {
-        _createFrameBuffers(m_renderPass);
-    }
-
     return SLANG_OK;
 }
 
@@ -324,21 +233,6 @@ void VulkanSwapChain::_destroySwapChain()
     }
 
     m_deviceQueue->waitForIdle();
-
-    if (m_renderPass != VK_NULL_HANDLE)
-    {
-        _destroyFrameBuffers();
-    }
-
-    for (Index i = 0; i < m_images.getCount(); ++i)
-    {
-        Image& image = m_images[i];
-
-        if (image.m_imageView != VK_NULL_HANDLE)
-        {
-            m_api->vkDestroyImageView(m_api->m_device, image.m_imageView, nullptr);
-        }
-    }
 
     if (m_swapChain != VK_NULL_HANDLE)
     {
@@ -421,9 +315,8 @@ void VulkanSwapChain::present(bool vsync)
 
     m_deviceQueue->flushStepB();
 
-    if (result != VK_SUCCESS || m_vsync != vsync)
+    if (result != VK_SUCCESS)
     {
-        m_vsync = vsync;
         _destroySwapChain();
     }
 }

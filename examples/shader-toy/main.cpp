@@ -352,8 +352,6 @@ Result initialize()
 
     IRenderer::Desc rendererDesc;
     rendererDesc.rendererType = RendererType::DirectX11;
-    rendererDesc.width = gWindowWidth;
-    rendererDesc.height = gWindowHeight;
     Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 
@@ -516,6 +514,12 @@ void renderFrame()
         startTime = getCurrentTime();
         firstTime = false;
     }
+
+    gfx::Viewport viewport = {};
+    viewport.maxZ = 1.0f;
+    viewport.extentX = (float)gWindowWidth;
+    viewport.extentY = (float)gWindowHeight;
+    gRenderer->setViewportAndScissor(viewport);
 
     static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
     gRenderer->setClearColor(kClearColor);

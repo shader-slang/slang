@@ -1166,8 +1166,6 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    glViewport(0, 0, desc.width, desc.height);
-
     if (!glGenVertexArrays)
         return SLANG_FAIL;
 
@@ -1255,25 +1253,28 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setFramebuffer(IFramebuffer* frameBu
 SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
     ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
 {
-    size_t requiredSize = m_desc.width * m_desc.height * sizeof(uint32_t);
+    auto resource = static_cast<TextureResourceImpl*>(texture);
+    auto size = resource->getDesc()->size;
+    size_t requiredSize = size.width * size.height * sizeof(uint32_t);
     if (outRowPitch)
-        *outRowPitch = m_desc.width * sizeof(uint32_t);
+        *outRowPitch = size.width * sizeof(uint32_t);
     if (outPixelSize)
         *outPixelSize = sizeof(uint32_t);
 
     RefPtr<ListBlob> blob = new ListBlob();
     blob->m_data.setCount(requiredSize);
     auto buffer = blob->m_data.begin();
-    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+    glBindTexture(resource->m_target, resource->m_handle);
+    glGetTexImage(resource->m_target, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
     // Flip pixels vertically in-place.
-    for (int y = 0; y < m_desc.height / 2; y++)
+    for (int y = 0; y < size.height / 2; y++)
     {
-        for (int x = 0; x < m_desc.width; x++)
+        for (int x = 0; x < size.width; x++)
         {
             std::swap(
-                *((uint32_t*)buffer + y * m_desc.width + x),
-                *((uint32_t*)buffer + (m_desc.height - y - 1) * m_desc.width + x));
+                *((uint32_t*)buffer + y * size.width + x),
+                *((uint32_t*)buffer + (size.height - y - 1) * size.width + x));
         }
     }
 

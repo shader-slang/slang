@@ -1144,7 +1144,7 @@ public:
         Format format;
         uint32_t width, height;
         uint32_t imageCount;
-        bool isFullSpeed;
+        bool enableVSync;
     };
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) = 0;
@@ -1206,8 +1206,6 @@ public:
     struct Desc
     {
         RendererType rendererType; // The underlying API/Platform of the renderer.
-        int width = 0;                                  // Width in pixels
-        int height = 0;                                 // height in pixels
         const char* adapter = nullptr;                  // Name to identify the adapter to use
         int requiredFeatureCount = 0;                   // Number of required features.
         const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
@@ -1460,7 +1458,15 @@ public:
     {
         setScissorRects(1, &rect);
     }
-
+    /// Sets the viewport, and sets the scissor rect to match the viewport.
+    inline void setViewportAndScissor(Viewport const& viewport)
+    {
+        setViewports(1, &viewport);
+        ScissorRect rect = {};
+        rect.maxX = static_cast<gfx::Int>(viewport.extentX);
+        rect.maxY = static_cast<gfx::Int>(viewport.extentY);
+        setScissorRects(1, &rect);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* framebuffer) = 0;
 

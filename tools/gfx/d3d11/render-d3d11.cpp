@@ -477,8 +477,10 @@ public:
         }
 
     public:
-        ShortList<RefPtr<RenderTargetViewImpl>> renderTargetViews;
+        ShortList<RefPtr<RenderTargetViewImpl>, kMaxRTVs> renderTargetViews;
+        ShortList<ID3D11RenderTargetView*, kMaxRTVs> d3dRenderTargetViews;
         RefPtr<DepthStencilViewImpl> depthStencilView;
+        ID3D11DepthStencilView* d3dDepthStencilView;
     };
 
     class SwapchainImpl
@@ -521,13 +523,7 @@ public:
             swapChainDesc.SampleDesc.Count = 1;
             swapChainDesc.Windowed = TRUE;
 
-            if (desc.isFullSpeed)
-            {
-                m_hasVsync = false;
-                m_allowFullScreen = false;
-            }
-
-            if (!m_hasVsync)
+            if (!desc.enableVSync)
             {
                 swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
             }
@@ -538,7 +534,7 @@ public:
                 m_renderer->m_device, &swapChainDesc, swapChain.writeRef()));
             SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
 
-            if (!m_hasVsync)
+            if (!desc.enableVSync)
             {
                 m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
@@ -612,8 +608,6 @@ public:
     public:
         D3D11Renderer* m_renderer = nullptr;
         ISwapchain::Desc m_desc;
-        bool m_hasVsync = false;
-        bool m_allowFullScreen = false;
         HANDLE m_swapChainWaitableObject = nullptr;
         ComPtr<IDXGISwapChain2> m_swapChain;
         ShortList<RefPtr<TextureResourceImpl>> m_images;
@@ -887,14 +881,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc)
         SLANG_ASSERT(m_immediateContext && m_device);
     }
 
-    // Set viewport.
-    {
-        Viewport viewport = {};
-        viewport.extentX = (float)desc.width;
-        viewport.extentY = (float)desc.height;
-        setViewport(viewport);
-    }
-
     // NVAPI
     if (desc.nvapiExtnSlot >= 0)
     {
@@ -985,11 +971,14 @@ Result D3D11Renderer::createFramebuffer(
 {
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl();
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
+    framebuffer->d3dRenderTargetViews.setCount(desc.renderTargetCount);
     for (uint32_t i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] = static_cast<RenderTargetViewImpl*>(desc.renderTargetViews[i]);
+        framebuffer->d3dRenderTargetViews[i] = framebuffer->renderTargetViews[i]->m_rtv;
     }
     framebuffer->depthStencilView = static_cast<DepthStencilViewImpl*>(desc.depthStencilView);
+    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView->m_dsv;
     *outFramebuffer = framebuffer.detach();
     return SLANG_OK;
 }
@@ -2428,13 +2417,10 @@ void D3D11Renderer::_flushGraphicsState()
 
         auto rtvCount = (UINT)m_currentFramebuffer->renderTargetViews.getCount();
         auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
-        ShortList<ID3D11RenderTargetView*> rtvs;
-        for (auto rtv : m_currentFramebuffer->renderTargetViews)
-            rtvs.add(rtv->m_rtv);
         m_immediateContext->OMSetRenderTargetsAndUnorderedAccessViews(
             rtvCount,
-            rtvs.getArrayView().getBuffer(),
-            m_currentFramebuffer->depthStencilView->m_dsv.get(),
+            m_currentFramebuffer->d3dRenderTargetViews.getArrayView().getBuffer(),
+            m_currentFramebuffer->d3dDepthStencilView,
             rtvCount,
             uavCount,
             m_uavBindings[pipelineType][0].readRef(),
