@@ -950,6 +950,7 @@ private:
             switch (desc.format)
             {
             case Format::R_Float32:
+            case Format::D_Float32:
                 {
                     format = CU_AD_FORMAT_FLOAT;
                     numChannels = 1;

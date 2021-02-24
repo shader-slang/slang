@@ -729,13 +729,13 @@ void RenderTestApp::_initializeFramebuffer()
     framebufferLayoutDesc.renderTargetCount = 1;
     framebufferLayoutDesc.renderTargets = &colorAttachment;
     framebufferLayoutDesc.depthStencil = &depthAttachment;
-    m_framebufferLayout = m_renderer->createFramebufferLayout(framebufferLayoutDesc);
+    m_renderer->createFramebufferLayout(framebufferLayoutDesc, m_framebufferLayout.writeRef());
     gfx::IFramebuffer::Desc framebufferDesc;
     framebufferDesc.renderTargetCount = 1;
     framebufferDesc.depthStencilView = dsv.get();
     framebufferDesc.renderTargetViews = rtv.readRef();
     framebufferDesc.layout = m_framebufferLayout;
-    m_framebuffer = m_renderer->createFramebuffer(framebufferDesc);
+    m_renderer->createFramebuffer(framebufferDesc, m_framebuffer.writeRef());
 }
 
 void LegacyRenderTestApp::setProjectionMatrix()
