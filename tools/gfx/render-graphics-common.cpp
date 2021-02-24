@@ -962,7 +962,7 @@ protected:
         {
             ComPtr<IDescriptorSet> descriptorSet;
             SLANG_RETURN_ON_FAIL(
-                renderer->createDescriptorSet(descriptorSetInfo->layout, descriptorSet.writeRef()));
+                renderer->createDescriptorSet(descriptorSetInfo->layout, IDescriptorSet::Flag::Transient, descriptorSet.writeRef()));
             descriptorSets.add(descriptorSet);
         }
 
@@ -1474,7 +1474,6 @@ void GraphicsAPIRenderer::preparePipelineDesc(GraphicsPipelineStateDesc& desc)
     {
         auto program = dynamic_cast<GraphicsCommonShaderProgram*>(desc.program);
         auto rootLayout = program->getLayout();
-        desc.renderTargetCount = rootLayout->getRenderTargetCount();
         desc.pipelineLayout = rootLayout->getPipelineLayout();
     }
 }

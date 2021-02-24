@@ -196,6 +196,7 @@
     <ClInclude Include="..\..\..\tools\gfx\slang-context.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h" />
+    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-device-queue.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-module.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.h" />
@@ -217,6 +218,7 @@
     <ClCompile Include="..\..\..\tools\gfx\renderer-shared.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\render-vk.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-api.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-device-queue.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-module.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.cpp" />

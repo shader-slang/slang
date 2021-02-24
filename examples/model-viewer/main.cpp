@@ -548,7 +548,7 @@ struct ParameterBlockEncoder
     // A top-level encoder will unmap the underlying constant
     // buffer (if any) when it goes out of scope.
     //
-    ~ParameterBlockEncoder();
+    void finishEncoding();
 
     // The underlying descriptor set being filled in.
     //
@@ -669,7 +669,7 @@ RefPtr<ParameterBlock> allocateParameterBlockImpl(
     // resource parameters (including the primary constant buffer, if any).
     //
     auto descriptorSet = renderer->createDescriptorSet(
-        layout->descriptorSetLayout);
+        layout->descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
 
     // If the parameter block has any ordinary data, then it requires
     // a "primary" constant buffer to hold that data.
@@ -743,10 +743,7 @@ ParameterBlockEncoder ParameterBlock::beginEncoding()
     return encoder;
 }
 
-// When a "top-level" encoder goes out of scope,
-// we need to unmap the parameter block.
-//
-ParameterBlockEncoder::~ParameterBlockEncoder()
+void ParameterBlockEncoder::finishEncoding()
 {
     if (parameterBlock && uniformData)
     {
@@ -801,7 +798,8 @@ struct EffectVariant : RefObject
 RefPtr<EffectVariant> createEffectVaraint(
     Effect*                         effect,
     UInt                            parameterBlockCount,
-    ParameterBlockLayout* const*    parameterBlockLayouts)
+    ParameterBlockLayout* const*    parameterBlockLayouts,
+    IFramebufferLayout*             framebufferLayout)
 {
     // One note to make at the very start is that the creation
     // of a specialized variant is based on the *layout* of
@@ -982,7 +980,7 @@ RefPtr<EffectVariant> createEffectVaraint(
     pipelineStateDesc.program = specializedProgram;
     pipelineStateDesc.pipelineLayout = pipelineLayout;
     pipelineStateDesc.inputLayout = effect->inputLayout;
-    pipelineStateDesc.renderTargetCount = effect->renderTargetCount;
+    pipelineStateDesc.framebufferLayout = framebufferLayout;
     auto pipelineState = renderer->createGraphicsPipelineState(pipelineStateDesc);
 
     RefPtr<EffectVariant> variant = new EffectVariant();
@@ -1040,7 +1038,8 @@ struct ShaderCache : RefObject
     // on demand in case of a miss.
     //
     RefPtr<EffectVariant> getEffectVariant(
-        VariantKey const&   key)
+        VariantKey const&   key,
+        IFramebufferLayout* framebufferLayout)
     {
         RefPtr<EffectVariant> variant;
         if(variants.TryGetValue(key, variant))
@@ -1049,7 +1048,8 @@ struct ShaderCache : RefObject
         variant = createEffectVaraint(
             key.effect,
             key.parameterBlockCount,
-            key.parameterBlockLayouts);
+            key.parameterBlockLayouts,
+            framebufferLayout);
 
         variants.Add(key, variant);
         return variant;
@@ -1224,7 +1224,7 @@ public:
         pipelineStateDirty = true;
     }
 
-    void flushState()
+    void flushState(IFramebufferLayout* framebufferLayout)
     {
         // The `flushState()` operation must be used by the application
         // any time it binds a different effect or parameter block(s),
@@ -1248,7 +1248,7 @@ public:
             // be present in the cache, and this function returns
             // without much effort.
             //
-            auto variant = shaderCache->getEffectVariant(variantKey);
+            auto variant = shaderCache->getEffectVariant(variantKey, framebufferLayout);
 
             // In order to adapt to a change in shader variant,
             // we simply bind its PSO into the GPU state, and
@@ -1342,6 +1342,7 @@ struct SimpleMaterial : Material
         encoder.writeField(0, diffuseColor);
         encoder.writeField(1, specularColor);
         encoder.writeField(2, specularity);
+        encoder.finishEncoding();
 
         return parameterBlock;
     }
@@ -1811,6 +1812,7 @@ struct LightEnv : public RefObject
 
         ParameterBlockEncoder encoder = parameterBlock->beginEncoding();
         fillInParameterBlock(encoder);
+        encoder.finishEncoding();
 
         return parameterBlock;
     }
@@ -1911,7 +1913,9 @@ struct ModelViewer {
 
 Window* gWindow;
 Slang::ComPtr<gfx::IRenderer> gRenderer;
-ComPtr<gfx::IResourceView> gDepthTarget;
+ComPtr<gfx::ISwapchain> gSwapchain;
+ComPtr<IFramebufferLayout> gFramebufferLayout;
+Slang::List<ComPtr<gfx::IFramebuffer>> gFramebuffers;
 
 // We keep a pointer to the one effect we are using (for a forward
 // rendering pass), plus the parameter-block layouts for our `PerView`
@@ -1946,6 +1950,7 @@ void loadAndAddModel(
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
+const uint32_t kSwapchainImageCount = 2;
 
 // Our "simulation" state consists of just a few values.
 //
@@ -2052,9 +2057,7 @@ Result initialize()
 
     IRenderer::Desc rendererDesc = {};
     rendererDesc.rendererType = gfx::RendererType::DirectX11;
-    rendererDesc.width = gWindowWidth;
-    rendererDesc.height = gWindowHeight;
-    gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
 
     InputElementDesc inputElements[] = {
         {"POSITION", 0, Format::RGB_Float32, offsetof(Model::Vertex, position) },
@@ -2066,23 +2069,64 @@ Result initialize()
         3);
     if(!inputLayout) return SLANG_FAIL;
 
-    // Because we are rendering more than a single triangle this time, we
-    // require a depth buffer to resolve visibility.
-    //
-    ITextureResource::Desc depthBufferDesc = gRenderer->getSwapChainTextureDesc();
-    depthBufferDesc.format = Format::D_Float32;
-    depthBufferDesc.setDefaults(IResource::Usage::DepthWrite);
-    auto depthTexture = gRenderer->createTextureResource(
-        IResource::Usage::DepthWrite,
-        depthBufferDesc);
-    if(!depthTexture) return SLANG_FAIL;
+    // Create swapchain and framebuffers.
+    gfx::ISwapchain::Desc swapchainDesc = {};
+    swapchainDesc.format = gfx::Format::RGBA_Unorm_UInt8;
+    swapchainDesc.width = gWindowWidth;
+    swapchainDesc.height = gWindowHeight;
+    swapchainDesc.imageCount = kSwapchainImageCount;
+    gSwapchain = gRenderer->createSwapchain(
+        swapchainDesc, gfx::WindowHandle::FromHwnd(getPlatformWindowHandle(gWindow)));
 
-    IResourceView::Desc textureViewDesc;
-    textureViewDesc.type = IResourceView::Type::DepthStencil;
-    auto depthTarget = gRenderer->createTextureView(depthTexture, textureViewDesc);
-    if (!depthTarget) return SLANG_FAIL;
+    IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
+    IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
+    IFramebufferLayout::Desc framebufferLayoutDesc;
+    framebufferLayoutDesc.renderTargetCount = 1;
+    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
+    framebufferLayoutDesc.depthStencil = &depthLayout;
+    SLANG_RETURN_ON_FAIL(
+        gRenderer->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
 
-    gDepthTarget = depthTarget;
+    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    {
+        gfx::ITextureResource::Desc depthBufferDesc;
+        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
+        depthBufferDesc.init2D(
+            gfx::IResource::Type::Texture2D,
+            gfx::Format::D_Float32,
+            gSwapchain->getDesc().width,
+            gSwapchain->getDesc().height,
+            0);
+
+        ComPtr<gfx::ITextureResource> depthBufferResource = gRenderer->createTextureResource(
+            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+        ComPtr<gfx::ITextureResource> colorBuffer;
+        gSwapchain->getImage(i, colorBuffer.writeRef());
+
+        gfx::IResourceView::Desc colorBufferViewDesc;
+        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+        colorBufferViewDesc.format = gSwapchain->getDesc().format;
+        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+        ComPtr<gfx::IResourceView> rtv =
+            gRenderer->createTextureView(colorBuffer.get(), colorBufferViewDesc);
+
+        gfx::IResourceView::Desc depthBufferViewDesc;
+        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
+        depthBufferViewDesc.format = gfx::Format::D_Float32;
+        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
+        ComPtr<gfx::IResourceView> dsv =
+            gRenderer->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
+
+        gfx::IFramebuffer::Desc framebufferDesc;
+        framebufferDesc.renderTargetCount = 1;
+        framebufferDesc.depthStencilView = dsv.get();
+        framebufferDesc.renderTargetViews = rtv.readRef();
+        framebufferDesc.layout = gFramebufferLayout;
+        ComPtr<gfx::IFramebuffer> frameBuffer = gRenderer->createFramebuffer(framebufferDesc);
+        gFramebuffers.add(frameBuffer);
+    }
 
     // Unlike the earlier example, we will not generate final shader kernel
     // code during initialization. Instead, we simply load the shader module
@@ -2157,7 +2201,7 @@ Result initialize()
 
     // We will do some GUI rendering in this app, using "Dear, IMGUI",
     // so we need to do the appropriate initialization work here.
-    gui = new GUI(gWindow, gRenderer);
+    gui = new GUI(gWindow, gRenderer, gFramebufferLayout);
 
     showWindow(gWindow);
 
@@ -2170,6 +2214,7 @@ Result initialize()
 //
 void renderFrame()
 {
+    gRenderer->beginFrame();
     gui->beginFrame();
 
     // In order to see that things are rendering properly we need some
@@ -2213,7 +2258,15 @@ void renderFrame()
 
     // Some of the basic rendering setup is identical to the previous example.
     //
-    gRenderer->setDepthStencilTarget(gDepthTarget);
+    auto frameIndex = gSwapchain->acquireNextImage();
+    gRenderer->setFramebuffer(gFramebuffers[frameIndex]);
+
+    gfx::Viewport viewport = {};
+    viewport.maxZ = 1.0f;
+    viewport.extentX = (float)gWindowWidth;
+    viewport.extentY = (float)gWindowHeight;
+    gRenderer->setViewportAndScissor(viewport);
+
     static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
     gRenderer->setClearColor(kClearColor);
     gRenderer->clearFrame();
@@ -2245,6 +2298,7 @@ void renderFrame()
         auto encoder = viewParameterBlock->beginEncoding();
         encoder.writeField(0, viewProjection);
         encoder.writeField(1, cameraPosition);
+        encoder.finishEncoding();
     }
     //
     // Note: the assignment of indices to parameter blocks is driven
@@ -2288,6 +2342,7 @@ void renderFrame()
             auto encoder = modelParameterBlock->beginEncoding();
             encoder.writeField(0, modelTransform);
             encoder.writeField(1, inverseTransposeModelTransform);
+            encoder.finishEncoding();
         }
         context.setParameterBlock(1, modelParameterBlock);
 
@@ -2321,7 +2376,7 @@ void renderFrame()
             // material changed, a shader switch might be
             // required).
             //
-            context.flushState();
+            context.flushState(gFramebufferLayout);
 
             gRenderer->drawIndexed(mesh->indexCount, mesh->firstIndex);
         }
@@ -2348,7 +2403,11 @@ void renderFrame()
     ImGui::End();
 
     gui->endFrame();
-    gRenderer->presentFrame();
+
+    gRenderer->makeSwapchainImagePresentable(gSwapchain);
+    gRenderer->endFrame();
+    gSwapchain->present();
+
 }
 
 void finalize()
@@ -2359,7 +2418,9 @@ void finalize()
     // that we aren't relying on C++ global destructors to tear
     // down our application cleanly.
     //
+    gRenderer->waitForGpu();
     SimpleMaterial::gParameterBlockLayout = nullptr;
+    destroyWindow(gWindow);
 }
 
 };

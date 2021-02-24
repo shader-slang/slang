@@ -44,28 +44,20 @@ struct VulkanSwapChain
             m_depthFormatTypeless = Format::Unknown;
             m_depthFormat = Format::Unknown;
             m_textureDepthFormat = Format::Unknown;
+            m_imageCount = 2;
+            m_vsync = false;
         }
 
         Format m_format;
-        //bool m_enableFormat;
         Format m_depthFormatTypeless;
         Format m_depthFormat;
         Format m_textureDepthFormat;
+        uint32_t m_imageCount;
+        bool m_vsync;
     };
-
-    struct Image
-    {
-        VkImage m_image = VK_NULL_HANDLE;
-        VkImageView m_imageView = VK_NULL_HANDLE;
-        VkFramebuffer m_frameBuffer = VK_NULL_HANDLE;
-    };
-
 
         /// Must be called before the swap chain can be used
     SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
-
-        /// Create the frame buffers (they must be compatible with the supplied renderPass)
-    SlangResult createFrameBuffers(VkRenderPass renderPass);
 
         /// Returned the desc used to construct the swap chain.
         /// Is invalid if init hasn't returned with successful result.
@@ -89,7 +81,7 @@ struct VulkanSwapChain
     int getHeight() const { return m_height; }
 
         /// Get the detail about the images
-    const Slang::List<Image>& getImages() const { return m_images; }
+    const Slang::List<VkImage>& getImages() const { return m_images; }
 
         /// Get the next front render image index. Returns -1, if image couldn't be found
     int nextFrontImageIndex();
@@ -114,10 +106,7 @@ struct VulkanSwapChain
     const T* _getPlatformDesc() const { return static_cast<const T*>((const PlatformDesc*)m_platformDescBuffer.getBuffer()); }
     SlangResult _createSwapChain();
     void _destroySwapChain();
-    SlangResult _createFrameBuffers(VkRenderPass renderPass);
-    void _destroyFrameBuffers();
 
-    bool m_vsync = true;
     int m_width = 0;
     int m_height = 0;
 
@@ -127,11 +116,9 @@ struct VulkanSwapChain
     VkSurfaceKHR m_surface = VK_NULL_HANDLE;
     VkSwapchainKHR m_swapChain = VK_NULL_HANDLE;
 
-    VkRenderPass m_renderPass = VK_NULL_HANDLE;             //< Not owned
-
     int m_currentSwapChainIndex = 0;
 
-    Slang::List<Image> m_images;
+    Slang::List<VkImage> m_images;
 
     VulkanDeviceQueue* m_deviceQueue = nullptr;
     const VulkanApi* m_api = nullptr;

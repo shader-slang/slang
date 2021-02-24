@@ -2,6 +2,7 @@
 #pragma once
 
 #include "vk-api.h"
+#include "vk-descriptor-allocator.h"
 
 namespace gfx {
 
@@ -35,6 +36,7 @@ struct VulkanDeviceQueue
 
         /// Make the specified event 'current' - meaning it's semaphore must be waited on
     VkSemaphore makeCurrent(EventType eventType);
+    VkSemaphore getSemaphore(EventType eventType);
         /// Makes the event no longer required to be waited on
     void makeCompleted(EventType eventType);
         /// Returns true if the event is already current
@@ -42,6 +44,11 @@ struct VulkanDeviceQueue
 
         /// Get the command buffer
     VkCommandBuffer getCommandBuffer() const { return m_commandBuffer; }
+
+    VulkanDescriptorSet allocTransientDescriptorSet(VkDescriptorSetLayout layout)
+    {
+        return m_descSetAllocator[m_commandBufferIndex].allocate(layout);
+    }
 
         /// Get the queue
     VkQueue getQueue() const { return m_queue; }
@@ -76,18 +83,20 @@ struct VulkanDeviceQueue
 
     VkQueue m_queue = VK_NULL_HANDLE;
 
-    VkCommandPool m_commandPool = VK_NULL_HANDLE;
     int m_numCommandBuffers = 0;
     int m_commandBufferIndex = 0;
     // There are the same amount of command buffers as fences
+    VkCommandPool m_commandPools[kMaxCommandBuffers] = {VK_NULL_HANDLE};
     VkCommandBuffer m_commandBuffers[kMaxCommandBuffers] = { VK_NULL_HANDLE };
 
     Fence m_fences[kMaxCommandBuffers] = { {VK_NULL_HANDLE, 0, 0u} };
 
     VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
-
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
     VkSemaphore m_semaphores[int(EventType::CountOf)];
     VkSemaphore m_currentSemaphores[int(EventType::CountOf)];
+
+    DescriptorSetAllocator m_descSetAllocator[kMaxCommandBuffers];
 
     uint64_t m_lastFenceCompleted = 1;
     uint64_t m_nextFenceValue = 2;

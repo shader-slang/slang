@@ -137,7 +137,7 @@ int main()
     Slang::ComPtr<gfx::IRenderer> renderer;
     IRenderer::Desc rendererDesc = {};
     rendererDesc.rendererType = RendererType::CUDA;
-    SLANG_RETURN_ON_FAIL(gfxCreateRenderer(&rendererDesc, nullptr, renderer.writeRef()));
+    SLANG_RETURN_ON_FAIL(gfxCreateRenderer(&rendererDesc, renderer.writeRef()));
 
     // Now we can load the shader code.
     // A `gfx::IShaderProgram` object for use in the `gfx` layer.
@@ -211,10 +211,11 @@ int main()
 
     // We have set up all required parameters in entry-point object, now it is time
     // to bind the pipeline and root object and launch the kernel.
+    renderer->beginFrame();
     renderer->setPipelineState(pipelineState);
     SLANG_RETURN_ON_FAIL(renderer->bindRootShaderObject(gfx::PipelineType::Compute, rootObject));
     renderer->dispatchCompute(1, 1, 1);
-
+    renderer->endFrame();
     // Read back the results.
     renderer->waitForGpu();
     float* result = (float*)renderer->map(numbersBuffer, gfx::MapFlavor::HostRead);

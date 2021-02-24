@@ -327,6 +327,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& 
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
+const uint32_t kSwapchainImageCount = 2;
 
 gfx::ApplicationContext*    gAppContext;
 gfx::Window*                gWindow;
@@ -336,6 +337,8 @@ ComPtr<gfx::IPipelineLayout> gPipelineLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
 ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
+ComPtr<gfx::ISwapchain> gSwapchain;
+Slang::List<ComPtr<gfx::IFramebuffer>> gFramebuffers;
 
 Result initialize()
 {
@@ -349,9 +352,7 @@ Result initialize()
 
     IRenderer::Desc rendererDesc;
     rendererDesc.rendererType = RendererType::DirectX11;
-    rendererDesc.width = gWindowWidth;
-    rendererDesc.height = gWindowHeight;
-    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 
     int constantBufferSize = sizeof(Uniforms);
@@ -409,20 +410,82 @@ Result initialize()
 
     gPipelineLayout = pipelineLayout;
 
-    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout);
+    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
     descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);
 
     gDescriptorSet = descriptorSet;
 
+    // Create swapchain and framebuffers.
+    gfx::ISwapchain::Desc swapchainDesc = {};
+    swapchainDesc.format = gfx::Format::RGBA_Unorm_UInt8;
+    swapchainDesc.width = gWindowWidth;
+    swapchainDesc.height = gWindowHeight;
+    swapchainDesc.imageCount = kSwapchainImageCount;
+    gSwapchain = gRenderer->createSwapchain(
+        swapchainDesc, gfx::WindowHandle::FromHwnd(getPlatformWindowHandle(gWindow)));
+
+    IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
+    IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
+    IFramebufferLayout::Desc framebufferLayoutDesc;
+    framebufferLayoutDesc.renderTargetCount = 1;
+    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
+    framebufferLayoutDesc.depthStencil = &depthLayout;
+    ComPtr<IFramebufferLayout> framebufferLayout;
+    SLANG_RETURN_ON_FAIL(
+        gRenderer->createFramebufferLayout(framebufferLayoutDesc, framebufferLayout.writeRef()));
+
+    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    {
+        gfx::ITextureResource::Desc depthBufferDesc;
+        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
+        depthBufferDesc.init2D(
+            gfx::IResource::Type::Texture2D,
+            gfx::Format::D_Float32,
+            gSwapchain->getDesc().width,
+            gSwapchain->getDesc().height,
+            0);
+
+        ComPtr<gfx::ITextureResource> depthBufferResource = gRenderer->createTextureResource(
+            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+        ComPtr<gfx::ITextureResource> colorBuffer;
+        gSwapchain->getImage(i, colorBuffer.writeRef());
+
+        gfx::IResourceView::Desc colorBufferViewDesc;
+        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+        colorBufferViewDesc.format = gSwapchain->getDesc().format;
+        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+        ComPtr<gfx::IResourceView> rtv =
+            gRenderer->createTextureView(colorBuffer.get(), colorBufferViewDesc);
+
+        gfx::IResourceView::Desc depthBufferViewDesc;
+        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
+        depthBufferViewDesc.format = gfx::Format::D_Float32;
+        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
+        ComPtr<gfx::IResourceView> dsv =
+            gRenderer->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
+
+        gfx::IFramebuffer::Desc framebufferDesc;
+        framebufferDesc.renderTargetCount = 1;
+        framebufferDesc.depthStencilView = dsv.get();
+        framebufferDesc.renderTargetViews = rtv.readRef();
+        framebufferDesc.layout = framebufferLayout;
+        ComPtr<gfx::IFramebuffer> frameBuffer = gRenderer->createFramebuffer(framebufferDesc);
+        gFramebuffers.add(frameBuffer);
+    }
+
+    // Create pipeline.
     GraphicsPipelineStateDesc desc;
-    desc.pipelineLayout = gPipelineLayout;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
-    desc.renderTargetCount = 1;
+    desc.framebufferLayout = framebufferLayout;
+    desc.pipelineLayout = pipelineLayout;
     auto pipelineState = gRenderer->createGraphicsPipelineState(desc);
-    if(!pipelineState) return SLANG_FAIL;
+    if (!pipelineState)
+        return SLANG_FAIL;
 
     gPipelineState = pipelineState;
 
@@ -443,11 +506,20 @@ uint64_t startTime = 0;
 
 void renderFrame()
 {
+    gRenderer->beginFrame();
+    auto frameIndex = gSwapchain->acquireNextImage();
+    gRenderer->setFramebuffer(gFramebuffers[frameIndex]);
     if( firstTime )
     {
         startTime = getCurrentTime();
         firstTime = false;
     }
+
+    gfx::Viewport viewport = {};
+    viewport.maxZ = 1.0f;
+    viewport.extentX = (float)gWindowWidth;
+    viewport.extentY = (float)gWindowHeight;
+    gRenderer->setViewportAndScissor(viewport);
 
     static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
     gRenderer->setClearColor(kClearColor);
@@ -483,10 +555,18 @@ void renderFrame()
 
     gRenderer->draw(3);
 
-    gRenderer->presentFrame();
+    gRenderer->makeSwapchainImagePresentable(gSwapchain);
+
+    gRenderer->endFrame();
+
+    gSwapchain->present();
 }
 
-void finalize() { destroyWindow(gWindow); }
+void finalize()
+{
+    gRenderer->waitForGpu();
+    destroyWindow(gWindow);
+}
 
 void handleEvent(Event const& event)
 {

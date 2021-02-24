@@ -64,7 +64,6 @@ int gWindowWidth = 640;
 int gWindowHeight = 480;
 
 gfx::ApplicationContext*    gAppContext;
-gfx::Window*                gWindow;
 ComPtr<gfx::IRenderer>      gRenderer;
 
 ComPtr<slang::ISession> gSlangSession;
@@ -112,17 +111,9 @@ ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char
 
 Result execute()
 {
-    WindowDesc windowDesc;
-    windowDesc.title = "GPU Printing";
-    windowDesc.width = gWindowWidth;
-    windowDesc.height = gWindowHeight;
-    gWindow = createWindow(windowDesc);
-
     IRenderer::Desc rendererDesc;
     rendererDesc.rendererType = gfx::RendererType::DirectX11;
-    rendererDesc.width = gWindowWidth;
-    rendererDesc.height = gWindowHeight;
-    Result res = gfxCreateRenderer(&rendererDesc, getPlatformWindowHandle(gWindow), gRenderer.writeRef());
+    Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 
     gSlangSession = createSlangSession(gRenderer);
@@ -157,7 +148,7 @@ Result execute()
     // Once we have the descriptor set layout, we can allocate
     // and fill in a descriptor set to hold our parameters.
     //
-    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout);
+    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
 //    descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);

@@ -160,6 +160,7 @@ enum class Format
     R_Float32,
 
     RGBA_Unorm_UInt8,
+    BGRA_Unorm_UInt8,
 
     R_UInt16,
     R_UInt32,
@@ -594,6 +595,7 @@ public:
         int numMipLevels;       ///< Number of mip levels - if 0 will create all mip levels
         Format format;          ///< The resources format
         SampleDesc sampleDesc;  ///< How the resource is sampled
+        float optimalClearValue[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     };
 
         /// The ordering of the subResources is
@@ -795,10 +797,23 @@ public:
         UnorderedAccess,
     };
 
+    struct RenderTargetDesc
+    {
+        // The resource shape of this render target view.
+        IResource::Type shape;
+        uint32_t mipSlice;
+        uint32_t arrayIndex;
+        uint32_t arraySize;
+        uint32_t planeIndex;
+    };
+
     struct Desc
     {
         Type    type;
         Format  format;
+
+        // Fields for `RenderTarget` and `DepthStencil` views.
+        RenderTargetDesc renderTarget;
     };
 };
 #define SLANG_UUID_IResourceView                                                       \
@@ -810,6 +825,15 @@ public:
 class IDescriptorSet : public ISlangUnknown
 {
 public:
+    struct Flag
+    {
+        enum Enum
+        {
+            None = 0,
+            Transient = 1,
+            Persistent = 2
+        };
+    };
     virtual SLANG_NO_THROW void SLANG_MCALL setConstantBuffer(UInt range, UInt index, IBufferResource* buffer) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setResource(UInt range, UInt index, IResourceView* view) = 0;
@@ -917,6 +941,9 @@ struct DepthStencilOpDesc
     StencilOp       stencilDepthFailOp  = StencilOp::Keep;
     StencilOp       stencilPassOp       = StencilOp::Keep;
     ComparisonFunc  stencilFunc         = ComparisonFunc::Always;
+    uint32_t        stencilCompareMask  = 0xFFFFFFFF;
+    uint32_t        stencilWriteMask    = 0xFFFFFFFF;
+    uint32_t        stencilReference    = 0;
 };
 
 struct DepthStencilDesc
@@ -1022,6 +1049,26 @@ struct BlendDesc
     bool alphaToCoverateEnable  = false;
 };
 
+class IFramebufferLayout : public ISlangUnknown
+{
+public:
+    struct AttachmentLayout
+    {
+        Format format;
+        int sampleCount;
+    };
+    struct Desc
+    {
+        uint32_t renderTargetCount;
+        AttachmentLayout* renderTargets;
+        AttachmentLayout* depthStencil;
+    };
+};
+#define SLANG_UUID_IFramebufferLayout                                                \
+    {                                                                                \
+        0xa838785, 0xc13a, 0x4832, { 0xad, 0x88, 0x64, 0x6, 0xb5, 0x4b, 0x5e, 0xba } \
+    }
+
 struct GraphicsPipelineStateDesc
 {
     IShaderProgram*      program;
@@ -1030,8 +1077,8 @@ struct GraphicsPipelineStateDesc
     // from `program`, which must have been created with Slang reflection info.
     IPipelineLayout* pipelineLayout = nullptr;
 
-    IInputLayout*        inputLayout;
-    UInt                renderTargetCount = 0; // Only used if `pipelineLayout` is non-null
+    IInputLayout*       inputLayout;
+    IFramebufferLayout* framebufferLayout;
     DepthStencilDesc    depthStencil;
     RasterizerDesc      rasterizer;
     BlendDesc           blend;
@@ -1073,6 +1120,69 @@ struct Viewport
     float maxZ    = 1.0f;
 };
 
+class IFramebuffer : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        uint32_t renderTargetCount;
+        IResourceView* const* renderTargetViews;
+        IResourceView* depthStencilView;
+        IFramebufferLayout* layout;
+    };
+};
+#define SLANG_UUID_IFrameBuffer                                                       \
+    {                                                                                 \
+        0xf0c0d9a, 0x4ef3, 0x4e18, { 0x9b, 0xa9, 0x34, 0x60, 0xea, 0x69, 0x87, 0x95 } \
+    }
+
+class ISwapchain : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        Format format;
+        uint32_t width, height;
+        uint32_t imageCount;
+        bool enableVSync;
+    };
+    virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
+    virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) = 0;
+    virtual SLANG_NO_THROW Result present() = 0;
+    virtual SLANG_NO_THROW uint32_t acquireNextImage() = 0;
+};
+#define SLANG_UUID_ISwapchain                                                         \
+    {                                                                                 \
+        0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 }  \
+    }
+
+struct WindowHandle
+{
+    enum class Type
+    {
+        Unknown,
+        Win32Handle,
+        XLibHandle,
+    };
+    Type type;
+    intptr_t handleValues[2];
+    static WindowHandle FromHwnd(void* hwnd)
+    {
+        WindowHandle handle = {};
+        handle.type = WindowHandle::Type::Win32Handle;
+        handle.handleValues[0] = (intptr_t)(hwnd);
+        return handle;
+    }
+    static WindowHandle FromXWindow(void* xdisplay, uint32_t xwindow)
+    {
+        WindowHandle handle = {};
+        handle.type = WindowHandle::Type::XLibHandle;
+        handle.handleValues[0] = (intptr_t)(xdisplay);
+        handle.handleValues[1] = xwindow;
+        return handle;
+    }
+};
+
 class IRenderer: public ISlangUnknown
 {
 public:
@@ -1096,8 +1206,6 @@ public:
     struct Desc
     {
         RendererType rendererType; // The underlying API/Platform of the renderer.
-        int width = 0;                                  // Width in pixels
-        int height = 0;                                 // height in pixels
         const char* adapter = nullptr;                  // Name to identify the adapter to use
         int requiredFeatureCount = 0;                   // Number of required features.
         const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
@@ -1122,10 +1230,10 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() = 0;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() = 0;
-
-    virtual SLANG_NO_THROW ITextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        makeSwapchainImagePresentable(ISwapchain* swapchain) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
@@ -1192,6 +1300,33 @@ public:
         return view;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebufferLayout(IFramebufferLayout::Desc const& desc, IFramebufferLayout** outFrameBuffer) = 0;
+    inline ComPtr<IFramebufferLayout> createFramebufferLayout(IFramebufferLayout::Desc const& desc)
+    {
+        ComPtr<IFramebufferLayout> fb;
+        SLANG_RETURN_NULL_ON_FAIL(createFramebufferLayout(desc, fb.writeRef()));
+        return fb;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffer** outFrameBuffer) = 0;
+    inline ComPtr<IFramebuffer> createFramebuffer(IFramebuffer::Desc const& desc)
+    {
+        ComPtr<IFramebuffer> fb;
+        SLANG_RETURN_NULL_ON_FAIL(createFramebuffer(desc, fb.writeRef()));
+        return fb;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
+        ISwapchain::Desc const& desc, WindowHandle window, ISwapchain** outSwapchain) = 0;
+    inline ComPtr<ISwapchain> createSwapchain(ISwapchain::Desc const& desc, WindowHandle window)
+    {
+        ComPtr<ISwapchain> swapchain;
+        SLANG_RETURN_NULL_ON_FAIL(createSwapchain(desc, window, swapchain.writeRef()));
+        return swapchain;
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout) = 0;
 
@@ -1241,12 +1376,12 @@ public:
         return layout;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet) = 0;
 
-    inline ComPtr<IDescriptorSet> createDescriptorSet(IDescriptorSetLayout* layout)
+    inline ComPtr<IDescriptorSet> createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag)
     {
         ComPtr<IDescriptorSet> descriptorSet;
-        SLANG_RETURN_NULL_ON_FAIL(createDescriptorSet(layout, descriptorSet.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createDescriptorSet(layout, flag, descriptorSet.writeRef()));
         return descriptorSet;
     }
 
@@ -1283,8 +1418,12 @@ public:
         return state;
     }
 
-        /// Captures the back buffer and stores the result in surfaceOut. If the surface contains data - it will either be overwritten (if same size and format), or freed and a re-allocated.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(void* buffer, size_t *inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) = 0;
+        /// Read back texture resource and stores the result in `outBlob`.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
+        ITextureResource* resource,
+        ISlangBlob** outBlob,
+        size_t* outRowPitch,
+        size_t* outPixelSize) = 0;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) = 0;
@@ -1308,8 +1447,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset = 0) = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setDepthStencilTarget(IResourceView* depthStencilView) = 0;
-
     virtual SLANG_NO_THROW void SLANG_MCALL setViewports(UInt count, Viewport const* viewports) = 0;
     inline void setViewport(Viewport const& viewport)
     {
@@ -1321,8 +1458,17 @@ public:
     {
         setScissorRects(1, &rect);
     }
-
+    /// Sets the viewport, and sets the scissor rect to match the viewport.
+    inline void setViewportAndScissor(Viewport const& viewport)
+    {
+        setViewports(1, &viewport);
+        ScissorRect rect = {};
+        rect.maxX = static_cast<gfx::Int>(viewport.extentX);
+        rect.maxY = static_cast<gfx::Int>(viewport.extentY);
+        setScissorRects(1, &rect);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* framebuffer) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) = 0;
@@ -1372,7 +1518,7 @@ extern "C"
     SLANG_GFX_API const char* SLANG_MCALL gfxGetRendererName(RendererType type);
 
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer);
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
 }
 
 }// renderer_test
