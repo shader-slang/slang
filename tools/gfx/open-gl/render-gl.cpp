@@ -3,13 +3,11 @@
 
 #include "../nvapi/nvapi-util.h"
 
-//WORKING:#include "options.h"
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 #include "core/slang-secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
@@ -33,6 +31,7 @@
 
 #include <GL/GL.h>
 #include "external/glext.h"
+#include "external/wglext.h"
 
 // We define an "X-macro" for mapping over loadable OpenGL
 // extension entry point that we will use, so that we can
@@ -69,8 +68,21 @@
     F(glBindSampler,                PFNGLBINDSAMPLERPROC) \
     F(glTexImage3D,                 PFNGLTEXIMAGE3DPROC) \
     F(glSamplerParameteri,          PFNGLSAMPLERPARAMETERIPROC) \
+    F(glGenFramebuffers, PFNGLGENFRAMEBUFFERSPROC) \
+    F(glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERSPROC) \
+    F(glBindFramebuffer, PFNGLBINDFRAMEBUFFERPROC) \
+    F(glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2DPROC) \
+    F(glFramebufferTextureLayer, PFNGLFRAMEBUFFERTEXTURELAYERPROC) \
+    F(glBlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC) \
+    F(glCheckFramebufferStatus, PFNGLCHECKFRAMEBUFFERSTATUSPROC) \
+    F(glGenVertexArrays, PFNGLGENVERTEXARRAYSPROC) \
+    F(glBindVertexArray, PFNGLBINDVERTEXARRAYPROC) \
+    F(glDeleteVertexArrays, PFNGLDELETEVERTEXARRAYSPROC) \
     /* end */
 
+#define MAP_WGL_EXTENSION_FUNCS(F) \
+    F(wglCreateContextAttribsARB, PFNWGLCREATECONTEXTATTRIBSARBPROC) \
+    /* end */
 using namespace Slang;
 
 namespace gfx {
@@ -78,13 +90,24 @@ namespace gfx {
 class GLRenderer : public GraphicsAPIRenderer
 {
 public:
-
     // Renderer    implementation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override;
-    virtual SLANG_NO_THROW  ITextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        makeSwapchainImagePresentable(ISwapchain* swapchain) override
+    {
+        SLANG_UNUSED(swapchain);
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
+        const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
+        const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -114,7 +137,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) override;
+        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -123,8 +146,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
-        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
+        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
@@ -146,8 +169,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        setDepthStencilTarget(IResourceView* depthStencilView) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
@@ -166,6 +187,7 @@ public:
     {
         return m_currentPipelineState.Ptr();
     }
+    HGLRC createGLContext(HDC hdc);
     GLRenderer();
     ~GLRenderer();
 
@@ -296,6 +318,200 @@ public:
     public:
         RefPtr<BufferResourceImpl>  m_resource;
         GLuint                      m_bufferID;
+    };
+
+    class FramebufferLayoutImpl
+        : public IFramebufferLayout
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebufferLayout* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
+                return static_cast<IFramebufferLayout*>(this);
+            return nullptr;
+        }
+
+    public:
+        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        bool m_hasDepthStencil = false;
+        IFramebufferLayout::AttachmentLayout m_depthStencil;
+    };
+
+    class FramebufferImpl
+        : public IFramebuffer
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebuffer* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
+                return static_cast<IFramebuffer*>(this);
+            return nullptr;
+        }
+
+    public:
+        GLuint m_framebuffer;
+        WeakSink<GLRenderer>* m_renderer;
+        ShortList<RefPtr<TextureViewImpl>> renderTargetViews;
+        RefPtr<TextureViewImpl> depthStencilView;
+        FramebufferImpl(WeakSink<GLRenderer>* renderer) :m_renderer(renderer) {}
+        ~FramebufferImpl()
+        {
+            if (auto renderer = m_renderer->get())
+            {
+                renderer->glDeleteFramebuffers(1, &m_framebuffer);
+            }
+        }
+        void createGLFramebuffer()
+        {
+            auto renderer = m_renderer->get();
+            renderer->glGenFramebuffers(1, &m_framebuffer);
+            renderer->glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+            for (Index i = 0; i < renderTargetViews.getCount(); i++)
+            {
+                auto rtv = renderTargetViews[i].Ptr();
+                renderer->glFramebufferTexture2D(
+                    GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + (uint32_t)i, GL_TEXTURE_2D, rtv->m_textureID, 0);
+            }
+            if (depthStencilView)
+            {
+                renderer->glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_DEPTH_ATTACHMENT,
+                    GL_TEXTURE_2D,
+                    depthStencilView->m_textureID,
+                    0);
+            }
+            auto error = renderer->glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (error != GL_FRAMEBUFFER_COMPLETE)
+            {
+                return;
+            }
+        }
+    };
+
+    class SwapchainImpl
+        : public ISwapchain
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ISwapchain* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
+                return static_cast<ISwapchain*>(this);
+            return nullptr;
+        }
+
+    public:
+        ~SwapchainImpl()
+        {
+            for (auto image : m_images)
+                image->m_handle = 0;
+            if (auto rendererRef = m_renderer->get())
+            {
+                rendererRef->glDeleteFramebuffers(1, &m_framebuffer);
+                glDeleteTextures(1, &m_backBuffer);
+            }
+            wglMakeCurrent(m_hdc, 0);
+            wglDeleteContext(m_glrc);
+            ::ReleaseDC(m_hwnd, m_hdc);
+        }
+        Result init(GLRenderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+        {
+            m_renderer = renderer->m_weakRenderer.Ptr();
+
+            m_hwnd = (HWND)window.handleValues[0];
+            m_hdc = ::GetDC(m_hwnd);
+            m_glrc = renderer->createGLContext(m_hdc);
+            wglMakeCurrent(renderer->m_hdc, renderer->m_glContext);
+
+            m_desc = desc;
+
+            glGenTextures(1, &m_backBuffer);
+            glBindTexture(GL_TEXTURE_2D, m_backBuffer);
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RGBA8,
+                desc.width,
+                desc.height,
+                0,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                nullptr);
+
+            wglMakeCurrent(m_hdc, m_glrc);
+            renderer->glGenFramebuffers(1, &m_framebuffer);
+            renderer->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);
+            renderer->glFramebufferTexture2D(
+                GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_backBuffer, 0);
+
+            for (uint32_t i = 0; i < desc.imageCount; i++)
+            {
+                ITextureResource::Desc texDesc = {};
+                texDesc.init2D(
+                    IResource::Type::Texture2D,
+                    gfx::Format::RGBA_Unorm_UInt8,
+                    desc.width,
+                    desc.height,
+                    1);
+                RefPtr<TextureResourceImpl> tex =
+                    new TextureResourceImpl(IResource::Usage::RenderTarget, texDesc, m_renderer);
+                tex->m_handle = m_backBuffer;
+                m_images.add(tex);
+            }
+            wglMakeCurrent(renderer->m_hdc, renderer->m_glContext);
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
+        virtual SLANG_NO_THROW Result
+            getImage(uint32_t index, ITextureResource** outResource) override
+        {
+            m_images[index]->addRef();
+            *outResource = m_images[index].Ptr();
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW Result present() override
+        {
+            glFlush();
+            wglMakeCurrent(m_hdc, m_glrc);
+            auto renderer = m_renderer->get();
+            renderer->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            renderer->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);
+            renderer->glBlitFramebuffer(
+                0,
+                0,
+                m_desc.width,
+                m_desc.height,
+                0,
+                0,
+                m_desc.width,
+                m_desc.height,
+                GL_COLOR_BUFFER_BIT,
+                GL_NEAREST);
+            SwapBuffers(m_hdc);
+            wglMakeCurrent(renderer->m_hdc, renderer->m_glContext);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
+        {
+            return 0;
+        }
+
+    public:
+        WeakSink<GLRenderer>* m_renderer = nullptr;
+        GLuint m_framebuffer;
+        GLuint m_backBuffer;
+        HGLRC m_glrc;
+        HWND m_hwnd;
+        HDC m_hdc;
+        ISwapchain::Desc m_desc;
+        ShortList<RefPtr<TextureResourceImpl>> m_images;
     };
 
     enum class GLDescriptorSlotType
@@ -429,6 +645,8 @@ public:
     {
         Unknown,
         RGBA_Unorm_UInt8,
+        D_Float32,
+        D_Unorm24_S8,
         CountOf,
     };
 
@@ -455,10 +673,11 @@ public:
     static void compileTimeAsserts();
 
     HDC     m_hdc;
-    HGLRC   m_glContext;
+    HGLRC   m_glContext = 0;
     float   m_clearColor[4] = { 0, 0, 0, 0 };
-
+    GLuint m_vao;
     RefPtr<PipelineStateImpl> m_currentPipelineState;
+    RefPtr<FramebufferImpl> m_currentFramebuffer;
     RefPtr<WeakSink<GLRenderer> > m_weakRenderer;
 
     RefPtr<DescriptorSetImpl>   m_boundDescriptorSets[kMaxDescriptorSetCount];
@@ -469,11 +688,12 @@ public:
     UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
 
     Desc m_desc;
-
+    WindowHandle m_windowHandle;
     // Declare a function pointer for each OpenGL
     // extension function we need to load
 #define DECLARE_GL_EXTENSION_FUNC(NAME, TYPE) TYPE NAME;
     MAP_GL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
+    MAP_WGL_EXTENSION_FUNCS(DECLARE_GL_EXTENSION_FUNC)
 #undef DECLARE_GL_EXTENSION_FUNC
 
     static const GlPixelFormatInfo s_pixelFormatInfos[];            /// Maps GlPixelFormat to a format info
@@ -484,6 +704,9 @@ public:
     switch (format)
     {
         case Format::RGBA_Unorm_UInt8:      return GlPixelFormat::RGBA_Unorm_UInt8;
+        case Format::D_Float32:             return GlPixelFormat::D_Float32;
+        case Format::D_Unorm24_S8:          return GlPixelFormat::D_Unorm24_S8;
+
         default:                            return GlPixelFormat::Unknown;
     }
 }
@@ -493,6 +716,9 @@ public:
     // internalType, format, formatType
     { 0,                0,          0},                         // GlPixelFormat::Unknown
     { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::RGBA_Unorm_UInt8
+    { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Float32
+    { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Unorm24_S8
+
 };
 
 /* static */void GLRenderer::compileTimeAsserts()
@@ -500,10 +726,10 @@ public:
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
     RefPtr<GLRenderer> result = new GLRenderer();
-    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
@@ -520,26 +746,6 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
             break;
         default:
             break;
-    }
-}
-
-
-GLRenderer::GLRenderer()
-{
-    m_weakRenderer = new WeakSink<GLRenderer>(this);
-}
-
-GLRenderer::~GLRenderer()
-{
-    // We can destroy things whilst in this state
-    m_currentPipelineState.setNull();
-
-    // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no longer
-    // be able to access this object which is entering a 'being destroyed' to 'destroyed' state
-    if (m_weakRenderer)
-    {
-        SLANG_ASSERT(m_weakRenderer->get() == this);
-        m_weakRenderer->detach();
     }
 }
 
@@ -582,6 +788,11 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
 
 void GLRenderer::flushStateForDraw()
 {
+    if (m_currentFramebuffer)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, m_currentFramebuffer->m_framebuffer);
+    }
+    glBindVertexArray(m_vao);
     auto inputLayout = m_currentPipelineState->m_inputLayout.Ptr();
     auto attrCount = Index(inputLayout->m_attributeCount);
     for (Index ii = 0; ii < attrCount; ++ii)
@@ -606,7 +817,6 @@ void GLRenderer::flushStateForDraw()
     {
         glDisableVertexAttribArray((GLuint)ii);
     }
-
     // Next bind the descriptor sets as required by the layout
     auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
     auto descriptorSetCount = pipelineLayout->m_sets.getCount();
@@ -770,36 +980,126 @@ GLuint GLRenderer::loadShader(GLenum stage, const char* source)
     return shaderID;
 }
 
-#if 0
-void GLRenderer::destroyBindingEntries(const BindingState::Desc& desc, const BindingDetail* details)
-{
-    const auto& bindings = desc.m_bindings;
-    const int numBindings = int(bindings.Count());
-	for (int i = 0; i < numBindings; ++i)
-	{
-        const auto& binding = bindings[i];
-        const auto& detail = details[i];
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        if (binding.bindingType == BindingType::Sampler && detail.m_samplerHandle != 0)
-        {
-            glDeleteSamplers(1, &detail.m_samplerHandle);
-        }
-	}
+#ifdef _WIN32
+LRESULT CALLBACK WindowProc(_In_ HWND hwnd, _In_ UINT uMsg, _In_ WPARAM wParam, _In_ LPARAM lParam)
+{
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 #endif
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
+WindowHandle createWindow()
+{
+    WindowHandle window = {};
+#ifdef _WIN32
+    const wchar_t className[] = L"OpenGLContextWindow";
+    static bool windowClassRegistered = false;
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    if (!windowClassRegistered)
+    {
+        windowClassRegistered = true;
+        WNDCLASS wc = {};
+        wc.lpfnWndProc = WindowProc;
+        wc.hInstance = hInstance;
+        wc.lpszClassName = className;
+        RegisterClass(&wc);
+    }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc, void* inWindowHandle)
+    HWND hwnd = CreateWindowEx(
+        0, // Optional window styles.
+        className, // Window class
+        L"GLWindow", // Window text
+        WS_OVERLAPPEDWINDOW, // Window style
+        // Size and position
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        NULL, // Parent window
+        NULL, // Menu
+        hInstance, // Instance handle
+        NULL // Additional application data
+    );
+
+    if (hwnd == NULL)
+    {
+        return window;
+    }
+    window = WindowHandle::FromHwnd(hwnd);
+#endif
+    return window;
+}
+
+void destroyWindow(WindowHandle window)
+{
+#ifdef _WIN32
+    DestroyWindow((HWND)window.handleValues[0]);
+#endif
+}
+
+GLRenderer::GLRenderer() { m_weakRenderer = new WeakSink<GLRenderer>(this); }
+
+GLRenderer::~GLRenderer()
+{
+    // We can destroy things whilst in this state
+    m_currentPipelineState.setNull();
+    m_currentFramebuffer.setNull();
+    if (glDeleteVertexArrays)
+    {
+        glDeleteVertexArrays(1, &m_vao);
+    }
+    if (m_glContext)
+    {
+        wglDeleteContext(m_glContext);
+    }
+    destroyWindow(m_windowHandle);
+
+    // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no
+    // longer be able to access this object which is entering a 'being destroyed' to 'destroyed'
+    // state
+    if (m_weakRenderer)
+    {
+        SLANG_ASSERT(m_weakRenderer->get() == this);
+        m_weakRenderer->detach();
+    }
+}
+
+HGLRC GLRenderer::createGLContext(HDC hdc)
+{
+    PIXELFORMATDESCRIPTOR pixelFormatDesc = {sizeof(PIXELFORMATDESCRIPTOR)};
+    pixelFormatDesc.nVersion = 1;
+    pixelFormatDesc.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
+    pixelFormatDesc.iPixelType = PFD_TYPE_RGBA;
+    pixelFormatDesc.cColorBits = 32;
+    pixelFormatDesc.cDepthBits = 24;
+    pixelFormatDesc.cStencilBits = 8;
+    pixelFormatDesc.iLayerType = PFD_MAIN_PLANE;
+    int pixelFormatIndex = ChoosePixelFormat(hdc, &pixelFormatDesc);
+    SetPixelFormat(hdc, pixelFormatIndex, &pixelFormatDesc);
+
+    int attributeList[5];
+
+    attributeList[0] = WGL_CONTEXT_MAJOR_VERSION_ARB;
+    attributeList[1] = 4;
+    attributeList[2] = WGL_CONTEXT_MINOR_VERSION_ARB;
+    attributeList[3] = 3;
+    attributeList[4] = 0;
+
+    HGLRC newGLContext = wglCreateContextAttribsARB(hdc, m_glContext, attributeList);
+    return newGLContext;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "glsl_440"));
 
-    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
 
-    auto windowHandle = (HWND)inWindowHandle;
+    m_windowHandle = createWindow();
     m_desc = desc;
 
-    m_hdc = ::GetDC(windowHandle);
+    m_hdc = ::GetDC((HWND)m_windowHandle.handleValues[0]);
 
     PIXELFORMATDESCRIPTOR pixelFormatDesc = { sizeof(PIXELFORMATDESCRIPTOR) };
     pixelFormatDesc.nVersion = 1;
@@ -812,7 +1112,6 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc, void*
 
     int pixelFormatIndex = ChoosePixelFormat(m_hdc, &pixelFormatDesc);
     SetPixelFormat(m_hdc, pixelFormatIndex, &pixelFormatDesc);
-
     m_glContext = wglCreateContext(m_hdc);
     wglMakeCurrent(m_hdc, m_glContext);
 
@@ -844,19 +1143,39 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc, void*
 
 #define LOAD_GL_EXTENSION_FUNC(NAME, TYPE) NAME = (TYPE) wglGetProcAddress(#NAME);
     MAP_GL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
+    MAP_WGL_EXTENSION_FUNCS(LOAD_GL_EXTENSION_FUNC)
 #undef LOAD_GL_EXTENSION_FUNC
+
+    wglMakeCurrent(m_hdc, 0);
+    wglDeleteContext(m_glContext);
+    m_glContext = 0;
+
+    if (!wglCreateContextAttribsARB)
+    {
+        return SLANG_FAIL;
+    }
+
+    m_glContext = createGLContext(m_hdc);
+
+    if (m_glContext == NULL)
+    {
+        return SLANG_FAIL;
+    }
+    wglMakeCurrent(m_hdc, m_glContext);
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    glViewport(0, 0, desc.width, desc.height);
+    if (!glGenVertexArrays)
+        return SLANG_FAIL;
+
+    glGenVertexArrays(1, &m_vao);
 
     if (glDebugMessageCallback)
     {
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(staticDebugCallback, this);
     }
-
     return SLANG_OK;
 }
 
@@ -870,48 +1189,96 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::clearFrame()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::presentFrame()
+SLANG_NO_THROW void SLANG_MCALL GLRenderer::beginFrame() { }
+
+SLANG_NO_THROW void SLANG_MCALL GLRenderer::endFrame()
 {
     glFlush();
-    ::SwapBuffers(m_hdc);
 }
 
-SLANG_NO_THROW TextureResource::Desc SLANG_MCALL GLRenderer::getSwapChainTextureDesc()
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createSwapchain(
+    const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
-    TextureResource::Desc desc;
-    desc.init2D(IResource::Type::Texture2D, Format::Unknown, m_desc.width, m_desc.height, 1);
-    return desc;
+    RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
+    SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
+    *outSwapchain = swapchain.detach();
+    wglMakeCurrent(m_hdc, m_glContext);
+    return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::captureScreenSurface(
-    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createFramebufferLayout(
+    const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
-    size_t requiredSize = m_desc.width * m_desc.height * sizeof(uint32_t);
+    RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
+    layout->m_renderTargets.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        layout->m_renderTargets[i] = desc.renderTargets[i];
+    }
+
+    if (desc.depthStencil)
+    {
+        layout->m_hasDepthStencil = true;
+        layout->m_depthStencil = *desc.depthStencil;
+    }
+    else
+    {
+        layout->m_hasDepthStencil = false;
+    }
+    *outLayout = layout.detach();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL
+    GLRenderer::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
+{
+    RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl(m_weakRenderer);
+    framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        framebuffer->renderTargetViews[i] =
+            static_cast<TextureViewImpl*>(desc.renderTargetViews[i]);
+    }
+    framebuffer->depthStencilView = static_cast<TextureViewImpl*>(desc.depthStencilView);
+    framebuffer->createGLFramebuffer();
+    *outFramebuffer = framebuffer.detach();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW void SLANG_MCALL GLRenderer::setFramebuffer(IFramebuffer* frameBuffer)
+{
+    m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
+    ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+{
+    auto resource = static_cast<TextureResourceImpl*>(texture);
+    auto size = resource->getDesc()->size;
+    size_t requiredSize = size.width * size.height * sizeof(uint32_t);
     if (outRowPitch)
-        *outRowPitch = m_desc.width * sizeof(uint32_t);
+        *outRowPitch = size.width * sizeof(uint32_t);
     if (outPixelSize)
         *outPixelSize = sizeof(uint32_t);
 
-    if (!buffer || *inOutBufferSize == 0)
-    {
-        *inOutBufferSize = requiredSize;
-        return SLANG_OK;
-    }
-    if (*inOutBufferSize < requiredSize)
-        return SLANG_ERROR_INSUFFICIENT_BUFFER;
-
-    glReadPixels(0, 0, m_desc.width, m_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+    RefPtr<ListBlob> blob = new ListBlob();
+    blob->m_data.setCount(requiredSize);
+    auto buffer = blob->m_data.begin();
+    glBindTexture(resource->m_target, resource->m_handle);
+    glGetTexImage(resource->m_target, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 
     // Flip pixels vertically in-place.
-    for (int y = 0; y < m_desc.height / 2; y++)
+    for (int y = 0; y < size.height / 2; y++)
     {
-        for (int x = 0; x < m_desc.width; x++)
+        for (int x = 0; x < size.width; x++)
         {
             std::swap(
-                *((uint32_t*)buffer + y * m_desc.width + x),
-                *((uint32_t*)buffer + (m_desc.height - y - 1) * m_desc.width + x));
+                *((uint32_t*)buffer + y * size.width + x),
+                *((uint32_t*)buffer + (size.height - y - 1) * size.width + x));
         }
     }
+
+    *outBlob = blob.detach();
 
     return SLANG_OK;
 }
@@ -945,12 +1312,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
 
     const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
 
-    assert(initData);
-    assert(initData->numSubResources == srcDesc.numMipLevels * srcDesc.size.depth * effectiveArraySize);
-
     // Set on texture so will be freed if failure
     texture->m_handle = handle;
-    const void*const*const data = initData->subResources;
 
     switch (srcDesc.type)
     {
@@ -966,7 +1329,16 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                 {
                     for (int j = 0; j < srcDesc.numMipLevels; j++)
                     {
-                        glTexImage2D(target, j, internalFormat, srcDesc.size.width, i, 0, format, formatType, data[slice++]);
+                        glTexImage2D(
+                            target,
+                            j,
+                            internalFormat,
+                            Math::Max(1, srcDesc.size.width >> j),
+                            i,
+                            0,
+                            format,
+                            formatType,
+                            initData ? initData->subResources[slice++] : nullptr);
                     }
                 }
             }
@@ -976,7 +1348,15 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                 glBindTexture(target, handle);
                 for (int i = 0; i < srcDesc.numMipLevels; i++)
                 {
-                    glTexImage1D(target, i, internalFormat, srcDesc.size.width, 0, format, formatType, data[i]);
+                    glTexImage1D(
+                        target,
+                        i,
+                        internalFormat,
+                        Math::Max(1, srcDesc.size.width >> i),
+                        0,
+                        format,
+                        formatType,
+                        initData ? initData->subResources[i] : nullptr);
                 }
             }
             break;
@@ -1002,7 +1382,17 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                 {
                     for (int j = 0; j < srcDesc.numMipLevels; j++)
                     {
-                        glTexImage3D(target, j, internalFormat, srcDesc.size.width, srcDesc.size.height, slice, 0, format, formatType, data[slice++]);
+                        glTexImage3D(
+                            target,
+                            j,
+                            internalFormat,
+                            Math::Max(1, srcDesc.size.width >> j),
+                            Math::Max(1, srcDesc.size.height >> j),
+                            slice,
+                            0,
+                            format,
+                            formatType,
+                            initData ? initData->subResources[slice++] : nullptr);
                     }
                 }
             }
@@ -1018,7 +1408,16 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                     {
                         for (int i = 0; i < srcDesc.numMipLevels; i++)
                         {
-                            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + j, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[slice++]);
+                            glTexImage2D(
+                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + j,
+                                i,
+                                internalFormat,
+                                Math::Max(1, srcDesc.size.width >> i),
+                                Math::Max(1, srcDesc.size.height >> i),
+                                0,
+                                format,
+                                formatType,
+                                initData ? initData->subResources[slice++] : nullptr);
                         }
                     }
                 }
@@ -1028,7 +1427,16 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                     glBindTexture(target, handle);
                     for (int i = 0; i < srcDesc.numMipLevels; i++)
                     {
-                        glTexImage2D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, 0, format, formatType, data[i]);
+                        glTexImage2D(
+                            target,
+                            i,
+                            internalFormat,
+                            Math::Max(1, srcDesc.size.width >> i),
+                            Math::Max(1, srcDesc.size.height >> i),
+                            0,
+                            format,
+                            formatType,
+                            initData ? initData->subResources[i] : nullptr);
                     }
                 }
             }
@@ -1040,7 +1448,17 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
             glBindTexture(target, handle);
             for (int i = 0; i < srcDesc.numMipLevels; i++)
             {
-                glTexImage3D(target, i, internalFormat, srcDesc.size.width, srcDesc.size.height, srcDesc.size.depth, 0, format, formatType, data[i]);
+                glTexImage3D(
+                    target,
+                    i,
+                    internalFormat,
+                    Math::Max(1, srcDesc.size.width >> i),
+                    Math::Max(1, srcDesc.size.height >> i),
+                    Math::Max(1, srcDesc.size.depth >> i),
+                    0,
+                    format,
+                    formatType,
+                    initData ? initData->subResources[i] : nullptr);
             }
             break;
         }
@@ -1122,14 +1540,14 @@ SLANG_NO_THROW Result SLANG_MCALL
 SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureView(
     ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
-    auto resourceImpl = (TextureResourceImpl*) texture;
+    auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
 
     // TODO: actually do something?
 
     RefPtr<TextureViewImpl> viewImpl = new TextureViewImpl();
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_textureID = resourceImpl->m_handle;
-    *outView = viewImpl;
+    *outView = viewImpl.detach();
     return SLANG_OK;
 }
 
@@ -1232,10 +1650,6 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setVertexBuffers(
 
 SLANG_NO_THROW void SLANG_MCALL
     GLRenderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
-{
-}
-
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setDepthStencilTarget(IResourceView* depthStencilView)
 {
 }
 
@@ -1455,8 +1869,10 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLRenderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet)
+    GLRenderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet)
 {
+    SLANG_UNUSED(flag);
+
     auto layoutImpl = (DescriptorSetLayoutImpl*) layout;
 
     RefPtr<DescriptorSetImpl> descriptorSetImpl = new DescriptorSetImpl();

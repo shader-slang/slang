@@ -80,11 +80,10 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
-class RenderTestApp : public WindowListener
+class RenderTestApp : public RefObject
 {
 public:
-    // WindowListener
-    virtual Result update(Window* window) SLANG_OVERRIDE;
+    Result update();
 
     // At initialization time, we are going to load and compile our Slang shader
     // code, and then create the API objects we need for rendering.
@@ -110,7 +109,7 @@ protected:
         IRenderer* renderer,
         Options::ShaderProgramType shaderType,
         const ShaderCompilerUtil::Input& input);
-
+    void _initializeFramebuffer();
     virtual void finalizeImpl();
 
     uint64_t m_startTicks;
@@ -124,6 +123,9 @@ protected:
     ComPtr<IBufferResource> m_vertexBuffer;
     ComPtr<IShaderProgram> m_shaderProgram;
     ComPtr<IPipelineState> m_pipelineState;
+    ComPtr<IFramebufferLayout> m_framebufferLayout;
+    ComPtr<IFramebuffer> m_framebuffer;
+    ComPtr<ITextureResource> m_colorBuffer;
 
     ShaderCompilerUtil::OutputAndLayout m_compilationOutput;
 
@@ -472,10 +474,13 @@ SlangResult LegacyRenderTestApp::initialize(
 {
     m_options = options;
 
+    m_renderer = renderer;
+
     SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
 
+    _initializeFramebuffer();
+
     m_numAddedConstantBuffers = 0;
-    m_renderer = renderer;
 
     // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
     m_constantBufferSize = 16 * sizeof(float);
@@ -557,14 +562,12 @@ SlangResult LegacyRenderTestApp::initialize(
                 desc.pipelineLayout = m_bindingState->pipelineLayout;
                 desc.program = m_shaderProgram;
                 desc.inputLayout = m_inputLayout;
-                desc.renderTargetCount = m_bindingState->m_numRenderTargets;
-
+                desc.framebufferLayout = m_framebufferLayout;
                 m_pipelineState = renderer->createGraphicsPipelineState(desc);
             }
             break;
         }
     }
-
     // If success must have a pipeline state
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
@@ -603,6 +606,8 @@ SlangResult ShaderObjectRenderTestApp::initialize(
         renderer, m_programVars, m_compilationOutput.layout, m_outputPlan, slangReflection));
 
 	m_renderer = renderer;
+
+    _initializeFramebuffer();
 
     {
         switch(m_options.shaderType)
@@ -649,13 +654,12 @@ SlangResult ShaderObjectRenderTestApp::initialize(
                 GraphicsPipelineStateDesc desc;
                 desc.program = m_shaderProgram;
                 desc.inputLayout = inputLayout;
-
+                desc.framebufferLayout = m_framebufferLayout;
                 m_pipelineState = renderer->createGraphicsPipelineState(desc);
             }
             break;
         }
     }
-
     // If success must have a pipeline state
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
@@ -678,6 +682,61 @@ Result RenderTestApp::_initializeShaders(
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
+void RenderTestApp::_initializeFramebuffer()
+{
+    gfx::ITextureResource::Desc depthBufferDesc;
+    depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
+    depthBufferDesc.init2D(
+        gfx::IResource::Type::Texture2D,
+        gfx::Format::D_Float32,
+        gWindowWidth,
+        gWindowHeight,
+        0);
+
+    ComPtr<gfx::ITextureResource> depthBufferResource = m_renderer->createTextureResource(
+        gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+
+    gfx::ITextureResource::Desc colorBufferDesc;
+    colorBufferDesc.setDefaults(gfx::IResource::Usage::RenderTarget);
+    colorBufferDesc.init2D(
+        gfx::IResource::Type::Texture2D,
+        gfx::Format::RGBA_Unorm_UInt8,
+        gWindowWidth,
+        gWindowHeight,
+        0);
+    m_colorBuffer = m_renderer->createTextureResource(
+        gfx::IResource::Usage::RenderTarget, colorBufferDesc, nullptr);
+
+    gfx::IResourceView::Desc colorBufferViewDesc;
+    memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+    colorBufferViewDesc.format = gfx::Format::RGBA_Unorm_UInt8;
+    colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+    colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+    ComPtr<gfx::IResourceView> rtv =
+        m_renderer->createTextureView(m_colorBuffer.get(), colorBufferViewDesc);
+
+    gfx::IResourceView::Desc depthBufferViewDesc;
+    memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
+    depthBufferViewDesc.format = gfx::Format::D_Float32;
+    depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+    depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
+    ComPtr<gfx::IResourceView> dsv =
+        m_renderer->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
+
+    IFramebufferLayout::AttachmentLayout colorAttachment = {gfx::Format::RGBA_Unorm_UInt8, 1};
+    IFramebufferLayout::AttachmentLayout depthAttachment = {gfx::Format::D_Float32, 1};
+    gfx::IFramebufferLayout::Desc framebufferLayoutDesc;
+    framebufferLayoutDesc.renderTargetCount = 1;
+    framebufferLayoutDesc.renderTargets = &colorAttachment;
+    framebufferLayoutDesc.depthStencil = &depthAttachment;
+    m_renderer->createFramebufferLayout(framebufferLayoutDesc, m_framebufferLayout.writeRef());
+    gfx::IFramebuffer::Desc framebufferDesc;
+    framebufferDesc.renderTargetCount = 1;
+    framebufferDesc.depthStencilView = dsv.get();
+    framebufferDesc.renderTargetViews = rtv.readRef();
+    framebufferDesc.layout = m_framebufferLayout;
+    m_renderer->createFramebuffer(framebufferDesc, m_framebuffer.writeRef());
+}
 
 void LegacyRenderTestApp::setProjectionMatrix()
 {
@@ -843,14 +902,10 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const c
 
 Result RenderTestApp::writeScreen(const char* filename)
 {
-    size_t rowPitch, bufferSize, pixelSize;
-    List<uint8_t> buffer;
-
-    SLANG_RETURN_ON_FAIL(m_renderer->captureScreenSurface(nullptr, &bufferSize, &rowPitch, &pixelSize));
-    buffer.setCount(bufferSize);
-    SLANG_RETURN_ON_FAIL(
-        m_renderer->captureScreenSurface(buffer.getBuffer(), &bufferSize, &rowPitch, &pixelSize));
-
+    size_t rowPitch, pixelSize;
+    ComPtr<ISlangBlob> blob;
+    SLANG_RETURN_ON_FAIL(m_renderer->readTextureResource(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
+    auto bufferSize = blob->getBufferSize();
     Surface surface;
     size_t width = rowPitch / pixelSize;
     size_t height = bufferSize / rowPitch;
@@ -859,12 +914,14 @@ Result RenderTestApp::writeScreen(const char* filename)
         (int)height,
         gfx::Format::RGBA_Unorm_UInt8,
         (int)rowPitch,
-        buffer.getBuffer());
+        (void*)blob->getBufferPointer());
     return PngSerializeUtil::write(filename, surface);
 }
 
-Result RenderTestApp::update(Window* window)
+Result RenderTestApp::update()
 {
+    m_renderer->beginFrame();
+
     // Whenever we don't have Windows events to process, we render a frame.
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
@@ -873,9 +930,16 @@ Result RenderTestApp::update(Window* window)
     else
     {
         static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
+        m_renderer->setFramebuffer(m_framebuffer);
+
+        gfx::Viewport viewport = {};
+        viewport.maxZ = 1.0f;
+        viewport.extentX = (float)gWindowWidth;
+        viewport.extentY = (float)gWindowHeight;
+        m_renderer->setViewportAndScissor(viewport);
+
         m_renderer->setClearColor(kClearColor);
         m_renderer->clearFrame();
-
         renderFrame();
     }
 
@@ -947,12 +1011,10 @@ Result RenderTestApp::update(Window* window)
                 }
             }
         }
-        // We are done
-        window->postQuit();
         return SLANG_OK;
     }
 
-    m_renderer->presentFrame();
+    m_renderer->endFrame();
     return SLANG_OK;
 }
 
@@ -998,9 +1060,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
 	// Parse command-line options
 	SLANG_RETURN_ON_FAIL(Options::parse(argcIn, argvIn, StdWriters::getError(), options));
-
-    // Declare window pointer before renderer, such that window is released after renderer
-    RefPtr<renderer_test::Window> window;
 
     ShaderCompilerUtil::Input input;
     
@@ -1281,8 +1340,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     {
         IRenderer::Desc desc = {};
         desc.rendererType = options.rendererType;
-        desc.width = gWindowWidth;
-        desc.height = gWindowHeight;
         desc.adapter = options.adapter.getBuffer();
 
         List<const char*> requiredFeatureList;
@@ -1294,16 +1351,9 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
-        window = renderer_test::Window::create();
-        void* windowHandle = nullptr;
-        if (window)
-        {
-            SLANG_RETURN_ON_FAIL(window->initialize(gWindowWidth, gWindowHeight));
-            windowHandle = window->getHandle();
-        }
 
         {
-            SlangResult res = gfxCreateRenderer(&desc, windowHandle, renderer.writeRef());
+            SlangResult res = gfxCreateRenderer(&desc, renderer.writeRef());
             if (SLANG_FAILED(res))
             {
                 // We need to be careful here about SLANG_E_NOT_AVAILABLE. This return value means that the renderer couldn't
@@ -1351,8 +1401,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         else
             app = new LegacyRenderTestApp();
 		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, options, input));
-        window->show();
-        SLANG_RETURN_ON_FAIL(window->runLoop(app));
+        app->update();
         app->finalize();
         return SLANG_OK;
 	}

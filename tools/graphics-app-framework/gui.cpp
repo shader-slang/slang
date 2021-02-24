@@ -36,7 +36,7 @@ void setNativeWindowHook(Window* window, WNDPROC proc);
 #endif
 
 
-GUI::GUI(Window* window, IRenderer* inRenderer)
+GUI::GUI(Window* window, IRenderer* inRenderer, IFramebufferLayout* framebufferLayout)
     : renderer(inRenderer)
 {
      ImGui::CreateContext();
@@ -188,7 +188,7 @@ GUI::GUI(Window* window, IRenderer* inRenderer)
     targetBlendDesc.alpha.dstFactor = BlendFactor::Zero;
 
     GraphicsPipelineStateDesc pipelineDesc;
-    pipelineDesc.renderTargetCount = 1;
+    pipelineDesc.framebufferLayout = framebufferLayout;
     pipelineDesc.program = program;
     pipelineDesc.pipelineLayout = pipelineLayout;
     pipelineDesc.inputLayout = inputLayout;
@@ -367,7 +367,7 @@ void GUI::endFrame()
                 renderer->setScissorRect(rect);
 
                 // TODO: This should be a dynamic/transient descriptor set...
-                auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout);
+                auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
                 descriptorSet->setConstantBuffer(0, 0, constantBuffer);
                 descriptorSet->setResource(1, 0,
                     (gfx::IResourceView*) command->TextureId);

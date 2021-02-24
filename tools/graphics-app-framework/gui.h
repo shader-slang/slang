@@ -12,7 +12,7 @@ namespace gfx {
 
 struct GUI : Slang::RefObject
 {
-    GUI(Window* window, IRenderer* renderer);
+    GUI(Window* window, IRenderer* renderer, IFramebufferLayout* framebufferLayout);
     ~GUI();
 
     void beginFrame();

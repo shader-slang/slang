@@ -1,9 +1,9 @@
 // render-d3d11.cpp
-
 #define _CRT_SECURE_NO_WARNINGS
 
 #include "render-d3d11.h"
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 
 //WORKING: #include "options.h"
 #include "../renderer-shared.h"
@@ -63,11 +63,23 @@ public:
     ~D3D11Renderer() {}
 
     // Renderer    implementation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override;
-    virtual SLANG_NO_THROW TextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        makeSwapchainImagePresentable(ISwapchain* swapchain) override
+    {
+        SLANG_UNUSED(swapchain);
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
+        const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
+        const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -96,8 +108,10 @@ public:
         const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(
+        IDescriptorSetLayout* layout,
+        IDescriptorSet::Flag::Enum flag,
+        IDescriptorSet** outDescriptorSet) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -106,8 +120,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
-        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
+        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
@@ -128,8 +142,6 @@ public:
         const UInt* offsets) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setDepthStencilTarget(IResourceView* depthStencilView) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -432,6 +444,175 @@ public:
         ComPtr<ID3D11RenderTargetView>      m_rtv;
     };
 
+    class FramebufferLayoutImpl
+        : public IFramebufferLayout
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebufferLayout* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
+                return static_cast<IFramebufferLayout*>(this);
+            return nullptr;
+        }
+
+    public:
+        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        bool m_hasDepthStencil = false;
+        IFramebufferLayout::AttachmentLayout m_depthStencil;
+    };
+
+    class FramebufferImpl
+        : public IFramebuffer
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebuffer* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
+                return static_cast<IFramebuffer*>(this);
+            return nullptr;
+        }
+
+    public:
+        ShortList<RefPtr<RenderTargetViewImpl>, kMaxRTVs> renderTargetViews;
+        ShortList<ID3D11RenderTargetView*, kMaxRTVs> d3dRenderTargetViews;
+        RefPtr<DepthStencilViewImpl> depthStencilView;
+        ID3D11DepthStencilView* d3dDepthStencilView;
+    };
+
+    class SwapchainImpl
+        : public ISwapchain
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ISwapchain* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
+                return static_cast<ISwapchain*>(this);
+            return nullptr;
+        }
+
+    public:
+        Result init(D3D11Renderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+        {
+            // Return fail on non-supported platforms.
+            switch (window.type)
+            {
+            case WindowHandle::Type::Win32Handle:
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+
+            m_renderer = renderer;
+            m_desc = desc;
+
+            // Describe the swap chain.
+            DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+            swapChainDesc.BufferCount = desc.imageCount;
+            swapChainDesc.BufferDesc.Width = desc.width;
+            swapChainDesc.BufferDesc.Height = desc.height;
+            swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(desc.format);
+            swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+            swapChainDesc.OutputWindow = (HWND)window.handleValues[0];
+            swapChainDesc.SampleDesc.Count = 1;
+            swapChainDesc.Windowed = TRUE;
+
+            if (!desc.enableVSync)
+            {
+                swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+            }
+
+            // Swap chain needs the queue so that it can force a flush on it.
+            ComPtr<IDXGISwapChain> swapChain;
+            SLANG_RETURN_ON_FAIL(m_renderer->m_dxgiFactory->CreateSwapChain(
+                m_renderer->m_device, &swapChainDesc, swapChain.writeRef()));
+            SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
+
+            if (!desc.enableVSync)
+            {
+                m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+
+                int maxLatency = desc.imageCount - 2;
+
+                // Make sure the maximum latency is in the range required by dx12 runtime
+                maxLatency = (maxLatency < 1) ? 1 : maxLatency;
+                maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS)
+                                 ? DXGI_MAX_SWAP_CHAIN_BUFFERS
+                                 : maxLatency;
+
+                m_swapChain->SetMaximumFrameLatency(maxLatency);
+            }
+
+            SLANG_RETURN_ON_FAIL(m_renderer->m_dxgiFactory->MakeWindowAssociation(
+                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER));
+
+            for (uint32_t i = 0; i < desc.imageCount; i++)
+            {
+                ComPtr<ID3D11Resource> d3dResource;
+                m_swapChain->GetBuffer(0, IID_PPV_ARGS(d3dResource.writeRef()));
+                ITextureResource::Desc imageDesc = {};
+                imageDesc.init2D(
+                    IResource::Type::Texture2D, desc.format, desc.width, desc.height, 0);
+                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc, IResource::Usage::RenderTarget);
+                image->m_resource = d3dResource;
+                m_images.add(image);
+            }
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
+        virtual SLANG_NO_THROW Result
+            getImage(uint32_t index, ITextureResource** outResource) override
+        {
+            m_images[index]->addRef();
+            *outResource = m_images[index].Ptr();
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW Result present() override
+        {
+            if (m_swapChainWaitableObject)
+            {
+                // check if now is good time to present
+                // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it
+                // means that no frame is waiting to be be displayed so there is no point doing a
+                // present.
+                const bool shouldPresent =
+                    (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
+                if (shouldPresent)
+                {
+                    m_swapChain->Present(0, 0);
+                }
+            }
+            else
+            {
+                if (SLANG_FAILED(m_swapChain->Present(1, 0)))
+                {
+                    return SLANG_FAIL;
+                }
+            }
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
+        {
+            uint32_t count;
+            m_swapChain->GetLastPresentCount(&count);
+            return count % m_images.getCount();
+        }
+
+    public:
+        D3D11Renderer* m_renderer = nullptr;
+        ISwapchain::Desc m_desc;
+        HANDLE m_swapChainWaitableObject = nullptr;
+        ComPtr<IDXGISwapChain2> m_swapChain;
+        ShortList<RefPtr<TextureResourceImpl>> m_images;
+    };
+
     class InputLayoutImpl: public IInputLayout, public RefObject
 	{
     public:
@@ -489,16 +670,6 @@ public:
         }
     };
 
-        /// Capture a texture to a file
-    static HRESULT captureTextureToSurface(
-        ID3D11Device* device,
-        ID3D11DeviceContext* context,
-        TextureResourceImpl* texture,
-        void* buffer,
-        size_t* inOutBufferSize,
-        size_t* outRowPitch,
-        size_t* outPixelSize);
-
     void _flushGraphicsState();
     void _flushComputeState();
 
@@ -506,21 +677,16 @@ public:
     ComPtr<ID3D11Device> m_device;
     ComPtr<ID3D11DeviceContext> m_immediateContext;
     ComPtr<ID3D11Texture2D> m_backBufferTexture;
+    ComPtr<IDXGIFactory> m_dxgiFactory;
 
-    RefPtr<TextureResourceImpl>     m_primaryRenderTargetTexture;
-    RefPtr<RenderTargetViewImpl> m_primaryRenderTargetView;
-
-//    List<ComPtr<ID3D11RenderTargetView> > m_renderTargetViews;
-//    List<ComPtr<ID3D11Texture2D> > m_renderTargetTextures;
-
-    bool m_renderTargetBindingsDirty = false;
+    RefPtr<FramebufferImpl> m_currentFramebuffer;
 
     ComPtr<PipelineStateImpl> m_currentPipelineState;
 
-    ComPtr<ID3D11RenderTargetView>      m_rtvBindings[kMaxRTVs];
-    ComPtr<ID3D11DepthStencilView>      m_dsvBinding;
     ComPtr<ID3D11UnorderedAccessView>   m_uavBindings[int(PipelineType::CountOf)][kMaxUAVs];
-    bool m_targetBindingsDirty[int(PipelineType::CountOf)];
+
+    bool m_framebufferBindingDirty = true;
+    bool m_shaderBindingDirty = true;
 
     Desc m_desc;
 
@@ -529,10 +695,10 @@ public:
     bool m_nvapi = false;
 };
 
-SlangResult SLANG_MCALL createD3D11Renderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createD3D11Renderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
     RefPtr<D3D11Renderer> result = new D3D11Renderer();
-    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
@@ -575,87 +741,6 @@ D3D11Renderer::ScopeNVAPI::~ScopeNVAPI()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!D3D11Renderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-/* static */ HRESULT D3D11Renderer::captureTextureToSurface(
-    ID3D11Device* device,
-    ID3D11DeviceContext* context,
-    TextureResourceImpl* texture,
-    void* buffer,
-    size_t* inOutBufferSize,
-    size_t* outRowPitch,
-    size_t* outPixelSize)
-{
-    if (!context) return E_INVALIDARG;
-    if (!texture) return E_INVALIDARG;
-
-    // Don't bother supporting MSAA for right now
-    if (texture->getDesc()->sampleDesc.numSamples > 1)
-    {
-        fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
-        return E_INVALIDARG;
-    }
-
-    size_t bytesPerPixel = sizeof(uint32_t);
-    size_t rowPitch = int(texture->getDesc()->size.width) * bytesPerPixel;
-    size_t bufferSize = rowPitch * int(texture->getDesc()->size.height);
-    if (outRowPitch)
-        *outRowPitch = rowPitch;
-    if (outPixelSize)
-        *outPixelSize = bytesPerPixel;
-    if (!buffer || *inOutBufferSize == 0)
-    {
-        *inOutBufferSize = bufferSize;
-        return S_OK;
-    }
-    if (*inOutBufferSize < bufferSize)
-        return SLANG_ERROR_INSUFFICIENT_BUFFER;
-
-    D3D11_TEXTURE2D_DESC textureDesc;
-    auto d3d11Texture = ((ID3D11Texture2D*)texture->m_resource.get());
-    d3d11Texture->GetDesc(&textureDesc);
-
-    HRESULT hr = S_OK;
-    ComPtr<ID3D11Texture2D> stagingTexture;
-
-    if (textureDesc.Usage == D3D11_USAGE_STAGING && (textureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
-    {
-        stagingTexture = d3d11Texture;
-    }
-    else
-    {
-        // Modify the descriptor to give us a staging texture
-        textureDesc.BindFlags = 0;
-        textureDesc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
-        textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        textureDesc.Usage = D3D11_USAGE_STAGING;
-
-        hr = device->CreateTexture2D(&textureDesc, 0, stagingTexture.writeRef());
-        if (FAILED(hr))
-        {
-            fprintf(stderr, "ERROR: failed to create staging texture\n");
-            return hr;
-        }
-
-        context->CopyResource(stagingTexture, d3d11Texture);
-    }
-
-    // Now just read back texels from the staging textures
-    {
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        SLANG_RETURN_ON_FAIL(context->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource));
-
-        for (size_t y = 0; y < textureDesc.Height; y++)
-        {
-            memcpy(
-                (char*)buffer + y * (*outRowPitch),
-                (char*)mappedResource.pData + y * mappedResource.RowPitch,
-                *outRowPitch);
-        }
-        // Make sure to unmap
-        context->Unmap(stagingTexture, 0);
-        return SLANG_OK;
-    }
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
 static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
@@ -671,13 +756,12 @@ static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
 #endif
 }
 
-SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
+SlangResult D3D11Renderer::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_0"));
 
-    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
 
-    auto windowHandle = (HWND)inWindowHandle;
     m_desc = desc;
 
     // Rather than statically link against D3D, we load it dynamically.
@@ -705,24 +789,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             "error: failed load symbol 'D3D11CreateDevice'\n");
         return SLANG_FAIL;
     }
-
-    // Our swap chain uses RGBA8 with sRGB, with double buffering.
-    DXGI_SWAP_CHAIN_DESC swapChainDesc = { 0 };
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-
-    // Note(tfoley): Disabling sRGB for DX back buffer for now, so that we
-    // can get consistent output with OpenGL, where setting up sRGB will
-    // probably be more involved.
-    // swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.SampleDesc.Quality = 0;
-    swapChainDesc.BufferCount = 2;
-    swapChainDesc.OutputWindow = windowHandle;
-    swapChainDesc.Windowed = TRUE;
-    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-    swapChainDesc.Flags = 0;
 
     // We will ask for the highest feature level that can be supported.
     const D3D_FEATURE_LEVEL featureLevels[] = {
@@ -757,11 +823,13 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
         combiner.add(DeviceCheckFlag::UseFullFeatureLevel, ChangeType::OnOff);      ///< First try fully featured, then degrade features
 
+
         const int numCombinations = combiner.getNumCombinations();
         Result res = SLANG_FAIL;
         for (int i = 0; i < numCombinations; ++i)
         {
             const auto deviceCheckFlags = combiner.getCombination(i);
+            D3DUtil::createFactory(deviceCheckFlags, m_dxgiFactory);
 
             // If we have an adapter set on the desc, look it up. We only need to do so for hardware
             ComPtr<IDXGIAdapter> adapter;
@@ -787,36 +855,17 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
             const int startFeatureIndex = (deviceCheckFlags & DeviceCheckFlag::UseFullFeatureLevel) ? 0 : 1; 
             const UINT deviceFlags = (deviceCheckFlags & DeviceCheckFlag::UseDebug) ? D3D11_CREATE_DEVICE_DEBUG : 0;
 
-            if (windowHandle)
-            {
-                res = D3D11CreateDeviceAndSwapChain_(
-                    adapter,
-                    driverType,
-                    nullptr,                    // software
-                    deviceFlags,
-                    &featureLevels[startFeatureIndex],
-                    totalNumFeatureLevels - startFeatureIndex,
-                    D3D11_SDK_VERSION,
-                    &swapChainDesc,
-                    m_swapChain.writeRef(),
-                    m_device.writeRef(),
-                    &featureLevel,
-                    m_immediateContext.writeRef());
-            }
-            else
-            {
-                res = D3D11CreateDevice_(
-                    adapter,
-                    driverType,
-                    nullptr,
-                    deviceFlags,
-                    &featureLevels[startFeatureIndex],
-                    totalNumFeatureLevels - startFeatureIndex,
-                    D3D11_SDK_VERSION,
-                    m_device.writeRef(),
-                    &featureLevel,
-                    m_immediateContext.writeRef());
-            }
+            res = D3D11CreateDevice_(
+                adapter,
+                driverType,
+                nullptr,
+                deviceFlags,
+                &featureLevels[startFeatureIndex],
+                totalNumFeatureLevels - startFeatureIndex,
+                D3D11_SDK_VERSION,
+                m_device.writeRef(),
+                &featureLevel,
+                m_immediateContext.writeRef());
             // Check if successfully constructed - if so we are done. 
             if (SLANG_SUCCEEDED(res))
             {
@@ -830,7 +879,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         }
         // Check we have a swap chain, context and device
         SLANG_ASSERT(m_immediateContext && m_device);
-        SLANG_ASSERT(!windowHandle || m_swapChain);
     }
 
     // NVAPI
@@ -859,68 +907,6 @@ SlangResult D3D11Renderer::initialize(const Desc& desc, void* inWindowHandle)
         m_nvapi = true;
 #endif
     }
-    
-    // TODO: Add support for debugging to help detect leaks:
-    //
-    //      ComPtr<ID3D11Debug> gDebug;
-    //      m_device->QueryInterface(IID_PPV_ARGS(gDebug.writeRef()));
-    //
-
-    // After we've created the swap chain, we can request a pointer to the
-    // back buffer as a D3D11 texture, and create a render-target view from it.
-
-    static const IID kIID_ID3D11Texture2D = {
-        0x6f15aaf2, 0xd208, 0x4e89, 0x9a, 0xb4, 0x48,
-        0x95, 0x35, 0xd3, 0x4f, 0x9c };
-    if (m_swapChain)
-    {
-        SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, kIID_ID3D11Texture2D, (void**)m_backBufferTexture.writeRef()));
-
-        //    for (int i = 0; i < 8; i++)
-        {
-            ComPtr<ID3D11Texture2D> texture;
-            D3D11_TEXTURE2D_DESC textureDesc;
-            m_backBufferTexture->GetDesc(&textureDesc);
-            SLANG_RETURN_ON_FAIL(m_device->CreateTexture2D(&textureDesc, nullptr, texture.writeRef()));
-
-            ComPtr<ID3D11RenderTargetView> rtv;
-            D3D11_RENDER_TARGET_VIEW_DESC rtvDesc;
-            rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            rtvDesc.Texture2D.MipSlice = 0;
-            rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-            SLANG_RETURN_ON_FAIL(m_device->CreateRenderTargetView(texture, &rtvDesc, rtv.writeRef()));
-
-            TextureResource::Desc resourceDesc;
-            resourceDesc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, textureDesc.Width, textureDesc.Height, 1);
-
-            ComPtr<ITextureResource> primaryRenderTargetTexture;
-            SLANG_RETURN_ON_FAIL(createTextureResource(IResource::Usage::RenderTarget, resourceDesc, nullptr, primaryRenderTargetTexture.writeRef()));
-
-            IResourceView::Desc viewDesc;
-            viewDesc.format = resourceDesc.format;
-            viewDesc.type = IResourceView::Type::RenderTarget;
-            ComPtr<IResourceView> primaryRenderTargetView;
-            SLANG_RETURN_ON_FAIL(createTextureView(primaryRenderTargetTexture, viewDesc, primaryRenderTargetView.writeRef()));
-
-            m_primaryRenderTargetTexture = dynamic_cast<TextureResourceImpl*>(primaryRenderTargetTexture.get());
-            m_primaryRenderTargetView = dynamic_cast<RenderTargetViewImpl*>(primaryRenderTargetView.get());
-        }
-
-        //    m_immediateContext->OMSetRenderTargets(1, m_primaryRenderTargetView->m_rtv.readRef(), nullptr);
-        m_rtvBindings[0] = m_primaryRenderTargetView->m_rtv;
-        m_targetBindingsDirty[int(PipelineType::Graphics)] = true;
-
-        // Similarly, we are going to set up a viewport once, and then never
-        // switch, since this is a simple test app.
-        D3D11_VIEWPORT viewport;
-        viewport.TopLeftX = 0;
-        viewport.TopLeftY = 0;
-        viewport.Width = (float)desc.width;
-        viewport.Height = (float)desc.height;
-        viewport.MaxDepth = 1; // TODO(tfoley): use reversed depth
-        viewport.MinDepth = 0;
-        m_immediateContext->RSSetViewports(1, &viewport);
-    }
     return SLANG_OK;
 }
 
@@ -931,42 +917,146 @@ void D3D11Renderer::setClearColor(const float color[4])
 
 void D3D11Renderer::clearFrame()
 {
-    m_immediateContext->ClearRenderTargetView(m_primaryRenderTargetView->m_rtv, m_clearColor);
+    for (auto rtv : m_currentFramebuffer->renderTargetViews)
+        m_immediateContext->ClearRenderTargetView(rtv->m_rtv, m_clearColor);
 
-    if(m_dsvBinding)
+    if (m_currentFramebuffer->depthStencilView)
     {
-        m_immediateContext->ClearDepthStencilView(m_dsvBinding, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+        m_immediateContext->ClearDepthStencilView(
+            m_currentFramebuffer->depthStencilView->m_dsv,
+            D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+            1.0f,
+            0);
     }
 }
 
-void D3D11Renderer::presentFrame()
+void D3D11Renderer::beginFrame() { }
+
+void D3D11Renderer::endFrame() {}
+
+Result D3D11Renderer::createSwapchain(
+    const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
-    m_immediateContext->CopyResource(m_backBufferTexture, m_primaryRenderTargetTexture->m_resource);
-    m_swapChain->Present(0, 0);
+    RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
+    SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
+    *outSwapchain = swapchain.detach();
+    return SLANG_OK;
 }
 
-TextureResource::Desc D3D11Renderer::getSwapChainTextureDesc()
+Result D3D11Renderer::createFramebufferLayout(
+    const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
-    D3D11_TEXTURE2D_DESC dxDesc;
-    ((ID3D11Texture2D*)m_primaryRenderTargetTexture->m_resource.get())->GetDesc(&dxDesc);
+    RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
+    layout->m_renderTargets.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        layout->m_renderTargets[i] = desc.renderTargets[i];
+    }
 
-    TextureResource::Desc desc;
-    desc.init2D(IResource::Type::Texture2D, Format::Unknown, dxDesc.Width, dxDesc.Height, 1);
-
-    return desc;
+    if (desc.depthStencil)
+    {
+        layout->m_hasDepthStencil = true;
+        layout->m_depthStencil = *desc.depthStencil;
+    }
+    else
+    {
+        layout->m_hasDepthStencil = false;
+    }
+    *outLayout = layout.detach();
+    return SLANG_OK;
 }
 
-SlangResult D3D11Renderer::captureScreenSurface(
-    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
+Result D3D11Renderer::createFramebuffer(
+    const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
-    return captureTextureToSurface(
-        m_device,
-        m_immediateContext,
-        m_primaryRenderTargetTexture.Ptr(),
-        buffer,
-        inOutBufferSize,
-        outRowPitch,
-        outPixelSize);
+    RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl();
+    framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
+    framebuffer->d3dRenderTargetViews.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        framebuffer->renderTargetViews[i] = static_cast<RenderTargetViewImpl*>(desc.renderTargetViews[i]);
+        framebuffer->d3dRenderTargetViews[i] = framebuffer->renderTargetViews[i]->m_rtv;
+    }
+    framebuffer->depthStencilView = static_cast<DepthStencilViewImpl*>(desc.depthStencilView);
+    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView->m_dsv;
+    *outFramebuffer = framebuffer.detach();
+    return SLANG_OK;
+}
+
+void D3D11Renderer::setFramebuffer(IFramebuffer* frameBuffer)
+{
+    m_framebufferBindingDirty = true;
+    m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
+}
+
+SlangResult D3D11Renderer::readTextureResource(
+    ITextureResource* resource, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+{
+    auto texture = static_cast<TextureResourceImpl*>(resource);
+    // Don't bother supporting MSAA for right now
+    if (texture->getDesc()->sampleDesc.numSamples > 1)
+    {
+        fprintf(stderr, "ERROR: cannot capture multi-sample texture\n");
+        return E_INVALIDARG;
+    }
+
+    size_t bytesPerPixel = sizeof(uint32_t);
+    size_t rowPitch = int(texture->getDesc()->size.width) * bytesPerPixel;
+    size_t bufferSize = rowPitch * int(texture->getDesc()->size.height);
+    if (outRowPitch)
+        *outRowPitch = rowPitch;
+    if (outPixelSize)
+        *outPixelSize = bytesPerPixel;
+
+    D3D11_TEXTURE2D_DESC textureDesc;
+    auto d3d11Texture = ((ID3D11Texture2D*)texture->m_resource.get());
+    d3d11Texture->GetDesc(&textureDesc);
+
+    HRESULT hr = S_OK;
+    ComPtr<ID3D11Texture2D> stagingTexture;
+
+    if (textureDesc.Usage == D3D11_USAGE_STAGING &&
+        (textureDesc.CPUAccessFlags & D3D11_CPU_ACCESS_READ))
+    {
+        stagingTexture = d3d11Texture;
+    }
+    else
+    {
+        // Modify the descriptor to give us a staging texture
+        textureDesc.BindFlags = 0;
+        textureDesc.MiscFlags &= ~D3D11_RESOURCE_MISC_TEXTURECUBE;
+        textureDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        textureDesc.Usage = D3D11_USAGE_STAGING;
+
+        hr = m_device->CreateTexture2D(&textureDesc, 0, stagingTexture.writeRef());
+        if (FAILED(hr))
+        {
+            fprintf(stderr, "ERROR: failed to create staging texture\n");
+            return hr;
+        }
+
+        m_immediateContext->CopyResource(stagingTexture, d3d11Texture);
+    }
+
+    // Now just read back texels from the staging textures
+    {
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        SLANG_RETURN_ON_FAIL(m_immediateContext->Map(stagingTexture, 0, D3D11_MAP_READ, 0, &mappedResource));
+        RefPtr<ListBlob> blob = new ListBlob();
+        blob->m_data.setCount(bufferSize);
+        char* buffer = (char*)blob->m_data.begin();
+        for (size_t y = 0; y < textureDesc.Height; y++)
+        {
+            memcpy(
+                (char*)buffer + y * (*outRowPitch),
+                (char*)mappedResource.pData + y * mappedResource.RowPitch,
+                *outRowPitch);
+        }
+        // Make sure to unmap
+        m_immediateContext->Unmap(stagingTexture, 0);
+        *outBlob = blob.detach();
+        return SLANG_OK;
+    }
 }
 
 static D3D11_BIND_FLAG _calcResourceFlag(IResource::BindFlag::Enum bindFlag)
@@ -1661,12 +1751,6 @@ void D3D11Renderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, 
     m_immediateContext->IASetIndexBuffer(((BufferResourceImpl*)buffer)->m_buffer, dxFormat, UINT(offset));
 }
 
-void D3D11Renderer::setDepthStencilTarget(IResourceView* depthStencilView)
-{
-    m_dsvBinding = ((DepthStencilViewImpl*) depthStencilView)->m_dsv;
-    m_targetBindingsDirty[int(PipelineType::Graphics)] = true;
-}
-
 void D3D11Renderer::setViewports(UInt count, Viewport const* viewports)
 {
     static const int kMaxViewports = D3D11_VIEWPORT_AND_SCISSORRECT_MAX_INDEX + 1;
@@ -2097,9 +2181,10 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     state->m_depthStencilState = depthStencilState;
     state->m_rasterizerState = rasterizerState;
     state->m_blendState = blendState;
-    state->m_pipelineLayout = (PipelineLayoutImpl*) desc.pipelineLayout;
-    state->m_inputLayout = (InputLayoutImpl*) desc.inputLayout;
-    state->m_rtvCount = UINT(desc.renderTargetCount);
+    state->m_pipelineLayout = static_cast<PipelineLayoutImpl*>(desc.pipelineLayout);
+    state->m_inputLayout = static_cast<InputLayoutImpl*>(desc.inputLayout);
+    state->m_rtvCount = (UINT) static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout)
+                            ->m_renderTargets.getCount();
     state->m_blendColor[0] = 0;
     state->m_blendColor[1] = 0;
     state->m_blendColor[2] = 0;
@@ -2258,8 +2343,10 @@ Result D3D11Renderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IP
     return SLANG_OK;
 }
 
-Result D3D11Renderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet)
+Result D3D11Renderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet)
 {
+    SLANG_UNUSED(flag);
+
     auto layoutImpl = (DescriptorSetLayoutImpl*)layout;
 
     RefPtr<DescriptorSetImpl> descriptorSetImpl = new DescriptorSetImpl();
@@ -2321,19 +2408,19 @@ Result D3D11Renderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescrip
 void D3D11Renderer::_flushGraphicsState()
 {
     auto pipelineType = int(PipelineType::Graphics);
-    if(m_targetBindingsDirty[pipelineType])
+    if (m_framebufferBindingDirty || m_shaderBindingDirty)
     {
-        m_targetBindingsDirty[pipelineType] = false;
+        m_framebufferBindingDirty = false;
+        m_shaderBindingDirty = false;
 
         auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
 
-        auto rtvCount = pipelineState->m_rtvCount;
+        auto rtvCount = (UINT)m_currentFramebuffer->renderTargetViews.getCount();
         auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
-
         m_immediateContext->OMSetRenderTargetsAndUnorderedAccessViews(
             rtvCount,
-            m_rtvBindings[0].readRef(),
-            m_dsvBinding,
+            m_currentFramebuffer->d3dRenderTargetViews.getArrayView().getBuffer(),
+            m_currentFramebuffer->d3dDepthStencilView,
             rtvCount,
             uavCount,
             m_uavBindings[pipelineType][0].readRef(),
@@ -2344,9 +2431,9 @@ void D3D11Renderer::_flushGraphicsState()
 void D3D11Renderer::_flushComputeState()
 {
     auto pipelineType = int(PipelineType::Compute);
-    if(m_targetBindingsDirty[pipelineType])
+    if (m_shaderBindingDirty)
     {
-        m_targetBindingsDirty[pipelineType] = false;
+        m_shaderBindingDirty = false;
 
         auto pipelineState = static_cast<ComputePipelineStateImpl*>(m_currentPipelineState.get());
 
@@ -2568,7 +2655,7 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout*
             {
                 m_uavBindings[int(pipelineType)][startSlot + ii] = uavs[ii];
             }
-            m_targetBindingsDirty[int(pipelineType)] = true;
+            m_shaderBindingDirty = true;
         }
     }
 }

@@ -16,6 +16,10 @@ const Slang::Guid GfxGUID::IID_IPipelineLayout = SLANG_UUID_IPipelineLayout;
 const Slang::Guid GfxGUID::IID_IInputLayout = SLANG_UUID_IInputLayout;
 const Slang::Guid GfxGUID::IID_IPipelineState = SLANG_UUID_IPipelineState;
 const Slang::Guid GfxGUID::IID_IResourceView = SLANG_UUID_IResourceView;
+const Slang::Guid GfxGUID::IID_IFramebuffer = SLANG_UUID_IFrameBuffer;
+const Slang::Guid GfxGUID::IID_IFramebufferLayout = SLANG_UUID_IFramebufferLayout;
+
+const Slang::Guid GfxGUID::IID_ISwapchain = SLANG_UUID_ISwapchain;
 const Slang::Guid GfxGUID::IID_ISamplerState = SLANG_UUID_ISamplerState;
 const Slang::Guid GfxGUID::IID_IResource = SLANG_UUID_IResource;
 const Slang::Guid GfxGUID::IID_IBufferResource = SLANG_UUID_IBufferResource;
@@ -170,6 +174,7 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     desc = inDesc;
 
     auto program = desc.getProgram();
+    m_program = program;
     isSpecializable = (program->slangProgram && program->slangProgram->getSpecializationParamCount() != 0);
 }
 
@@ -180,10 +185,8 @@ IRenderer* gfx::RendererBase::getInterface(const Guid& guid)
         : nullptr;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc, void* inWindowHandle)
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
-    SLANG_UNUSED(inWindowHandle);
-
     shaderCache.init(desc.shaderCacheFileSystem);
     return SLANG_OK;
 }

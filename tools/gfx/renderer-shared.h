@@ -16,6 +16,9 @@ struct GfxGUID
     static const Slang::Guid IID_IPipelineLayout;
     static const Slang::Guid IID_IPipelineState;
     static const Slang::Guid IID_IResourceView;
+    static const Slang::Guid IID_IFramebuffer;
+    static const Slang::Guid IID_IFramebufferLayout;
+    static const Slang::Guid IID_ISwapchain;
     static const Slang::Guid IID_ISamplerState;
     static const Slang::Guid IID_IResource;
     static const Slang::Guid IID_IBufferResource;
@@ -234,7 +237,7 @@ public:
     // Indicates whether this is a specializable pipeline. A specializable
     // pipeline cannot be used directly and must be specialized first.
     bool isSpecializable = false;
-
+    ComPtr<IShaderProgram> m_program;
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);
 };
@@ -388,7 +391,7 @@ protected:
 
 
 protected:
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle);
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
 public:

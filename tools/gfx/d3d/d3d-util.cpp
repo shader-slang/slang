@@ -35,6 +35,8 @@ using namespace Slang;
         case Format::RG_Float32:            return DXGI_FORMAT_R32G32_FLOAT;
         case Format::R_Float32:             return DXGI_FORMAT_R32_FLOAT;
         case Format::RGBA_Unorm_UInt8:      return DXGI_FORMAT_R8G8B8A8_UNORM;
+        case Format::BGRA_Unorm_UInt8:      return DXGI_FORMAT_B8G8R8A8_UNORM;
+
         case Format::R_UInt16:              return DXGI_FORMAT_R16_UINT;
         case Format::R_UInt32:              return DXGI_FORMAT_R32_UINT;
 
