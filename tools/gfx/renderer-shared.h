@@ -164,7 +164,7 @@ protected:
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
 
-    static bool gfx::ShaderObjectBase::_doesValueFitInExistentialPayload(
+    static bool _doesValueFitInExistentialPayload(
         slang::TypeLayoutReflection*    concreteTypeLayout,
         slang::TypeLayoutReflection*    existentialFieldLayout);
 

@@ -1619,7 +1619,7 @@ protected:
         return SLANG_OK;
     }
 
-    virtual Result _createSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout)
+    Result _createSpecializedLayout(GraphicsCommonShaderObjectLayout** outLayout) SLANG_OVERRIDE
     {
         ExtendedShaderObjectTypeList specializationArgs;
         SLANG_RETURN_ON_FAIL(collectSpecializationArgs(specializationArgs));
