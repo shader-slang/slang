@@ -1348,23 +1348,27 @@ static PreprocessorExpressionValue ParseAndEvaluateExpression(PreprocessorDirect
 // Parse a unary (prefix) expression inside of a preprocessor directive.
 static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorDirectiveContext* context)
 {
-    switch (PeekTokenType(context))
+    if( PeekTokenType(context) == TokenType::EndOfDirective )
+    {
+        GetSink(context)->diagnose(PeekLoc(context), Diagnostics::syntaxErrorInPreprocessorExpression);
+        return 0;
+    }
+
+    auto token = AdvanceToken(context);
+    switch (token.type)
     {
     // handle prefix unary ops
     case TokenType::OpSub:
-        AdvanceToken(context);
         return -ParseAndEvaluateUnaryExpression(context);
     case TokenType::OpNot:
-        AdvanceToken(context);
         return !ParseAndEvaluateUnaryExpression(context);
     case TokenType::OpBitNot:
-        AdvanceToken(context);
         return ~ParseAndEvaluateUnaryExpression(context);
 
     // handle parenthized sub-expression
     case TokenType::LParent:
         {
-            Token leftParen = AdvanceToken(context);
+            Token leftParen = token;
             PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
             if (!Expect(context, TokenType::RParent, Diagnostics::expectedTokenInPreprocessorExpression))
             {
@@ -1374,11 +1378,10 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     case TokenType::IntegerLiteral:
-        return StringToInt(AdvanceToken(context).getContent());
+        return StringToInt(token.getContent());
 
     case TokenType::Identifier:
         {
-            Token token = AdvanceToken(context);
             if (token.getContent() == "defined")
             {
                 // handle `defined(someName)`
@@ -1419,7 +1422,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
         }
 
     default:
-        GetSink(context)->diagnose(PeekLoc(context), Diagnostics::syntaxErrorInPreprocessorExpression);
+        GetSink(context)->diagnose(token.loc, Diagnostics::syntaxErrorInPreprocessorExpression);
         return 0;
     }
 }
