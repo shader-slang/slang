@@ -1420,22 +1420,6 @@ namespace Slang
             Expr*	funcExpr,
             OverloadResolveContext&			context);
 
-        void formatType(StringBuilder& sb, Type* type);
-
-        void formatVal(StringBuilder& sb, Val* val);
-
-        void formatDeclPath(StringBuilder& sb, DeclRef<Decl> declRef);
-
-        void formatDeclParams(StringBuilder& sb, DeclRef<Decl> declRef);
-
-        void formatDeclResultType(StringBuilder& sb, DeclRef<Decl> const& declRef);
-
-        void formatDeclSignature(StringBuilder& sb, DeclRef<Decl> declRef);
-
-        String getDeclSignatureString(DeclRef<Decl> declRef);
-
-        String getDeclSignatureString(LookupResultItem item);
-
         String getCallSignatureString(
             OverloadResolveContext&     context);
 
