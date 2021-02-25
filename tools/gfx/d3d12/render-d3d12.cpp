@@ -6,7 +6,7 @@
 //WORKING:#include "options.h"
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
-
+#include "core/slang-blob.h"
 #include "core/slang-basic.h"
 
 // In order to use the Slang API, we need to include its header
@@ -66,11 +66,17 @@ class D3D12Renderer : public GraphicsAPIRenderer
 {
 public:
     // Renderer    implementation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override;
-    virtual SLANG_NO_THROW ITextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        makeSwapchainImagePresentable(ISwapchain* swapchain) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
+        const ISwapchain::Desc& desc,
+        WindowHandle window,
+        ISwapchain** outSwapchain) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -92,6 +98,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffer** outFrameBuffer) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebufferLayout(IFramebufferLayout::Desc const& desc, IFramebufferLayout** outLayout) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         const InputElementDesc* inputElements,
         UInt inputElementCount,
@@ -102,7 +114,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(
         const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(
-        IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) override;
+        IDescriptorSetLayout* layout,
+        IDescriptorSet::Flag::Enum flag,
+        IDescriptorSet** outDescriptorSet) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -111,8 +125,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
-        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
+        ITextureResource* resource, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual SLANG_NO_THROW void* SLANG_MCALL
         map(IBufferResource* buffer, MapFlavor flavor) override;
@@ -135,12 +149,12 @@ public:
         const UInt* offsets) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual void SLANG_MCALL setDepthStencilTarget(IResourceView* depthStencilView) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(UInt count, Viewport const* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
@@ -202,6 +216,18 @@ protected:
         }
         ComPtr<ID3D12CommandAllocator> m_commandAllocator;            ///< The command allocator for this frame
         UINT64 m_fenceValue;                                        ///< The fence value when rendering this Frame is complete
+
+        // During command submission, we need all the descriptor tables that get
+        // used to come from a single heap (for each descriptor heap type).
+        //
+        // We will thus keep a single heap of each type that we hope will hold
+        // all the descriptors that actually get needed in a frame.
+        //
+        // TODO: we need an allocation policy to reallocate and resize these
+        // if/when we run out of space during a frame.
+        //
+        D3D12DescriptorHeap m_viewHeap; ///< Cbv, Srv, Uav
+        D3D12DescriptorHeap m_samplerHeap; ///< Heap for samplers
     };
 
     class ShaderProgramImpl : public GraphicsCommonShaderProgram
@@ -315,7 +341,12 @@ protected:
             return nullptr;
         }
     public:
-        D3D12_CPU_DESCRIPTOR_HANDLE m_cpuHandle;
+        D3D12HostVisibleDescriptor m_descriptor;
+        D3D12Renderer* m_renderer;
+        ~SamplerStateImpl()
+        {
+            m_renderer->m_samplerAllocator.free(m_descriptor);
+        }
     };
 
     class ResourceViewImpl : public IResourceView, public RefObject
@@ -331,6 +362,189 @@ protected:
     public:
         RefPtr<Resource>            m_resource;
         D3D12HostVisibleDescriptor  m_descriptor;
+    };
+
+    class FramebufferLayoutImpl
+        : public IFramebufferLayout
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebufferLayout* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
+                return static_cast<IFramebufferLayout*>(this);
+            return nullptr;
+        }
+
+    public:
+        ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
+        bool m_hasDepthStencil = false;
+        IFramebufferLayout::AttachmentLayout m_depthStencil;
+    };
+
+    class FramebufferImpl
+        : public IFramebuffer
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        IFramebuffer* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
+                return static_cast<IFramebuffer*>(this);
+            return nullptr;
+        }
+
+    public:
+        ShortList<ComPtr<IResourceView>> renderTargetViews;
+        ComPtr<IResourceView> depthStencilView;
+        ShortList<D3D12_CPU_DESCRIPTOR_HANDLE> renderTargetDescriptors;
+        D3D12_CPU_DESCRIPTOR_HANDLE depthStencilDescriptor;
+    };
+
+    class SwapchainImpl
+        : public ISwapchain
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ISwapchain* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
+                return static_cast<ISwapchain*>(this);
+            return nullptr;
+        }
+
+    public:
+        Result init(D3D12Renderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+        {
+            // Return fail on non-supported platforms.
+            switch (window.type)
+            {
+            case WindowHandle::Type::Win32Handle:
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+
+            m_renderer = renderer;
+            m_desc = desc;
+
+            // Describe the swap chain.
+            DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+            swapChainDesc.BufferCount = desc.imageCount;
+            swapChainDesc.BufferDesc.Width = desc.width;
+            swapChainDesc.BufferDesc.Height = desc.height;
+            swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(desc.format);
+            swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+            swapChainDesc.OutputWindow = (HWND)window.handleValues[0];
+            swapChainDesc.SampleDesc.Count = 1;
+            swapChainDesc.Windowed = TRUE;
+
+            if (!desc.enableVSync)
+            {
+                swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+            }
+
+            // Swap chain needs the queue so that it can force a flush on it.
+            ComPtr<IDXGISwapChain> swapChain;
+            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->CreateSwapChain(
+                m_renderer->m_commandQueue, &swapChainDesc, swapChain.writeRef()));
+            SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
+
+            if (!desc.enableVSync)
+            {
+                m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+
+                int maxLatency = desc.imageCount - 2;
+
+                // Make sure the maximum latency is in the range required by dx12 runtime
+                maxLatency = (maxLatency < 1) ? 1 : maxLatency;
+                maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS)
+                                    ? DXGI_MAX_SWAP_CHAIN_BUFFERS
+                                    : maxLatency;
+
+                m_swapChain->SetMaximumFrameLatency(maxLatency);
+            }
+
+            // This sample does not support fullscreen transitions.
+            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(
+                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER));
+
+            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+            for (uint32_t i = 0; i < desc.imageCount; i++)
+            {
+                ComPtr<ID3D12Resource> d3dResource;
+                m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
+                ITextureResource::Desc imageDesc = {};
+                imageDesc.init2D(
+                    IResource::Type::Texture2D, desc.format, desc.width, desc.height, 0);
+                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
+                image->m_resource.setResource(d3dResource.get(), D3D12_RESOURCE_STATE_COMMON);
+                m_images.add(image);
+            }
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
+        virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) override
+        {
+            m_images[index]->addRef();
+            *outResource = m_images[index].Ptr();
+            return SLANG_OK;
+        }
+        void makeBackbufferPresentable()
+        {
+            D3D12BarrierSubmitter submitter(m_renderer->m_commandList);
+            m_images[m_renderTargetIndex]->m_resource.transition(
+                D3D12_RESOURCE_STATE_PRESENT, submitter);
+        }
+        virtual SLANG_NO_THROW Result present() override
+        {
+            if (m_swapChainWaitableObject)
+            {
+                // check if now is good time to present
+                // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it
+                // means that no frame is waiting to be be displayed so there is no point doing a
+                // present.
+                const bool shouldPresent =
+                    (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
+                if (shouldPresent)
+                {
+                    m_swapChain->Present(0, 0);
+                }
+            }
+            else
+            {
+                if (SLANG_FAILED(m_swapChain->Present(1, 0)))
+                {
+                    return SLANG_FAIL;
+                }
+            }
+            // Update the render target index.
+            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
+        {
+            // `IRenderer::beginFrame()` must be called before `acquireNextImage`.
+            SLANG_RELEASE_ASSERT(m_renderer->m_commandListOpenCount == 1);
+
+            D3D12BarrierSubmitter submitter(m_renderer->m_commandList);
+            m_images[m_renderTargetIndex]->m_resource.transition(
+                D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
+            return m_renderTargetIndex;
+        }
+    public:
+        D3D12Renderer* m_renderer = nullptr;
+        ISwapchain::Desc m_desc;
+        HANDLE m_swapChainWaitableObject = nullptr;
+        ComPtr<IDXGISwapChain3> m_swapChain;
+        uint32_t m_renderTargetIndex;
+        ShortList<RefPtr<TextureResourceImpl>> m_images;
     };
 
     class InputLayoutImpl: public IInputLayout, public RefObject
@@ -495,8 +709,8 @@ protected:
         D3D12Renderer*           m_renderer = nullptr;          ///< Weak pointer - must be because if set on Renderer, will have a circular reference
         RefPtr<DescriptorSetLayoutImpl> m_layout;
 
-        D3D12DescriptorHeap*        m_resourceHeap = nullptr;
-        D3D12DescriptorHeap*        m_samplerHeap = nullptr;
+        D3D12HostVisibleDescriptorAllocator*        m_resourceHeap = nullptr;
+        D3D12HostVisibleDescriptorAllocator*        m_samplerHeap = nullptr;
 
         Int                         m_resourceTable = 0;
         Int                         m_samplerTable = 0;
@@ -514,20 +728,15 @@ protected:
 
             /// Backing storage for root constant ranges in this descriptor set.
         List<char>                      m_rootConstantData;
+
+        ~DescriptorSetImpl()
+        {
+            if (m_resourceObjects.getCount())
+                m_resourceHeap->free((int)m_resourceTable, (int)m_resourceObjects.getCount());
+            if (m_samplerObjects.getCount())
+                m_samplerHeap->free((int)m_samplerTable, (int)m_samplerObjects.getCount());
+        }
     };
-
-
-    // During command submission, we need all the descriptor tables that get
-    // used to come from a single heap (for each descriptor heap type).
-    //
-    // We will thus keep a single heap of each type that we hope will hold
-    // all the descriptors that actually get needed in a frame.
-    //
-    // TODO: we need an allocation policy to reallocate and resize these
-    // if/when we run out of space during a frame.
-    //
-    D3D12DescriptorHeap m_viewHeap;             ///< Cbv, Srv, Uav
-    D3D12DescriptorHeap m_samplerHeap;          ///< Heap for samplers
 
     D3D12HostVisibleDescriptorAllocator m_rtvAllocator;
     D3D12HostVisibleDescriptorAllocator m_dsvAllocator;
@@ -539,8 +748,8 @@ protected:
     // around CPU-visible heaps for storing descriptors in a format
     // that is ready for copying into the GPU-visible heaps as needed.
     //
-    D3D12DescriptorHeap m_cpuViewHeap;          ///< Cbv, Srv, Uav
-    D3D12DescriptorHeap m_cpuSamplerHeap;       ///< Heap for samplers
+    D3D12HostVisibleDescriptorAllocator m_cpuViewHeap; ///< Cbv, Srv, Uav
+    D3D12HostVisibleDescriptorAllocator m_cpuSamplerHeap; ///< Heap for samplers
 
     class PipelineStateImpl : public PipelineStateBase
     {
@@ -639,17 +848,12 @@ protected:
 
     Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
 
-    void beginRender();
-
-    void endRender();
-
     void submitGpuWorkAndWait();
     void _resetCommandList();
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
-        void* buffer,
-        size_t* inOutBufferSize,
+        ISlangBlob** blob,
         size_t* outRowPitch,
         size_t* outPixelSize);
 
@@ -658,21 +862,10 @@ protected:
 
     ID3D12GraphicsCommandList* getCommandList() const { return m_commandList; }
 
-//    RenderState* calcRenderState();
-
-        /// From current bindings calculate the root signature and pipeline state
-//    Result calcGraphicsPipelineState(ComPtr<ID3D12RootSignature>& sigOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
-//    Result calcComputePipelineState(ComPtr<ID3D12RootSignature>& signatureOut, ComPtr<ID3D12PipelineState>& pipelineStateOut);
-
     Result _bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
-
-//    Result _calcBindParameters(BindParameters& params);
-//    RenderState* findRenderState(PipelineType pipelineType);
 
     Result _createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo);
     
-    D3D12CircularResourceHeap m_circularResourceHeap;
-
     int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
 
     List<BoundVertexBuffer> m_boundVertexBuffers;
@@ -683,20 +876,7 @@ protected:
 
     RefPtr<PipelineStateImpl> m_currentPipelineState;
 
-//    RefPtr<ShaderProgramImpl> m_boundShaderProgram;
-//    RefPtr<InputLayoutImpl> m_boundInputLayout;
-
-//    RefPtr<BindingStateImpl> m_boundBindingState;
     RefPtr<DescriptorSetImpl> m_boundDescriptorSets[int(PipelineType::CountOf)][kMaxDescriptorSetCount];
-
-    DXGI_FORMAT m_targetFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-    DXGI_FORMAT m_depthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    bool m_hasVsync = true;
-    bool m_isFullSpeed = false;
-    bool m_allowFullScreen = false;
-    bool m_isMultiSampled = false;
-    int m_numTargetSamples = 1;                                ///< The number of multi sample samples
-    int m_targetSampleQuality = 0;                            ///< The multi sample quality
 
     Desc m_desc;
 
@@ -707,26 +887,20 @@ protected:
 
     float m_clearColor[4] = { 0, 0, 0, 0 };
 
-    D3D12_VIEWPORT m_viewport = {};
+    D3D12_VIEWPORT m_viewports[kMaxRTVCount] = {};
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
     DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
 
-    ComPtr<IDXGISwapChain3> m_swapChain;
     ComPtr<ID3D12CommandQueue> m_commandQueue;
-//    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
     ComPtr<ID3D12GraphicsCommandList> m_commandList;
 
-    D3D12_RECT m_scissorRect = {};
-
-//    List<RefPtr<RenderState> > m_renderStates;                ///< Holds list of all render state combinations
-//    RenderState* m_currentRenderState = nullptr;            ///< The current combination
+    D3D12_RECT m_scissorRects[kMaxRTVCount] = {};
 
     UINT m_rtvDescriptorSize = 0;
 
-//    ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
     UINT m_dsvDescriptorSize = 0;
 
     // Synchronization objects.
@@ -740,17 +914,8 @@ protected:
     FrameInfo m_frameInfos[kMaxNumRenderFrames];
 
     int m_numRenderTargets = 2;
-    int m_renderTargetIndex = 0;
-
-    D3D12Resource* m_backBuffers[kMaxNumRenderTargets];
-    D3D12Resource* m_renderTargets[kMaxNumRenderTargets];
-
-    D3D12Resource m_backBufferResources[kMaxNumRenderTargets];
-    D3D12Resource m_renderTargetResources[kMaxNumRenderTargets];
-
     
-    RefPtr<ResourceViewImpl> m_rtvs[kMaxRTVCount];
-    RefPtr<ResourceViewImpl> m_dsv;
+    RefPtr<FramebufferImpl> m_frameBuffer;
 
     int32_t m_depthStencilUsageFlags = 0;    ///< D3DUtil::UsageFlag combination for depth stencil
     int32_t m_targetUsageFlags = 0;            ///< D3DUtil::UsageFlag combination for target
@@ -760,15 +925,13 @@ protected:
     PFN_D3D12_CREATE_DEVICE m_D3D12CreateDevice = nullptr;
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
-    HWND m_hwnd = nullptr;
-
     bool m_nvapi = false;
 };
 
-SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
     RefPtr<D3D12Renderer> result = new D3D12Renderer();
-    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
@@ -786,21 +949,11 @@ SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, void* w
 
 void D3D12Renderer::releaseFrameResources()
 {
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/bb174577%28v=vs.85%29.aspx
-
-    // Release the resources holding references to the swap chain (requirement of
-    // IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
-    // current fence value.
     for (int i = 0; i < m_numRenderFrames; i++)
     {
         FrameInfo& info = m_frameInfos[i];
         info.reset();
         info.m_fenceValue = m_fence.getCurrentValue();
-    }
-    for (int i = 0; i < m_numRenderTargets; i++)
-    {
-        m_backBuffers[i]->setResourceNull();
-        m_renderTargets[i]->setResourceNull();
     }
 }
 
@@ -965,75 +1118,21 @@ void D3D12Renderer::_resetCommandList()
 
     ID3D12GraphicsCommandList* commandList = getCommandList();
     commandList->Reset(frame.m_commandAllocator, nullptr);
-
-    // TIM: when should this get set?
-//    commandList->OMSetRenderTargets(
-//        1,
-//        &m_rtvs[0]->m_descriptor.cpuHandle,
-//        FALSE,
-//        m_dsv ? &m_dsv->m_descriptor.cpuHandle : nullptr);
-
-    // Set necessary state.
-    commandList->RSSetViewports(1, &m_viewport);
-    commandList->RSSetScissorRects(1, &m_scissorRect);
 }
 
-void D3D12Renderer::beginRender()
+void D3D12Renderer::beginFrame()
 {
-    // Should currently not be open!
-    assert(m_commandListOpenCount == 0);
-
-    m_circularResourceHeap.updateCompleted();
-
-    getFrame().m_commandAllocator->Reset();
-
-    _resetCommandList();
-
-    // Indicate that the render target needs to be writable
-    if (m_swapChain)
-    {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        m_renderTargets[m_renderTargetIndex]->transition(D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
-    }
-
-    m_commandListOpenCount = 1;
 }
 
-void D3D12Renderer::endRender()
+void D3D12Renderer::makeSwapchainImagePresentable(ISwapchain* swapchain)
+{
+    static_cast<SwapchainImpl*>(swapchain)->makeBackbufferPresentable();
+}
+
+void D3D12Renderer::endFrame()
 {
     assert(m_commandListOpenCount == 1);
-
-    {
-        const UInt64 signalValue = m_fence.nextSignal(m_commandQueue);
-        m_circularResourceHeap.addSync(signalValue);
-    }
-    if (m_swapChain)
-    {
-        D3D12Resource& backBuffer = *m_backBuffers[m_renderTargetIndex];
-        if (m_isMultiSampled)
-        {
-            // MSAA resolve
-            D3D12Resource& renderTarget = *m_renderTargets[m_renderTargetIndex];
-            assert(&renderTarget != &backBuffer);
-            // Barriers to wait for the render target, and the backbuffer to be in correct state
-            {
-                D3D12BarrierSubmitter submitter(m_commandList);
-                renderTarget.transition(D3D12_RESOURCE_STATE_RESOLVE_SOURCE, submitter);
-                backBuffer.transition(D3D12_RESOURCE_STATE_RESOLVE_DEST, submitter);
-            }
-
-            // Do the resolve...
-            m_commandList->ResolveSubresource(backBuffer, 0, renderTarget, 0, m_targetFormat);
-        }
-
-        // Make the back buffer presentable
-        {
-            D3D12BarrierSubmitter submitter(m_commandList);
-            backBuffer.transition(D3D12_RESOURCE_STATE_PRESENT, submitter);
-        }
-    }
     SLANG_ASSERT_VOID_ON_FAIL(m_commandList->Close());
-
     {
         // Execute the command list.
         ID3D12CommandList* commandLists[] = { m_commandList };
@@ -1043,6 +1142,30 @@ void D3D12Renderer::endRender()
     assert(m_commandListOpenCount == 1);
     // Must be 0
     m_commandListOpenCount = 0;
+
+    
+    // Increment the fence value. Save on the frame - we'll know that frame is done when the fence
+    // value >=
+    m_frameInfos[m_frameIndex].m_fenceValue = m_fence.nextSignal(m_commandQueue);
+
+    // increment frame index after signal
+    m_frameIndex = (m_frameIndex + 1) % m_numRenderFrames;
+
+    // On the current frame wait until it is completed
+    {
+        FrameInfo& frame = m_frameInfos[m_frameIndex];
+        // If the next frame is not ready to be rendered yet, wait until it is ready.
+        m_fence.waitUntilCompleted(frame.m_fenceValue);
+    }
+
+    getFrame().m_commandAllocator->Reset();
+
+    _resetCommandList();
+
+    m_commandListOpenCount = 1;
+
+    getFrame().m_viewHeap.deallocateAll();
+    getFrame().m_samplerHeap.deallocateAll();
 }
 
 void D3D12Renderer::submitGpuWork()
@@ -1069,8 +1192,7 @@ void D3D12Renderer::submitGpuWorkAndWait()
 
 Result D3D12Renderer::captureTextureToSurface(
     D3D12Resource& resource,
-    void* buffer,
-    size_t* inOutBufferSize,
+    ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
@@ -1092,13 +1214,7 @@ Result D3D12Renderer::captureTextureToSurface(
         *outRowPitch = rowPitch;
     if (outPixelSize)
         *outPixelSize = bytesPerPixel;
-    if (!buffer || *inOutBufferSize == 0)
-    {
-        *inOutBufferSize = bufferSize;
-        return SLANG_OK;
-    }
-    if (*inOutBufferSize < bufferSize)
-        return SLANG_ERROR_INSUFFICIENT_BUFFER;
+ 
     D3D12Resource stagingResource;
     {
         D3D12_RESOURCE_DESC stagingDesc;
@@ -1155,9 +1271,11 @@ Result D3D12Renderer::captureTextureToSurface(
 
         SLANG_RETURN_ON_FAIL(dxResource->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
-        memcpy(buffer, data, bufferSize);
-
+        RefPtr<Slang::ListBlob> resultBlob = new Slang::ListBlob();
+        resultBlob->m_data.setCount(bufferSize);
+        memcpy(resultBlob->m_data.getBuffer(), data, bufferSize);
         dxResource->Unmap(0, nullptr);
+        *outBlob = resultBlob.detach();
         return SLANG_OK;
     }
 }
@@ -1174,8 +1292,8 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
 
     ID3D12DescriptorHeap* heaps[] =
     {
-        m_viewHeap.getHeap(),
-        m_samplerHeap.getHeap(),
+        getFrame().m_viewHeap.getHeap(),
+        getFrame().m_samplerHeap.getHeap(),
     };
     commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
 
@@ -1196,7 +1314,7 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
         {
             if(auto descriptorCount = descriptorSetLayout->m_resourceCount)
             {
-                auto& gpuHeap = m_viewHeap;
+                auto& gpuHeap = getFrame().m_viewHeap;
                 auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
 
                 auto& cpuHeap = *descriptorSet->m_resourceHeap;
@@ -1214,7 +1332,7 @@ Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3
         {
             if(auto descriptorCount = descriptorSetLayout->m_samplerCount)
             {
-                auto& gpuHeap = m_samplerHeap;
+                auto& gpuHeap = getFrame().m_samplerHeap;
                 auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
 
                 auto& cpuHeap = *descriptorSet->m_samplerHeap;
@@ -1352,14 +1470,12 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 #endif
 }
 
-Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
+Result D3D12Renderer::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_1"));
 
-    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc, inWindowHandle));
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
 
-    m_hwnd = (HWND)inWindowHandle;
-    
     // Rather than statically link against D3D, we load it dynamically.
 
     HMODULE d3dModule = LoadLibraryA("d3d12.dll");
@@ -1505,23 +1621,6 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
     m_desc = desc;
 
-    // set viewport
-    {
-        m_viewport.Width = float(m_desc.width);
-        m_viewport.Height = float(m_desc.height);
-        m_viewport.MinDepth = 0;
-        m_viewport.MaxDepth = 1;
-        m_viewport.TopLeftX = 0;
-        m_viewport.TopLeftY = 0;
-    }
-
-    {
-        m_scissorRect.left = 0;
-        m_scissorRect.top = 0;
-        m_scissorRect.right = m_desc.width;
-        m_scissorRect.bottom = m_desc.height;
-    }
-
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -1529,62 +1628,22 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
 
     SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
 
-    if (inWindowHandle)
-    {
-        // Describe the swap chain.
-        DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-        swapChainDesc.BufferCount = m_numRenderTargets;
-        swapChainDesc.BufferDesc.Width = m_desc.width;
-        swapChainDesc.BufferDesc.Height = m_desc.height;
-        swapChainDesc.BufferDesc.Format = m_targetFormat;
-        swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-        swapChainDesc.OutputWindow = m_hwnd;
-        swapChainDesc.SampleDesc.Count = 1;
-        swapChainDesc.Windowed = TRUE;
-
-        if (m_isFullSpeed)
-        {
-            m_hasVsync = false;
-            m_allowFullScreen = false;
-        }
-
-        if (!m_hasVsync)
-        {
-            swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
-        }
-
-        // Swap chain needs the queue so that it can force a flush on it.
-        ComPtr<IDXGISwapChain> swapChain;
-        SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->CreateSwapChain(m_commandQueue, &swapChainDesc, swapChain.writeRef()));
-        SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
-
-        if (!m_hasVsync)
-        {
-            m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
-
-            int maxLatency = m_numRenderTargets - 2;
-
-            // Make sure the maximum latency is in the range required by dx12 runtime
-            maxLatency = (maxLatency < 1) ? 1 : maxLatency;
-            maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS) ? DXGI_MAX_SWAP_CHAIN_BUFFERS : maxLatency;
-
-            m_swapChain->SetMaximumFrameLatency(maxLatency);
-        }
-
-        // This sample does not support fullscreen transitions.
-        SLANG_RETURN_ON_FAIL(m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER));
-
-        m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
-    }
-
     // Create descriptor heaps.
-
-    SLANG_RETURN_ON_FAIL(m_viewHeap.init   (m_device, 256, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-    SLANG_RETURN_ON_FAIL(m_samplerHeap.init(m_device, 16,  D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,     D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-
-    SLANG_RETURN_ON_FAIL(m_cpuViewHeap.init   (m_device, 1024, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-    SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap.init(m_device, 64,   D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,     D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
+    for (int i = 0; i < m_numRenderFrames; i++)
+    {
+        SLANG_RETURN_ON_FAIL(m_frameInfos[i].m_viewHeap.init(
+            m_device,
+            256,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+            D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
+        SLANG_RETURN_ON_FAIL(m_frameInfos[i].m_samplerHeap.init(
+            m_device,
+            16,
+            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+            D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
+    }
+    SLANG_RETURN_ON_FAIL(m_cpuViewHeap.init   (m_device, 1024, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+    SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap.init(m_device, 64,   D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
 
     SLANG_RETURN_ON_FAIL(m_rtvAllocator.init    (m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
     SLANG_RETURN_ON_FAIL(m_dsvAllocator.init    (m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
@@ -1603,17 +1662,9 @@ Result D3D12Renderer::initialize(const Desc& desc, void* inWindowHandle)
         m_commandList->Close();
     }
 
-    {
-        D3D12CircularResourceHeap::Desc desc;
-        desc.init();
-        // Define size
-        desc.m_blockSize = 65536;
-        // Set up the heap
-        m_circularResourceHeap.init(m_device, desc, &m_fence);
-    }
+    _resetCommandList();
 
-    // Setup for rendering
-    beginRender();
+    m_commandListOpenCount = 1;
 
     m_isInitialized = true;
     return SLANG_OK;
@@ -1628,133 +1679,6 @@ Result D3D12Renderer::createFrameResources()
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
     }
 
-    // Create back buffers
-    if (m_swapChain)
-    {
-//        D3D12_CPU_DESCRIPTOR_HANDLE rtvStart(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
-
-        // Work out target format
-        D3D12_RESOURCE_DESC resourceDesc;
-        {
-            ComPtr<ID3D12Resource> backBuffer;
-            SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.writeRef())));
-            resourceDesc = backBuffer->GetDesc();
-        }
-        const DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_TARGET, m_targetUsageFlags, resourceDesc.Format);
-        const DXGI_FORMAT targetFormat = D3DUtil::calcFormat(D3DUtil::USAGE_TARGET, resourceFormat);
-
-        // Set the target format
-        m_targetFormat = targetFormat;
-
-        // Create a RTV, and a command allocator for each frame.
-        for (int i = 0; i < m_numRenderTargets; i++)
-        {
-            // Get the back buffer
-            ComPtr<ID3D12Resource> backBuffer;
-            SLANG_RETURN_ON_FAIL(m_swapChain->GetBuffer(UINT(i), IID_PPV_ARGS(backBuffer.writeRef())));
-
-            // Set up resource for back buffer
-            m_backBufferResources[i].setResource(backBuffer, D3D12_RESOURCE_STATE_COMMON);
-            m_backBuffers[i] = &m_backBufferResources[i];
-            // Assume they are the same thing for now...
-            m_renderTargets[i] = &m_backBufferResources[i];
-
-            // If we are multi-sampling - create a render target separate from the back buffer
-            if (m_isMultiSampled)
-            {
-                D3D12_HEAP_PROPERTIES heapProps;
-                heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-                heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-                heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-                heapProps.CreationNodeMask = 1;
-                heapProps.VisibleNodeMask = 1;
-                D3D12_CLEAR_VALUE clearValue = {};
-                clearValue.Format = m_targetFormat;
-
-                // Don't know targets alignment, so just memory copy
-                ::memcpy(clearValue.Color, m_clearColor, sizeof(m_clearColor));
-
-                D3D12_RESOURCE_DESC desc(resourceDesc);
-
-                desc.Format = resourceFormat;
-                desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-                desc.SampleDesc.Count = m_numTargetSamples;
-                desc.SampleDesc.Quality = m_targetSampleQuality;
-                desc.Alignment = 0;
-
-                SLANG_RETURN_ON_FAIL(m_renderTargetResources[i].initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, desc, D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue));
-                m_renderTargets[i] = &m_renderTargetResources[i];
-            }
-
-            D3D12HostVisibleDescriptor rtvDescriptor;
-            SLANG_RETURN_ON_FAIL(m_rtvAllocator.allocate(&rtvDescriptor));
-
-            m_device->CreateRenderTargetView(*m_renderTargets[i], nullptr, rtvDescriptor.cpuHandle);
-        }
-    }
-
-    if (m_swapChain)
-    {
-        D3D12_RESOURCE_DESC desc = m_backBuffers[0]->getResource()->GetDesc();
-        assert(desc.Width == UINT64(m_desc.width) && desc.Height == UINT64(m_desc.height));
-    }
-
-    // Create the depth stencil view.
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        DXGI_FORMAT resourceFormat = D3DUtil::calcResourceFormat(D3DUtil::USAGE_DEPTH_STENCIL, m_depthStencilUsageFlags, m_depthStencilFormat);
-        DXGI_FORMAT depthStencilFormat = D3DUtil::calcFormat(D3DUtil::USAGE_DEPTH_STENCIL, resourceFormat);
-
-        // Set the depth stencil format
-        m_depthStencilFormat = depthStencilFormat;
-
-        // Setup default clear
-        D3D12_CLEAR_VALUE clearValue = {};
-        clearValue.Format = depthStencilFormat;
-        clearValue.DepthStencil.Depth = 1.0f;
-        clearValue.DepthStencil.Stencil = 0;
-
-        D3D12_RESOURCE_DESC resourceDesc = {};
-        resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-        resourceDesc.Format = resourceFormat;
-        resourceDesc.Width = m_desc.width;
-        resourceDesc.Height = m_desc.height;
-        resourceDesc.DepthOrArraySize = 1;
-        resourceDesc.MipLevels = 1;
-        resourceDesc.SampleDesc.Count = m_numTargetSamples;
-        resourceDesc.SampleDesc.Quality = m_targetSampleQuality;
-        resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-        resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        resourceDesc.Alignment = 0;
-
-#if 0
-        SLANG_RETURN_ON_FAIL(m_depthStencil.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, &clearValue));
-
-        // Set the depth stencil
-        D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
-        depthStencilDesc.Format = depthStencilFormat;
-        depthStencilDesc.ViewDimension = m_isMultiSampled ? D3D12_DSV_DIMENSION_TEXTURE2DMS : D3D12_DSV_DIMENSION_TEXTURE2D;
-        depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-
-        // Set up as the depth stencil view
-        m_device->CreateDepthStencilView(m_depthStencil, &depthStencilDesc, m_dsvHeap->GetCPUDescriptorHandleForHeapStart());
-        m_depthStencilView = m_dsvHeap->GetCPUDescriptorHandleForHeapStart();
-#endif
-    }
-
-    m_viewport.Width = static_cast<float>(m_desc.width);
-    m_viewport.Height = static_cast<float>(m_desc.height);
-    m_viewport.MaxDepth = 1.0f;
-
-    m_scissorRect.right = static_cast<LONG>(m_desc.width);
-    m_scissorRect.bottom = static_cast<LONG>(m_desc.height);
-
     return SLANG_OK;
 }
 
@@ -1766,72 +1690,35 @@ void D3D12Renderer::setClearColor(const float color[4])
 void D3D12Renderer::clearFrame()
 {
     // Record commands
-    if(auto rtv = m_rtvs[0])
+    if (!m_frameBuffer)
+        return;
+    for (auto rtv : m_frameBuffer->renderTargetDescriptors)
     {
-        m_commandList->ClearRenderTargetView(rtv->m_descriptor.cpuHandle, m_clearColor, 0, nullptr);
+        m_commandList->ClearRenderTargetView(rtv, m_clearColor, 0, nullptr);
     }
-    if (m_dsv)
+    if (m_frameBuffer->depthStencilView)
     {
-        m_commandList->ClearDepthStencilView(m_dsv->m_descriptor.cpuHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        m_commandList->ClearDepthStencilView(
+            m_frameBuffer->depthStencilDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
     }
 }
 
-void D3D12Renderer::presentFrame()
+SLANG_NO_THROW Result SLANG_MCALL D3D12Renderer::createSwapchain(
+    const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
-    endRender();
-
-    if (m_swapChainWaitableObject)
-    {
-        // check if now is good time to present
-        // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it means that no frame is waiting to be be displayed
-        // so there is no point doing a present.
-        const bool shouldPresent = (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
-        if (shouldPresent)
-        {
-            m_swapChain->Present(0, 0);
-        }
-    }
-    else
-    {
-        if (SLANG_FAILED(m_swapChain->Present(1, 0)))
-        {
-            assert(!"Problem presenting");
-            beginRender();
-            return;
-        }
-    }
-
-    // Increment the fence value. Save on the frame - we'll know that frame is done when the fence value >=
-    m_frameInfos[m_frameIndex].m_fenceValue = m_fence.nextSignal(m_commandQueue);
-
-    // increment frame index after signal
-    m_frameIndex = (m_frameIndex + 1) % m_numRenderFrames;
-    // Update the render target index.
-    m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-    // On the current frame wait until it is completed
-    {
-        FrameInfo& frame = m_frameInfos[m_frameIndex];
-        // If the next frame is not ready to be rendered yet, wait until it is ready.
-        m_fence.waitUntilCompleted(frame.m_fenceValue);
-    }
-
-    // Setup such that rendering can restart
-    beginRender();
+    RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
+    SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
+    *outSwapchain = swapchain.detach();
+    return SLANG_OK;
 }
 
-TextureResource::Desc D3D12Renderer::getSwapChainTextureDesc()
+SlangResult D3D12Renderer::readTextureResource(
+    ITextureResource* resource,
+    ISlangBlob** outBlob,
+    size_t* outRowPitch,
+    size_t* outPixelSize)
 {
-    TextureResource::Desc desc;
-    desc.init2D(IResource::Type::Texture2D, Format::Unknown, m_desc.width, m_desc.height, 1);
-
-    return desc;
-}
-
-SlangResult D3D12Renderer::captureScreenSurface(
-    void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize)
-{
-    return captureTextureToSurface(*m_renderTargets[m_renderTargetIndex], buffer, inOutBufferSize, outRowPitch, outPixelSize);
+    return captureTextureToSurface(static_cast<TextureResourceImpl*>(resource)->m_resource, outBlob, outRowPitch, outPixelSize);
 }
 
 static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
@@ -1934,6 +1821,22 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
 
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+    switch (initialUsage)
+    {
+    case IResource::Usage::RenderTarget:
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        break;
+    case IResource::Usage::DepthWrite:
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        break;
+    case IResource::Usage::UnorderedAccess:
+        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        break;
+    default:
+        break;
+    }
+
     resourceDesc.Alignment = 0;
 
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
@@ -1948,7 +1851,22 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
-        SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+        D3D12_CLEAR_VALUE clearValue;
+        D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
+        if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
+                                   D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL)) == 0)
+        {
+            clearValuePtr = nullptr;
+        }
+        clearValue.Format = pixelFormat;
+        memcpy(clearValue.Color, descIn.optimalClearValue, sizeof(clearValue.Color));
+        SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
+            m_device,
+            heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            resourceDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            clearValuePtr));
 
         texture->m_resource.setDebugName(L"Texture");
     }
@@ -1961,17 +1879,13 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
     List<UInt32> mipNumRows;
     mipNumRows.setCount(numMipMaps);
 
-    // Since textures are effectively immutable currently initData must be set
-    assert(initData);
-    // We should have this many sub resources
-    assert(initData->numSubResources == numMipMaps * srcDesc.size.depth * arraySize);
-
     // NOTE! This is just the size for one array upload -> not for the whole texture
     UInt64 requiredSize = 0;
     m_device->GetCopyableFootprints(&resourceDesc, 0, numMipMaps, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
 
     // Sub resource indexing
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing
+    if (initData)
     {
         // Create the upload texture
         D3D12Resource uploadTexture;
@@ -2242,27 +2156,17 @@ Result D3D12Renderer::createSamplerState(ISamplerState::Desc const& desc, ISampl
 
     auto samplerHeap = &m_cpuSamplerHeap;
 
-    int indexInSamplerHeap = samplerHeap->allocate();
-    if(indexInSamplerHeap < 0)
-    {
-        // We ran out of room in our CPU sampler heap.
-        //
-        // TODO: this should not be a catastrophic failure, because
-        // we should just allocate another CPU sampler heap that
-        // can service subsequent allocation.
-        //
-        return SLANG_FAIL;
-    }
-    auto cpuDescriptorHandle = samplerHeap->getCpuHandle(indexInSamplerHeap);
-
-    m_device->CreateSampler(&dxDesc, cpuDescriptorHandle);
+    D3D12HostVisibleDescriptor cpuDescriptor;
+    samplerHeap->allocate(&cpuDescriptor);
+    m_device->CreateSampler(&dxDesc, cpuDescriptor.cpuHandle);
 
     // TODO: We really ought to have a free-list of sampler-heap
     // entries that we check before we go to the heap, and then
     // when we are done with a sampler we simply add it to the free list.
     //
     RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
-    samplerImpl->m_cpuHandle = cpuDescriptorHandle;
+    samplerImpl->m_renderer = this;
+    samplerImpl->m_descriptor = cpuDescriptor;
     *outSampler = samplerImpl.detach();
     return SLANG_OK;
 }
@@ -2282,14 +2186,53 @@ Result D3D12Renderer::createTextureView(ITextureResource* texture, IResourceView
     case IResourceView::Type::RenderTarget:
         {
             SLANG_RETURN_ON_FAIL(m_rtvAllocator.allocate(&viewImpl->m_descriptor));
-            m_device->CreateRenderTargetView(resourceImpl->m_resource, nullptr, viewImpl->m_descriptor.cpuHandle);
+            D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+            rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            switch (desc.renderTarget.shape)
+            {
+            case IResource::Type::Texture1D:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE1D;
+                rtvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
+                break;
+            case IResource::Type::Texture2D:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+                rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
+                rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                break;
+            case IResource::Type::Texture3D:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
+                rtvDesc.Texture3D.MipSlice = desc.renderTarget.mipSlice;
+                rtvDesc.Texture3D.FirstWSlice = desc.renderTarget.arrayIndex;
+                rtvDesc.Texture3D.WSize = desc.renderTarget.arraySize;
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+            m_device->CreateRenderTargetView(
+                resourceImpl->m_resource, &rtvDesc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
     case IResourceView::Type::DepthStencil:
         {
             SLANG_RETURN_ON_FAIL(m_dsvAllocator.allocate(&viewImpl->m_descriptor));
-            m_device->CreateDepthStencilView(resourceImpl->m_resource, nullptr, viewImpl->m_descriptor.cpuHandle);
+            D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+            dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            switch (desc.renderTarget.shape)
+            {
+            case IResource::Type::Texture1D:
+                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE1D;
+                dsvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
+                break;
+            case IResource::Type::Texture2D:
+                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+                dsvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+            m_device->CreateDepthStencilView(
+                resourceImpl->m_resource, &dsvDesc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
@@ -2400,6 +2343,54 @@ Result D3D12Renderer::createBufferView(IBufferResource* buffer, IResourceView::D
     }
 
     *outView = viewImpl.detach();
+    return SLANG_OK;
+}
+
+Result D3D12Renderer::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuffer** outFb)
+{
+    RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl();
+    framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
+    framebuffer->renderTargetDescriptors.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        framebuffer->renderTargetViews[i] = desc.renderTargetViews[i];
+        framebuffer->renderTargetDescriptors[i] =
+            static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_descriptor.cpuHandle;
+    }
+    framebuffer->depthStencilView = desc.depthStencilView;
+    if (desc.depthStencilView)
+    {
+        framebuffer->depthStencilDescriptor =
+            static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_descriptor.cpuHandle;
+    }
+    else
+    {
+        framebuffer->depthStencilDescriptor.ptr = 0;
+    }
+    *outFb = framebuffer.detach();
+    return SLANG_OK;
+}
+
+Result D3D12Renderer::createFramebufferLayout(
+    IFramebufferLayout::Desc const& desc, IFramebufferLayout** outLayout)
+{
+    RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
+    layout->m_renderTargets.setCount(desc.renderTargetCount);
+    for (uint32_t i = 0; i < desc.renderTargetCount; i++)
+    {
+        layout->m_renderTargets[i] = desc.renderTargets[i];
+    }
+    
+    if (desc.depthStencil)
+    {
+        layout->m_hasDepthStencil = true;
+        layout->m_depthStencil = *desc.depthStencil;
+    }
+    else
+    {
+        layout->m_hasDepthStencil = false;
+    }
+    *outLayout = layout.detach();
     return SLANG_OK;
 }
 
@@ -2655,20 +2646,14 @@ void D3D12Renderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, 
     m_boundIndexOffset = UINT(offset);
 }
 
-void D3D12Renderer::setDepthStencilTarget(IResourceView* depthStencilView)
-{
-}
-
 void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
 {
     static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxViewports);
-
-    D3D12_VIEWPORT dxViewports[kMaxViewports];
+    assert(count <= kMaxViewports && count <= kMaxRTVCount);
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
-        auto& dxViewport = dxViewports[ii];
+        auto& dxViewport = m_viewports[ii];
 
         dxViewport.TopLeftX = inViewport.originX;
         dxViewport.TopLeftY = inViewport.originY;
@@ -2677,20 +2662,18 @@ void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
         dxViewport.MinDepth = inViewport.minZ;
         dxViewport.MaxDepth = inViewport.maxZ;
     }
-
-    m_commandList->RSSetViewports(UINT(count), dxViewports);
+    m_commandList->RSSetViewports(UINT(count), m_viewports);
 }
 
 void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
 {
     static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxScissorRects);
+    assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
 
-    D3D12_RECT dxRects[kMaxScissorRects];
     for(UInt ii = 0; ii < count; ++ii)
     {
         auto& inRect = rects[ii];
-        auto& dxRect = dxRects[ii];
+        auto& dxRect = m_scissorRects[ii];
 
         dxRect.left     = LONG(inRect.minX);
         dxRect.top      = LONG(inRect.minY);
@@ -2698,13 +2681,26 @@ void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
         dxRect.bottom   = LONG(inRect.maxY);
     }
 
-    m_commandList->RSSetScissorRects(UINT(count), dxRects);
+    m_commandList->RSSetScissorRects(UINT(count), m_scissorRects);
 }
 
 void D3D12Renderer::setPipelineState(IPipelineState* state)
 {
     m_currentPipelineState = (PipelineStateImpl*)state;
 }
+
+void D3D12Renderer::setFramebuffer(IFramebuffer* frameBuffer)
+{
+    ID3D12GraphicsCommandList* commandList = m_commandList;
+    auto framebufferImpl = static_cast<FramebufferImpl*>(frameBuffer);
+    commandList->OMSetRenderTargets(
+        (UINT)framebufferImpl->renderTargetViews.getCount(),
+        framebufferImpl->renderTargetDescriptors.getArrayView().getBuffer(),
+        FALSE,
+        framebufferImpl->depthStencilView ? &framebufferImpl->depthStencilDescriptor : nullptr);
+    m_frameBuffer = framebufferImpl;
+}
+
 
 void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
 {
@@ -2864,7 +2860,7 @@ void D3D12Renderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISampl
     dxDevice->CopyDescriptorsSimple(
         1,
         m_samplerHeap->getCpuHandle(int(descriptorIndex)),
-        samplerImpl->m_cpuHandle,
+        samplerImpl->m_descriptor.cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
 
@@ -2908,7 +2904,7 @@ void D3D12Renderer::DescriptorSetImpl::setCombinedTextureSampler(
     dxDevice->CopyDescriptorsSimple(
         1,
         m_samplerHeap->getCpuHandle(int(samplerDescriptorIndex)),
-        samplerImpl->m_cpuHandle,
+        samplerImpl->m_descriptor.cpuHandle,
         D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
 }
 
@@ -3601,7 +3597,10 @@ Result D3D12Renderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IP
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet)
+Result D3D12Renderer::createDescriptorSet(
+    IDescriptorSetLayout* layout,
+    IDescriptorSet::Flag::Enum flag,
+    IDescriptorSet** outDescriptorSet)
 {
     auto layoutImpl = (DescriptorSetLayoutImpl*) layout;
 
@@ -3660,13 +3659,22 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
 
     {
-        const int numRenderTargets = int(desc.renderTargetCount);
+        auto framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+        const int numRenderTargets = int(framebufferLayout->m_renderTargets.getCount());
 
-        psoDesc.DSVFormat = m_depthStencilFormat;
+        if (framebufferLayout->m_hasDepthStencil)
+        {
+            psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
+        }
+        else
+        {
+            psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+        }
         psoDesc.NumRenderTargets = numRenderTargets;
         for (Int i = 0; i < numRenderTargets; i++)
         {
-            psoDesc.RTVFormats[i] = m_targetFormat;
+            psoDesc.RTVFormats[i] =
+                D3DUtil::getMapFormat(framebufferLayout->m_renderTargets[i].format);
         }
 
         psoDesc.SampleDesc.Count = 1;
@@ -3735,6 +3743,7 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_pipelineState = pipelineState;
+    pipelineStateImpl->m_program = programImpl;
     pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;

@@ -10,7 +10,7 @@
 
 #include "../flag-combiner.h"
 
-#include "../render.h"
+#include "slang-gfx.h"
 
 #include <D3Dcommon.h>
 #include <DXGIFormat.h>

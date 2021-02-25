@@ -219,6 +219,7 @@
     <ClInclude Include="..\..\..\source\core\slang-type-text-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-type-traits.h" />
     <ClInclude Include="..\..\..\source\core\slang-uint-set.h" />
+    <ClInclude Include="..\..\..\source\core\slang-virtual-object-pool.h" />
     <ClInclude Include="..\..\..\source\core\slang-visual-studio-compiler-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-writer.h" />
     <ClInclude Include="..\..\..\source\core\slang-zip-file-system.h" />

@@ -14,14 +14,14 @@ namespace gfx {
 #define VK_API_INSTANCE_PROCS_OPT(x) \
     x(vkGetPhysicalDeviceFeatures2) \
     x(vkGetPhysicalDeviceProperties2) \
+    x(vkCreateDebugReportCallbackEXT) \
+    x(vkDestroyDebugReportCallbackEXT) \
+    x(vkDebugReportMessageEXT) \
     /* */
 
 #define VK_API_INSTANCE_PROCS(x) \
     x(vkCreateDevice) \
     x(vkDestroyDevice) \
-    x(vkCreateDebugReportCallbackEXT) \
-    x(vkDestroyDebugReportCallbackEXT) \
-    x(vkDebugReportMessageEXT) \
     x(vkEnumeratePhysicalDevices) \
     x(vkGetPhysicalDeviceProperties) \
     x(vkGetPhysicalDeviceFeatures) \
@@ -34,6 +34,7 @@ namespace gfx {
 #define VK_API_DEVICE_PROCS(x) \
     x(vkCreateDescriptorPool) \
     x(vkDestroyDescriptorPool) \
+    x(vkResetDescriptorPool) \
     x(vkGetDeviceQueue) \
     x(vkQueueSubmit) \
     x(vkQueueWaitIdle) \
@@ -47,6 +48,7 @@ namespace gfx {
     x(vkCreateDescriptorSetLayout) \
     x(vkDestroyDescriptorSetLayout) \
     x(vkAllocateDescriptorSets) \
+    x(vkFreeDescriptorSets) \
     x(vkUpdateDescriptorSets) \
     x(vkCreatePipelineLayout) \
     x(vkDestroyPipelineLayout) \
@@ -74,6 +76,7 @@ namespace gfx {
     x(vkGetImageMemoryRequirements) \
     \
     x(vkCmdBindPipeline) \
+    x(vkCmdClearAttachments) \
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
     x(vkCmdDraw) \
@@ -107,6 +110,7 @@ namespace gfx {
     x(vkBeginCommandBuffer) \
     x(vkEndCommandBuffer) \
     x(vkResetCommandBuffer) \
+    x(vkResetCommandPool) \
     \
     x(vkBindImageMemory) \
     x(vkBindBufferMemory) \

@@ -6,6 +6,7 @@
 
 #include "slang-com-ptr.h"
 #include "core/slang-list.h"
+#include "core/slang-virtual-object-pool.h"
 
 namespace gfx {
 
@@ -76,8 +77,6 @@ struct D3D12HostVisibleDescriptor
 ///
 /// Unlike the `D3D12DescriptorHeap` type, this class allows for both
 /// allocation and freeing of descriptors, by maintaining a free list.
-/// In order to keep the implementation simple, this class only supports
-/// allocation of single descriptors and not ranges.
 ///
 class D3D12HostVisibleDescriptorAllocator
 {
@@ -86,8 +85,7 @@ class D3D12HostVisibleDescriptorAllocator
     D3D12_DESCRIPTOR_HEAP_TYPE              m_type;
 
     D3D12DescriptorHeap                     m_heap;
-    Slang::List<D3D12HostVisibleDescriptor> m_freeList;
-    Slang::List<D3D12DescriptorHeap>        m_heaps;
+    Slang::VirtualObjectPool m_allocator;
 
 public:
     D3D12HostVisibleDescriptorAllocator()
@@ -100,36 +98,29 @@ public:
         m_type = type;
 
         SLANG_RETURN_ON_FAIL(m_heap.init(m_device, m_chunkSize, m_type, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-
+        m_allocator.initPool(m_chunkSize);
         return SLANG_OK;
+    }
+
+    SLANG_FORCE_INLINE D3D12_CPU_DESCRIPTOR_HANDLE getCpuHandle(int index) const
+    {
+        return m_heap.getCpuHandle(index);
+    }
+
+    int allocate(int count)
+    {
+        return m_allocator.alloc(count);
     }
 
     Slang::Result allocate(D3D12HostVisibleDescriptor* outDescriptor)
     {
         // TODO: this allocator would take some work to make thread-safe
 
-        if(m_freeList.getCount() > 0)
-        {
-            auto descriptor = m_freeList[0];
-            m_freeList.fastRemoveAt(0);
-
-            *outDescriptor = descriptor;
-            return SLANG_OK;
-        }
-
-        int index = m_heap.allocate();
+        int index = m_allocator.alloc(1);
         if(index < 0)
         {
-            // Allocate a new heap and try again.
-            m_heaps.add(m_heap);
-            SLANG_RETURN_ON_FAIL(m_heap.init(m_device, m_chunkSize, m_type, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-
-            int index = m_heap.allocate();
-            if(index < 0)
-            {
-                assert(!"descriptor allocation failed on fresh heap");
-                return SLANG_FAIL;
-            }
+            assert(!"descriptor allocation failed");
+            return SLANG_FAIL;
         }
 
         D3D12HostVisibleDescriptor descriptor;
@@ -139,9 +130,16 @@ public:
         return SLANG_OK;
     }
 
+    void free(int index, int count)
+    {
+        m_allocator.free(index, count);
+    }
+
     void free(D3D12HostVisibleDescriptor descriptor)
     {
-        m_freeList.add(descriptor);
+        auto index =
+            (int)(descriptor.cpuHandle.ptr - m_heap.getCpuStart().ptr) / m_heap.getDescriptorSize();
+        free(index, 1);
     }
 };
 

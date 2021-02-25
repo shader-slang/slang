@@ -283,7 +283,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     auto pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
     if(!pipelineLayout) return SLANG_FAIL;
 
-    auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout);
+    auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
     List<BindingStateImpl::OutputBinding> outputBindings;

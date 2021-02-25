@@ -878,11 +878,11 @@ private:
             cuCtxDestroy(m_context);
         }
     }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc, void* inWindowHandle) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override
     {
         SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_PTX, "sm_5_1"));
 
-        SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc, inWindowHandle));
+        SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
         SLANG_RETURN_ON_FAIL(_initCuda(reportType));
 
@@ -950,6 +950,7 @@ private:
             switch (desc.format)
             {
             case Format::R_Float32:
+            case Format::D_Float32:
                 {
                     format = CU_AD_FORMAT_FLOAT;
                     numChannels = 1;
@@ -1358,11 +1359,10 @@ private:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+    virtual Result createShaderObject(
         ShaderObjectLayoutBase* layout,
         IShaderObject**         outObject) override
     {
-
         RefPtr<CUDAShaderObject> result = new CUDAShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, dynamic_cast<CUDAShaderObjectLayout*>(layout)));
         *outObject = result.detach();
@@ -1560,12 +1560,39 @@ public:
         SLANG_UNUSED(color);
     }
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL presentFrame() override {}
-    virtual SLANG_NO_THROW TextureResource::Desc SLANG_MCALL getSwapChainTextureDesc() override
+    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override {}
+    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override {}
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        makeSwapchainImagePresentable(ISwapchain* swapchain) override
     {
-        return TextureResource::Desc();
+        SLANG_UNUSED(swapchain);
     }
-    
+    virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
+        const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override
+    {
+        SLANG_UNUSED(desc);
+        SLANG_UNUSED(window);
+        SLANG_UNUSED(outSwapchain);
+        return SLANG_FAIL;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
+        const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override
+    {
+        SLANG_UNUSED(desc);
+        SLANG_UNUSED(outLayout);
+        return SLANG_FAIL;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override
+    {
+        SLANG_UNUSED(desc);
+        SLANG_UNUSED(outFramebuffer);
+        return SLANG_FAIL;
+    }
+    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override
+    {
+        SLANG_UNUSED(frameBuffer);
+    }
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override
     {
@@ -1599,9 +1626,10 @@ public:
         return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet** outDescriptorSet) override
+        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flags, IDescriptorSet** outDescriptorSet) override
     {
         SLANG_UNUSED(layout);
+        SLANG_UNUSED(flags);
         SLANG_UNUSED(outDescriptorSet);
         return SLANG_E_NOT_AVAILABLE;
     }
@@ -1612,11 +1640,11 @@ public:
         SLANG_UNUSED(outState);
         return SLANG_E_NOT_AVAILABLE;
     }
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL captureScreenSurface(
-        void* buffer, size_t* inOutBufferSize, size_t* outRowPitch, size_t* outPixelSize) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
+        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override
     {
-        SLANG_UNUSED(buffer);
-        SLANG_UNUSED(inOutBufferSize);
+        SLANG_UNUSED(texture);
+        SLANG_UNUSED(outBlob);
         SLANG_UNUSED(outRowPitch);
         SLANG_UNUSED(outPixelSize);
 
@@ -1657,11 +1685,6 @@ public:
         SLANG_UNUSED(buffer);
         SLANG_UNUSED(indexFormat);
         SLANG_UNUSED(offset);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setDepthStencilTarget(IResourceView* depthStencilView) override
-    {
-        SLANG_UNUSED(depthStencilView);
     }
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(UInt count, Viewport const* viewports) override
@@ -1760,18 +1783,17 @@ SlangResult CUDARootShaderObject::init(IRenderer* renderer, CUDAShaderObjectLayo
     return SLANG_OK;
 }
 
-SlangResult SLANG_MCALL createCUDARenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createCUDARenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
     RefPtr<CUDARenderer> result = new CUDARenderer();
-    SLANG_RETURN_ON_FAIL(result->initialize(*desc, windowHandle));
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
 #else
-SlangResult SLANG_MCALL createCUDARenderer(const IRenderer::Desc* desc, void* windowHandle, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createCUDARenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
     SLANG_UNUSED(desc);
-    SLANG_UNUSED(windowHandle);
     *outRenderer = nullptr;
     return SLANG_OK;
 }

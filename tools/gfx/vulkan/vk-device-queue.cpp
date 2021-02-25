@@ -24,10 +24,11 @@ void VulkanDeviceQueue::destroy()
 
         for (int i = 0; i < m_numCommandBuffers; i++)
         {
-            m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPool, 1, &m_commandBuffers[i]);
+            m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPools[i], 1, &m_commandBuffers[i]);
             m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
+            m_api->vkDestroyCommandPool(m_api->m_device, m_commandPools[i], nullptr);
+            m_descSetAllocator[i].close();
         }
-        m_api->vkDestroyCommandPool(m_api->m_device, m_commandPool, nullptr);
         m_api = nullptr;
     }
 }
@@ -47,26 +48,25 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
 
     m_queue = queue;
 
-    VkCommandPoolCreateInfo poolCreateInfo = {};
-    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    poolCreateInfo.queueFamilyIndex = queueIndex;
-
-    api.vkCreateCommandPool(api.m_device, &poolCreateInfo, nullptr, &m_commandPool);
-
-    VkCommandBufferAllocateInfo commandInfo = {};
-    commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    commandInfo.commandPool = m_commandPool;
-    commandInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    commandInfo.commandBufferCount = 1;
-
-    VkFenceCreateInfo fenceCreateInfo = {};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = 0; // VK_FENCE_CREATE_SIGNALED_BIT;
-
     for (int i = 0; i < m_numCommandBuffers; i++)
     {
+        VkCommandPoolCreateInfo poolCreateInfo = {};
+        poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+        poolCreateInfo.queueFamilyIndex = queueIndex;
+
+        api.vkCreateCommandPool(api.m_device, &poolCreateInfo, nullptr, &m_commandPools[i]);
+
+        VkCommandBufferAllocateInfo commandInfo = {};
+        commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        commandInfo.commandPool = m_commandPools[i];
+        commandInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        commandInfo.commandBufferCount = 1;
+
+        VkFenceCreateInfo fenceCreateInfo = {};
+        fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceCreateInfo.flags = 0; // VK_FENCE_CREATE_SIGNALED_BIT;
         Fence& fence = m_fences[i];
 
         api.vkAllocateCommandBuffers(api.m_device, &commandInfo, &m_commandBuffers[i]);
@@ -74,6 +74,8 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
         api.vkCreateFence(api.m_device, &fenceCreateInfo, nullptr, &fence.fence);
         fence.active = false;
         fence.value = 0;
+
+        m_descSetAllocator[i].m_api = &api;
     }
 
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
@@ -133,6 +135,7 @@ void VulkanDeviceQueue::flushStepA()
 
     // No longer waiting on this semaphore
     makeCompleted(EventType::BeginFrame);
+    makeCompleted(EventType::EndFrame);
 }
 
 void VulkanDeviceQueue::_updateFenceAtIndex( int fenceIndex, bool blocking)
@@ -161,6 +164,7 @@ void VulkanDeviceQueue::flushStepB()
 {
     m_commandBufferIndex = (m_commandBufferIndex + 1) % m_numCommandBuffers;
     m_commandBuffer = m_commandBuffers[m_commandBufferIndex];
+    m_commandPool = m_commandPools[m_commandBufferIndex];
 
     // non-blocking update of fence values
     for (int i = 0; i < m_numCommandBuffers; ++i)
@@ -171,9 +175,8 @@ void VulkanDeviceQueue::flushStepB()
     // blocking update of fence values
     _updateFenceAtIndex(m_commandBufferIndex, true);
 
-    m_api->vkResetCommandBuffer(m_commandBuffer, 0);
-
-    //m_api.vkResetCommandPool(m_api->m_device, m_commandPool, 0);
+    m_descSetAllocator[m_commandBufferIndex].reset();
+    m_api->vkResetCommandPool(m_api->m_device, m_commandPool, 0);
 
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -192,6 +195,11 @@ void VulkanDeviceQueue::flushAndWait()
 {
     flush();
     waitForIdle();
+}
+
+VkSemaphore VulkanDeviceQueue::getSemaphore(EventType eventType)
+{
+    return m_semaphores[int(eventType)];
 }
 
 VkSemaphore VulkanDeviceQueue::makeCurrent(EventType eventType)

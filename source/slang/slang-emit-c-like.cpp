@@ -2663,6 +2663,18 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     auto paramName = getName(param);
     auto paramType = param->getDataType();
 
+    if(auto layoutDecoration = param->findDecoration<IRLayoutDecoration>() )
+    {
+        auto layout = as<IRVarLayout>(layoutDecoration->getLayout());
+        SLANG_ASSERT(layout);
+
+        if(layout->usesResourceKind(LayoutResourceKind::VaryingInput)
+            || layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
+        {
+            emitInterpolationModifiers(param, paramType, layout);
+        }
+    }
+
     emitParamType(paramType, paramName);
     emitSemantics(param);
 }
