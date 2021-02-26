@@ -175,19 +175,26 @@ Result execute()
     printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
     auto printBufferView = gRenderer->createBufferView(printBuffer, printBufferViewDesc);
 
+    ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
+    auto queue = gRenderer->createCommandQueue(queueDesc);
+    auto commandBuffer = queue->createCommandBuffer();
+    auto encoder = commandBuffer->encodeComputeCommands();
     // TODO: need to copy a zero into the start of the print buffer!
 
     gDescriptorSet->setResource(0, 0, printBufferView);
-    gRenderer->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
+    encoder->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
 
-    gRenderer->setPipelineState(gPipelineState);
-    gRenderer->dispatchCompute(1, 1, 1);
-
+    encoder->setPipelineState(gPipelineState);
+    encoder->dispatchCompute(1, 1, 1);
+    encoder->endEncoding();
+    commandBuffer->close();
+    queue->executeCommandBuffer(commandBuffer);
     // TODO: need to copy from the print buffer to a staging buffer...
 
-    auto printBufferData = (uint32_t*) gRenderer->map(printBuffer, MapFlavor::HostRead);
+    ComPtr<ISlangBlob> blob;
+    gRenderer->readBufferResource(printBuffer, 0, printBufferSize, blob.writeRef());
 
-    gGPUPrinting.processGPUPrintCommands(printBufferData, printBufferSize);
+    gGPUPrinting.processGPUPrintCommands(blob->getBufferPointer(), printBufferSize);
 
     return SLANG_OK;
 }

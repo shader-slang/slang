@@ -1,3 +1,4 @@
+#if 0
 #include "../../prelude/slang-cpp-prelude.h"
 
 
@@ -140,6 +141,7 @@ bool executeComputation_0()
 
     gfx_Window_0* _S9 = createWindow_0(int(1024), int(768));
     gfx_Renderer_0* _S10 = createRenderer_0(int(1024), int(768), _S9);
+    gfx_CommandQueue_0* _
     gfx_BufferResource_0* _S11 = createStructuredBuffer_0(_S10, initialArray_0);
     Vector<uint32_t, 3> _S12 = make_VecU3(uint32_t(int(4)), uint32_t(int(1)), uint32_t(int(1)));
     RWStructuredBuffer<float> _S13 = convertBuffer_0(_S11);
@@ -192,3 +194,4 @@ void computeMain(ComputeVaryingInput* varyingInput, void* entryPointParams, void
         }
     }
 }
+#endif

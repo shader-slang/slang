@@ -12,6 +12,9 @@
     <ClInclude Include="..\..\..\slang-gfx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\command-writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -33,7 +36,13 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\dummy-render-pass-layout.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\immediate-renderer-base.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h">
@@ -98,7 +107,13 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\dummy-render-pass-layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\flag-combiner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx\immediate-renderer-base.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp">

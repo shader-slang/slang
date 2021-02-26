@@ -1,3 +1,4 @@
+#if 0
 // main.cpp
 
 //
@@ -2214,7 +2215,6 @@ Result initialize()
 //
 void renderFrame()
 {
-    gRenderer->beginFrame();
     gui->beginFrame();
 
     // In order to see that things are rendering properly we need some
@@ -2402,10 +2402,6 @@ void renderFrame()
 
     ImGui::End();
 
-    gui->endFrame();
-
-    gRenderer->makeSwapchainImagePresentable(gSwapchain);
-    gRenderer->endFrame();
     gSwapchain->present();
 
 }
@@ -2441,3 +2437,5 @@ void innerMain(ApplicationContext* context)
     app.finalize();
 }
 GFX_UI_MAIN(innerMain)
+
+#endif

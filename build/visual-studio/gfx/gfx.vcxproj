@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang-gfx.h" />
+    <ClInclude Include="..\..\..\tools\gfx\command-writer.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h" />
@@ -187,7 +188,9 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\render-d3d12.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h" />
+    <ClInclude Include="..\..\..\tools\gfx\dummy-render-pass-layout.h" />
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h" />
+    <ClInclude Include="..\..\..\tools\gfx\immediate-renderer-base.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
@@ -210,7 +213,9 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\render-d3d12.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\dummy-render-pass-layout.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\flag-combiner.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\immediate-renderer-base.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render-graphics-common.cpp" />

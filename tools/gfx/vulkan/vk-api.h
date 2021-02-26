@@ -89,6 +89,8 @@ namespace gfx {
     x(vkCmdPipelineBarrier) \
     x(vkCmdCopyBufferToImage)\
     x(vkCmdPushConstants) \
+    x(vkCmdSetPrimitiveTopologyEXT) \
+    x(vkCmdSetStencilReference) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \

@@ -243,7 +243,7 @@ static ATOM createWindowClassAtom()
     windowClassDesc.cbWndExtra = 0;
     windowClassDesc.hInstance = (HINSTANCE) GetModuleHandle(0);
     windowClassDesc.hIcon = 0;
-    windowClassDesc.hCursor = 0;
+    windowClassDesc.hCursor = LoadCursorW(NULL, IDC_ARROW);
     windowClassDesc.hbrBackground = 0;
     windowClassDesc.lpszMenuName = 0;
     windowClassDesc.lpszClassName = L"SlangGraphicsWindow";
@@ -269,9 +269,16 @@ Window* createWindow(WindowDesc const& desc)
     OSString windowTitle(desc.title);
 
     DWORD windowExtendedStyle = 0;
-    DWORD windowStyle = 0;
+    DWORD windowStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
 
     HINSTANCE instance = (HINSTANCE) GetModuleHandle(0);
+
+    RECT windowRect;
+    windowRect.left = 0;
+    windowRect.top = 0;
+    windowRect.bottom = desc.height;
+    windowRect.right = desc.width;
+    AdjustWindowRect(&windowRect, windowStyle, FALSE);
 
     HWND windowHandle = CreateWindowExW(
         windowExtendedStyle,
@@ -279,11 +286,13 @@ Window* createWindow(WindowDesc const& desc)
         windowTitle,
         windowStyle,
         0, 0, // x, y
-        desc.width, desc.height,
+        windowRect.right,
+        windowRect.bottom,
         NULL, // parent
         NULL, // menu
         instance,
         window);
+
 
     if(!windowHandle)
     {

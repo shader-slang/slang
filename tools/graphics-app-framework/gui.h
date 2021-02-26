@@ -12,14 +12,16 @@ namespace gfx {
 
 struct GUI : Slang::RefObject
 {
-    GUI(Window* window, IRenderer* renderer, IFramebufferLayout* framebufferLayout);
+    GUI(Window* window, IRenderer* renderer, ICommandQueue* queue, IFramebufferLayout* framebufferLayout);
     ~GUI();
 
     void beginFrame();
-    void endFrame();
+    void endFrame(IFramebuffer* framebuffer);
 
 private:
     Slang::ComPtr<IRenderer>    renderer;
+    Slang::ComPtr<ICommandQueue> queue;
+    Slang::ComPtr<IRenderPassLayout> renderPass;
     Slang::ComPtr<IPipelineState>       pipelineState;
     Slang::ComPtr<IDescriptorSetLayout> descriptorSetLayout;
     Slang::ComPtr<IPipelineLayout>      pipelineLayout;
