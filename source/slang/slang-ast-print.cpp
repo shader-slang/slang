@@ -18,7 +18,7 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
         case Type::DeclPath:            return Kind::Name;
         case Type::GenericParamType:    return Kind::Type;
         case Type::GenericParamValue:   return Kind::Value; 
-        case Type::GenericValueType:    return Kind::Type;
+        case Type::GenericParamValueType:    return Kind::Type;
         default: break;
     }
     return Kind::None;
@@ -188,7 +188,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 sb << ":";
 
                 {
-                    ScopePart scopePart(this, Part::Type::GenericValueType);
+                    ScopePart scopePart(this, Part::Type::GenericParamValueType);
                     addType(getType(m_astBuilder, genericValParam));
                 }
             }
@@ -258,5 +258,17 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
 {
     return getDeclSignatureString(item.declRef, astBuilder);
 }
+
+/* static */UnownedStringSlice ASTPrinter::getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts)
+{
+    const Index index = parts.findFirstIndex([&](const Part& part) -> bool { return part.type == partType; });
+    return index >= 0 ? getPart(slice, parts[index]) : UnownedStringSlice();
+}
+
+UnownedStringSlice ASTPrinter::getPart(Part::Type partType) const
+{
+    return m_parts ? getPart(partType, getSlice(), *m_parts) : UnownedStringSlice();
+}
+
 
 } // namespace Slang

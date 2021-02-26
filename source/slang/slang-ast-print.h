@@ -23,7 +23,7 @@ public:
     /// Moreover we could have less kinds, if we used the overlaps to signal out sections
     ///
     /// For example we could have a 'Param', 'Generic' span, and then have 'Name', 'Type' and 'Value'.
-    /// So a param type, would be the 'Type' defined in a Param span. Moreover you could have the hierachy of Types, and then
+    /// So a param type, would be the 'Type' defined in a Param span. Moreover you could have the hierarchy of Types, and then
     /// such that you can pull out specific parts that make up a type.
     ///
     /// This is powerful/flexible - but requires more complexity at the use sites, so for now we use this simpler mechanism.
@@ -41,21 +41,28 @@ public:
 
         enum class Type
         {
+            None,
             ParamType,          ///< The type associated with a parameter
             ParamName,          ///< The name associated with a parameter 
             ReturnType,         ///< The return type
             DeclPath,           ///< The declaration path (NOT including the actual decl name)
             GenericParamType,   ///< Generic parameter type
             GenericParamValue,  ///< Generic parameter value
-            GenericValueType,   ///< The type requirement for a value type
+            GenericParamValueType,   ///< The type requirement for a value type
         };
 
         static Kind getKind(Type type);
-        static Part make(Type type, Index start, Index end) { return Part{ type, start, end}; }
+        static Part make(Type type, Index start, Index end) { Part part; part.type = type; part.start = start; part.end = end; return part; }
 
-        Type type;
+        Type type = Type::None;
         Index start;
         Index end;
+    };
+
+    struct PartPair
+    {
+        Part first;
+        Part second;
     };
 
     struct ScopePart
@@ -71,7 +78,7 @@ public:
             List<Part>* parts = m_printer->m_parts;
             if (parts)
             {
-                parts->add(Part{m_type, m_startIndex, m_printer->m_builder.getLength()});
+                parts->add(Part::make(m_type, m_startIndex, m_printer->m_builder.getLength()));
             }
         }
 
@@ -94,6 +101,9 @@ public:
         /// Get the current string
     String getString() { return m_builder.ProduceString(); }
 
+        /// Get contents as a slice
+    UnownedStringSlice getSlice() const { return m_builder.getUnownedSlice(); }
+
         /// Add a type
     void addType(Type* type);
         /// Add a value
@@ -115,6 +125,15 @@ public:
 
         /// Add the signature for the decl
     void addDeclSignature(const DeclRef<Decl>& declRef);
+
+        /// Get the specified part type. Returns empty slice if not found
+    UnownedStringSlice getPart(Part::Type partType) const;
+        /// Get the slice for a part
+    UnownedStringSlice getPartSlice(const Part& part) const { return getPart(getSlice(), part); }
+    
+        /// Gets the specified part type
+    static UnownedStringSlice getPart(const UnownedStringSlice& slice, const Part& part) { return UnownedStringSlice(slice.begin() + part.start, slice.begin() + part.end); }
+    static UnownedStringSlice getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts);
 
         /// Ctor
     ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Part>* parts = nullptr):

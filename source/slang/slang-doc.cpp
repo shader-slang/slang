@@ -3,6 +3,9 @@
 
 #include "../core/slang-string-util.h"
 
+#include "slang-ast-builder.h"
+#include "slang-ast-print.h"
+
 namespace Slang {
 
 /* TODO(JS):
@@ -901,8 +904,57 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
     return context.extract(this, moduleDecl, sourceManager, sink);
 }
 
-/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, StringBuilder& out)
+
+/* static */void DocumentationUtil::getSignature(const List<Part>& parts, Signature& outSig)
 {
+    const Index count = parts.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& part = parts[i];
+        switch (part.type)
+        {
+            case Part::Type::ParamType:
+            {
+                PartPair pair;
+                pair.first = part;
+                if (parts[i + 1].type == Part::Type::ParamName)
+                {
+                    pair.second = parts[i + 1];
+                    i++;
+                }
+                outSig.params.add(pair);
+                break;
+            }
+            case Part::Type::ReturnType:
+            {
+                outSig.returnType = part;
+                break;
+            }
+            case Part::Type::DeclPath:
+            {
+                outSig.name = part;
+                break;
+            }
+            default: break;
+        }
+    }
+}
+
+static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out)
+{
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(in, lines);
+    StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
+}
+
+/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, ASTBuilder* astBuilder, StringBuilder& out)
+{
+    typedef ASTPrinter::Part Part;
+
+    // The ASTBuilder is needed in order to be able to create ast types that can then be printed.
+    // It is *assumed* here, that them being transient on this temporary ASTBuilder, doesn't mutate
+    // any of the nodes from the ASTBuilder/s for the things being documented
+
     for (const auto& entry : markup->getEntries())
     {
         NodeBase* node = entry.m_node;
@@ -920,12 +972,61 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
 
         if (CallableDecl* callableDecl = as<CallableDecl>(decl))
         {
-            out << entry.m_markup;
+            // Output the signature
+            {
+                StringBuilder sigBuffer;
+                List<ASTPrinter::Part> parts;
+                ASTPrinter printer(astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
 
-            // There's code to output sigs in the SemanticsVisitor - we probably need to extract that functionality
-            // out so can be used here
+                printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
 
-            //   String declString = getDeclSignatureString(item);
+                Signature signature;
+                getSignature(parts, signature);
+
+                // Extract the name
+                
+                out << "# " << printer.getPartSlice(signature.name) << "\n\n";
+
+                out << "## Signature \n";
+                out << "```\n";
+                out << printer.getPartSlice(signature.returnType) << " ";
+                out << printer.getPartSlice(signature.name) << "(\n";
+
+                StringBuilder line;
+
+                const Index paramCount = signature.params.getCount();
+
+                for (Index i = 0; i < paramCount; ++i)
+                {
+                    const auto& param = signature.params[i];
+                    line.Clear();                    
+                    // If we want to tab these over... we'll need to know how must space I have
+                    line << "    " << printer.getPartSlice(param.first);
+
+                    Index indent = 25;
+                    if (line.getLength() < indent)
+                    {
+                        line.appendRepeatedChar(' ', indent - line.getLength());
+                    }
+                    else
+                    {
+                        line.appendChar(' ');
+                    }
+
+                    line << printer.getPartSlice(param.second);
+                    if (i < paramCount - 1)
+                    {
+                        line << ",\n";
+                    }
+
+                    out << line;
+                }
+
+                out << ");\n";
+                out << "```\n\n";
+            }
+
+            out << "## Parameters\n\n";
 
             auto params = callableDecl->getParameters();
             //const auto& returnType = callableDecl->returnType;
@@ -935,36 +1036,100 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
             {
                 DocMarkup::Entry* paramEntry = markup->getEntry(param);
 
+                out << "* ";
+
+                Name* name = param->getName();
+                if (name)
+                {
+                    out << toSlice("_") << name->text << toSlice("_ ");
+                }
                 if (paramEntry)
                 {
-                    out << paramEntry->m_markup;
-
-                    auto type = param->getType();
-
-                    if (type)
-                    {
-                        type->toText(out);
-                    }
-
-                    Name* name = param->getName();
-                    if (name)
-                    {
-                        out << " ";
-                        out << name->text;
-                    }
-                    out << "\n\n";
+                    // Hmm, we'll want to make something multiline into a single line
+                    _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
                 }
+
+                out << "\n";
             }
+            out << toSlice("\n");
+
+            out << "## Description\n\n";
+
+            out << entry.m_markup;
         }
         else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
         {
+            out << toSlice("# enum ");
+            Name* name = enumDecl->getName();
+            if (name)
+            {
+                out << name->text;
+            }
+            out << toSlice("\n\n");
 
+            out << toSlice("## Values \n\n");
+
+            for(auto caseDecl : enumDecl->getMembersOfType<EnumCaseDecl>())
+            {
+                out << toSlice("* _");
+                Name* caseName = caseDecl->getName();
+                out << caseName->text;
+                out << toSlice("_ ");
+
+                // Look for markup
+                DocMarkup::Entry* caseEntry = markup->getEntry(caseDecl);
+                if (caseEntry)
+                {
+                    _appendAsSingleLine(caseEntry->m_markup.getUnownedSlice(), out);
+                }
+                out << "\n";
+            }
+            out << toSlice("\n");
+
+            out << toSlice("\n## Description\n\n");
+
+            out << entry.m_markup;
         }
-        else if (StructDecl* structDecl = as<StructDecl>(decl))
+        else if (as<StructDecl>(decl) || as<ClassDecl>(decl))
         {
-        }
-        else if (ClassDecl* classDecl = as<ClassDecl>(decl))
-        {
+            AggTypeDecl* agg = as<AggTypeDecl>(decl);
+
+
+            out << toSlice("# ");
+            if (as<StructDecl>(decl))
+            {
+                out << toSlice("struct ");
+            }
+            else
+            {
+                out << toSlice("class ");
+            }
+
+            Name* name = decl->getName();
+            if (name)
+            {
+                out << name->text;
+            }
+            out << toSlice("\n\n");
+
+            out << "## Fields\n\n";
+
+            for (VarDecl* fieldDecl : agg->getMembersOfType<VarDecl>())
+            {
+                out << toSlice("* _");
+                Name* fieldName = fieldDecl->getName();
+                out << fieldName->text;
+                out << toSlice("_ ");
+
+                // Look for markup
+                DocMarkup::Entry* fieldEntry = markup->getEntry(fieldDecl);
+                if (fieldEntry)
+                {
+                    _appendAsSingleLine(fieldEntry->m_markup.getUnownedSlice(), out);
+                }
+                out << toSlice("\n");
+            }
+            out << toSlice("\n");
         }
     }
 
