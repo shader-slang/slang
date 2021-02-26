@@ -19,10 +19,16 @@ public:
         };
     };
 
+    /// Note that we could/can have a hierarchy of Parts - with overlapping spans.
+    /// Moreover we could have less kinds, if we used the overlaps to signal out sections
+    ///
+    /// For example we could have a 'Param', 'Generic' span, and then have 'Name', 'Type' and 'Value'.
+    /// So a param type, would be the 'Type' defined in a Param span. Moreover you could have the hierachy of Types, and then
+    /// such that you can pull out specific parts that make up a type.
+    ///
+    /// This is powerful/flexible - but requires more complexity at the use sites, so for now we use this simpler mechanism.
+    
     /// Defines part of the structure of the output printed.
-    /// That we could have a hierarchy of Parts, but sorting out the relationship
-    /// requires looking at how the spans overlap.
-    /// For example we could have Param span, and then that could contain a Name and a Type
     struct Part
     {
         enum class Kind
@@ -105,7 +111,7 @@ public:
 
         /// Add the result type
         /// Should be called after the decl params
-    void addDeclResultType(DeclRef<Decl> const& inDeclRef);
+    void addDeclResultType(const DeclRef<Decl>& inDeclRef);
 
         /// Add the signature for the decl
     void addDeclSignature(const DeclRef<Decl>& declRef);
@@ -126,10 +132,10 @@ protected:
     void _addDeclPathRec(const DeclRef<Decl>& declRef);
     void _addDeclName(Decl* decl);
     
-    OptionFlags m_optionFlags;
-    List<Part>* m_parts;
-    ASTBuilder* m_astBuilder;
-    StringBuilder m_builder;
+    OptionFlags m_optionFlags;              ///< Flags controlling output
+    List<Part>* m_parts;                    ///< Optional parts list
+    ASTBuilder* m_astBuilder;               ///< Required as types are setup as part of printing
+    StringBuilder m_builder;                ///< The output of the 'printing' process
 };
 
 } // namespace Slang
