@@ -5,23 +5,23 @@
 
 namespace Slang {
 
-ASTPrinter::Part::Flags ASTPrinter::Part::getFlags(ASTPrinter::Part::Kind kind)
+ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 {
     typedef ASTPrinter::Part::Kind Kind;
-    typedef ASTPrinter::Part::Flag Flag;
+    typedef ASTPrinter::Part::Type Type;
 
-    switch (kind)
+    switch (type)
     {
-        case Kind::ParamType:           return Flag::IsType;
-        case Kind::ParamName:           return 0;
-        case Kind::ReturnType:          return Flag::IsType; 
-        case Kind::DeclPath:            return 0;
-        case Kind::GenericParamType:    return Flag::IsType; 
-        case Kind::GenericParamValue:   return 0; 
-        case Kind::GenericValueType:    return Flag::IsType;
+        case Type::ParamType:           return Kind::Type;
+        case Type::ParamName:           return Kind::Name;
+        case Type::ReturnType:          return Kind::Type;
+        case Type::DeclPath:            return Kind::Name;
+        case Type::GenericParamType:    return Kind::Type;
+        case Type::GenericParamValue:   return Kind::Value; 
+        case Type::GenericValueType:    return Kind::Type;
         default: break;
     }
-    return 0;
+    return Kind::None;
 }
 
 void ASTPrinter::addType(Type* type)
@@ -52,7 +52,7 @@ void ASTPrinter::_addDeclName(Decl* decl)
 
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
 {
-    ScopePart scopePart(this, Part::Kind::DeclPath);
+    ScopePart scopePart(this, Part::Type::DeclPath);
     _addDeclPathRec(declRef);
 }
 
@@ -139,7 +139,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
             ParamDecl* paramDecl = paramDeclRef;
 
             {
-                ScopePart scopePart(this, Part::Kind::ParamType);
+                ScopePart scopePart(this, Part::Type::ParamType);
                 addType(getType(m_astBuilder, paramDeclRef));
             }
 
@@ -149,7 +149,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 sb << " ";
 
                 {
-                    ScopePart scopePart(this, Part::Kind::ParamName);
+                    ScopePart scopePart(this, Part::Type::ParamName);
                     sb << paramDecl->getName()->text;
                 }
             }
@@ -171,7 +171,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 first = false;
 
                 {
-                    ScopePart scopePart(this, Part::Kind::GenericParamType);
+                    ScopePart scopePart(this, Part::Type::GenericParamType);
                     sb << getText(genericTypeParam.getName());
                 }
             }
@@ -181,14 +181,14 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 first = false;
 
                 {
-                    ScopePart scopePart(this, Part::Kind::GenericParamValue);
+                    ScopePart scopePart(this, Part::Type::GenericParamValue);
                     sb << getText(genericValParam.getName());
                 }
 
                 sb << ":";
 
                 {
-                    ScopePart scopePart(this, Part::Kind::GenericValueType);
+                    ScopePart scopePart(this, Part::Type::GenericValueType);
                     addType(getType(m_astBuilder, genericValParam));
                 }
             }
@@ -233,7 +233,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
         m_builder << " -> ";
 
         {
-            ScopePart scopePart(this, Part::Kind::ReturnType);
+            ScopePart scopePart(this, Part::Type::ReturnType);
             addType(getResultType(m_astBuilder, callableDeclRef));
         }
     }

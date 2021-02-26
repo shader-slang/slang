@@ -25,16 +25,15 @@ public:
     /// For example we could have Param span, and then that could contain a Name and a Type
     struct Part
     {
-        typedef uint32_t Flags;
-        struct Flag
+        enum class Kind
         {
-            enum Enum : Flags
-            {
-                IsType = 0x1,
-            };
+            None,
+            Type,
+            Value,
+            Name,
         };
 
-        enum class Kind
+        enum class Type
         {
             ParamType,          ///< The type associated with a parameter
             ParamName,          ///< The name associated with a parameter 
@@ -45,19 +44,19 @@ public:
             GenericValueType,   ///< The type requirement for a value type
         };
 
-        static Flags getFlags(Kind kind);
-        static Part make(Kind kind, Index start, Index end) { return Part{ kind, start, end}; }
+        static Kind getKind(Type type);
+        static Part make(Type type, Index start, Index end) { return Part{ type, start, end}; }
 
-        Kind kind;
+        Type type;
         Index start;
         Index end;
     };
 
     struct ScopePart
     {
-        ScopePart(ASTPrinter* printer, Part::Kind kind):
+        ScopePart(ASTPrinter* printer, Part::Type type):
             m_printer(printer),
-            m_kind(kind),
+            m_type(type),
             m_startIndex(printer->m_builder.getLength())
         {
         }
@@ -66,11 +65,11 @@ public:
             List<Part>* parts = m_printer->m_parts;
             if (parts)
             {
-                parts->add(Part{m_kind, m_startIndex, m_printer->m_builder.getLength()});
+                parts->add(Part{m_type, m_startIndex, m_printer->m_builder.getLength()});
             }
         }
 
-        Part::Kind m_kind;
+        Part::Type m_type;
         Index m_startIndex;
         ASTPrinter* m_printer;
     };
