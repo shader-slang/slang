@@ -1279,7 +1279,7 @@ namespace Slang
         for( UInt aa = 0; aa < argCount; ++aa )
         {
             if(aa != 0) argsListBuilder << ", ";
-            argsListBuilder << context.getArgType(aa)->toString();
+            context.getArgType(aa)->toText(argsListBuilder);
         }
         argsListBuilder << ")";
         return argsListBuilder.ProduceString();

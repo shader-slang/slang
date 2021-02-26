@@ -652,6 +652,7 @@ namespace Slang
 
         // Debugging:
         String toString() const;
+        void toText(StringBuilder& out) const;
     };
 
     template<typename T>

@@ -98,7 +98,11 @@ class Val : public NodeBase
     Val* substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
     bool equalsVal(Val* val);
+
+    // Appends as text to the end of the builder
+    void toText(StringBuilder& out);
     String toString();
+
     HashCode getHashCode();
     bool operator == (const Val & v)
     {
@@ -108,7 +112,7 @@ class Val : public NodeBase
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
 };
 

@@ -77,9 +77,9 @@ Type* Type::getCanonicalType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OverloadGroupType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String OverloadGroupType::_toStringOverride()
+void OverloadGroupType::_toTextOverride(StringBuilder& out)
 {
-    return "overload group";
+    out << UnownedStringSlice::fromLiteral("overload group");
 }
 
 bool OverloadGroupType::_equalsImplOverride(Type * /*type*/)
@@ -99,9 +99,9 @@ HashCode OverloadGroupType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! InitializerListType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String InitializerListType::_toStringOverride()
+void InitializerListType::_toTextOverride(StringBuilder& out)
 {
-    return "initializer list";
+    out.append("initializer list");
 }
 
 bool InitializerListType::_equalsImplOverride(Type * /*type*/)
@@ -121,9 +121,9 @@ HashCode InitializerListType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ErrorType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String ErrorType::_toStringOverride()
+void ErrorType::_toTextOverride(StringBuilder& out)
 {
-    return "error";
+    out.append("error");
 }
 
 bool ErrorType::_equalsImplOverride(Type* type)
@@ -150,9 +150,9 @@ HashCode ErrorType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String DeclRefType::_toStringOverride()
+void DeclRefType::_toTextOverride(StringBuilder& out)
 {
-    return declRef.toString();
+    declRef.toText(out);
 }
 
 HashCode DeclRefType::_getHashCodeOverride()
@@ -306,11 +306,13 @@ BasicExpressionType* BasicExpressionType::_getScalarTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String VectorExpressionType::_toStringOverride()
+void VectorExpressionType::_toTextOverride(StringBuilder& out)
 {
-    StringBuilder sb;
-    sb << "vector<" << elementType->toString() << "," << elementCount->toString() << ">";
-    return sb.ProduceString();
+    out.append("vector<");
+    elementType->toText(out);
+    out.append(",");
+    elementCount->toText(out);
+    out.append(">");
 }
 
 BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
@@ -320,11 +322,15 @@ BasicExpressionType* VectorExpressionType::_getScalarTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MatrixExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String MatrixExpressionType::_toStringOverride()
+void MatrixExpressionType::_toTextOverride(StringBuilder& out)
 {
-    StringBuilder sb;
-    sb << "matrix<" << getElementType()->toString() << "," << getRowCount()->toString() << "," << getColumnCount()->toString() << ">";
-    return sb.ProduceString();
+    out.append("matrix<");
+    getElementType()->toText(out);
+    out.append(",");
+    getRowCount()->toText(out);
+    out.append(",");
+    getColumnCount()->toText(out);
+    out.append(">");
 }
 
 BasicExpressionType* MatrixExpressionType::_getScalarTypeOverride()
@@ -401,21 +407,24 @@ HashCode ArrayExpressionType::_getHashCodeOverride()
         return baseType->getHashCode();
 }
 
-Slang::String ArrayExpressionType::_toStringOverride()
+void ArrayExpressionType::_toTextOverride(StringBuilder& out)
 {
+    baseType->toText(out);
+    out.appendChar('[');
     if (arrayLength)
-        return baseType->toString() + "[" + arrayLength->toString() + "]";
-    else
-        return baseType->toString() + "[]";
+    {
+        arrayLength->toText(out);
+    }
+    out.appendChar(']');
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String TypeType::_toStringOverride()
+void TypeType::_toTextOverride(StringBuilder& out)
 {
-    StringBuilder sb;
-    sb << "typeof(" << type->toString() << ")";
-    return sb.ProduceString();
+    out.append("typeof(");
+    type->toText(out);
+    out.append(")");
 }
 
 bool TypeType::_equalsImplOverride(Type * t)
@@ -440,10 +449,10 @@ HashCode TypeType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericDeclRefType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String GenericDeclRefType::_toStringOverride()
+void GenericDeclRefType::_toTextOverride(StringBuilder& out)
 {
     // TODO: what is appropriate here?
-    return "<DeclRef<GenericDecl>>";
+    out.append("<DeclRef<GenericDecl>>");
 }
 
 bool GenericDeclRefType::_equalsImplOverride(Type * type)
@@ -467,12 +476,10 @@ Type* GenericDeclRefType::_createCanonicalTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamespaceType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String NamespaceType::_toStringOverride()
+void NamespaceType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append("namespace ");
-    result.append(declRef.toString());
-    return result;
+    out.append("namespace ");
+    declRef.toText(out); 
 }
 
 bool NamespaceType::_equalsImplOverride(Type * type)
@@ -504,9 +511,13 @@ Type* PtrTypeBase::getValueType()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NamedExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String NamedExpressionType::_toStringOverride()
+void NamedExpressionType::_toTextOverride(StringBuilder& out)
 {
-    return getText(declRef.getName());
+    Name* name = declRef.getName();
+    if (name)
+    {
+        out << name->text;
+    }
 }
 
 bool NamedExpressionType::_equalsImplOverride(Type * /*type*/)
@@ -538,19 +549,17 @@ HashCode NamedExpressionType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String FuncType::_toStringOverride()
+void FuncType::_toTextOverride(StringBuilder& out)
 {
-    StringBuilder sb;
-    sb << "(";
-    UInt paramCount = getParamCount();
-    for (UInt pp = 0; pp < paramCount; ++pp)
+    out.append("(");
+    Index paramCount = getParamCount();
+    for (Index pp = 0; pp < paramCount; ++pp)
     {
-        if (pp != 0) sb << ", ";
-        sb << getParamType(pp)->toString();
+        if (pp != 0) out.append(", ");
+        getParamType(pp)->toText(out);
     }
-    sb << ") -> ";
-    sb << getResultType()->toString();
-    return sb.ProduceString();
+    out.append(") -> ");
+    getResultType()->toText(out);
 }
 
 bool FuncType::_equalsImplOverride(Type * type)
@@ -641,12 +650,10 @@ HashCode FuncType::_getHashCodeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String ExtractExistentialType::_toStringOverride()
+void ExtractExistentialType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append(declRef.toString());
-    result.append(".This");
-    return result;
+    declRef.toText(out);
+    out.append(".This");
 }
 
 bool ExtractExistentialType::_equalsImplOverride(Type* type)
@@ -686,20 +693,18 @@ Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, Sub
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String TaggedUnionType::_toStringOverride()
+void TaggedUnionType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append("__TaggedUnion(");
+    out.append("__TaggedUnion(");
     bool first = true;
     for (auto caseType : caseTypes)
     {
-        if (!first) result.append(", ");
+        if (!first) out.append(", ");
         first = false;
 
-        result.append(caseType->toString());
+        caseType->toText(out);
     }
-    result.append(")");
-    return result;
+    out.append(")");
 }
 
 bool TaggedUnionType::_equalsImplOverride(Type* type)
@@ -764,18 +769,16 @@ Val* TaggedUnionType::_substituteImplOverride(ASTBuilder* astBuilder, Substituti
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialSpecializedType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String ExistentialSpecializedType::_toStringOverride()
+void ExistentialSpecializedType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append("__ExistentialSpecializedType(");
-    result.append(baseType->toString());
+    out.append("__ExistentialSpecializedType(");
+    baseType->toText(out);
     for (auto arg : args)
     {
-        result.append(", ");
-        result.append(arg.val->toString());
+        out << ", ";
+        arg.val->toText(out);
     }
-    result.append(")");
-    return result;
+    out.append(")");
 }
 
 bool ExistentialSpecializedType::_equalsImplOverride(Type * type)
@@ -880,12 +883,10 @@ Val* ExistentialSpecializedType::_substituteImplOverride(ASTBuilder* astBuilder,
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String ThisType::_toStringOverride()
+void ThisType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append(interfaceDeclRef.toString());
-    result.append(".This");
-    return result;
+    interfaceDeclRef.toText(out);
+    out.append(".This");
 }
 
 bool ThisType::_equalsImplOverride(Type * type)
@@ -940,13 +941,11 @@ Val* ThisType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AndType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-String AndType::_toStringOverride()
+void AndType::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append(left->toString());
-    result.append(" & ");
-    result.append(right->toString());
-    return result;
+    left->toText(out);
+    out.append(" & ");
+    right->toText(out);
 }
 
 bool AndType::_equalsImplOverride(Type * type)

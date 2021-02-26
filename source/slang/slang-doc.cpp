@@ -943,7 +943,7 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
 
                     if (type)
                     {
-                        out << type->toString();
+                        type->toText(out);
                     }
 
                     Name* name = param->getName();

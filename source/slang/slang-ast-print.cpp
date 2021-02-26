@@ -26,12 +26,12 @@ ASTPrinter::Part::Kind ASTPrinter::Part::getKind(ASTPrinter::Part::Type type)
 
 void ASTPrinter::addType(Type* type)
 {
-    m_builder << type->toString();
+    type->toText(m_builder);
 }
 
 void ASTPrinter::addVal(Val* val)
 {
-    m_builder << val->toString();
+    val->toText(m_builder);
 }
 
 void ASTPrinter::_addDeclName(Decl* decl)
