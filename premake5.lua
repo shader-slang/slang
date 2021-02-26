@@ -786,6 +786,7 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
         addSourceDir "tools/gfx/cuda"
+        addSourceDir "tools/gfx/cpu"
 
         if type(cudaPath) == "string" then
             defines { "GFX_ENABLE_CUDA" }

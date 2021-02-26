@@ -294,6 +294,11 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL link(
             slang::IComponentType**         outLinkedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int                     entryPointIndex,
+            int                     targetIndex,
+            ISlangSharedLibrary**   outSharedLibrary,
+            slang::IBlob**          outDiagnostics) SLANG_OVERRIDE;
 
             /// Get the linkage (aka "session" in the public API) for this component type.
         Linkage* getLinkage() { return m_linkage; }
@@ -705,6 +710,15 @@ namespace Slang
                 outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int                     entryPointIndex,
+            int                     targetIndex,
+            ISlangSharedLibrary**   outSharedLibrary,
+            slang::IBlob**          outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
+        }
+
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
             Linkage*            linkage,
@@ -910,6 +924,15 @@ namespace Slang
             return Super::link(
                 outLinkedComponentType,
                 outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int                     entryPointIndex,
+            int                     targetIndex,
+            ISlangSharedLibrary**   outSharedLibrary,
+            slang::IBlob**          outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(

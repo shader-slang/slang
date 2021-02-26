@@ -149,6 +149,30 @@ protected:
     slang::TypeLayoutReflection* m_elementTypeLayout = nullptr;
     ShaderComponentID m_componentID = 0;
 
+    static slang::TypeLayoutReflection* _unwrapParameterGroups(slang::TypeLayoutReflection* typeLayout)
+    {
+        for (;;)
+        {
+            if (!typeLayout->getType())
+            {
+                if (auto elementTypeLayout = typeLayout->getElementTypeLayout())
+                    typeLayout = elementTypeLayout;
+            }
+
+            switch (typeLayout->getKind())
+            {
+            default:
+                return typeLayout;
+
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            case slang::TypeReflection::Kind::ParameterBlock:
+                typeLayout = typeLayout->getElementTypeLayout();
+                continue;
+            }
+        }
+    }
+
+
 public:
     RendererBase* getDevice() { return m_renderer; }
 
