@@ -722,6 +722,8 @@ namespace Slang
         }
     };
 
+    SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase& declRef) { declRef.toText(io); return io; }
+
     template<typename T>
     DeclRef<T> DeclRefBase::as() const
     {

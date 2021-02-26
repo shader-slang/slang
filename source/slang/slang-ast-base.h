@@ -116,6 +116,8 @@ class Val : public NodeBase
     HashCode _getHashCodeOverride();
 };
 
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }
+
 class Type;
 
 template <typename T>
