@@ -15,6 +15,9 @@
     <ClInclude Include="..\..\..\tools\gfx\command-writer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\cpu\render-cpu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -86,6 +89,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\gfx\cpu\render-cpu.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx\cuda\render-cuda.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

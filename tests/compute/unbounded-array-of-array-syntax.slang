@@ -1,5 +1,5 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:CROSS_COMPILE:-target dxbc-assembly -entry computeMain -profile cs_5_1
 //TEST:CROSS_COMPILE:-target spirv-assembly -entry computeMain -profile cs_5_1
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute

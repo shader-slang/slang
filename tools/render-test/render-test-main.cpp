@@ -1294,7 +1294,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     }
 
     // If it's CPU testing we don't need a window or a renderer
-    if (options.deviceType == DeviceType::CPU)
+    if (options.deviceType == DeviceType::CPU && !options.useShaderObjects)
     {
         // Check we have all the required features
         for (const auto& renderFeature : options.renderFeatures)
