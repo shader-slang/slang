@@ -5,6 +5,25 @@
 
 namespace Slang {
 
+ASTPrinter::Part::Flags ASTPrinter::Part::getFlags(ASTPrinter::Part::Kind kind)
+{
+    typedef ASTPrinter::Part::Kind Kind;
+    typedef ASTPrinter::Part::Flag Flag;
+
+    switch (kind)
+    {
+        case Kind::ParamType:           return Flag::IsType;
+        case Kind::ParamName:           return 0;
+        case Kind::ReturnType:          return Flag::IsType; 
+        case Kind::DeclPath:            return 0;
+        case Kind::GenericParamType:    return Flag::IsType; 
+        case Kind::GenericParamValue:   return 0; 
+        case Kind::GenericValueType:    return Flag::IsType;
+        default: break;
+    }
+    return 0;
+}
+
 void ASTPrinter::addType(Type* type)
 {
     m_builder << type->toString();
@@ -33,9 +52,8 @@ void ASTPrinter::_addDeclName(Decl* decl)
 
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
 {
-    const Index startIndex = m_builder.getLength();
+    ScopePart scopePart(this, Part::Kind::DeclPath);
     _addDeclPathRec(declRef);
-    _addSection(Section::Part::DeclPath, startIndex);
 }
 
 void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
@@ -121,9 +139,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
             ParamDecl* paramDecl = paramDeclRef;
 
             {
-                const Index startIndex = m_builder.getLength();
+                ScopePart scopePart(this, Part::Kind::ParamType);
                 addType(getType(m_astBuilder, paramDeclRef));
-                _addSection(Section::Part::ParamType, startIndex);
             }
 
             // Output the parameter name if there is one, and it's enabled in the options
@@ -132,9 +149,8 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 sb << " ";
 
                 {
-                    const Index startIndex = m_builder.getLength();
+                    ScopePart scopePart(this, Part::Kind::ParamName);
                     sb << paramDecl->getName()->text;
-                    _addSection(Section::Part::ParamName, startIndex);
                 }
             }
 
@@ -154,11 +170,10 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 if (!first) sb << ", ";
                 first = false;
 
-                const Index startIndex = m_builder.getLength();
-
-                sb << getText(genericTypeParam.getName());
-
-                _addSection(Section::Part::GenericParamType, startIndex);
+                {
+                    ScopePart scopePart(this, Part::Kind::GenericParamType);
+                    sb << getText(genericTypeParam.getName());
+                }
             }
             else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
             {
@@ -166,16 +181,15 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 first = false;
 
                 {
-                    const Index startIndex = m_builder.getLength();
+                    ScopePart scopePart(this, Part::Kind::GenericParamValue);
                     sb << getText(genericValParam.getName());
-                    _addSection(Section::Part::GenericParamValue, startIndex);
                 }
 
                 sb << ":";
+
                 {
-                    const Index startIndex = m_builder.getLength();
+                    ScopePart scopePart(this, Part::Kind::GenericValueType);
                     addType(getType(m_astBuilder, genericValParam));
-                    _addSection(Section::Part::GenericValueType, startIndex);
                 }
             }
             else
@@ -219,9 +233,8 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
         m_builder << " -> ";
 
         {
-            const Index startIndex = m_builder.getLength();
+            ScopePart scopePart(this, Part::Kind::ReturnType);
             addType(getResultType(m_astBuilder, callableDeclRef));
-            _addSection(Section::Part::ReturnType, startIndex);
         }
     }
 }

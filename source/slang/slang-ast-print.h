@@ -19,11 +19,24 @@ public:
         };
     };
 
-    struct Section
+    /// Defines part of the structure of the output printed.
+    /// That we could have a hierarchy of Parts, but sorting out the relationship
+    /// requires looking at how the spans overlap.
+    /// For example we could have Param span, and then that could contain a Name and a Type
+    struct Part
     {
-        enum class Part
+        typedef uint32_t Flags;
+        struct Flag
         {
-            ParamType,          ///< The type associated with a name
+            enum Enum : Flags
+            {
+                IsType = 0x1,
+            };
+        };
+
+        enum class Kind
+        {
+            ParamType,          ///< The type associated with a parameter
             ParamName,          ///< The name associated with a parameter 
             ReturnType,         ///< The return type
             DeclPath,           ///< The declaration path (NOT including the actual decl name)
@@ -32,11 +45,34 @@ public:
             GenericValueType,   ///< The type requirement for a value type
         };
 
-        static Section make(Part part, Index start, Index end) { return Section{part, start, end}; }
+        static Flags getFlags(Kind kind);
+        static Part make(Kind kind, Index start, Index end) { return Part{ kind, start, end}; }
 
-        Part part;
+        Kind kind;
         Index start;
         Index end;
+    };
+
+    struct ScopePart
+    {
+        ScopePart(ASTPrinter* printer, Part::Kind kind):
+            m_printer(printer),
+            m_kind(kind),
+            m_startIndex(printer->m_builder.getLength())
+        {
+        }
+        ~ScopePart()
+        {
+            List<Part>* parts = m_printer->m_parts;
+            if (parts)
+            {
+                parts->add(Part{m_kind, m_startIndex, m_printer->m_builder.getLength()});
+            }
+        }
+
+        Part::Kind m_kind;
+        Index m_startIndex;
+        ASTPrinter* m_printer;
     };
 
         /// We might want options to change how things are output, for example we may want to output parameter names
@@ -76,9 +112,9 @@ public:
     void addDeclSignature(const DeclRef<Decl>& declRef);
 
         /// Ctor
-    ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Section>* sections = nullptr):
+    ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Part>* parts = nullptr):
         m_astBuilder(astBuilder),
-        m_sections(sections),
+        m_parts(parts),
         m_optionFlags(optionFlags)
     {
     }
@@ -90,16 +126,9 @@ protected:
 
     void _addDeclPathRec(const DeclRef<Decl>& declRef);
     void _addDeclName(Decl* decl);
-    void _addSection(Section::Part part, Index startIndex)
-    {
-        if (m_sections)
-        {
-            m_sections->add(Section{ part, startIndex, m_builder.getLength() }); 
-        }
-    }
-
+    
     OptionFlags m_optionFlags;
-    List<Section>* m_sections;
+    List<Part>* m_parts;
     ASTBuilder* m_astBuilder;
     StringBuilder m_builder;
 };
