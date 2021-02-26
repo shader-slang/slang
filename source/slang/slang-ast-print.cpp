@@ -15,7 +15,7 @@ void ASTPrinter::addVal(Val* val)
     m_builder << val->toString();
 }
 
-void ASTPrinter::addDeclName(Decl* decl)
+void ASTPrinter::_addDeclName(Decl* decl)
 {
     if (as<ConstructorDecl>(decl))
     {
@@ -33,6 +33,13 @@ void ASTPrinter::addDeclName(Decl* decl)
 
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
 {
+    const Index startIndex = m_builder.getLength();
+    _addDeclPathRec(declRef);
+    _addSection(Section::Part::DeclPath, startIndex);
+}
+
+void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
+{
     auto& sb = m_builder;
 
     // Find the parent declaration
@@ -49,11 +56,11 @@ void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
     // Depending on what the parent is, we may want to format things specially
     if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
     {
-        addDeclPath(aggTypeDeclRef);
+        _addDeclPathRec(aggTypeDeclRef);
         sb << ".";
     }
 
-    addDeclName(declRef.getDecl());
+    _addDeclName(declRef.getDecl());
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
@@ -111,7 +118,25 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
         {
             if (!first) sb << ", ";
 
-            addType(getType(m_astBuilder, paramDeclRef));
+            ParamDecl* paramDecl = paramDeclRef;
+
+            {
+                const Index startIndex = m_builder.getLength();
+                addType(getType(m_astBuilder, paramDeclRef));
+                _addSection(Section::Part::ParamType, startIndex);
+            }
+
+            // Output the parameter name if there is one, and it's enabled in the options
+            if (m_optionFlags & OptionFlag::ParamNames && paramDecl->getName())
+            {
+                sb << " ";
+
+                {
+                    const Index startIndex = m_builder.getLength();
+                    sb << paramDecl->getName()->text;
+                    _addSection(Section::Part::ParamName, startIndex);
+                }
+            }
 
             first = false;
         }
@@ -129,16 +154,29 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
                 if (!first) sb << ", ";
                 first = false;
 
+                const Index startIndex = m_builder.getLength();
+
                 sb << getText(genericTypeParam.getName());
+
+                _addSection(Section::Part::GenericParamType, startIndex);
             }
             else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
             {
                 if (!first) sb << ", ";
                 first = false;
 
-                sb << getText(genericValParam.getName());
+                {
+                    const Index startIndex = m_builder.getLength();
+                    sb << getText(genericValParam.getName());
+                    _addSection(Section::Part::GenericParamValue, startIndex);
+                }
+
                 sb << ":";
-                addType(getType(m_astBuilder, genericValParam));
+                {
+                    const Index startIndex = m_builder.getLength();
+                    addType(getType(m_astBuilder, genericValParam));
+                    _addSection(Section::Part::GenericValueType, startIndex);
+                }
             }
             else
             {
@@ -179,7 +217,12 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     else if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
         m_builder << " -> ";
-        addType(getResultType(m_astBuilder, callableDeclRef));
+
+        {
+            const Index startIndex = m_builder.getLength();
+            addType(getResultType(m_astBuilder, callableDeclRef));
+            _addSection(Section::Part::ReturnType, startIndex);
+        }
     }
 }
 

@@ -10,6 +10,35 @@ namespace Slang {
 class ASTPrinter
 {
 public:
+    typedef uint32_t OptionFlags;
+    struct OptionFlag
+    {
+        enum Enum : OptionFlags
+        {
+            ParamNames = 0x1,               ///< If set will output parameter names
+        };
+    };
+
+    struct Section
+    {
+        enum class Part
+        {
+            ParamType,          ///< The type associated with a name
+            ParamName,          ///< The name associated with a parameter 
+            ReturnType,         ///< The return type
+            DeclPath,           ///< The declaration path (NOT including the actual decl name)
+            GenericParamType,   ///< Generic parameter type
+            GenericParamValue,  ///< Generic parameter value
+            GenericValueType,   ///< The type requirement for a value type
+        };
+
+        static Section make(Part part, Index start, Index end) { return Section{part, start, end}; }
+
+        Part part;
+        Index start;
+        Index end;
+    };
+
         /// We might want options to change how things are output, for example we may want to output parameter names
         /// if there are any
 
@@ -29,8 +58,6 @@ public:
         /// Add a value
     void addVal(Val* val);
 
-        /// Add a declaration name 
-    void addDeclName(Decl* decl);
         /// Add the path to the declaration including the declaration name
     void addDeclPath(const DeclRef<Decl>& declRef);
 
@@ -48,8 +75,11 @@ public:
         /// Add the signature for the decl
     void addDeclSignature(const DeclRef<Decl>& declRef);
 
-    ASTPrinter(ASTBuilder* astBuilder):
-        m_astBuilder(astBuilder)
+        /// Ctor
+    ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Section>* sections = nullptr):
+        m_astBuilder(astBuilder),
+        m_sections(sections),
+        m_optionFlags(optionFlags)
     {
     }
 
@@ -58,15 +88,20 @@ public:
 
 protected:
 
+    void _addDeclPathRec(const DeclRef<Decl>& declRef);
+    void _addDeclName(Decl* decl);
+    void _addSection(Section::Part part, Index startIndex)
+    {
+        if (m_sections)
+        {
+            m_sections->add(Section{ part, startIndex, m_builder.getLength() }); 
+        }
+    }
+
+    OptionFlags m_optionFlags;
+    List<Section>* m_sections;
     ASTBuilder* m_astBuilder;
     StringBuilder m_builder;
-};
-
-struct ASTPrintUtil
-{
-    
-
-    
 };
 
 } // namespace Slang
