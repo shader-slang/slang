@@ -124,19 +124,31 @@ public:
         IndexRange range;
     };
 
+    enum SearchStyle
+    {
+        None,               ///< Cannot be searched for
+        EnumCase,           ///< An enum case
+        Param,              ///< A parameter in a function/method
+        Variable,           ///< A variable-like declaration
+        Before,             ///< Only allows before
+        Function,           ///< Function/method
+    };
+     
     struct FindInfo
     {
-
         SourceView* sourceView;         ///< The source view the tokens were generated from
         TokenList* tokenList;           ///< The token list
-        Index declTokenIndex;           ///< The token index location (where searches start from)
-        Index declLineIndex;            ///< The line number for the decl
+        Index tokenIndex;               ///< The token index location (where searches start from)
+        Index lineIndex;                ///< The line number for the decl
     };
 
         /// Extracts documentation from the nodes held in the module using the source manager. Found documentation is placed
         /// in outMarkup
     SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outMarkup);
 
+        /// Given a decl determines the search style that is appropriate. Returns None if can't determine a suitable style
+    static SearchStyle getSearchStyle(Decl* decl);
+    
     static MarkupFlags getFlags(MarkupType type);
     static MarkupType findMarkupType(const Token& tok);
     static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
@@ -152,7 +164,7 @@ protected:
     SlangResult _findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out);
 
     /// Given the decl, the token stream, and the decls tokenIndex, try to find some associated markup
-    SlangResult _findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out);
+    SlangResult _findMarkup(const FindInfo& info, SearchStyle searchStyle, FoundMarkup& out);
 
     /// Given a found markup location extracts the contents of the tokens into out
     SlangResult _extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out);

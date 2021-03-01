@@ -357,7 +357,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     Index openBracketCount = 0;
 
     const TokenList& toks = *info.tokenList;
-    const Index tokIndex = info.declTokenIndex;
+    const Index tokIndex = info.tokenIndex;
 
     Index direction = isBefore(location) ? -1 : 1;
 
@@ -481,7 +481,7 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
     out.reset();
 
     const auto& toks = info.tokenList->m_tokens;
-    const Index tokIndex = info.declTokenIndex;
+    const Index tokIndex = info.tokenIndex;
 
     // The starting token index
     Index startIndex = _findStartIndex(info, location);
@@ -615,36 +615,63 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location
     return SLANG_OK;
 }
 
-SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
+/* static */DocMarkupExtractor::SearchStyle DocMarkupExtractor::getSearchStyle(Decl* decl)
 {
     if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterEnumCase };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::EnumCase;
     }
     if (auto paramDecl = as<ParamDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterParam };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::Param;
     }
     else if (auto callableDecl = as<CallableDecl>(decl))
     {
-        // We allow it defined before
-        return _findMarkup(info, Location::Before, out);
+        return SearchStyle::Function;
     }
     else if (as<VarDecl>(decl) || as<TypeDefDecl>(decl) || as<AssocTypeDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterSemicolon };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::Variable;
     }
     else if (auto genericDecl = as<GenericDecl>(decl))
     {
-        return _findMarkup(info, genericDecl->inner, out);
+        return getSearchStyle(genericDecl->inner);
     }
     else
     {
-        // We'll only allow before
-        return _findMarkup(info, Location::Before, out);
+        return SearchStyle::Before;
+    }
+}
+
+SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle searchStyle, FoundMarkup& out)
+{
+    switch (searchStyle)
+    {
+        default:
+        case SearchStyle::None:
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+        case SearchStyle::EnumCase:
+        {
+            Location locs[] = { Location::Before, Location::AfterEnumCase };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::Param:
+        {
+            Location locs[] = { Location::Before, Location::AfterParam };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::Before:
+        case SearchStyle::Function:
+        {
+            return _findMarkup(info, Location::Before, out);
+        }
+        case SearchStyle::Variable:
+        {
+            Location locs[] = { Location::Before, Location::AfterSemicolon };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
     }
 }
 
@@ -666,6 +693,8 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
         Index viewIndex;                    ///< The view/file index this loc is found in
         SourceLoc::RawValue locOrOffset;    ///< Can be a loc or an offset into the file
 
+        SearchStyle searchStyle;
+
         Decl* decl;                         ///< The decl
     };
 
@@ -682,6 +711,7 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             entry.decl = decl;
             entry.viewIndex = -1;            //< We don't know what file/view it's in
             entry.locOrOffset = decl->loc.getRaw();
+            entry.searchStyle = getSearchStyle(decl);
         }
     }
 
@@ -744,6 +774,12 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
 
         for (auto& entry : entries)
         {
+            // If there isn't a mechanism to search with, just move on
+            if (entry.searchStyle == SearchStyle::None)
+            {
+                continue;
+            }
+
             if (viewIndex != entry.viewIndex)
             {
                 viewIndex = entry.viewIndex;
@@ -775,14 +811,14 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             if (tokenIndex >= 0 && lineIndex >= 0)
             {
                 FindInfo findInfo;
-                findInfo.declTokenIndex = tokenIndex;
-                findInfo.declLineIndex = lineIndex;
+                findInfo.tokenIndex = tokenIndex;
+                findInfo.lineIndex = lineIndex;
                 findInfo.tokenList = &tokens;
                 findInfo.sourceView = sourceView;
 
                 // Okay let's see if we extract some documentation then for this.
                 FoundMarkup foundMarkup;
-                SlangResult res = _findMarkup(findInfo, entry.decl, foundMarkup);
+                SlangResult res = _findMarkup(findInfo, entry.searchStyle, foundMarkup);
 
                 if (SLANG_SUCCEEDED(res))
                 {
