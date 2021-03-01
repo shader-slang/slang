@@ -65,18 +65,6 @@ class SharedASTBuilder;
 
 struct DocumentationUtil
 {
-    typedef ASTPrinter::Part Part;
-    typedef ASTPrinter::PartPair PartPair;
-
-    struct Signature
-    {
-        Part returnType;
-        List<PartPair> params;
-        Part name;
-    };
-
-    static void getSignature(const List<Part>& parts, Signature& outSig);
-
     static SlangResult writeMarkdown(DocMarkup* markup, ASTBuilder* astBuilder, StringBuilder& out);
 };
 
