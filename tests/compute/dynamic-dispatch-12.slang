@@ -1,9 +1,14 @@
 // Test using interface typed shader parameters with dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+// Note: Not using `-shaderobj` because this test relies on
+// setting up a `ConstantBuffer<IInterface>`, which currently
+// doesn't work right on the shader object path for a bunch
+// of complicated reasons.
+
+//TEST(compute):COMPARE_COMPUTE:-dx11
+//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-vk
+//TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
 interface IInterface

@@ -164,6 +164,12 @@ protected:
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
 
+    static bool _doesValueFitInExistentialPayload(
+        slang::TypeLayoutReflection*    concreteTypeLayout,
+        slang::TypeLayoutReflection*    existentialFieldLayout);
+
+    Result _getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
+
 public:
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     IShaderObject* getInterface(const Slang::Guid& guid);
@@ -176,7 +182,7 @@ public:
 
     // Get the final type this shader object represents. If the shader object's type has existential fields,
     // this function will return a specialized type using the bound sub-objects' type as specialization argument.
-    Result getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
+    virtual Result getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
 
     RendererBase* getRenderer() { return m_layout->getRenderer(); }
 
@@ -368,6 +374,10 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) SLANG_OVERRIDE;
 
+    Result getShaderObjectLayout(
+        slang::TypeReflection*      type,
+        ShaderObjectLayoutBase**    outLayout);
+
 protected:
     // Retrieves the currently bound unspecialized pipeline.
     // If the bound pipeline is not created from a Slang component, an implementation should return null.
@@ -380,10 +390,6 @@ protected:
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) = 0;
-
-    Result getShaderObjectLayout(
-        slang::TypeReflection*      type,
-        ShaderObjectLayoutBase**    outLayout);
 
     virtual Result createShaderObject(
         ShaderObjectLayoutBase* layout,
