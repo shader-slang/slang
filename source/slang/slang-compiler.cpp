@@ -577,6 +577,45 @@ namespace Slang
         outCodeBuilder << fileContent << "\n";
     }
 
+    static void _maybeCreatePassThroughExtensionTracker(
+        CodeGenTarget           target,
+        EndToEndCompileRequest* endToEndReq,
+        SourceResult&           outSource)
+    {
+        if(!isPassThroughEnabled(endToEndReq))
+            return;
+
+        if(target != CodeGenTarget::GLSL)
+            return;
+
+        if(outSource.extensionTracker)
+            return;
+
+        RefPtr<GLSLExtensionTracker> extensionTracker = new GLSLExtensionTracker();
+        outSource.extensionTracker = extensionTracker;
+    }
+
+    void trackGLSLTargetCaps(
+        GLSLExtensionTracker*   extensionTracker,
+        CapabilitySet const&    caps)
+    {
+        for( auto atom : caps.getExpandedAtoms() )
+        {
+            switch( atom )
+            {
+            default:
+                break;
+
+            case CapabilityAtom::SPIRV_1_0: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 0)); break;
+            case CapabilityAtom::SPIRV_1_1: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 1)); break;
+            case CapabilityAtom::SPIRV_1_2: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 2)); break;
+            case CapabilityAtom::SPIRV_1_3: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 3)); break;
+            case CapabilityAtom::SPIRV_1_4: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 4)); break;
+            case CapabilityAtom::SPIRV_1_5: extensionTracker->requireSPIRVVersion(SemanticVersion(1, 5)); break;
+            }
+        }
+    }
+
     SlangResult emitEntryPointsSource(
         BackEndCompileRequest*  compileRequest,
         const List<Int>&        entryPointIndices,
@@ -602,6 +641,10 @@ namespace Slang
                 StringBuilder codeBuilder;
                 if (target == CodeGenTarget::GLSL)
                 {
+                    _maybeCreatePassThroughExtensionTracker(target, endToEndReq, outSource);
+                    if(auto extensionTracker = as<GLSLExtensionTracker>(outSource.extensionTracker))
+                        trackGLSLTargetCaps(extensionTracker, targetReq->getTargetCaps());
+
                     // Special case GLSL
                     int translationUnitCounter = 0;
                     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -1632,20 +1675,6 @@ SlangResult dissassembleDXILUsingDXC(
             request.spirvVersion.major = spirvLanguageVersion.m_major;
             request.spirvVersion.minor = spirvLanguageVersion.m_minor;
             request.spirvVersion.patch = spirvLanguageVersion.m_patch;
-        }
-        else
-        {
-            // HACK: look at the requested capabilities of the target,
-            // and see if they specify a SPIR-V version that we should
-            // pass down.
-            //
-            auto targetCaps = targetReq->getTargetCaps();
-            if(targetCaps.implies(CapabilityAtom::SPIRV_1_4))
-            {
-                request.spirvVersion.major = 1;
-                request.spirvVersion.minor = 4;
-                request.spirvVersion.patch = 0;
-            }
         }
 
         request.outputFunc = outputFunc;

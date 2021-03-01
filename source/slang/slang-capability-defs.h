@@ -56,15 +56,18 @@ SLANG_CAPABILITY_ATOM0(C,        c,         Concrete,TargetFormat,0)
 SLANG_CAPABILITY_ATOM0(CPP,      cpp,       Concrete,TargetFormat,0)
 SLANG_CAPABILITY_ATOM0(CUDA,     cuda,      Concrete,TargetFormat,0)
 
-// TODO: We should have multiple capabilities for the various SPIR-V versions,
+// We have multiple capabilities for the various SPIR-V versions,
 // arranged so that they inherit from one another to represent which versions
-// provide a super-set of the features of earlier ones (e.g., SPIR-V 1.4 should
-// be expressed as inheriting from SPIR-V 1.3).
+// provide a super-set of the features of earlier ones (e.g., SPIR-V 1.4 is
+// expressed as inheriting from SPIR-V 1.3).
 //
-// For now we are only including the version(s) that are relevant to the
-// features controlled by the capability system.
-//
-SLANG_CAPABILITY_ATOM1(SPIRV_1_4,   spirv_1_4,  Concrete,None,0,   GLSL)
+SLANG_CAPABILITY_ATOM1(SPIRV,       __spirv,    Abstract,None,0,   GLSL)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_0,   spirv_1_0,  Concrete,None,0,   SPIRV)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_1,   spirv_1_1,  Concrete,None,0,   SPIRV_1_0)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_2,   spirv_1_2,  Concrete,None,0,   SPIRV_1_1)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_3,   spirv_1_3,  Concrete,None,0,   SPIRV_1_2)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_4,   spirv_1_4,  Concrete,None,0,   SPIRV_1_3)
+SLANG_CAPABILITY_ATOM1(SPIRV_1_5,   spirv_1_5,  Concrete,None,0,   SPIRV_1_4)
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
