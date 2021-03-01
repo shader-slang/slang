@@ -1046,63 +1046,78 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
 
     auto& out = m_builder;
 
+    StringBuilder sigBuffer;
+    List<ASTPrinter::Part> parts;
+    ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
+
+    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+
+    Signature signature;
+    getSignature(parts, signature);
+
+    const Index paramCount = signature.params.getCount();
+
     // Output the signature
-    {
-        StringBuilder sigBuffer;
-        List<ASTPrinter::Part> parts;
-        ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
-
-        printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
-
-        Signature signature;
-        getSignature(parts, signature);
-
+    {        
         // Extract the name
-        out << "# " << printer.getPartSlice(signature.name) << "\n\n";
+        out << toSlice("# ") << printer.getPartSlice(signature.name) << toSlice("\n\n");
 
-        out << "## Signature \n";
-        out << "```\n";
-        out << printer.getPartSlice(signature.returnType) << " ";
-        out << printer.getPartSlice(signature.name) << "(\n";
+        out << toSlice("## Signature \n");
+        out << toSlice("```\n");
+        out << printer.getPartSlice(signature.returnType) << toSlice(" ");
 
-        StringBuilder line;
+        out << printer.getPartSlice(signature.name);
 
-        const Index paramCount = signature.params.getCount();
-
-        for (Index i = 0; i < paramCount; ++i)
+        
+        if (paramCount > 0)
         {
-            const auto& param = signature.params[i];
-            line.Clear();
-            // If we want to tab these over... we'll need to know how must space I have
-            line << "    " << printer.getPartSlice(param.first);
+            out << toSlice("(\n");
 
-            Index indent = 25;
-            if (line.getLength() < indent)
+            StringBuilder line;
+            for (Index i = 0; i < paramCount; ++i)
             {
-                line.appendRepeatedChar(' ', indent - line.getLength());
-            }
-            else
-            {
-                line.appendChar(' ');
+                const auto& param = signature.params[i];
+                line.Clear();
+                // If we want to tab these over... we'll need to know how must space I have
+                line << "    " << printer.getPartSlice(param.first);
+
+                Index indent = 25;
+                if (line.getLength() < indent)
+                {
+                    line.appendRepeatedChar(' ', indent - line.getLength());
+                }
+                else
+                {
+                    line.appendChar(' ');
+                }
+
+                line << printer.getPartSlice(param.second);
+                if (i < paramCount - 1)
+                {
+                    line << ",\n";
+                }
+
+                out << line;
             }
 
-            line << printer.getPartSlice(param.second);
-            if (i < paramCount - 1)
-            {
-                line << ",\n";
-            }
-
-            out << line;
+            out << ");\n";
+        }
+        else
+        {
+            out << toSlice("();\n");
         }
 
-        out << ");\n";
         out << "```\n\n";
     }
 
-    out << "## Parameters\n\n";
+    // Only output params if there are any
+    if (paramCount)
+    {
+        out << "## Parameters\n\n";
 
-    auto params = callableDecl->getParameters();
-    _appendAsBullets(params);
+        auto params = callableDecl->getParameters();
+        _appendAsBullets(params);
+    }
 
     writeDescription(entry);
 }
