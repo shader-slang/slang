@@ -637,6 +637,10 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, Fo
         Location locs[] = { Location::Before, Location::AfterSemicolon };
         return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
     }
+    else if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        return _findMarkup(info, genericDecl->inner, out);
+    }
     else
     {
         // We'll only allow before

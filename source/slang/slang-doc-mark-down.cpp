@@ -241,34 +241,42 @@ void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
     out << entry.m_markup;
 }
 
+void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
+{
+    // Skip these they will be output as part of their respective 'containers'
+    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl))
+    {
+        return; 
+    }
+
+    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
+    {
+        writeCallable(entry, callableDecl);
+    }
+    else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
+    {
+        writeEnum(entry, enumDecl);
+    }
+    else if (AggTypeDecl* aggType = as<AggTypeDecl>(decl))
+    {
+        writeAggType(entry, aggType);
+    }
+    else if (GenericDecl* genericDecl = as<GenericDecl>(decl))
+    {
+        writeDecl(entry, genericDecl->inner);
+    }
+}
+
+
 void DocMarkDownWriter::writeAll()
 {
     for (const auto& entry : m_markup->getEntries())
     {
         NodeBase* node = entry.m_node;
         Decl* decl = as<Decl>(node);
-        if (!decl)
+        if (decl)
         {
-            continue;
-        }
-
-        // Skip these they will be output as part of their respective 'containers'
-        if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl))
-        {
-            continue;
-        }
-
-        if (CallableDecl* callableDecl = as<CallableDecl>(decl))
-        {
-            writeCallable(entry, callableDecl);
-        }
-        else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
-        {
-            writeEnum(entry, enumDecl);
-        }
-        else if (AggTypeDecl* aggType = as<AggTypeDecl>(decl))
-        {
-            writeAggType(entry, aggType);
+            writeDecl(entry, decl);
         }
     }
 }

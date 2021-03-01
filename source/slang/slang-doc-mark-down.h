@@ -27,10 +27,11 @@ struct DocMarkDownWriter
     void writeCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
     void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
     void writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl);
+    void writeDecl(const DocMarkup::Entry& entry, Decl* decl);
 
     void writePreamble(const DocMarkup::Entry& entry);
     void writeDescription(const DocMarkup::Entry& entry);
-
+    
         /// Get the output string
     const StringBuilder& getOutput() const { return m_builder; }
 
