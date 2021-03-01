@@ -133,7 +133,22 @@ public:
         Before,             ///< Only allows before
         Function,           ///< Function/method
     };
-     
+
+        /// An input search item
+    struct SearchItemInput
+    {
+        SourceLoc sourceLoc;
+        SearchStyle searchStyle;            ///< The search style when looking for an item
+    };
+
+        /// The items will be in source order
+    struct SearchItemOutput
+    {
+        Index viewIndex;                    ///< Index into the array of views on the output
+        Index inputIndex;                   ///< The index to this item in the input
+        String text;                        ///< The found text
+    };
+
     struct FindInfo
     {
         SourceView* sourceView;         ///< The source view the tokens were generated from
@@ -144,7 +159,16 @@ public:
 
         /// Extracts documentation from the nodes held in the module using the source manager. Found documentation is placed
         /// in outMarkup
-    SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outMarkup);
+    static SlangResult extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outMarkup);
+
+        /// Extracts 'markup' doc information for the specified input items
+        /// The output is placed in out - with the items now in the source order *not* the order of the input items
+        /// The inputIndex on the output holds the input item index
+        /// The outViews holds the views specified in viewIndex in the output, which may be useful for determining where the documentation was placed in source
+    SlangResult extract(const SearchItemInput* inputItems, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out);
+
+        /// Given a module finds all the decls, and places in outDecls
+    static void findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls);
 
         /// Given a decl determines the search style that is appropriate. Returns None if can't determine a suitable style
     static SearchStyle getSearchStyle(Decl* decl);
@@ -176,15 +200,6 @@ protected:
     /// True if the tok is 'on' lineIndex. Interpretation of 'on' depends on the markup type.
     static bool _isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex);
 
-    void _addDecl(Decl* decl);
-    void _addDeclRec(Decl* decl);
-    void _findDecls(ModuleDecl* moduleDecl);
-
-    List<Decl*> m_decls;                ///< All the decls found from the module
-
-    DocMarkup* m_doc;                   ///< The doc to write the documentation information found
-    ModuleDecl* m_moduleDecl;
-    SourceManager* m_sourceManager;
     DiagnosticSink* m_sink;
 };
 

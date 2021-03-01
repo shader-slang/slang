@@ -1809,9 +1809,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         for (TranslationUnitRequest* translationUnit : translationUnits)
         {
             RefPtr<DocMarkup> markup(new DocMarkup);
-
-            DocMarkupExtractor extractor;
-            extractor.extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
+            DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
             // Hmm.. we can have multiple sourcefiles. So fir now we just pick the first, so as to come up with
             // a reasonable name

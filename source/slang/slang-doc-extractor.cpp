@@ -68,50 +68,6 @@ namespace Slang {
     return comment;
 }
 
-void DocMarkupExtractor::_addDecl(Decl* decl)
-{
-    if (!decl->loc.isValid())
-    {
-        return;
-    }
-    m_decls.add(decl);
-}
-
-void DocMarkupExtractor::_addDeclRec(Decl* decl)
-{
-    // Just add.
-    // There may be things we don't want to add, but just add them all of now
-    _addDecl(decl);
-
-#if 0
-    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
-    {
-        // For callables (like functions),
-
-        m_decls.add(callableDecl);
-    }
-    else
-#endif
-
-    if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
-    {
-        // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
-        // Now add what the container contains
-        for (Decl* childDecl : containerDecl->members)
-        {
-            _addDeclRec(childDecl);
-        }
-    }
-}
-
-void DocMarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
-{
-    for (Decl* decl : moduleDecl->members)
-    {
-        _addDeclRec(decl);
-    }
-}
-
 static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
 {
     // Use a binary search to find the token
@@ -675,48 +631,33 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
     }
 }
 
-SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outDoc)
+SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out)
 {
-    m_doc = outDoc;
-    m_moduleDecl = moduleDecl;
-    m_sourceManager = sourceManager;
-    m_sink = sink;
-
-    _findDecls(moduleDecl);
-
     struct Entry
     {
         typedef Entry ThisType;
 
-        bool operator<(const ThisType& rhs) const { return locOrOffset < rhs.locOrOffset; }
-
         Index viewIndex;                    ///< The view/file index this loc is found in
         SourceLoc::RawValue locOrOffset;    ///< Can be a loc or an offset into the file
 
-        SearchStyle searchStyle;
-
-        Decl* decl;                         ///< The decl
+        SearchStyle searchStyle;            ///< The search style when looking for an item
+        Index inputIndex;                   ///< The index to this item in the input
     };
 
     List<Entry> entries;
 
     {
-        const Index count = m_decls.getCount();
-        entries.setCount(count);
-
-        for (Index i = 0; i < count; ++i)
+        entries.setCount(inputCount);
+        for (Index i = 0; i < inputCount; ++i)
         {
+            const auto& input = inputs[i];
             Entry& entry = entries[i];
-            auto decl = m_decls[i];
-            entry.decl = decl;
+            entry.inputIndex = i;
             entry.viewIndex = -1;            //< We don't know what file/view it's in
-            entry.locOrOffset = decl->loc.getRaw();
-            entry.searchStyle = getSearchStyle(decl);
+            entry.locOrOffset = input.sourceLoc.getRaw();
+            entry.searchStyle = input.searchStyle;
         }
     }
-
-    // We hold one view per *SourceFile*
-    List<SourceView*> views;
 
     // Sort them into loc order
     entries.sort([](Entry& a, Entry& b) { return a.locOrOffset < b.locOrOffset; });
@@ -732,19 +673,19 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             if (sourceView == nullptr || !sourceView->getRange().contains(loc))
             {
                 // Find the new view
-                sourceView = m_sourceManager->findSourceView(loc);
+                sourceView = sourceManager->findSourceView(loc);
                 SLANG_ASSERT(sourceView);
 
                 // We want only one view per SourceFile
                 SourceFile* sourceFile = sourceView->getSourceFile();
 
                 // NOTE! The view found might be different than sourceView. 
-                viewIndex = views.findFirstIndex([&](SourceView* currentView) -> bool { return currentView->getSourceFile() == sourceFile; });
+                viewIndex = outViews.findFirstIndex([&](SourceView* currentView) -> bool { return currentView->getSourceFile() == sourceFile; });
 
                 if (viewIndex < 0)
                 {
-                    viewIndex = views.getCount();
-                    views.add(sourceView);
+                    viewIndex = outViews.getCount();
+                    outViews.add(sourceView);
                 }
             }
 
@@ -772,8 +713,18 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
         Index viewIndex = -1;
         SourceView* sourceView = nullptr;
 
-        for (auto& entry : entries)
+        const Int entryCount = entries.getCount();
+
+        out.setCount(entryCount);
+
+        for (Index i = 0; i < entryCount; ++i)
         {
+            const auto& entry = entries[i];
+            auto& dst = out[i];
+
+            dst.viewIndex = -1;
+            dst.inputIndex = entry.inputIndex;
+
             // If there isn't a mechanism to search with, just move on
             if (entry.searchStyle == SearchStyle::None)
             {
@@ -783,7 +734,7 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             if (viewIndex != entry.viewIndex)
             {
                 viewIndex = entry.viewIndex;
-                sourceView = views[viewIndex];
+                sourceView = outViews[viewIndex];
 
                 // Make all memory free again
                 memoryArena.reset();
@@ -826,9 +777,9 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
                     StringBuilder buf;
                     SLANG_RETURN_ON_FAIL(_extractMarkup(findInfo, foundMarkup, buf));
 
-                    // Add to the documentation
-                    DocMarkup::Entry& docEntry = m_doc->addEntry(entry.decl);
-                    docEntry.m_markup = buf;
+                    // Save the extracted text in the output
+                    dst.text = buf;
+
                 }
                 else if (res != SLANG_E_NOT_FOUND)
                 {
@@ -837,7 +788,91 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             }
         }
     }
-   
+
+    return SLANG_OK;
+}
+
+static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
+{
+    // Just add.
+    // There may be things we don't want to add, but just add them all of now
+    if (decl->loc.isValid())
+    {
+        outDecls.add(decl);
+    }
+    
+#if 0
+    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
+    {
+        // For callables (like functions),
+
+        m_decls.add(callableDecl);
+    }
+    else
+#endif
+
+    if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
+    {
+        // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
+        // Now add what the container contains
+        for (Decl* childDecl : containerDecl->members)
+        {
+            _addDeclRec(childDecl, outDecls);
+        }
+    }
+}
+
+/* static */void DocMarkupExtractor::findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
+{
+    for (Decl* decl : moduleDecl->members)
+    {
+        _addDeclRec(decl, outDecls);
+    }
+}
+
+SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outDoc)
+{
+    List<Decl*> decls;
+    findDecls(moduleDecl, decls);
+
+    const Index declsCount = decls.getCount();
+    
+    List<SearchItemOutput> outItems;
+
+    {
+        List<SearchItemInput> inputItems;
+        inputItems.setCount(declsCount);
+
+        for (Index i = 0; i < declsCount; ++i)
+        {
+            Decl* decl = decls[i];
+            auto& item = inputItems[i];
+
+            item.sourceLoc = decl->loc;
+            item.searchStyle = getSearchStyle(decl);
+        }
+
+        DocMarkupExtractor extractor;
+
+        List<SourceView*> views;
+        SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), declsCount, sourceManager, sink, views, outItems));
+    }
+
+    // Set back
+    for (Index i = 0; i < declsCount; ++i)
+    {
+        const auto& outputItem = outItems[i];
+
+        if (outputItem.text.getLength() > 0)
+        {
+            Decl* decl = decls[outputItem.inputIndex];
+       
+            // Add to the documentation
+            DocMarkup::Entry& docEntry = outDoc->addEntry(decl);
+            docEntry.m_markup = outputItem.text;
+        }
+    }
+    
     return SLANG_OK;
 }
 
