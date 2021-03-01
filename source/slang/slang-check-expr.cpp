@@ -13,6 +13,8 @@
 
 #include "slang-lookup.h"
 
+#include "slang-ast-print.h"
+
 namespace Slang
 {
     DeclRefType* SemanticsVisitor::getExprDeclRefType(Expr * expr)
@@ -518,7 +520,7 @@ namespace Slang
 
         for(auto item : lookupResult.items)
         {
-            String declString = getDeclSignatureString(item);
+            String declString = ASTPrinter::getDeclSignatureString(item, m_astBuilder);
             getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
         }
     }

@@ -20,23 +20,23 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)
 {
-    sb << type->toString();
+    type->toText(sb);
 }
 
 void printDiagnosticArg(StringBuilder& sb, Val* val)
 {
-    sb << val->toString();
+    val->toText(sb);
 }
 
 void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 {
-    sb << type.type->toString();
+    type.type->toText(sb);
 }
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)
 {
     if (type.type)
-        sb << type.type->toString();
+        type.type->toText(sb);
     else
         sb << "<null>";
 }
@@ -1104,13 +1104,22 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
 
     String DeclRefBase::toString() const
     {
-        if (!decl) return "";
+        StringBuilder builder;
+        toText(builder);
+        return builder;
+    }
 
-        auto name = decl->getName();
-        if (!name) return "";
-
-        // TODO: need to print out substitutions too!
-        return name->text;
+    void DeclRefBase::toText(StringBuilder& out) const
+    {
+        if (decl)
+        {
+            auto name = decl->getName();
+            if (name)
+            {
+                // TODO: need to print out substitutions too!
+                out << name->text;
+            }
+        }
     }
 
     bool SubstitutionSet::equals(const SubstitutionSet& substSet) const

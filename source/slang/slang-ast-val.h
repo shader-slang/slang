@@ -23,7 +23,7 @@ class ConstantIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
 
 protected:
@@ -42,7 +42,7 @@ class GenericParamIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
@@ -63,7 +63,7 @@ class ErrorIntVal : public IntVal
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -125,7 +125,7 @@ class TypeEqualityWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -140,7 +140,7 @@ class DeclaredSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -158,7 +158,7 @@ class TransitiveSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -174,7 +174,7 @@ class ExtractExistentialSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
@@ -195,7 +195,7 @@ class TaggedUnionSubtypeWitness : public SubtypeWitness
 
     // Overrides should be public so base classes can access
     bool _equalsValOverride(Val* val);
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     HashCode _getHashCodeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };

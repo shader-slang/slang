@@ -652,6 +652,7 @@ namespace Slang
 
         // Debugging:
         String toString() const;
+        void toText(StringBuilder& out) const;
     };
 
     template<typename T>
@@ -720,6 +721,8 @@ namespace Slang
             return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent());
         }
     };
+
+    SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase& declRef) { declRef.toText(io); return io; }
 
     template<typename T>
     DeclRef<T> DeclRefBase::as() const

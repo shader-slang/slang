@@ -14,7 +14,7 @@ class OverloadGroupType : public Type
     SLANG_AST_CLASS(OverloadGroupType)
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -28,7 +28,7 @@ class InitializerListType : public Type
 
     
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -40,7 +40,7 @@ class ErrorType : public Type
     SLANG_AST_CLASS(ErrorType)
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -58,7 +58,7 @@ class DeclRefType : public Type
     static DeclRefType* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -393,7 +393,7 @@ class ArrayExpressionType : public Type
     IntVal* arrayLength = nullptr;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -411,7 +411,7 @@ class TypeType : public Type
     Type* type = nullptr;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -437,7 +437,7 @@ class VectorExpressionType : public ArithmeticExpressionType
     IntVal* elementCount = nullptr;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
 };
 
@@ -453,7 +453,7 @@ class MatrixExpressionType : public ArithmeticExpressionType
     Type* getRowType();
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
 
 private:
@@ -530,7 +530,7 @@ class NamedExpressionType : public Type
     Type* innerType = nullptr;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
@@ -564,7 +564,7 @@ class FuncType : public Type
     Type* getResultType() { return resultType; }
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     bool _equalsImplOverride(Type* type);
@@ -581,7 +581,7 @@ class GenericDeclRefType : public Type
     DeclRef<GenericDecl> const& getDeclRef() const { return declRef; }
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
@@ -603,7 +603,7 @@ class NamespaceType : public Type
     DeclRef<NamespaceDeclBase> const& getDeclRef() const { return declRef; }
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();    
@@ -619,7 +619,7 @@ class ExtractExistentialType : public Type
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
@@ -639,7 +639,7 @@ class TaggedUnionType : public Type
     List<Type*> caseTypes;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
@@ -654,7 +654,7 @@ class ExistentialSpecializedType : public Type
     ExpandedSpecializationArgs args;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
@@ -669,7 +669,7 @@ class ThisType : public Type
     DeclRef<InterfaceDecl> interfaceDeclRef;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
@@ -687,7 +687,7 @@ class AndType : public Type
     Type* right;
 
     // Overrides should be public so base classes can access
-    String _toStringOverride();
+    void _toTextOverride(StringBuilder& out);
     bool _equalsImplOverride(Type* type);
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();

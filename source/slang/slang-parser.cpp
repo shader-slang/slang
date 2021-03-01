@@ -3620,6 +3620,8 @@ namespace Slang
     static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
     {
         EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
+        parser->FillPosition(decl);
+        
         decl->nameAndLoc = expectIdentifier(parser);
 
         if(AdvanceIf(parser, TokenType::OpAssign))
