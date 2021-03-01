@@ -207,7 +207,8 @@
     <ClInclude Include="..\..\..\source\slang\slang-compiler.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-doc.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-doc-extractor.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-doc-mark-down.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-c-like.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-cpp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-cuda.h" />
@@ -337,7 +338,8 @@
     <ClCompile Include="..\..\..\source\slang\slang-check.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-compiler.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-doc.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-doc-extractor.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-doc-mark-down.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-dxc-support.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-cpp.cpp" />

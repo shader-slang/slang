@@ -30,7 +30,8 @@
 #include "slang-serialize-ir.h"
 #include "slang-serialize-container.h"
 
-#include "slang-doc.h"
+#include "slang-doc-extractor.h"
+#include "slang-doc-mark-down.h"
 
 #include "slang-check-impl.h"
 
@@ -1809,7 +1810,8 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         {
             RefPtr<DocMarkup> markup(new DocMarkup);
 
-            markup->extract(translationUnit->getModuleDecl(), getSourceManager(), getSink());
+            DocMarkupExtractor extractor;
+            extractor.extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
             // Hmm.. we can have multiple sourcefiles. So fir now we just pick the first, so as to come up with
             // a reasonable name
@@ -1822,10 +1824,10 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
                 String fileName = Path::getFileNameWithoutExt(path);
                 fileName.append(".md");
 
-                StringBuilder buf;
-                DocumentationUtil::writeMarkdown(markup, astBuilder, buf);
+                DocMarkDownWriter writer(markup, astBuilder);
+                writer.writeAll();
 
-                File::writeAllText(fileName, buf);
+                File::writeAllText(fileName, writer.getOutput());
             }
         }
     }
