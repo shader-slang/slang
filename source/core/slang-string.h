@@ -181,6 +181,10 @@ namespace Slang
         char const* m_end;
     };
 
+    // A more convenient way to make slices from *string literals*
+    template <size_t SIZE>
+    SLANG_FORCE_INLINE UnownedStringSlice toSlice(const char (&in)[SIZE]) { return UnownedStringSlice(in, SIZE - 1); }
+
     // A `StringRepresentation` provides the backing storage for
     // all reference-counted string-related types.
     class StringRepresentation : public RefObject

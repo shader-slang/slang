@@ -3,6 +3,9 @@
 
 #include "../core/slang-string-util.h"
 
+#include "slang-ast-builder.h"
+#include "slang-ast-print.h"
+
 namespace Slang {
 
 /* TODO(JS):
@@ -33,18 +36,22 @@ public:
         };
     };
 
+    // NOTE! Don't change order without fixing isBefore and isAfter
     enum class MarkupType
     {
         None,
-        BlockBefore,        /// /**  */ or /*!  */.
-        BlockAfter,         /// /*!< */ or /**< */
 
+        BlockBefore,        /// /**  */ or /*!  */.
         LineBangBefore,      /// //! Can be multiple lines
         LineSlashBefore,     /// /// Can be multiple lines
 
+        BlockAfter,         /// /*!< */ or /**< */
         LineBangAfter,       /// //!< Can be multiple lines
         LineSlashAfter,      /// ///< Can be multiple lines
     };
+
+    static bool isBefore(MarkupType type) { return Index(type) >= Index(MarkupType::BlockBefore) && Index(type) <= Index(MarkupType::LineSlashBefore); }
+    static bool isAfter(MarkupType type) { return Index(type) >= Index(MarkupType::BlockAfter); }
 
     struct IndexRange
     {
@@ -60,7 +67,11 @@ public:
         Before,
         AfterParam,                     ///< Can have trailing , or )
         AfterSemicolon,                 ///< Can have a trailing ;
+        AfterEnumCase,                  ///< Can have a , or before }
     };
+
+    static bool isAfter(Location location) { return Index(location) >= Index(Location::AfterParam); }
+    static bool isBefore(Location location) { return location == Location::Before; }
 
     struct FoundMarkup
     {
@@ -199,6 +210,7 @@ void DocMarkupExtractor::_addDeclRec(Decl* decl)
     }
     else
 #endif
+
     if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
     {
         // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
@@ -465,7 +477,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     const TokenList& toks = *info.tokenList;
     const Index tokIndex = info.declTokenIndex;
 
-    Index direction = (location == Location::Before) ? -1 : 1;
+    Index direction = isBefore(location) ? -1 : 1;
 
     const Index count = toks.m_tokens.getCount();
     for (Index i = tokIndex; i >= 0 && i < count; i += direction)
@@ -474,6 +486,26 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+            {
+                if (openParensCount == 0 && openBracketCount == 0)
+                {
+                    // Determine the markup type
+                    const MarkupType markupType = findMarkupType(tok);
+                    // If the location wanted is before and the markup is, we'll assume this is it
+                    if (isBefore(location) && isBefore(markupType))
+                    {
+                        return i;
+                    }
+                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
+                    if (location == Location::AfterEnumCase && isAfter(markupType))
+                    {
+                        return i;
+                    }
+                }
+                break;
+            }
             case TokenType::LParent:
             {
                 ++openParensCount;
@@ -481,12 +513,12 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
             }
             case TokenType::RBracket:
             {
-                openBracketCount += Index(location == Location::Before);
+                openBracketCount += Index(isBefore(location));
                 break;
             }
             case TokenType::LBracket:
             {
-                openBracketCount -= Index(location == Location::Before);
+                openBracketCount -= Index(isBefore(location));
                 break;
             }
             case TokenType::RParent:
@@ -507,7 +539,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
             }
             case TokenType::Comma:
             {
-                if (location == Location::AfterParam)
+                if (location == Location::AfterParam || location == Location::AfterEnumCase)
                 {
                     return i + 1;
                 }
@@ -516,7 +548,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
             case TokenType::RBrace:
             {
                 // If we haven't hit a candidate yet before hitting } it's not going to work
-                if (location == Location::Before)
+                if (location == Location::Before || location == Location::AfterEnumCase)
                 {
                     return -1;
                 }
@@ -533,16 +565,6 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 if (openParensCount == 0 && location == Location::AfterSemicolon)
                 {
                     return i + 1;
-                }
-                break;
-            }
-            case TokenType::LineComment:
-            case TokenType::BlockComment:
-            {
-                // We hit a comment this could be the markup
-                if (location == Location::Before && openParensCount == 0 && openBracketCount == 0)
-                {
-                    return i;
                 }
                 break;
             }
@@ -600,13 +622,13 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location locat
         return SLANG_E_NOT_FOUND;
     }
 
-    const Index searchDirection = (location == Location::Before) ? -1 : 1;
+    const Index searchDirection = isBefore(location) ? -1 : 1;
     
     // Get the type and flags
     const MarkupType type = findMarkupType(toks[startIndex]);
     const MarkupFlags flags = getFlags(type);
 
-    const MarkupFlag::Enum requiredFlag = (location == Location::Before) ? MarkupFlag::Before : MarkupFlag::After;
+    const MarkupFlag::Enum requiredFlag = isBefore(location) ? MarkupFlag::Before : MarkupFlag::After;
     if ((flags & requiredFlag) == 0)
     {
         return SLANG_E_NOT_FOUND;
@@ -714,6 +736,11 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location
 
 SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
 {
+    if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        Location locs[] = { Location::Before, Location::AfterEnumCase };
+        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+    }
     if (auto paramDecl = as<ParamDecl>(decl))
     {
         Location locs[] = { Location::Before, Location::AfterParam };
@@ -901,9 +928,281 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
     return context.extract(this, moduleDecl, sourceManager, sink);
 }
 
-/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, StringBuilder& out)
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+
+struct DocMarkDownWriter
 {
-    for (const auto& entry : markup->getEntries())
+    typedef ASTPrinter::Part Part;
+    typedef ASTPrinter::PartPair PartPair;
+
+    struct Signature
+    {
+        Part returnType;
+        List<PartPair> params;
+        Part name;
+    };
+
+    void write();
+
+    void writeCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
+    void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
+    void writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl);
+
+    void writePreamble(const DocMarkup::Entry& entry);
+    void writeDescription(const DocMarkup::Entry& entry);
+    
+    DocMarkDownWriter(DocMarkup* markup, ASTBuilder* astBuilder):
+        m_markup(markup),
+        m_astBuilder(astBuilder)
+    {
+    }
+
+    static void getSignature(const List<Part>& parts, Signature& outSig);
+
+    template <typename T>
+    void _appendAsBullets(FilteredMemberList<T>& in);
+
+    DocMarkup* m_markup;
+    ASTBuilder* m_astBuilder;
+    StringBuilder m_builder;
+};
+
+static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out)
+{
+    List<UnownedStringSlice> lines;
+    StringUtil::calcLines(in, lines);
+
+    // Ideally we'd remove any extraneous whitespace, but for now just join
+    StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
+}
+
+template <typename T>
+void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
+{
+    auto& out = m_builder;
+    for (auto element : list)
+    {
+        DocMarkup::Entry* paramEntry = m_markup->getEntry(element);
+
+        out << "* ";
+
+        Name* name = element->getName();
+        if (name)
+        {
+            out << toSlice("_") << name->text << toSlice("_ ");
+        }
+
+        if (paramEntry)
+        {
+            // Hmm, we'll want to make something multiline into a single line
+            _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
+        }
+
+        out << "\n";
+    }
+
+    out << toSlice("\n");
+}
+
+/* static */void DocMarkDownWriter::getSignature(const List<Part>& parts, Signature& outSig)
+{
+    const Index count = parts.getCount();
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& part = parts[i];
+        switch (part.type)
+        {
+            case Part::Type::ParamType:
+            {
+                PartPair pair;
+                pair.first = part;
+                if (parts[i + 1].type == Part::Type::ParamName)
+                {
+                    pair.second = parts[i + 1];
+                    i++;
+                }
+                outSig.params.add(pair);
+                break;
+            }
+            case Part::Type::ReturnType:
+            {
+                outSig.returnType = part;
+                break;
+            }
+            case Part::Type::DeclPath:
+            {
+                outSig.name = part;
+                break;
+            }
+            default: break;
+        }
+    }
+}
+
+void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
+{
+    writePreamble(entry);
+
+    auto& out = m_builder;
+
+    StringBuilder sigBuffer;
+    List<ASTPrinter::Part> parts;
+    ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
+
+    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+
+    Signature signature;
+    getSignature(parts, signature);
+
+    const Index paramCount = signature.params.getCount();
+
+    // Output the signature
+    {        
+        // Extract the name
+        out << toSlice("# ") << printer.getPartSlice(signature.name) << toSlice("\n\n");
+
+        out << toSlice("## Signature \n");
+        out << toSlice("```\n");
+        out << printer.getPartSlice(signature.returnType) << toSlice(" ");
+
+        out << printer.getPartSlice(signature.name);
+
+        
+        if (paramCount > 0)
+        {
+            out << toSlice("(\n");
+
+            StringBuilder line;
+            for (Index i = 0; i < paramCount; ++i)
+            {
+                const auto& param = signature.params[i];
+                line.Clear();
+                // If we want to tab these over... we'll need to know how must space I have
+                line << "    " << printer.getPartSlice(param.first);
+
+                Index indent = 25;
+                if (line.getLength() < indent)
+                {
+                    line.appendRepeatedChar(' ', indent - line.getLength());
+                }
+                else
+                {
+                    line.appendChar(' ');
+                }
+
+                line << printer.getPartSlice(param.second);
+                if (i < paramCount - 1)
+                {
+                    line << ",\n";
+                }
+
+                out << line;
+            }
+
+            out << ");\n";
+        }
+        else
+        {
+            out << toSlice("();\n");
+        }
+
+        out << "```\n\n";
+    }
+
+    // Only output params if there are any
+    if (paramCount)
+    {
+        out << "## Parameters\n\n";
+
+        auto params = callableDecl->getParameters();
+        _appendAsBullets(params);
+    }
+
+    writeDescription(entry);
+}
+
+void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl)
+{
+    writePreamble(entry);
+
+    auto& out = m_builder;
+
+    out << toSlice("# enum ");
+    Name* name = enumDecl->getName();
+    if (name)
+    {
+        out << name->text;
+    }
+    out << toSlice("\n\n");
+
+    out << toSlice("## Values \n\n");
+
+    auto cases = enumDecl->getMembersOfType<EnumCaseDecl>();
+    _appendAsBullets(cases);
+
+    writeDescription(entry);
+}
+
+void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl)
+{
+    writePreamble(entry);
+
+    auto& out = m_builder;
+
+    // This could be lots of different things - struct/class/extension/interface/..
+
+    out << toSlice("# ");
+    if (as<StructDecl>(aggTypeDecl))
+    {
+        out << toSlice("struct ");
+    }
+    else if (as<ClassDecl>(aggTypeDecl))
+    {
+        out << toSlice("class ");
+    }
+    else
+    {
+        out << toSlice("?");
+    }
+
+    Name* name = aggTypeDecl->getName();
+    if (name)
+    {
+        out << name->text;
+    }
+    out << toSlice("\n\n");
+
+    out << "## Fields\n\n";
+
+    auto fields = aggTypeDecl->getMembersOfType<VarDecl>();
+    _appendAsBullets(fields);
+
+    writeDescription(entry);
+}
+
+void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
+{
+    SLANG_UNUSED(entry);
+    auto& out = m_builder;
+
+    out << toSlice("\n");
+    out.appendRepeatedChar('-', 80);
+    out << toSlice("\n");
+}
+
+
+void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
+{
+    auto& out = m_builder;
+
+    out << toSlice("\n## Description\n\n");
+    out << entry.m_markup;
+}
+
+void DocMarkDownWriter::write()
+{
+    for (const auto& entry : m_markup->getEntries())
     {
         NodeBase* node = entry.m_node;
         Decl* decl = as<Decl>(node);
@@ -920,53 +1219,29 @@ SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceMana
 
         if (CallableDecl* callableDecl = as<CallableDecl>(decl))
         {
-            out << entry.m_markup;
-
-            // There's code to output sigs in the SemanticsVisitor - we probably need to extract that functionality
-            // out so can be used here
-
-            //   String declString = getDeclSignatureString(item);
-
-            auto params = callableDecl->getParameters();
-            //const auto& returnType = callableDecl->returnType;
-
-            // Let's see if we can get markup on the parameters            
-            for (auto param : params)
-            {
-                DocMarkup::Entry* paramEntry = markup->getEntry(param);
-
-                if (paramEntry)
-                {
-                    out << paramEntry->m_markup;
-
-                    auto type = param->getType();
-
-                    if (type)
-                    {
-                        out << type->toString();
-                    }
-
-                    Name* name = param->getName();
-                    if (name)
-                    {
-                        out << " ";
-                        out << name->text;
-                    }
-                    out << "\n\n";
-                }
-            }
+            writeCallable(entry, callableDecl);
         }
         else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
         {
-
+            writeEnum(entry, enumDecl);
         }
-        else if (StructDecl* structDecl = as<StructDecl>(decl))
+        else if (AggTypeDecl* aggType = as<AggTypeDecl>(decl))
         {
-        }
-        else if (ClassDecl* classDecl = as<ClassDecl>(decl))
-        {
+            writeAggType(entry, aggType);
         }
     }
+}
+
+/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, ASTBuilder* astBuilder, StringBuilder& out)
+{
+    // The ASTBuilder is needed in order to be able to create ast types that can then be printed.
+    // It is *assumed* here, that them being transient on this temporary ASTBuilder, doesn't mutate
+    // any of the nodes from the ASTBuilder/s for the things being documented
+
+    DocMarkDownWriter writer(markup, astBuilder);
+    writer.write();
+
+    Swap(out, writer.m_builder);
 
     return SLANG_OK;
 }

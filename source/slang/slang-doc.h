@@ -4,6 +4,7 @@
 
 #include "../core/slang-basic.h"
 #include "slang-ast-all.h"
+#include "slang-ast-print.h"
 
 namespace Slang {
 
@@ -60,9 +61,11 @@ SLANG_INLINE DocMarkup::Entry* DocMarkup::getEntry(NodeBase* base)
     return (indexPtr) ? &m_entries[*indexPtr] : nullptr;
 }
 
+class SharedASTBuilder;
+
 struct DocumentationUtil
 {
-    static SlangResult writeMarkdown(DocMarkup* markup, StringBuilder& out);
+    static SlangResult writeMarkdown(DocMarkup* markup, ASTBuilder* astBuilder, StringBuilder& out);
 };
 
 } // namespace Slang
