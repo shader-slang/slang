@@ -26,9 +26,16 @@ bool Val::equalsVal(Val* val)
     SLANG_AST_NODE_VIRTUAL_CALL(Val, equalsVal, (val))
 }
 
+void Val::toText(StringBuilder& out)
+{
+    SLANG_AST_NODE_VIRTUAL_CALL(Val, toText, (out))
+}
+
 String Val::toString()
 {
-    SLANG_AST_NODE_VIRTUAL_CALL(Val, toString, ())
+    StringBuilder builder;
+    toText(builder);
+    return builder;
 }
 
 HashCode Val::getHashCode()
@@ -52,10 +59,10 @@ bool Val::_equalsValOverride(Val* val)
     //return false;
 }
 
-String Val::_toStringOverride()
+void Val::_toTextOverride(StringBuilder& out)
 {
+    SLANG_UNUSED(out);
     SLANG_UNEXPECTED("Val::_toStringOverride not overridden");
-    //return String();
 }
 
 HashCode Val::_getHashCodeOverride()
@@ -73,9 +80,9 @@ bool ConstantIntVal::_equalsValOverride(Val* val)
     return false;
 }
 
-String ConstantIntVal::_toStringOverride()
+void ConstantIntVal::_toTextOverride(StringBuilder& out)
 {
-    return String(value);
+    out << value;
 }
 
 HashCode ConstantIntVal::_getHashCodeOverride()
@@ -94,9 +101,13 @@ bool GenericParamIntVal::_equalsValOverride(Val* val)
     return false;
 }
 
-String GenericParamIntVal::_toStringOverride()
+void GenericParamIntVal::_toTextOverride(StringBuilder& out)
 {
-    return getText(declRef.getName());
+    Name* name = declRef.getName();
+    if (name)
+    {
+        out << name->text;
+    }
 }
 
 HashCode GenericParamIntVal::_getHashCodeOverride()
@@ -157,9 +168,9 @@ bool ErrorIntVal::_equalsValOverride(Val* val)
     return false;
 }
 
-String ErrorIntVal::_toStringOverride()
+void ErrorIntVal::_toTextOverride(StringBuilder& out)
 {
-    return "<error>";
+    out << toSlice("<error>");
 }
 
 HashCode ErrorIntVal::_getHashCodeOverride()
@@ -195,9 +206,9 @@ Val* TypeEqualityWitness::_substituteImplOverride(ASTBuilder* astBuilder, Substi
     return rs;
 }
 
-String TypeEqualityWitness::_toStringOverride()
+void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
 {
-    return "TypeEqualityWitness(" + sub->toString() + ")";
+    out << toSlice("TypeEqualityWitness(") << sub << toSlice(")");
 }
 
 HashCode TypeEqualityWitness::_getHashCodeOverride()
@@ -319,17 +330,9 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, Sub
     return rs;
 }
 
-String DeclaredSubtypeWitness::_toStringOverride()
+void DeclaredSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
-    StringBuilder sb;
-    sb << "DeclaredSubtypeWitness(";
-    sb << this->sub->toString();
-    sb << ", ";
-    sb << this->sup->toString();
-    sb << ", ";
-    sb << this->declRef.toString();
-    sb << ")";
-    return sb.ProduceString();
+    out << toSlice("DeclaredSubtypeWitness(") << sub << toSlice(", ") << sup << toSlice(", ") << declRef << toSlice(")");
 }
 
 HashCode DeclaredSubtypeWitness::_getHashCodeOverride()
@@ -392,18 +395,13 @@ Val* TransitiveSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, S
     return result;
 }
 
-String TransitiveSubtypeWitness::_toStringOverride()
+void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     // Note: we only print the constituent
     // witnesses, and rely on them to print
     // the starting and ending types.
-    StringBuilder sb;
-    sb << "TransitiveSubtypeWitness(";
-    sb << this->subToMid->toString();
-    sb << ", ";
-    sb << this->midToSup->toString();
-    sb << ")";
-    return sb.ProduceString();
+    
+    out << toSlice("TransitiveSubtypeWitness(") << subToMid << toSlice(", ") << midToSup << toSlice(")");
 }
 
 HashCode TransitiveSubtypeWitness::_getHashCodeOverride()
@@ -426,13 +424,9 @@ bool ExtractExistentialSubtypeWitness::_equalsValOverride(Val* val)
     return false;
 }
 
-String ExtractExistentialSubtypeWitness::_toStringOverride()
+void ExtractExistentialSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append("extractExistentialValue(");
-    result.append(declRef.toString());
-    result.append(")");
-    return result;
+    out << toSlice("extractExistentialValue(") << declRef << toSlice(")");
 }
 
 HashCode ExtractExistentialSubtypeWitness::_getHashCodeOverride()
@@ -482,19 +476,21 @@ bool TaggedUnionSubtypeWitness::_equalsValOverride(Val* val)
     return true;
 }
 
-String TaggedUnionSubtypeWitness::_toStringOverride()
+void TaggedUnionSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
-    String result;
-    result.append("TaggedUnionSubtypeWitness(");
+    out << toSlice("TaggedUnionSubtypeWitness(");
     bool first = true;
     for (auto caseWitness : caseWitnesses)
     {
-        if (!first) result.append(", ");
+        if (!first)
+        {
+            out << toSlice(", ");
+        }
         first = false;
 
-        result.append(caseWitness->toString());
+        out << caseWitness;
     }
-    return result;
+    out << toSlice(")");
 }
 
 HashCode TaggedUnionSubtypeWitness::_getHashCodeOverride()
