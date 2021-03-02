@@ -648,7 +648,7 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
             // Append the hash in hex
             out.append(uint64_t(hash), 16);
 
-            SLANG_ASSERT(out.getSize() <= maxTokenLength);
+            SLANG_ASSERT(out.getLength() <= maxTokenLength);
         }
     }
 }
