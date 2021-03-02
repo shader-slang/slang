@@ -747,6 +747,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
                 tokens = lexer.lexAllTokens();
             }
 
+            dst.viewIndex = viewIndex;
+
             // Get the offset within the source file
             const uint32_t offset = entry.locOrOffset;
 
@@ -800,16 +802,6 @@ static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
     {
         outDecls.add(decl);
     }
-    
-#if 0
-    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
-    {
-        // For callables (like functions),
-
-        m_decls.add(callableDecl);
-    }
-    else
-#endif
 
     if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
     {
@@ -836,11 +828,11 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
     findDecls(moduleDecl, decls);
 
     const Index declsCount = decls.getCount();
-    
+
+    List<SearchItemInput> inputItems;
     List<SearchItemOutput> outItems;
 
     {
-        List<SearchItemInput> inputItems;
         inputItems.setCount(declsCount);
 
         for (Index i = 0; i < declsCount; ++i)
@@ -862,8 +854,10 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
     for (Index i = 0; i < declsCount; ++i)
     {
         const auto& outputItem = outItems[i];
+        const auto& inputItem = inputItems[outputItem.inputIndex];
 
-        if (outputItem.text.getLength() > 0)
+        // If we don't know how to search add to the output
+        if (inputItem.searchStyle != SearchStyle::None)
         {
             Decl* decl = decls[outputItem.inputIndex];
        

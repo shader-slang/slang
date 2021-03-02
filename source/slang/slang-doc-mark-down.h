@@ -16,8 +16,15 @@ struct DocMarkDownWriter
 
     struct Signature
     {
+        struct GenericParam
+        {
+            Part name;
+            Part type;
+        };
+
         Part returnType;
         List<PartPair> params;
+        List<GenericParam> genericParams;
         Part name;
     };
 
@@ -47,6 +54,7 @@ struct DocMarkDownWriter
 
     template <typename T>
     void _appendAsBullets(FilteredMemberList<T>& in);
+    void _appendAsBullets(const List<Decl*>& in);
 
     DocMarkup* m_markup;
     ASTBuilder* m_astBuilder;

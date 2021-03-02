@@ -18,6 +18,33 @@ static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out
     StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
 }
 
+void DocMarkDownWriter::_appendAsBullets(const List<Decl*>& in)
+{
+    auto& out = m_builder;
+    for (auto decl : in)
+    {
+        DocMarkup::Entry* paramEntry = m_markup->getEntry(decl);
+
+        out << "* ";
+
+        Name* name = decl->getName();
+        if (name)
+        {
+            out << toSlice("_") << name->text << toSlice("_ ");
+        }
+
+        if (paramEntry)
+        {
+            // Hmm, we'll want to make something multiline into a single line
+            _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
+        }
+
+        out << "\n";
+    }
+
+    out << toSlice("\n");
+}
+
 template <typename T>
 void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
 {
@@ -58,7 +85,7 @@ void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
             {
                 PartPair pair;
                 pair.first = part;
-                if (parts[i + 1].type == Part::Type::ParamName)
+                if ((i + 1) < count && parts[i + 1].type == Part::Type::ParamName)
                 {
                     pair.second = parts[i + 1];
                     i++;
@@ -76,6 +103,22 @@ void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
                 outSig.name = part;
                 break;
             }
+            case Part::Type::GenericParamValue:
+            case Part::Type::GenericParamType:
+            {
+                Signature::GenericParam genericParam;
+                genericParam.name = part;
+                
+                if ((i + 1) < count && parts[i + 1].type == Part::Type::GenericParamValueType)
+                {
+                    genericParam.type = parts[i + 1];
+                    i++;
+                }
+
+                outSig.genericParams.add(genericParam);
+                break;
+            }
+
             default: break;
         }
     }
@@ -87,11 +130,19 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
 
     auto& out = m_builder;
 
-    StringBuilder sigBuffer;
     List<ASTPrinter::Part> parts;
     ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
 
-    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+    GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
+
+    if (genericDecl)
+    {
+        printer.addDeclSignature(DeclRef<Decl>(genericDecl, nullptr));
+    }
+    else
+    {
+        printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+    }
 
     Signature signature;
     getSignature(parts, signature);
@@ -109,7 +160,28 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
 
         out << printer.getPartSlice(signature.name);
 
-        
+        if (signature.genericParams.getCount())
+        {
+            out << toSlice("<");
+            const Index count = signature.genericParams.getCount();
+            for (Index i = 0; i < count; ++i)
+            {
+                const auto& genericParam = signature.genericParams[i];
+                if (i > 0)
+                {
+                    out << toSlice(", ");
+                }
+                out << printer.getPartSlice(genericParam.name);
+
+                if (genericParam.type.type != Part::Type::None)
+                {
+                    out << toSlice(" : ");
+                    out << printer.getPartSlice(genericParam.type);
+                }
+            }
+            out << toSlice(">");
+        }
+
         if (paramCount > 0)
         {
             out << toSlice("(\n");
@@ -151,13 +223,33 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
         out << "```\n\n";
     }
 
-    // Only output params if there are any
-    if (paramCount)
     {
-        out << "## Parameters\n\n";
+        // The parameters, in order
+        List<Decl*> params;
 
-        auto params = callableDecl->getParameters();
-        _appendAsBullets(params);
+        if (genericDecl)
+        {
+            for (Decl* decl : genericDecl->members)
+            {
+                if (as<GenericTypeParamDecl>(decl) ||
+                    as<GenericValueParamDecl>(decl))
+                {
+                    params.add(decl);
+                }
+            }
+        }
+
+        for (ParamDecl* paramDecl : callableDecl->getParameters())
+        {
+            params.add(paramDecl);
+        }
+
+        if (params.getCount())
+        {
+            out << "## Parameters\n\n";
+            // We have generic params and regular parameters, in this list
+            _appendAsBullets(params);
+        }
     }
 
     writeDescription(entry);
@@ -263,6 +355,8 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     }
     else if (GenericDecl* genericDecl = as<GenericDecl>(decl))
     {
+
+
         writeDecl(entry, genericDecl->inner);
     }
 }

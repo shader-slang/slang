@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
+//TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
 
     /// Let's test indent
     /// 
@@ -19,6 +19,9 @@ struct SomeStruct
     /// is a thing
     int anotherField;
     int yetAnother; ///< A field with stuff 
+    
+        /// Get a value 
+    int getMethod() { return yetAnother; }
 };
 
 /// An enum
@@ -46,6 +49,11 @@ int doThing(int a,  ///< a parameter
     }
     
     return a;
+}
+
+T addInts<T : __BuiltinIntegerType, let V : int>(T a, T b)
+{
+    return a + b;
 }
 
 [numthreads(4, 1, 1)]
