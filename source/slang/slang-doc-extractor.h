@@ -105,6 +105,7 @@ public:
         AfterParam,                     ///< Can have trailing , or )
         AfterSemicolon,                 ///< Can have a trailing ;
         AfterEnumCase,                  ///< Can have a , or before }
+        AfterGenericParam,              ///< Can have trailing , or > 
     };
 
     static bool isAfter(Location location) { return Index(location) >= Index(Location::AfterParam); }
@@ -132,6 +133,7 @@ public:
         Variable,           ///< A variable-like declaration
         Before,             ///< Only allows before
         Function,           ///< Function/method
+        GenericParam,       ///< Generic parameter
     };
 
         /// An input search item

@@ -18,7 +18,6 @@ namespace Slang {
 ** This will need to display the decoration appropriately
 */
 
-
 /* static */UnownedStringSlice DocMarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
 {
     switch (type)
@@ -309,8 +308,7 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
 Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 {
-    Index openParensCount = 0;
-    Index openBracketCount = 0;
+    Index openCount = 0;
 
     const TokenList& toks = *info.tokenList;
     const Index tokIndex = info.tokenIndex;
@@ -324,63 +322,41 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
-            {
-                if (openParensCount == 0 && openBracketCount == 0)
-                {
-                    // Determine the markup type
-                    const MarkupType markupType = findMarkupType(tok);
-                    // If the location wanted is before and the markup is, we'll assume this is it
-                    if (isBefore(location) && isBefore(markupType))
-                    {
-                        return i;
-                    }
-                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
-                    if (location == Location::AfterEnumCase && isAfter(markupType))
-                    {
-                        return i;
-                    }
-                }
-                break;
-            }
+            case TokenType::LBracket:
             case TokenType::LParent:
+            case TokenType::OpLess:
             {
-                ++openParensCount;
+                openCount += direction;
+                if (openCount < 0) return -1;
                 break;
             }
             case TokenType::RBracket:
             {
-                openBracketCount += Index(isBefore(location));
+                openCount -= direction;
+                if (openCount < 0) return -1;
                 break;
             }
-            case TokenType::LBracket:
+            case TokenType::OpGreater:
             {
-                openBracketCount -= Index(isBefore(location));
-                break;
-            }
-            case TokenType::RParent:
-            {
-                if (openParensCount == 0 &&
-                    location == Location::AfterParam)
+                if (location == Location::AfterGenericParam && openCount == 0)
                 {
                     return i + 1;
                 }
 
-                --openParensCount;
-                if (openParensCount < 0)
-                {
-                    // Not found - or weird parens at least 
-                    return -1;
-                }
+                openCount -= direction;
+                if (openCount < 0) return -1;
+
                 break;
             }
-            case TokenType::Comma:
+            case TokenType::RParent:
             {
-                if (location == Location::AfterParam || location == Location::AfterEnumCase)
+                if (openCount == 0 && location == Location::AfterParam)
                 {
                     return i + 1;
                 }
+
+                openCount -= direction;
+                if (openCount < 0) return -1;
                 break;
             }
             case TokenType::RBrace:
@@ -392,6 +368,43 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+            {
+                if (openCount == 0)
+                {
+                    // Determine the markup type
+                    const MarkupType markupType = findMarkupType(tok);
+                    // If the location wanted is before and the markup is, we'll assume this is it
+                    if (isBefore(location) && isBefore(markupType))
+                    {
+                        return i;
+                    }
+                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
+                    if (isAfter(location) && isAfter(markupType))
+                    {
+                        return i;
+                    }
+                }
+                break;
+            }
+            case TokenType::Comma:
+            {
+                if (openCount == 0)
+                {   
+                    if (location == Location::AfterParam || location == Location::AfterEnumCase || location == Location::AfterGenericParam)
+                    {
+                        return i + 1;
+                    }
+                }
+
+                if (location == Location::Before)
+                {
+                    return -1;
+                }
+
+                break;
+            }
             case TokenType::Semicolon:
             {
                 // If we haven't hit a candidate yet it's not going to work
@@ -399,8 +412,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 {
                     return -1;
                 }
-
-                if (openParensCount == 0 && location == Location::AfterSemicolon)
+                if (openCount == 0 && location == Location::AfterSemicolon)
                 {
                     return i + 1;
                 }
@@ -593,8 +605,13 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location
     {
         return getSearchStyle(genericDecl->inner);
     }
+    else if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl))
+    {
+        return SearchStyle::GenericParam;
+    }
     else
     {
+        // If can't determine just allow before
         return SearchStyle::Before;
     }
 }
@@ -626,6 +643,11 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
         case SearchStyle::Variable:
         {
             Location locs[] = { Location::Before, Location::AfterSemicolon };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::GenericParam:
+        {
+            Location locs[] = { Location::Before, Location::AfterGenericParam };
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
     }
@@ -796,11 +818,24 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
 static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
 {
-    // Just add.
-    // There may be things we don't want to add, but just add them all of now
-    if (decl->loc.isValid())
+    if (decl == nullptr)
+    {
+        return;
+    }
+
+    // If we don't have a loc, we have no way of locating documentation.
+    if (decl->loc.isValid() || decl->nameAndLoc.loc.isValid())
     {
         outDecls.add(decl);
+    }
+    else
+    {
+        SLANG_ASSERT(!"Decl without a location!");
+    }
+
+    if (GenericDecl* genericDecl = as<GenericDecl>(decl))
+    {
+        _addDeclRec(genericDecl->inner, outDecls);
     }
 
     if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
@@ -840,7 +875,10 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             Decl* decl = decls[i];
             auto& item = inputItems[i];
 
-            item.sourceLoc = decl->loc;
+            item.sourceLoc = decl->loc.isValid() ? decl->loc : decl->nameAndLoc.loc;
+            // Has to be valid to be lookupable
+            SLANG_ASSERT(item.sourceLoc.isValid());
+
             item.searchStyle = getSearchStyle(decl);
         }
 
