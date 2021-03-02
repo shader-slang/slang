@@ -17,6 +17,16 @@ syntax constexpr : ConstExprModifier;
 // visible at the global-memory scope
 syntax globallycoherent : GloballyCoherentModifier;
 
+/// Modifier to disable inteprolation and force per-vertex passing of a varying attribute.
+///
+/// When a varying attribute passed to the fragment shader is marked `pervertex`, it will
+/// not be interpolated during rasterization (similar to `nointerpolate` attributes).
+/// Unlike a plain `nointerpolate` attribute, this modifier indicates that the attribute
+/// should *only* be acccessed through the `GetAttributeAtVertex()` operation, so access its
+/// distinct per-vertex values.
+///
+syntax pervertex : PerVertexModifier;
+
 // A type that can be used as an operand for builtins
 [sealed]
 [builtin]

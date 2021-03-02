@@ -158,6 +158,17 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
         }
         break;
 
+    case DeclaratorInfo::Flavor::LiteralSizedArray:
+        {
+            auto arrayDeclarator = (LiteralSizedArrayDeclaratorInfo*)declarator;
+            emitDeclarator(arrayDeclarator->next);
+            m_writer->emit("[");
+            m_writer->emit(arrayDeclarator->elementCount);
+            m_writer->emit("]");
+        }
+        break;
+
+
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
         break;

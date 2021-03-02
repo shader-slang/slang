@@ -75,6 +75,7 @@ public:
             Ptr,
             SizedArray,
             UnsizedArray,
+            LiteralSizedArray,
         };
         Flavor flavor;
 
@@ -127,6 +128,16 @@ public:
     {
         UnsizedArrayDeclaratorInfo(DeclaratorInfo* next)
             : ChainedDeclaratorInfo(Flavor::UnsizedArray, next)
+        {}
+    };
+
+    struct LiteralSizedArrayDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        IRIntegerValue elementCount;
+
+        LiteralSizedArrayDeclaratorInfo(DeclaratorInfo* next, IRIntegerValue elementCount)
+            : ChainedDeclaratorInfo(Flavor::LiteralSizedArray, next)
+            , elementCount(elementCount)
         {}
     };
 
