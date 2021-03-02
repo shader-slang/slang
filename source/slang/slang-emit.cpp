@@ -696,6 +696,10 @@ Result linkAndOptimizeIR(
     return SLANG_OK;
 }
 
+void trackGLSLTargetCaps(
+    GLSLExtensionTracker*   extensionTracker,
+    CapabilitySet const&    caps);
+
 SlangResult emitEntryPointsSourceFromIR(
     BackEndCompileRequest*  compileRequest,
     const List<Int>&        entryPointIndices,
@@ -844,6 +848,8 @@ SlangResult emitEntryPointsSourceFromIR(
 
     if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
     {
+        trackGLSLTargetCaps(glslExtensionTracker, targetRequest->getTargetCaps());
+
         StringBuilder builder;
         glslExtensionTracker->appendExtensionRequireLines(builder);
         sourceWriter.emit(builder.getUnownedSlice());

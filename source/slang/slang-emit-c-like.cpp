@@ -594,6 +594,37 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
         out.appendChar(c);
         prevChar = c;
     }
+
+    if (getSourceLanguage() == SourceLanguage::GLSL)
+    {
+        // It looks like the default glslang name limit is 1024, but let's go a little less so there is some wiggle room
+        const Index maxTokenLength = 1024 - 8;
+
+        const Index length = out.getLength();
+
+        if (length > maxTokenLength)
+        {
+            // We are going to output with a prefix and a hash of the full name
+            const HashCode64 hash = getStableHashCode64(out.getBuffer(), length);
+            // Two hex chars per byte
+            const Index hashSize = sizeof(hash) * 2; 
+
+            // Work out a size that is within range taking into account the hash size and extra chars
+            Index reducedBaseLength = maxTokenLength - hashSize - 1;
+            // If it has a trailing _ remove it.
+            // We know because of scrubbing there can only be single _
+            reducedBaseLength -= Index(out[reducedBaseLength - 1] == '_');
+
+            // Reduce the length
+            out.reduceLength(reducedBaseLength);
+            // Let's add a _ to separate from the rest of the name
+            out.appendChar('_');
+            // Append the hash in hex
+            out.append(uint64_t(hash), 16);
+
+            SLANG_ASSERT(out.getLength() <= maxTokenLength);
+        }
+    }
 }
 
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
