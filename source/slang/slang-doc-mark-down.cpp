@@ -9,6 +9,27 @@ namespace Slang {
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+template <typename T>
+static void _getDeclsOfType(ContainerDecl* containerDecl, List<Decl*>& out)
+{
+    for (Decl* decl : containerDecl->members)
+    {
+        if (as<T>(decl))
+        {
+            out.add(decl);
+        }
+    }
+}
+
+template <typename T>
+static void _toList(FilteredMemberList<T>& list, List<Decl*>& out)
+{
+    for (Decl* decl : list)
+    {
+        out.add(decl);
+    }
+}
+
 static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out)
 {
     List<UnownedStringSlice> lines;
@@ -48,29 +69,9 @@ void DocMarkDownWriter::_appendAsBullets(const List<Decl*>& in)
 template <typename T>
 void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
 {
-    auto& out = m_builder;
-    for (auto element : list)
-    {
-        DocMarkup::Entry* paramEntry = m_markup->getEntry(element);
-
-        out << "* ";
-
-        Name* name = element->getName();
-        if (name)
-        {
-            out << toSlice("_") << name->text << toSlice("_ ");
-        }
-
-        if (paramEntry)
-        {
-            // Hmm, we'll want to make something multiline into a single line
-            _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
-        }
-
-        out << "\n";
-    }
-
-    out << toSlice("\n");
+    List<Decl*> decls;
+    _toList(list, decls);
+    _appendAsBullets(decls);
 }
 
 /* static */void DocMarkDownWriter::getSignature(const List<Part>& parts, Signature& outSig)
@@ -311,6 +312,10 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl*
     {
         out << toSlice("class ");
     }
+    else if (as<InterfaceDecl>(aggTypeDecl))
+    {
+        out << toSlice("interface ");
+    }
     else
     {
         out << toSlice("?");
@@ -323,10 +328,25 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl*
     }
     out << toSlice("\n\n");
 
-    out << "## Fields\n\n";
+    {
+        List<Decl*> fields;
+        _getDeclsOfType<VarDecl>(aggTypeDecl, fields);
+        if (fields.getCount())
+        {
+            out << "## Fields\n\n";
+            _appendAsBullets(fields);
+        }
+    }
 
-    auto fields = aggTypeDecl->getMembersOfType<VarDecl>();
-    _appendAsBullets(fields);
+    {
+        List<Decl*> methods;
+        _getDeclsOfType<CallableDecl>(aggTypeDecl, methods);
+        if (methods.getCount())
+        {
+            out << "## Methods\n\n";
+            _appendAsBullets(methods);
+        }
+    }
 
     writeDescription(entry);
 }

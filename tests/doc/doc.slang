@@ -10,6 +10,22 @@
     ///
 RWStructuredBuffer<int> inputBuffer;       
 
+
+/// An interface to do things
+interface IDoThing
+{
+        /// Add two integers
+    int add(int a,      ///< First parameter 
+        int b           ///< Second parameter
+    );
+    
+        /// Subtract
+        /// Multi-line
+    int sub(int a,      ///< First
+            int b       ///< Second
+    );
+}
+
 /// A struct with some fields
 struct SomeStruct
 {
