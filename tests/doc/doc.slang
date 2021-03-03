@@ -26,6 +26,25 @@ interface IDoThing
     );
 }
 
+interface IThing
+{
+    float getValue();
+};
+
+/// Implement IThing on float
+extension float : IThing
+{
+        /// Just return the float itself!
+	float getValue() { return this; }
+}
+
+struct Thing : IThing, IDoThing
+{
+    int add(int a, int b) { return a + b; }
+    int sub(int a, int b ) { return a - b; }
+    float getValue() { return 1.0f; }
+};
+
 /// A struct with some fields
 struct SomeStruct
 {

@@ -10,6 +10,18 @@ namespace Slang {
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 template <typename T>
+static void _getDecls(ContainerDecl* containerDecl, List<T*>& out)
+{
+    for (Decl* decl : containerDecl->members)
+    {
+        if (T* declAsType = as<T>(decl))
+        {
+            out.add(declAsType);
+        }
+    }
+}
+
+template <typename T>
 static void _getDeclsOfType(ContainerDecl* containerDecl, List<Decl*>& out)
 {
     for (Decl* decl : containerDecl->members)
@@ -295,7 +307,30 @@ void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumD
     writeDescription(entry);
 }
 
-void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl)
+void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl)
+{
+    auto& out = m_builder;
+
+    List<InheritanceDecl*> inheritanceDecls;
+    _getDecls(aggTypeDecl, inheritanceDecls);
+
+    const Index count = inheritanceDecls.getCount();
+    if (count)
+    {
+        out << prefix;
+        for (Index i = 0; i < count; ++i)
+        {
+            InheritanceDecl* inheritanceDecl = inheritanceDecls[i];
+            if (i > 0)
+            {
+                out << toSlice(", ");
+            }
+            out << inheritanceDecl->base;
+        }
+    }
+}
+
+void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
 {
     writePreamble(entry);
 
@@ -316,6 +351,11 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl*
     {
         out << toSlice("interface ");
     }
+    else if (ExtensionDecl* extensionDecl = as<ExtensionDecl>(aggTypeDecl))
+    {
+        out << toSlice("extension ") << extensionDecl->targetType;
+        _appendDerivedFrom(toSlice(" : "), extensionDecl);   
+    }
     else
     {
         out << toSlice("?");
@@ -327,6 +367,26 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl*
         out << name->text;
     }
     out << toSlice("\n\n");
+
+    {
+        List<InheritanceDecl*> inheritanceDecls;
+        _getDecls<InheritanceDecl>(aggTypeDecl, inheritanceDecls);
+
+        if (inheritanceDecls.getCount())
+        {
+            out << "*Derives from:* ";
+
+            for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
+            {
+                if (i > 0)
+                {
+                    out << toSlice(", ");
+                }
+                out << inheritanceDecls[i]->base;
+            }
+            out << toSlice("\n\n");
+        }
+    }
 
     {
         List<Decl*> fields;
@@ -386,7 +446,7 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     {
         writeEnum(entry, enumDecl);
     }
-    else if (AggTypeDecl* aggType = as<AggTypeDecl>(decl))
+    else if (AggTypeDeclBase* aggType = as<AggTypeDeclBase>(decl))
     {
         writeAggType(entry, aggType);
     }

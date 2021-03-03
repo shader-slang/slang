@@ -33,7 +33,7 @@ struct DocMarkDownWriter
 
     void writeCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
     void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
-    void writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl);
+    void writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
     void writeDecl(const DocMarkup::Entry& entry, Decl* decl);
     void writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl);
 
@@ -56,6 +56,9 @@ struct DocMarkDownWriter
     template <typename T>
     void _appendAsBullets(FilteredMemberList<T>& in);
     void _appendAsBullets(const List<Decl*>& in);
+
+        /// Appends prefix and the list of types derived from
+    void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
 
     DocMarkup* m_markup;
     ASTBuilder* m_astBuilder;
