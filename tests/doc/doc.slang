@@ -51,9 +51,18 @@ int doThing(int a,  ///< a parameter
     return a;
 }
 
-T addInts<T : __BuiltinIntegerType, let V : int>(T a, T b)
+/// A rather silly generic function to test out doc extraction
+T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
+    /// Just testing out a 
+    /// non type based generic
+    let U : int,
+    let V : int>    ///< And another one                       
+    (
+    /// CHECKING!!
+    T z,           ///< The Z parameter
+    T b)            ///< The B parameter
 {
-    return a + b;
+    return z + b;
 }
 
 [numthreads(4, 1, 1)]

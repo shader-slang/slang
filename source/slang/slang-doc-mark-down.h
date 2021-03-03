@@ -35,6 +35,7 @@ struct DocMarkDownWriter
     void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
     void writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl);
     void writeDecl(const DocMarkup::Entry& entry, Decl* decl);
+    void writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl);
 
     void writePreamble(const DocMarkup::Entry& entry);
     void writeDescription(const DocMarkup::Entry& entry);

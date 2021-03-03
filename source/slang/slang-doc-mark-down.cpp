@@ -124,6 +124,23 @@ void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
     }
 }
 
+void DocMarkDownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl)
+{
+    writePreamble(entry);
+    auto& out = m_builder;
+
+    out << toSlice("# ") << varDecl->getName()->text << toSlice("\n\n");
+
+    // TODO(JS): The outputting of types this way isn't right - it doesn't handle int a[10] for example. 
+    //ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames);
+
+    out << toSlice("```\n");
+    out << varDecl->type << toSlice(" ") << varDecl <<  toSlice("\n");
+    out << toSlice("```\n");
+
+    writeDescription(entry);
+}
+
 void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
 {
     writePreamble(entry);
@@ -353,11 +370,13 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     {
         writeAggType(entry, aggType);
     }
-    else if (GenericDecl* genericDecl = as<GenericDecl>(decl))
+    else if (VarDecl* varDecl = as<VarDecl>(decl))
     {
-
-
-        writeDecl(entry, genericDecl->inner);
+        writeVar(entry, varDecl);
+    }
+    else if (as<GenericDecl>(decl))
+    {
+        // We can ignore as inner decls will be picked up, and written
     }
 }
 
