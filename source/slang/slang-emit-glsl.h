@@ -58,6 +58,8 @@ protected:
     void _emitGLSLByteAddressBuffer(IRGlobalParam* varDecl, IRByteAddressBufferTypeBase* byteAddressBufferType);
     void _emitGLSLParameterGroup(IRGlobalParam* varDecl, IRUniformParameterGroupType* type);
 
+    void _emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* param, IRType* type);
+
     void _emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType);
 
     void _emitGLSLLayoutQualifiers(IRVarLayout* layout, EmitVarChain* inChain, LayoutResourceKind filter = LayoutResourceKind::None);

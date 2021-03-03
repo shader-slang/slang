@@ -116,6 +116,8 @@ enum class IRInterpolationMode
 
     Centroid,
     Sample,
+
+    PerVertex,
 };
 
 struct IRInterpolationModeDecoration : IRDecoration
