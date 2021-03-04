@@ -6,7 +6,7 @@
 //WORKING:#include "options.h"
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
-#include "../dummy-render-pass-layout.h"
+#include "../simple-render-pass-layout.h"
 #include "core/slang-blob.h"
 #include "core/slang-basic.h"
 
@@ -334,13 +334,13 @@ protected:
         DepthStencilClearValue depthStencilClearValue;
     };
 
-    class RenderPassLayoutImpl : public DummyRenderPassLayout
+    class RenderPassLayoutImpl : public SimpleRenderPassLayout
     {
     public:
         RefPtr<FramebufferLayoutImpl> m_framebufferLayout;
         void init(const IRenderPassLayout::Desc& desc)
         {
-            DummyRenderPassLayout::init(desc);
+            SimpleRenderPassLayout::init(desc);
             m_framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
         }
     };
@@ -1022,18 +1022,17 @@ protected:
                 setPipelineStateImpl(state);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+                bindRootShaderObject(IShaderObject* object) override
             {
-                bindRootShaderObjectImpl(pipelineType, object);
+                bindRootShaderObjectImpl(PipelineType::Graphics, object);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                PipelineType pipelineType,
                 IPipelineLayout* layout,
                 UInt index,
                 IDescriptorSet* descriptorSet) override
             {
-                setDescriptorSetImpl(pipelineType, layout, index, descriptorSet);
+                setDescriptorSetImpl(PipelineType::Graphics, layout, index, descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1306,18 +1305,17 @@ protected:
                 setPipelineStateImpl(state);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+                bindRootShaderObject(IShaderObject* object) override
             {
-                bindRootShaderObjectImpl(pipelineType, object);
+                bindRootShaderObjectImpl(PipelineType::Compute, object);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                PipelineType pipelineType,
                 IPipelineLayout* layout,
                 UInt index,
                 IDescriptorSet* descriptorSet) override
             {
-                setDescriptorSetImpl(pipelineType, layout, index, descriptorSet);
+                setDescriptorSetImpl(PipelineType::Compute, layout, index, descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override

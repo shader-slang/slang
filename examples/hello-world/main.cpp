@@ -502,7 +502,7 @@ void renderFrame()
     // the `Uniforms` buffer that will filled in above).
     //
     renderEncoder->setPipelineState(gPipelineState);
-    renderEncoder->bindRootShaderObject(PipelineType::Graphics, gRootObject);
+    renderEncoder->bindRootShaderObject(gRootObject);
 
     // We also need to set up a few pieces of fixed-function pipeline
     // state that are not bound by the pipeline state above.

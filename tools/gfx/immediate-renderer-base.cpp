@@ -1,5 +1,5 @@
 #include "immediate-renderer-base.h"
-#include "dummy-render-pass-layout.h"
+#include "simple-render-pass-layout.h"
 #include "command-writer.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -64,7 +64,7 @@ public:
         CommandWriter* m_writer;
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 
-        void init(CommandBufferImpl* cmdBuffer, DummyRenderPassLayout* renderPass, IFramebuffer* framebuffer)
+        void init(CommandBufferImpl* cmdBuffer, SimpleRenderPassLayout* renderPass, IFramebuffer* framebuffer)
         {
             m_writer = &cmdBuffer->m_writer;
 
@@ -105,18 +105,17 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            bindRootShaderObject(PipelineType pipelineType, IShaderObject* object)
+            bindRootShaderObject(IShaderObject* object)
         {
-            m_writer->bindRootShaderObject(pipelineType, object);
+            m_writer->bindRootShaderObject(PipelineType::Graphics, object);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            PipelineType pipelineType,
             IPipelineLayout* layout,
             UInt index,
             IDescriptorSet* descriptorSet)
         {
-            m_writer->setDescriptorSet(pipelineType, layout, index, descriptorSet);
+            m_writer->setDescriptorSet(PipelineType::Graphics, layout, index, descriptorSet);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
@@ -174,7 +173,7 @@ public:
     {
         m_renderCommandEncoder.init(
             this,
-            static_cast<DummyRenderPassLayout*>(renderPass),
+            static_cast<SimpleRenderPassLayout*>(renderPass),
             framebuffer);
         *outEncoder = &m_renderCommandEncoder;
     }
@@ -214,18 +213,17 @@ public:
             m_writer->setPipelineState(state);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL
-            bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+            bindRootShaderObject(IShaderObject* object) override
         {
-            m_writer->bindRootShaderObject(pipelineType, object);
+            m_writer->bindRootShaderObject(PipelineType::Compute, object);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            PipelineType pipelineType,
             IPipelineLayout* layout,
             UInt index,
             IDescriptorSet* descriptorSet) override
         {
-            m_writer->setDescriptorSet(pipelineType, layout, index, descriptorSet);
+            m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -506,7 +504,7 @@ SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createRenderPassLayout(
     const IRenderPassLayout::Desc& desc,
     IRenderPassLayout** outRenderPassLayout)
 {
-    RefPtr<DummyRenderPassLayout> renderPass = new DummyRenderPassLayout();
+    RefPtr<SimpleRenderPassLayout> renderPass = new SimpleRenderPassLayout();
     renderPass->init(desc);
     *outRenderPassLayout = renderPass.detach();
     return SLANG_OK;

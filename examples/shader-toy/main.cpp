@@ -574,7 +574,7 @@ void renderFrame()
     viewport.extentY = (float)gWindowHeight;
     encoder->setViewportAndScissor(viewport);
     encoder->setPipelineState(gPipelineState);
-    encoder->setDescriptorSet(PipelineType::Graphics, gPipelineLayout, 0, gDescriptorSet);
+    encoder->setDescriptorSet(gPipelineLayout, 0, gDescriptorSet);
     encoder->setVertexBuffer(0, gVertexBuffer, sizeof(FullScreenTriangle::Vertex));
     encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->draw(3);

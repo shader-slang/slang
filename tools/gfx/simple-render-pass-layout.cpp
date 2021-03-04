@@ -1,18 +1,18 @@
-#include "dummy-render-pass-layout.h"
+#include "simple-render-pass-layout.h"
 
 #include "renderer-shared.h"
 
 namespace gfx
 {
 
-IRenderPassLayout* DummyRenderPassLayout::getInterface(const Slang::Guid& guid)
+IRenderPassLayout* SimpleRenderPassLayout::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IRenderPassLayout)
         return static_cast<IRenderPassLayout*>(this);
     return nullptr;
 }
 
-void DummyRenderPassLayout::init(const IRenderPassLayout::Desc& desc)
+void SimpleRenderPassLayout::init(const IRenderPassLayout::Desc& desc)
 {
     m_renderTargetAccesses.setCount(desc.renderTargetCount);
     for (uint32_t i = 0; i < desc.renderTargetCount; i++)

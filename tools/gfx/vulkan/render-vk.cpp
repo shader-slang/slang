@@ -45,6 +45,7 @@ public:
         kMaxDescriptorSets = 8,
     };
     // Renderer    implementation
+    Result initVulkanInstanceAndDevice(bool useValidationLayer);
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
@@ -1249,18 +1250,17 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                PipelineType pipelineType,
                 IPipelineLayout* layout,
                 UInt index,
                 IDescriptorSet* descriptorSet) override
             {
-                setDescriptorSetImpl(pipelineType, layout, index, descriptorSet);
+                setDescriptorSetImpl(PipelineType::Graphics, layout, index, descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+                bindRootShaderObject(IShaderObject* object) override
             {
-                bindRootShaderObjectImpl(pipelineType, object);
+                bindRootShaderObjectImpl(PipelineType::Graphics, object);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1317,9 +1317,25 @@ public:
                 setPrimitiveTopology(PrimitiveTopology topology) override
             {
                 auto& api = *m_api;
-                api.vkCmdSetPrimitiveTopologyEXT(
-                    m_vkCommandBuffer,
-                    VulkanUtil::getVkPrimitiveTopology(topology));
+                if (api.vkCmdSetPrimitiveTopologyEXT)
+                {
+                    api.vkCmdSetPrimitiveTopologyEXT(
+                        m_vkCommandBuffer,
+                        VulkanUtil::getVkPrimitiveTopology(topology));
+                }
+                else
+                {
+                    switch (topology)
+                    {
+                    case PrimitiveTopology::TriangleList:
+                        break;
+                    default:
+                        // We are using a non-list topology, but we don't have dynmaic state
+                        // extension, error out.
+                        assert(!"Non-list topology requires VK_EXT_extended_dynamic_states, which is not present.");
+                        break;
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
@@ -1469,18 +1485,17 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                PipelineType pipelineType,
                 IPipelineLayout* layout,
                 UInt index,
                 IDescriptorSet* descriptorSet) override
             {
-                setDescriptorSetImpl(pipelineType, layout, index, descriptorSet);
+                setDescriptorSetImpl(PipelineType::Compute, layout, index, descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+                bindRootShaderObject(IShaderObject* object) override
             {
-                bindRootShaderObjectImpl(pipelineType, object);
+                bindRootShaderObjectImpl(PipelineType::Compute, object);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -1906,6 +1921,7 @@ public:
     VulkanApi m_api;
 
     VulkanDeviceQueue m_deviceQueue;
+    uint32_t m_queueFamilyIndex;
 
     Desc m_desc;
 
@@ -1977,6 +1993,8 @@ VKRenderer::~VKRenderer()
     {
         m_api.vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
+        if (m_api.m_instance != VK_NULL_HANDLE)
+            m_api.vkDestroyInstance(m_api.m_instance, nullptr);
     }
 }
 
@@ -2055,16 +2073,8 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult VKRenderer::initialize(const Desc& desc)
+Result VKRenderer::initVulkanInstanceAndDevice(bool useValidationLayer)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_SPIRV, "sm_5_1"));
-
-    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
-
-    SLANG_RETURN_ON_FAIL(m_module.init());
-    SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
-    descriptorSetAllocator.m_api = &m_api;
-    m_desc = desc;
     m_queueAllocCount = 0;
 
     VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -2097,69 +2107,71 @@ SlangResult VKRenderer::initialize(const Desc& desc)
     instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
-#if ENABLE_VALIDATION_LAYER
-    // Depending on driver version, validation layer may or may not exist.
-    // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
-    // drivers provide only the deprecated
-    // "VK_LAYER_LUNARG_standard_validation" layer.
-    // We will check what layers are available, and use the newer
-    // "VK_LAYER_KHRONOS_validation" layer when possible.
-    uint32_t layerCount;
-    m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    List<VkLayerProperties> availableLayers;
-    availableLayers.setCount(layerCount);
-    m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
-
-    const char* layerNames[] = { nullptr };
-    for (auto& layer : availableLayers)
+    if (useValidationLayer)
     {
-        if (strncmp(
-                layer.layerName,
-                "VK_LAYER_KHRONOS_validation",
-                sizeof("VK_LAYER_KHRONOS_validation")) == 0)
-        {
-            layerNames[0] = "VK_LAYER_KHRONOS_validation";
-            break;
-        }
-    }
-    // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
-    // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
-    if (!layerNames[0])
-    {
+        // Depending on driver version, validation layer may or may not exist.
+        // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
+        // drivers provide only the deprecated
+        // "VK_LAYER_LUNARG_standard_validation" layer.
+        // We will check what layers are available, and use the newer
+        // "VK_LAYER_KHRONOS_validation" layer when possible.
+        uint32_t layerCount;
+        m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        List<VkLayerProperties> availableLayers;
+        availableLayers.setCount(layerCount);
+        m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
+
+        const char* layerNames[] = { nullptr };
         for (auto& layer : availableLayers)
         {
             if (strncmp(
-                    layer.layerName,
-                    "VK_LAYER_LUNARG_standard_validation",
-                    sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                layer.layerName,
+                "VK_LAYER_KHRONOS_validation",
+                sizeof("VK_LAYER_KHRONOS_validation")) == 0)
             {
-                layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                layerNames[0] = "VK_LAYER_KHRONOS_validation";
                 break;
             }
         }
+        // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
+        // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
+        if (!layerNames[0])
+        {
+            for (auto& layer : availableLayers)
+            {
+                if (strncmp(
+                    layer.layerName,
+                    "VK_LAYER_LUNARG_standard_validation",
+                    sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                {
+                    layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                    break;
+                }
+            }
+        }
+        if (layerNames[0])
+        {
+            instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
+            instanceCreateInfo.ppEnabledLayerNames = layerNames;
+        }
     }
-    if (layerNames[0])
-    {
-        instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
-        instanceCreateInfo.ppEnabledLayerNames = layerNames;
-    }
-#endif
 
     if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
-#if ENABLE_VALIDATION_LAYER
-    VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+    if (useValidationLayer)
+    {
+        VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
-    VkDebugReportCallbackCreateInfoEXT debugCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
-    debugCreateInfo.pfnCallback = &debugMessageCallback;
-    debugCreateInfo.pUserData = this;
-    debugCreateInfo.flags = debugFlags;
+        VkDebugReportCallbackCreateInfoEXT debugCreateInfo = { VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT };
+        debugCreateInfo.pfnCallback = &debugMessageCallback;
+        debugCreateInfo.pUserData = this;
+        debugCreateInfo.flags = debugFlags;
 
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
-#endif
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
+    }
 
     uint32_t numPhysicalDevices = 0;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
@@ -2170,11 +2182,11 @@ SlangResult VKRenderer::initialize(const Desc& desc)
 
     Index selectedDeviceIndex = 0;
 
-    if (desc.adapter)
+    if (m_desc.adapter)
     {
         selectedDeviceIndex = -1;
 
-        String lowerAdapter = String(desc.adapter).toLower();
+        String lowerAdapter = String(m_desc.adapter).toLower();
 
         for (Index i = 0; i < physicalDevices.getCount(); ++i)
         {
@@ -2202,7 +2214,6 @@ SlangResult VKRenderer::initialize(const Desc& desc)
 
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    deviceExtensions.add(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
 
     VkDeviceCreateInfo deviceCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceCreateInfo.queueCreateInfoCount = 1;
@@ -2322,12 +2333,12 @@ SlangResult VKRenderer::initialize(const Desc& desc)
         }
     }
 
-    int queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
-    assert(queueFamilyIndex >= 0);
+    m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
+    assert(m_queueFamilyIndex >= 0);
 
     float queuePriority = 0.0f;
     VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
+    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
@@ -2335,15 +2346,31 @@ SlangResult VKRenderer::initialize(const Desc& desc)
 
     deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
-    
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device));
+
+    if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
+        return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
+    return SLANG_OK;
+}
+
+SlangResult VKRenderer::initialize(const Desc& desc)
+{
+    m_desc = desc;
+
+    SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
+
+    SLANG_RETURN_ON_FAIL(m_module.init());
+    SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
+    descriptorSetAllocator.m_api = &m_api;
+    SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice(false));
     {
         VkQueue queue;
-        m_api.vkGetDeviceQueue(m_device, queueFamilyIndex, 0, &queue);
-        SLANG_RETURN_ON_FAIL(m_deviceQueue.init(m_api, queue, queueFamilyIndex));
+        m_api.vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &queue);
+        SLANG_RETURN_ON_FAIL(m_deviceQueue.init(m_api, queue, m_queueFamilyIndex));
     }
+
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_SPIRV, "sm_5_1"));
     return SLANG_OK;
 }
 
@@ -3813,7 +3840,27 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    // Use PRITIMVE_LIST topology for each primitive type here.
+    // All other forms of primitive toplogies are specified via dynamic state.
+    switch (inDesc.primitiveType)
+    {
+    case PrimitiveType::Point:
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        break;
+    case PrimitiveType::Line:
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+        break;
+    case PrimitiveType::Triangle:
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        break;
+    case PrimitiveType::Patch:
+        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+        break;
+    default:
+        assert(!"unknown topology type.");
+        break;
+    }
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkViewport viewport = {};

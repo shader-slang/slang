@@ -479,7 +479,7 @@ void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommand
             ComPtr<IComputeCommandEncoder> computeEncoder;
             encoder->queryInterface(
                 SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
-            computeEncoder->bindRootShaderObject(pipelineType, m_programVars);
+            computeEncoder->bindRootShaderObject(m_programVars);
         }
         break;
     case PipelineType::Graphics:
@@ -487,7 +487,7 @@ void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommand
             ComPtr<IRenderCommandEncoder> renderEncoder;
             encoder->queryInterface(
                 SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
-            renderEncoder->bindRootShaderObject(pipelineType, m_programVars);
+            renderEncoder->bindRootShaderObject(m_programVars);
         }
         break;
     default:

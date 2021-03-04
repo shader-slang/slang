@@ -1,4 +1,4 @@
-// dummy-render-pass-layout.h
+// simple-render-pass-layout.h
 #pragma once
 
 // Implementation of a dummy render pass layout object that stores and holds its
@@ -12,7 +12,7 @@
 namespace gfx
 {
 
-class DummyRenderPassLayout
+class SimpleRenderPassLayout
     : public IRenderPassLayout
     , public Slang::RefObject
 {

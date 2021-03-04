@@ -182,7 +182,7 @@ Result execute()
     // TODO: need to copy a zero into the start of the print buffer!
 
     gDescriptorSet->setResource(0, 0, printBufferView);
-    encoder->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
+    encoder->setDescriptorSet(gPipelineLayout, 0, gDescriptorSet);
 
     encoder->setPipelineState(gPipelineState);
     encoder->dispatchCompute(1, 1, 1);

@@ -217,7 +217,7 @@ int main()
         auto commandBuffer = queue->createCommandBuffer();
         auto encoder = commandBuffer->encodeComputeCommands();
         encoder->setPipelineState(pipelineState);
-        encoder->bindRootShaderObject(gfx::PipelineType::Compute, rootObject);
+        encoder->bindRootShaderObject(rootObject);
         encoder->dispatchCompute(1, 1, 1);
         encoder->endEncoding();
         commandBuffer->close();

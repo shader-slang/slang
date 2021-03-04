@@ -395,7 +395,6 @@ void GUI::endFrame(IFramebuffer* framebuffer)
                     samplerState);
 
                 renderEncoder->setDescriptorSet(
-                    PipelineType::Graphics,
                     pipelineLayout,
                     0,
                     descriptorSet);

@@ -1249,10 +1249,9 @@ class IRenderCommandEncoder : public ICommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) = 0;
+        bindRootShaderObject(IShaderObject* object) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
         IPipelineLayout* layout,
         UInt index,
         IDescriptorSet* descriptorSet) = 0;
@@ -1300,10 +1299,9 @@ class IComputeCommandEncoder : public ICommandEncoder
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL
-        bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) = 0;
+        bindRootShaderObject(IShaderObject* object) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
         IPipelineLayout* layout,
         UInt index,
         IDescriptorSet* descriptorSet) = 0;

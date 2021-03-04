@@ -15,7 +15,7 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
         {
             ComPtr<IComputeCommandEncoder> computeEncoder;
             encoder->queryInterface(SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
-            computeEncoder->setDescriptorSet(pipelineType, pipelineLayout, 0, descriptorSet);
+            computeEncoder->setDescriptorSet(pipelineLayout, 0, descriptorSet);
         }
         break;
     case PipelineType::Graphics:
@@ -23,7 +23,7 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
             ComPtr<IRenderCommandEncoder> renderEncoder;
             encoder->queryInterface(
                 SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
-            renderEncoder->setDescriptorSet(pipelineType, pipelineLayout, 0, descriptorSet);
+            renderEncoder->setDescriptorSet(pipelineLayout, 0, descriptorSet);
         }
         break;
     default:
