@@ -19,6 +19,9 @@ enum class MapFlavor
 
 class ImmediateRendererBase : public GraphicsAPIRenderer
 {
+private:
+    ComPtr<IPipelineState> m_currentPipelineState;
+
 public:
     // Immediate commands to be implemented by each target.
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
@@ -56,6 +59,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() = 0;
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual void unmap(IBufferResource* buffer) = 0;
+    void bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject);
 
 public:
     Slang::ComPtr<ICommandQueue> m_queue;
@@ -68,6 +72,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createRenderPassLayout(
         const IRenderPassLayout::Desc& desc,
         IRenderPassLayout** outRenderPassLayout) override;
+
+    void _setPipelineState(IPipelineState* state);
 
     void uploadBufferData(
         IBufferResource* dst,

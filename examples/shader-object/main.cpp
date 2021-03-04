@@ -136,7 +136,7 @@ int main()
     // interacting with the graphics API.
     Slang::ComPtr<gfx::IRenderer> renderer;
     IRenderer::Desc rendererDesc = {};
-    rendererDesc.rendererType = RendererType::CUDA;
+    rendererDesc.rendererType = RendererType::DirectX11;
     SLANG_RETURN_ON_FAIL(gfxCreateRenderer(&rendererDesc, renderer.writeRef()));
 
     // Now we can load the shader code.

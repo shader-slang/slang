@@ -244,7 +244,7 @@ Slang::Result initialize()
     // platforms/APIs.
     //
     IRenderer::Desc rendererDesc = {};
-    rendererDesc.rendererType = gfx::RendererType::Vulkan;
+    rendererDesc.rendererType = gfx::RendererType::DirectX11;
     gfx::Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 

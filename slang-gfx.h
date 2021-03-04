@@ -371,7 +371,7 @@ union ColorClearValue
 };
 struct ClearValue
 {
-    ColorClearValue color = {0.0f, 0.0f, 0.0f, 0.0f};
+    ColorClearValue color = {{0.0f, 0.0f, 0.0f, 0.0f}};
     DepthStencilClearValue depthStencil;
 };
 

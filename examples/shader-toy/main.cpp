@@ -353,7 +353,7 @@ Result initialize()
     gWindow = createWindow(windowDesc);
 
     IRenderer::Desc rendererDesc;
-    rendererDesc.rendererType = RendererType::Vulkan;
+    rendererDesc.rendererType = RendererType::DirectX11;
     Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
     if(SLANG_FAILED(res)) return res;
 

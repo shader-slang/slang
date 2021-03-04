@@ -285,7 +285,8 @@ Window* createWindow(WindowDesc const& desc)
         (LPWSTR) getWindowClassAtom(),
         windowTitle,
         windowStyle,
-        0, 0, // x, y
+        CW_USEDEFAULT,
+        0, // x, y
         windowRect.right,
         windowRect.bottom,
         NULL, // parent
