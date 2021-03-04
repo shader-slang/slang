@@ -214,7 +214,8 @@ void Session::addBuiltins(
     addBuiltinSource(
         coreLanguageScope,
         sourcePath,
-        sourceString);
+        sourceString,
+        0);
 }
 
 void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
@@ -245,7 +246,7 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
-SlangResult Session::compileStdLib()
+SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count())
     {
@@ -254,8 +255,8 @@ SlangResult Session::compileStdLib()
     }
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
-    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode(), compileFlags);
+    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode(), compileFlags);
     return SLANG_OK;
 }
 
@@ -3607,7 +3608,8 @@ RefPtr<Module> findOrImportModule(
 void Session::addBuiltinSource(
     RefPtr<Scope> const&    scope,
     String const&           path,
-    String const&           source)
+    String const&           source,
+    slang::CompileStdLibFlags flags)
 {
     SourceManager* sourceManager = getBuiltinSourceManager();
 
@@ -3616,6 +3618,8 @@ void Session::addBuiltinSource(
         m_builtinLinkage,
         &sink);
     compileRequest->m_isStandardLibraryCode = true;
+
+    compileRequest->shouldDocument = (flags & slang::CompileStdLibFlag::WriteDocumentation) != 0;
 
     // Set the source manager on the sink
     sink.setSourceManager(sourceManager);

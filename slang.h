@@ -2959,6 +2959,15 @@ namespace slang
         }
     };
 
+    typedef uint32_t CompileStdLibFlags;
+    struct CompileStdLibFlag
+    {
+        enum Enum : CompileStdLibFlags
+        {
+            WriteDocumentation = 0x1,
+        };
+    };
+
     typedef ISlangBlob IBlob;
 
     struct IComponentType;
@@ -3125,9 +3134,10 @@ namespace slang
 
             /** Compile from (embedded source) the StdLib on the session.
             Will return a failure if there is already a StdLib available
-            NOTE! API is experimental and not ready for production code 
+            NOTE! API is experimental and not ready for production code
+            @param flags to control compilation
             */
-        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() = 0;
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(CompileStdLibFlags flags) = 0;
 
             /** Load the StdLib. Currently loads modules from the file system. 
             @param stdLib Start address of the serialized stdlib

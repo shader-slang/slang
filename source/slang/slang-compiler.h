@@ -2176,7 +2176,7 @@ namespace Slang
         SLANG_NO_THROW SlangResult SLANG_MCALL checkCompileTargetSupport(SlangCompileTarget target) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL checkPassThroughSupport(SlangPassThrough passThrough) override;
 
-        SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib() override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL compileStdLib(slang::CompileStdLibFlags flags) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL loadStdLib(const void* stdLib, size_t stdLibSizeInBytes) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL saveStdLib(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
@@ -2263,7 +2263,8 @@ namespace Slang
         void addBuiltinSource(
             RefPtr<Scope> const&    scope,
             String const&           path,
-            String const&           source);
+            String const&           source,
+            slang::CompileStdLibFlags compileFlags);
         ~Session();
 
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)

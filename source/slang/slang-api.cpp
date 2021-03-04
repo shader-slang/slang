@@ -32,7 +32,7 @@ SLANG_API SlangResult slang_createGlobalSession(
     }
     else
     {
-        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+        SLANG_RETURN_ON_FAIL(globalSession->compileStdLib(0));
     }
 
     *outGlobalSession = globalSession.detach();
