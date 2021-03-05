@@ -1017,18 +1017,17 @@ public:
                 m_writer->setPipelineState(state);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
+                bindRootShaderObject(IShaderObject* object) override
             {
-                m_writer->bindRootShaderObject(pipelineType, object);
+                m_writer->bindRootShaderObject(PipelineType::Compute, object);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                PipelineType pipelineType,
                 IPipelineLayout* layout,
                 UInt index,
                 IDescriptorSet* descriptorSet) override
             {
-                m_writer->setDescriptorSet(pipelineType, layout, index, descriptorSet);
+                m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override

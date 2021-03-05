@@ -1,3 +1,8 @@
+// This example is out of date and currently disabled from build.
+// The `gfx` layer has been refactored with a new command list based
+// model. The example must be updated to use the new `gfx` interface
+// before it can be included in build.
+
 #if 0
 // main.cpp
 
