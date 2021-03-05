@@ -54,9 +54,12 @@ RWStructuredBuffer<int> inputBuffer;
 /// An interface to do things
 interface IDoThing
 {
+        /// An associated type
+    associatedtype V;
+    
         /// Add two integers
-    int add(int a,      ///< First parameter 
-        int b           ///< Second parameter
+    V add(V a,      ///< First parameter 
+        V b           ///< Second parameter
     );
     
         /// Subtract
@@ -80,6 +83,8 @@ extension float : IThing
 
 struct Thing : IThing, IDoThing
 {
+    typedef int V;
+    
     int add(int a, int b) { return a + b; }
     int sub(int a, int b ) { return a - b; }
     float getValue() { return 1.0f; }

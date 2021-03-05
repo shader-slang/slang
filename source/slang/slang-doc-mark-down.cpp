@@ -86,6 +86,18 @@ void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
     _appendAsBullets(decls);
 }
 
+void DocMarkDownWriter::_appendCommaList(List<InheritanceDecl*>& inheritanceDecls)
+{
+    for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
+    {
+        if (i > 0)
+        {
+            m_builder << toSlice(", ");
+        }
+        m_builder << inheritanceDecls[i]->base;
+    }
+}
+
 /* static */void DocMarkDownWriter::getSignature(const List<Part>& parts, Signature& outSig)
 {
     const Index count = parts.getCount();
@@ -325,6 +337,8 @@ void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, Agg
     }
 }
 
+
+
 void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
 {
     writePreamble(entry);
@@ -370,15 +384,43 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         if (inheritanceDecls.getCount())
         {
             out << "*Implements:* ";
+            _appendCommaList(inheritanceDecls);
+            out << toSlice("\n\n");
+        }
+    }
 
-            for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
-            {
-                if (i > 0)
+    {
+        List<AssocTypeDecl*> assocTypeDecls;
+        _getDecls<AssocTypeDecl>(aggTypeDecl, assocTypeDecls);
+
+        if (assocTypeDecls.getCount())
+        {
+            out << toSlice("# Associated types\n\n");
+
+            for (AssocTypeDecl* assocTypeDecl : assocTypeDecls)
+            {    
+                out << "* _" << assocTypeDecl->getName()->text << "_ ";
+
+                // Look up markup
+                DocMarkup::Entry* assocTypeDeclEntry = m_markup->getEntry(assocTypeDecl);
+                if (assocTypeDeclEntry)
                 {
-                    out << toSlice(", ");
+                    _appendAsSingleLine(assocTypeDeclEntry->m_markup.getUnownedSlice(), out);
                 }
-                out << inheritanceDecls[i]->base;
+                out << toSlice("\n");
+
+                
+                List<InheritanceDecl*> inheritanceDecls;
+                _getDecls<InheritanceDecl>(assocTypeDecl, inheritanceDecls);
+
+                if (inheritanceDecls.getCount())
+                {
+                    out << "  ";
+                    _appendCommaList(inheritanceDecls);
+                    out << toSlice("\n");
+                }
             }
+
             out << toSlice("\n\n");
         }
     }
@@ -450,7 +492,7 @@ void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
 void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
 {
     // Skip these they will be output as part of their respective 'containers'
-    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl))
+    if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl))
     {
         return; 
     }
@@ -469,6 +511,12 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     }
     else if (VarDecl* varDecl = as<VarDecl>(decl))
     {
+        // If part of aggregate type will be output there.
+        if (as<AggTypeDecl>(varDecl->parentDecl))
+        {
+            return;
+        }
+
         writeVar(entry, varDecl);
     }
     else if (as<GenericDecl>(decl))

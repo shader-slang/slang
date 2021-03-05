@@ -57,6 +57,8 @@ struct DocMarkDownWriter
     void _appendAsBullets(FilteredMemberList<T>& in);
     void _appendAsBullets(const List<Decl*>& in);
 
+    void _appendCommaList(List<InheritanceDecl*>& inheritanceDecls);
+
         /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
 

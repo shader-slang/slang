@@ -322,6 +322,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
+            case TokenType::LBrace:
             case TokenType::LBracket:
             case TokenType::LParent:
             case TokenType::OpLess:
@@ -636,6 +637,9 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
         case SearchStyle::Before:
+        {
+            return _findMarkup(info, Location::Before, out);
+        }
         case SearchStyle::Function:
         {
             return _findMarkup(info, Location::Before, out);
