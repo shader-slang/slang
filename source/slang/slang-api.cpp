@@ -27,9 +27,10 @@ SlangResult tryLoadStdLibFromCache(
     Slang::String& outCachePath,
     uint64_t& outTimestamp)
 {
-    auto fileName = Slang::SharedLibraryUtils::getSharedLibraryFileName(slang_createGlobalSession);
+    auto fileName =
+        Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)slang_createGlobalSession);
     uint64_t currentLibTimestamp =
-        Slang::SharedLibraryUtils::getSharedLibraryTimestamp(slang_createGlobalSession);
+        Slang::SharedLibraryUtils::getSharedLibraryTimestamp((void*)slang_createGlobalSession);
     auto dirName = Slang::Path::getParentDirectory(fileName);
     auto cacheFileName = Slang::Path::combine(dirName, "slang-stdlib.bin");
     outTimestamp = currentLibTimestamp;
