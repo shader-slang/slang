@@ -1,5 +1,5 @@
 // slang-doc.cpp
-#include "slang-doc.h"
+#include "slang-doc-extractor.h"
 
 #include "../core/slang-string-util.h"
 
@@ -17,125 +17,6 @@ namespace Slang {
 * Need a way to take the extracted markup and produce suitable markdown
 ** This will need to display the decoration appropriately
 */
-
-/* Extracts 'markup' from comments in Slang source core. The comments are extracted and associated in declarations. The association
-is held in DocMarkup type. The comment style follows the doxygen style */
-class DocMarkupExtractor 
-{
-public:
-
-    typedef uint32_t MarkupFlags;
-    struct MarkupFlag
-    {
-        enum Enum : MarkupFlags
-        {
-            Before          = 0x1,
-            After           = 0x2,
-            IsMultiToken    = 0x4,          ///< Can use more than one token
-            IsBlock         = 0x8,          ///< 
-        };
-    };
-
-    // NOTE! Don't change order without fixing isBefore and isAfter
-    enum class MarkupType
-    {
-        None,
-
-        BlockBefore,        /// /**  */ or /*!  */.
-        LineBangBefore,      /// //! Can be multiple lines
-        LineSlashBefore,     /// /// Can be multiple lines
-
-        BlockAfter,         /// /*!< */ or /**< */
-        LineBangAfter,       /// //!< Can be multiple lines
-        LineSlashAfter,      /// ///< Can be multiple lines
-    };
-
-    static bool isBefore(MarkupType type) { return Index(type) >= Index(MarkupType::BlockBefore) && Index(type) <= Index(MarkupType::LineSlashBefore); }
-    static bool isAfter(MarkupType type) { return Index(type) >= Index(MarkupType::BlockAfter); }
-
-    struct IndexRange
-    {
-        SLANG_FORCE_INLINE Index getCount() const { return end - start; }
-
-        Index start;
-        Index end;
-    };
-
-    enum class Location
-    {
-        None,                           ///< No defined location
-        Before,
-        AfterParam,                     ///< Can have trailing , or )
-        AfterSemicolon,                 ///< Can have a trailing ;
-        AfterEnumCase,                  ///< Can have a , or before }
-    };
-
-    static bool isAfter(Location location) { return Index(location) >= Index(Location::AfterParam); }
-    static bool isBefore(Location location) { return location == Location::Before; }
-
-    struct FoundMarkup
-    {
-        void reset()
-        {
-            location = Location::None;
-            type = MarkupType::None;
-            range = IndexRange { 0, 0 };
-        }
-
-        Location location = Location::None;
-        MarkupType type = MarkupType::None;
-        IndexRange range;
-    };
-
-    struct FindInfo
-    {
-
-        SourceView* sourceView;         ///< The source view the tokens were generated from
-        TokenList* tokenList;           ///< The token list
-        Index declTokenIndex;           ///< The token index location (where searches start from)
-        Index declLineIndex;            ///< The line number for the decl
-    };
-
-    SlangResult extract(DocMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink);
-
-    static MarkupFlags getFlags(MarkupType type);
-    static MarkupType findMarkupType(const Token& tok);
-    static UnownedStringSlice removeStart(MarkupType type, const UnownedStringSlice& comment);
-
-protected:
-        /// returns SLANG_E_NOT_FOUND if not found, SLANG_OK on success else an error
-    SlangResult _findMarkup(const FindInfo& info, Location location, FoundMarkup& out);
-
-        /// Locations are processed in order, and the first successful used. If found in another location will issue a warning.
-        /// returns SLANG_E_NOT_FOUND if not found, SLANG_OK on success else an error
-    SlangResult _findFirstMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out, Index& outIndex);
-
-    SlangResult _findMarkup(const FindInfo& info, const Location* locs, Index locCount, FoundMarkup& out);
-
-        /// Given the decl, the token stream, and the decls tokenIndex, try to find some associated markup
-    SlangResult _findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out);
-
-        /// Given a found markup location extracts the contents of the tokens into out
-    SlangResult _extractMarkup(const FindInfo& info, const FoundMarkup& foundMarkup, StringBuilder& out);
-
-        /// Given a location, try to find the first token index that could potentially be markup
-        /// Will return -1 if not found
-    Index _findStartIndex(const FindInfo& info, Location location);
-
-        /// True if the tok is 'on' lineIndex. Interpretation of 'on' depends on the markup type.
-    static bool _isTokenOnLineIndex(SourceView* sourceView, MarkupType type, const Token& tok, Index lineIndex);
-
-    void _addDecl(Decl* decl);
-    void _addDeclRec(Decl* decl);
-    void _findDecls(ModuleDecl* moduleDecl);
-    
-    List<Decl*> m_decls;
-
-    DocMarkup* m_doc;
-    ModuleDecl* m_moduleDecl;
-    SourceManager* m_sourceManager;
-    DiagnosticSink* m_sink;
-};
 
 /* static */UnownedStringSlice DocMarkupExtractor::removeStart(MarkupType type, const UnownedStringSlice& comment)
 {
@@ -184,50 +65,6 @@ protected:
         default: break;
     }
     return comment;
-}
-
-void DocMarkupExtractor::_addDecl(Decl* decl)
-{
-    if (!decl->loc.isValid())
-    {
-        return;
-    }
-    m_decls.add(decl);
-}
-
-void DocMarkupExtractor::_addDeclRec(Decl* decl)
-{
-    // Just add.
-    // There may be things we don't want to add, but just add them all of now
-    _addDecl(decl);
-
-#if 0
-    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
-    {
-        // For callables (like functions),
-
-        m_decls.add(callableDecl);
-    }
-    else
-#endif
-
-    if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
-    {
-        // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
-        // Now add what the container contains
-        for (Decl* childDecl : containerDecl->members)
-        {
-            _addDeclRec(childDecl);
-        }
-    }
-}
-
-void DocMarkupExtractor::_findDecls(ModuleDecl* moduleDecl)
-{
-    for (Decl* decl : moduleDecl->members)
-    {
-        _addDeclRec(decl);
-    }
 }
 
 static Index _findTokenIndex(SourceLoc loc, const Token* toks, Index numToks)
@@ -471,11 +308,10 @@ SlangResult DocMarkupExtractor::_extractMarkup(const FindInfo& info, const Found
 
 Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location location)
 {
-    Index openParensCount = 0;
-    Index openBracketCount = 0;
+    Index openCount = 0;
 
     const TokenList& toks = *info.tokenList;
-    const Index tokIndex = info.declTokenIndex;
+    const Index tokIndex = info.tokenIndex;
 
     Index direction = isBefore(location) ? -1 : 1;
 
@@ -486,63 +322,41 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
-            {
-                if (openParensCount == 0 && openBracketCount == 0)
-                {
-                    // Determine the markup type
-                    const MarkupType markupType = findMarkupType(tok);
-                    // If the location wanted is before and the markup is, we'll assume this is it
-                    if (isBefore(location) && isBefore(markupType))
-                    {
-                        return i;
-                    }
-                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
-                    if (location == Location::AfterEnumCase && isAfter(markupType))
-                    {
-                        return i;
-                    }
-                }
-                break;
-            }
+            case TokenType::LBracket:
             case TokenType::LParent:
+            case TokenType::OpLess:
             {
-                ++openParensCount;
+                openCount += direction;
+                if (openCount < 0) return -1;
                 break;
             }
             case TokenType::RBracket:
             {
-                openBracketCount += Index(isBefore(location));
+                openCount -= direction;
+                if (openCount < 0) return -1;
                 break;
             }
-            case TokenType::LBracket:
+            case TokenType::OpGreater:
             {
-                openBracketCount -= Index(isBefore(location));
-                break;
-            }
-            case TokenType::RParent:
-            {
-                if (openParensCount == 0 &&
-                    location == Location::AfterParam)
+                if (location == Location::AfterGenericParam && openCount == 0)
                 {
                     return i + 1;
                 }
 
-                --openParensCount;
-                if (openParensCount < 0)
-                {
-                    // Not found - or weird parens at least 
-                    return -1;
-                }
+                openCount -= direction;
+                if (openCount < 0) return -1;
+
                 break;
             }
-            case TokenType::Comma:
+            case TokenType::RParent:
             {
-                if (location == Location::AfterParam || location == Location::AfterEnumCase)
+                if (openCount == 0 && location == Location::AfterParam)
                 {
                     return i + 1;
                 }
+
+                openCount -= direction;
+                if (openCount < 0) return -1;
                 break;
             }
             case TokenType::RBrace:
@@ -554,6 +368,43 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 }
                 break;
             }
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+            {
+                if (openCount == 0)
+                {
+                    // Determine the markup type
+                    const MarkupType markupType = findMarkupType(tok);
+                    // If the location wanted is before and the markup is, we'll assume this is it
+                    if (isBefore(location) && isBefore(markupType))
+                    {
+                        return i;
+                    }
+                    // If we are looking for enum cases, and the markup is after, we'll assume this is it
+                    if (isAfter(location) && isAfter(markupType))
+                    {
+                        return i;
+                    }
+                }
+                break;
+            }
+            case TokenType::Comma:
+            {
+                if (openCount == 0)
+                {   
+                    if (location == Location::AfterParam || location == Location::AfterEnumCase || location == Location::AfterGenericParam)
+                    {
+                        return i + 1;
+                    }
+                }
+
+                if (location == Location::Before)
+                {
+                    return -1;
+                }
+
+                break;
+            }
             case TokenType::Semicolon:
             {
                 // If we haven't hit a candidate yet it's not going to work
@@ -561,8 +412,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                 {
                     return -1;
                 }
-
-                if (openParensCount == 0 && location == Location::AfterSemicolon)
+                if (openCount == 0 && location == Location::AfterSemicolon)
                 {
                     return i + 1;
                 }
@@ -594,13 +444,12 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
     }
 }
 
-
 SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Location location, FoundMarkup& out)
 {
     out.reset();
 
     const auto& toks = info.tokenList->m_tokens;
-    const Index tokIndex = info.declTokenIndex;
+    const Index tokIndex = info.tokenIndex;
 
     // The starting token index
     Index startIndex = _findStartIndex(info, location);
@@ -734,74 +583,103 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, const Location
     return SLANG_OK;
 }
 
-SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, Decl* decl, FoundMarkup& out)
+/* static */DocMarkupExtractor::SearchStyle DocMarkupExtractor::getSearchStyle(Decl* decl)
 {
     if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterEnumCase };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::EnumCase;
     }
     if (auto paramDecl = as<ParamDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterParam };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::Param;
     }
     else if (auto callableDecl = as<CallableDecl>(decl))
     {
-        // We allow it defined before
-        return _findMarkup(info, Location::Before, out);
+        return SearchStyle::Function;
     }
     else if (as<VarDecl>(decl) || as<TypeDefDecl>(decl) || as<AssocTypeDecl>(decl))
     {
-        Location locs[] = { Location::Before, Location::AfterSemicolon };
-        return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        return SearchStyle::Variable;
+    }
+    else if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        return getSearchStyle(genericDecl->inner);
+    }
+    else if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl))
+    {
+        return SearchStyle::GenericParam;
     }
     else
     {
-        // We'll only allow before
-        return _findMarkup(info, Location::Before, out);
+        // If can't determine just allow before
+        return SearchStyle::Before;
     }
 }
 
-SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle searchStyle, FoundMarkup& out)
 {
-    m_doc = doc;
-    m_moduleDecl = moduleDecl;
-    m_sourceManager = sourceManager;
-    m_sink = sink;
+    switch (searchStyle)
+    {
+        default:
+        case SearchStyle::None:
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+        case SearchStyle::EnumCase:
+        {
+            Location locs[] = { Location::Before, Location::AfterEnumCase };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::Param:
+        {
+            Location locs[] = { Location::Before, Location::AfterParam };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::Before:
+        case SearchStyle::Function:
+        {
+            return _findMarkup(info, Location::Before, out);
+        }
+        case SearchStyle::Variable:
+        {
+            Location locs[] = { Location::Before, Location::AfterSemicolon };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+        case SearchStyle::GenericParam:
+        {
+            Location locs[] = { Location::Before, Location::AfterGenericParam };
+            return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
+        }
+    }
+}
 
-    _findDecls(moduleDecl);
-
+SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out)
+{
     struct Entry
     {
         typedef Entry ThisType;
 
-        bool operator<(const ThisType& rhs) const { return locOrOffset < rhs.locOrOffset; }
-
         Index viewIndex;                    ///< The view/file index this loc is found in
         SourceLoc::RawValue locOrOffset;    ///< Can be a loc or an offset into the file
 
-        Decl* decl;                         ///< The decl
+        SearchStyle searchStyle;            ///< The search style when looking for an item
+        Index inputIndex;                   ///< The index to this item in the input
     };
 
     List<Entry> entries;
 
     {
-        const Index count = m_decls.getCount();
-        entries.setCount(count);
-
-        for (Index i = 0; i < count; ++i)
+        entries.setCount(inputCount);
+        for (Index i = 0; i < inputCount; ++i)
         {
+            const auto& input = inputs[i];
             Entry& entry = entries[i];
-            auto decl = m_decls[i];
-            entry.decl = decl;
+            entry.inputIndex = i;
             entry.viewIndex = -1;            //< We don't know what file/view it's in
-            entry.locOrOffset = decl->loc.getRaw();
+            entry.locOrOffset = input.sourceLoc.getRaw();
+            entry.searchStyle = input.searchStyle;
         }
     }
-
-    // We hold one view per *SourceFile*
-    List<SourceView*> views;
 
     // Sort them into loc order
     entries.sort([](Entry& a, Entry& b) { return a.locOrOffset < b.locOrOffset; });
@@ -817,19 +695,19 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
             if (sourceView == nullptr || !sourceView->getRange().contains(loc))
             {
                 // Find the new view
-                sourceView = m_sourceManager->findSourceView(loc);
+                sourceView = sourceManager->findSourceView(loc);
                 SLANG_ASSERT(sourceView);
 
                 // We want only one view per SourceFile
                 SourceFile* sourceFile = sourceView->getSourceFile();
 
                 // NOTE! The view found might be different than sourceView. 
-                viewIndex = views.findFirstIndex([&](SourceView* currentView) -> bool { return currentView->getSourceFile() == sourceFile; });
+                viewIndex = outViews.findFirstIndex([&](SourceView* currentView) -> bool { return currentView->getSourceFile() == sourceFile; });
 
                 if (viewIndex < 0)
                 {
-                    viewIndex = views.getCount();
-                    views.add(sourceView);
+                    viewIndex = outViews.getCount();
+                    outViews.add(sourceView);
                 }
             }
 
@@ -857,12 +735,28 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
         Index viewIndex = -1;
         SourceView* sourceView = nullptr;
 
-        for (auto& entry : entries)
+        const Int entryCount = entries.getCount();
+
+        out.setCount(entryCount);
+
+        for (Index i = 0; i < entryCount; ++i)
         {
+            const auto& entry = entries[i];
+            auto& dst = out[i];
+
+            dst.viewIndex = -1;
+            dst.inputIndex = entry.inputIndex;
+
+            // If there isn't a mechanism to search with, just move on
+            if (entry.searchStyle == SearchStyle::None)
+            {
+                continue;
+            }
+
             if (viewIndex != entry.viewIndex)
             {
                 viewIndex = entry.viewIndex;
-                sourceView = views[viewIndex];
+                sourceView = outViews[viewIndex];
 
                 // Make all memory free again
                 memoryArena.reset();
@@ -874,6 +768,8 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
                 // Lex everything
                 tokens = lexer.lexAllTokens();
             }
+
+            dst.viewIndex = viewIndex;
 
             // Get the offset within the source file
             const uint32_t offset = entry.locOrOffset;
@@ -890,14 +786,14 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
             if (tokenIndex >= 0 && lineIndex >= 0)
             {
                 FindInfo findInfo;
-                findInfo.declTokenIndex = tokenIndex;
-                findInfo.declLineIndex = lineIndex;
+                findInfo.tokenIndex = tokenIndex;
+                findInfo.lineIndex = lineIndex;
                 findInfo.tokenList = &tokens;
                 findInfo.sourceView = sourceView;
 
                 // Okay let's see if we extract some documentation then for this.
                 FoundMarkup foundMarkup;
-                SlangResult res = _findMarkup(findInfo, entry.decl, foundMarkup);
+                SlangResult res = _findMarkup(findInfo, entry.searchStyle, foundMarkup);
 
                 if (SLANG_SUCCEEDED(res))
                 {
@@ -905,9 +801,9 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
                     StringBuilder buf;
                     SLANG_RETURN_ON_FAIL(_extractMarkup(findInfo, foundMarkup, buf));
 
-                    // Add to the documentation
-                    DocMarkup::Entry& docEntry = m_doc->addEntry(entry.decl);
-                    docEntry.m_markup = buf;
+                    // Save the extracted text in the output
+                    dst.text = buf;
+
                 }
                 else if (res != SLANG_E_NOT_FOUND)
                 {
@@ -916,333 +812,99 @@ SlangResult DocMarkupExtractor::extract(DocMarkup* doc, ModuleDecl* moduleDecl, 
             }
         }
     }
-   
+
     return SLANG_OK;
 }
 
-SlangResult DocMarkup::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink)
+static void _addDeclRec(Decl* decl, List<Decl*>& outDecls)
 {
-    m_moduleDecl = moduleDecl;
-
-    DocMarkupExtractor context;
-    return context.extract(this, moduleDecl, sourceManager, sink);
-}
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-
-struct DocMarkDownWriter
-{
-    typedef ASTPrinter::Part Part;
-    typedef ASTPrinter::PartPair PartPair;
-
-    struct Signature
+    if (decl == nullptr)
     {
-        Part returnType;
-        List<PartPair> params;
-        Part name;
-    };
-
-    void write();
-
-    void writeCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
-    void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
-    void writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl);
-
-    void writePreamble(const DocMarkup::Entry& entry);
-    void writeDescription(const DocMarkup::Entry& entry);
-    
-    DocMarkDownWriter(DocMarkup* markup, ASTBuilder* astBuilder):
-        m_markup(markup),
-        m_astBuilder(astBuilder)
-    {
+        return;
     }
 
-    static void getSignature(const List<Part>& parts, Signature& outSig);
-
-    template <typename T>
-    void _appendAsBullets(FilteredMemberList<T>& in);
-
-    DocMarkup* m_markup;
-    ASTBuilder* m_astBuilder;
-    StringBuilder m_builder;
-};
-
-static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out)
-{
-    List<UnownedStringSlice> lines;
-    StringUtil::calcLines(in, lines);
-
-    // Ideally we'd remove any extraneous whitespace, but for now just join
-    StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
-}
-
-template <typename T>
-void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
-{
-    auto& out = m_builder;
-    for (auto element : list)
+    // If we don't have a loc, we have no way of locating documentation.
+    if (decl->loc.isValid() || decl->nameAndLoc.loc.isValid())
     {
-        DocMarkup::Entry* paramEntry = m_markup->getEntry(element);
-
-        out << "* ";
-
-        Name* name = element->getName();
-        if (name)
-        {
-            out << toSlice("_") << name->text << toSlice("_ ");
-        }
-
-        if (paramEntry)
-        {
-            // Hmm, we'll want to make something multiline into a single line
-            _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
-        }
-
-        out << "\n";
-    }
-
-    out << toSlice("\n");
-}
-
-/* static */void DocMarkDownWriter::getSignature(const List<Part>& parts, Signature& outSig)
-{
-    const Index count = parts.getCount();
-    for (Index i = 0; i < count; ++i)
-    {
-        const auto& part = parts[i];
-        switch (part.type)
-        {
-            case Part::Type::ParamType:
-            {
-                PartPair pair;
-                pair.first = part;
-                if (parts[i + 1].type == Part::Type::ParamName)
-                {
-                    pair.second = parts[i + 1];
-                    i++;
-                }
-                outSig.params.add(pair);
-                break;
-            }
-            case Part::Type::ReturnType:
-            {
-                outSig.returnType = part;
-                break;
-            }
-            case Part::Type::DeclPath:
-            {
-                outSig.name = part;
-                break;
-            }
-            default: break;
-        }
-    }
-}
-
-void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
-{
-    writePreamble(entry);
-
-    auto& out = m_builder;
-
-    StringBuilder sigBuffer;
-    List<ASTPrinter::Part> parts;
-    ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
-
-    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
-
-    Signature signature;
-    getSignature(parts, signature);
-
-    const Index paramCount = signature.params.getCount();
-
-    // Output the signature
-    {        
-        // Extract the name
-        out << toSlice("# ") << printer.getPartSlice(signature.name) << toSlice("\n\n");
-
-        out << toSlice("## Signature \n");
-        out << toSlice("```\n");
-        out << printer.getPartSlice(signature.returnType) << toSlice(" ");
-
-        out << printer.getPartSlice(signature.name);
-
-        
-        if (paramCount > 0)
-        {
-            out << toSlice("(\n");
-
-            StringBuilder line;
-            for (Index i = 0; i < paramCount; ++i)
-            {
-                const auto& param = signature.params[i];
-                line.Clear();
-                // If we want to tab these over... we'll need to know how must space I have
-                line << "    " << printer.getPartSlice(param.first);
-
-                Index indent = 25;
-                if (line.getLength() < indent)
-                {
-                    line.appendRepeatedChar(' ', indent - line.getLength());
-                }
-                else
-                {
-                    line.appendChar(' ');
-                }
-
-                line << printer.getPartSlice(param.second);
-                if (i < paramCount - 1)
-                {
-                    line << ",\n";
-                }
-
-                out << line;
-            }
-
-            out << ");\n";
-        }
-        else
-        {
-            out << toSlice("();\n");
-        }
-
-        out << "```\n\n";
-    }
-
-    // Only output params if there are any
-    if (paramCount)
-    {
-        out << "## Parameters\n\n";
-
-        auto params = callableDecl->getParameters();
-        _appendAsBullets(params);
-    }
-
-    writeDescription(entry);
-}
-
-void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl)
-{
-    writePreamble(entry);
-
-    auto& out = m_builder;
-
-    out << toSlice("# enum ");
-    Name* name = enumDecl->getName();
-    if (name)
-    {
-        out << name->text;
-    }
-    out << toSlice("\n\n");
-
-    out << toSlice("## Values \n\n");
-
-    auto cases = enumDecl->getMembersOfType<EnumCaseDecl>();
-    _appendAsBullets(cases);
-
-    writeDescription(entry);
-}
-
-void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDecl* aggTypeDecl)
-{
-    writePreamble(entry);
-
-    auto& out = m_builder;
-
-    // This could be lots of different things - struct/class/extension/interface/..
-
-    out << toSlice("# ");
-    if (as<StructDecl>(aggTypeDecl))
-    {
-        out << toSlice("struct ");
-    }
-    else if (as<ClassDecl>(aggTypeDecl))
-    {
-        out << toSlice("class ");
+        outDecls.add(decl);
     }
     else
     {
-        out << toSlice("?");
+        SLANG_ASSERT(!"Decl without a location!");
     }
 
-    Name* name = aggTypeDecl->getName();
-    if (name)
+    if (GenericDecl* genericDecl = as<GenericDecl>(decl))
     {
-        out << name->text;
+        _addDeclRec(genericDecl->inner, outDecls);
     }
-    out << toSlice("\n\n");
 
-    out << "## Fields\n\n";
-
-    auto fields = aggTypeDecl->getMembersOfType<VarDecl>();
-    _appendAsBullets(fields);
-
-    writeDescription(entry);
-}
-
-void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
-{
-    SLANG_UNUSED(entry);
-    auto& out = m_builder;
-
-    out << toSlice("\n");
-    out.appendRepeatedChar('-', 80);
-    out << toSlice("\n");
-}
-
-
-void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
-{
-    auto& out = m_builder;
-
-    out << toSlice("\n## Description\n\n");
-    out << entry.m_markup;
-}
-
-void DocMarkDownWriter::write()
-{
-    for (const auto& entry : m_markup->getEntries())
+    if (ContainerDecl* containerDecl = as<ContainerDecl>(decl))
     {
-        NodeBase* node = entry.m_node;
-        Decl* decl = as<Decl>(node);
-        if (!decl)
+        // Add the container - which could be a class, struct, enum, namespace, extension, generic etc.
+        // Now add what the container contains
+        for (Decl* childDecl : containerDecl->members)
         {
-            continue;
-        }
-
-        // Skip these they will be output as part of their respective 'containers'
-        if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl))
-        {
-            continue;
-        }
-
-        if (CallableDecl* callableDecl = as<CallableDecl>(decl))
-        {
-            writeCallable(entry, callableDecl);
-        }
-        else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
-        {
-            writeEnum(entry, enumDecl);
-        }
-        else if (AggTypeDecl* aggType = as<AggTypeDecl>(decl))
-        {
-            writeAggType(entry, aggType);
+            _addDeclRec(childDecl, outDecls);
         }
     }
 }
 
-/* static */SlangResult DocumentationUtil::writeMarkdown(DocMarkup* markup, ASTBuilder* astBuilder, StringBuilder& out)
+/* static */void DocMarkupExtractor::findDecls(ModuleDecl* moduleDecl, List<Decl*>& outDecls)
 {
-    // The ASTBuilder is needed in order to be able to create ast types that can then be printed.
-    // It is *assumed* here, that them being transient on this temporary ASTBuilder, doesn't mutate
-    // any of the nodes from the ASTBuilder/s for the things being documented
+    for (Decl* decl : moduleDecl->members)
+    {
+        _addDeclRec(decl, outDecls);
+    }
+}
 
-    DocMarkDownWriter writer(markup, astBuilder);
-    writer.write();
+SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* sourceManager, DiagnosticSink* sink, DocMarkup* outDoc)
+{
+    List<Decl*> decls;
+    findDecls(moduleDecl, decls);
 
-    Swap(out, writer.m_builder);
+    const Index declsCount = decls.getCount();
 
+    List<SearchItemInput> inputItems;
+    List<SearchItemOutput> outItems;
+
+    {
+        inputItems.setCount(declsCount);
+
+        for (Index i = 0; i < declsCount; ++i)
+        {
+            Decl* decl = decls[i];
+            auto& item = inputItems[i];
+
+            item.sourceLoc = decl->loc.isValid() ? decl->loc : decl->nameAndLoc.loc;
+            // Has to be valid to be lookupable
+            SLANG_ASSERT(item.sourceLoc.isValid());
+
+            item.searchStyle = getSearchStyle(decl);
+        }
+
+        DocMarkupExtractor extractor;
+
+        List<SourceView*> views;
+        SLANG_RETURN_ON_FAIL(extractor.extract(inputItems.getBuffer(), declsCount, sourceManager, sink, views, outItems));
+    }
+
+    // Set back
+    for (Index i = 0; i < declsCount; ++i)
+    {
+        const auto& outputItem = outItems[i];
+        const auto& inputItem = inputItems[outputItem.inputIndex];
+
+        // If we don't know how to search add to the output
+        if (inputItem.searchStyle != SearchStyle::None)
+        {
+            Decl* decl = decls[outputItem.inputIndex];
+       
+            // Add to the documentation
+            DocMarkup::Entry& docEntry = outDoc->addEntry(decl);
+            docEntry.m_markup = outputItem.text;
+        }
+    }
+    
     return SLANG_OK;
 }
 

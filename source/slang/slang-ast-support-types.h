@@ -840,9 +840,9 @@ namespace Slang
             /// Returns true if non empty (equivalent to getCount() != 0 but faster)
         bool isNonEmpty() const { return !isEmpty(); }
 
-        List<RefPtr<T>> toArray()
+        List<T*> toList()
         {
-            List<RefPtr<T>> result;
+            List<T*> result;
             for (auto element : (*this))
             {
                 result.add(element);
