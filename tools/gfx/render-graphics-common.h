@@ -17,6 +17,23 @@ private:
     Slang::RefPtr<ShaderObjectLayoutBase> m_layout;
 };
 
+class GraphicsComputeCommandEncoderBase
+{
+public:
+    RendererBase* m_rendererBase;
+    Slang::RefPtr<PipelineStateBase> m_currentPipeline;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSetImpl(
+        PipelineType pipelineType,
+        IPipelineLayout* layout,
+        UInt index,
+        IDescriptorSet* descriptorSet) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferDataImpl(
+        IBufferResource* buffer, size_t offset, size_t size, void* data) = 0;
+
+    Result bindRootShaderObjectImpl(PipelineType pipelineType, IShaderObject* object);
+};
+
 class GraphicsAPIRenderer : public RendererBase
 {
 public:
@@ -29,8 +46,6 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(
         IShaderProgram* program,
         IShaderObject** outObject) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) SLANG_OVERRIDE;
     void preparePipelineDesc(GraphicsPipelineStateDesc& desc);
     void preparePipelineDesc(ComputePipelineStateDesc& desc);
 

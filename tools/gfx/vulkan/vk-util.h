@@ -34,6 +34,8 @@ struct VulkanUtil
         /// Returns VK_PRIMITIVE_TOPOLOGY_MAX_ENUM on failure
     static VkPrimitiveTopology getVkPrimitiveTopology(PrimitiveTopology topology);
 
+    static VkImageLayout mapResourceStateToLayout(ResourceState state);
+
         /// Returns Slang::Result equivalent of a VkResult
     static Slang::Result toSlangResult(VkResult res);
 };

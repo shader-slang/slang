@@ -7,13 +7,28 @@ namespace renderer_test {
 using namespace Slang;
 using Slang::Result;
 
-void BindingStateImpl::apply(IRenderer* renderer, PipelineType pipelineType)
+void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType)
 {
-    renderer->setDescriptorSet(
-        pipelineType,
-        pipelineLayout,
-        0,
-        descriptorSet);
+    switch (pipelineType)
+    {
+    case PipelineType::Compute:
+        {
+            ComPtr<IComputeCommandEncoder> computeEncoder;
+            encoder->queryInterface(SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
+            computeEncoder->setDescriptorSet(pipelineLayout, 0, descriptorSet);
+        }
+        break;
+    case PipelineType::Graphics:
+        {
+            ComPtr<IRenderCommandEncoder> renderEncoder;
+            encoder->queryInterface(
+                SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
+            renderEncoder->setDescriptorSet(pipelineLayout, 0, descriptorSet);
+        }
+        break;
+    default:
+        throw "unknown pipeline type";
+    }
 }
 
 /* static */ Result ShaderRendererUtil::generateTextureResource(

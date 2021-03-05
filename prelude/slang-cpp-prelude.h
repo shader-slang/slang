@@ -56,6 +56,7 @@ struct gfx_PipelineLayout_0;
 struct gfx_DescriptorSet_0;
 struct gfx_BufferResource_0;
 struct gfx_PipelineState_0;
+struct gfx_CommandQueue_0;
 gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2);
 gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0);
 gfx_PipelineLayout_0* buildPipeline_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1);

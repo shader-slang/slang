@@ -3,10 +3,11 @@
 // Basic test for `GetAttributeAtVertex` function
 
 //TEST:CROSS_COMPILE:-target dxil -entry main -stage fragment -profile sm_6_1
+//TEST:CROSS_COMPILE:-target spirv -entry main -stage fragment -profile glsl_450
 
 [shader("fragment")]
 void main(
-    nointerpolation float4 color : COLOR,
+    pervertex float4 color : COLOR,
     float3 bary : SV_Barycentrics,
     out float4 result : SV_Target)
 {

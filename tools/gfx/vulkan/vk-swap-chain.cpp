@@ -26,12 +26,17 @@ static Index _indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format
     return -1;
 }
 
-SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& descIn, const PlatformDesc* platformDescIn)
+SlangResult VulkanSwapChain::init(
+    VulkanApi* vkapi,
+    VkQueue queue,
+    uint32_t queueFamilyIndex,
+    const Desc& descIn,
+    const PlatformDesc* platformDescIn)
 {
     assert(platformDescIn);
 
-    m_deviceQueue = deviceQueue;
-    m_api = deviceQueue->getApi();
+    m_queue = queue;
+    m_api = vkapi;
 
     // Make sure it's not set initially
     m_format = VK_FORMAT_UNDEFINED;
@@ -61,7 +66,7 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 #endif
 
     VkBool32 supported = false;
-    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, deviceQueue->getQueueIndex(), m_surface, &supported);
+    m_api->vkGetPhysicalDeviceSurfaceSupportKHR(m_api->m_physicalDevice, queueFamilyIndex, m_surface, &supported);
 
     uint32_t numSurfaceFormats = 0;
     List<VkSurfaceFormatKHR> surfaceFormats;
@@ -94,12 +99,13 @@ SlangResult VulkanSwapChain::init(VulkanDeviceQueue* deviceQueue, const Desc& de
 
     // Save the desc
     m_desc = desc;
-    SLANG_RETURN_ON_FAIL(_createSwapChain());
 
     if (descIn.m_format == Format::RGBA_Unorm_UInt8 && m_format == VK_FORMAT_B8G8R8A8_UNORM)
     {
         m_desc.m_format = Format::BGRA_Unorm_UInt8;
     }
+
+    SLANG_RETURN_ON_FAIL(_createSwapChain());
     return SLANG_OK;
 }
 
@@ -125,11 +131,6 @@ void VulkanSwapChain::getWindowSize(int* widthOut, int* heightOut) const
 
 SlangResult VulkanSwapChain::_createSwapChain()
 {
-    if (hasValidSwapChain())
-    {
-        return SLANG_OK;
-    }
-
     int width, height;
     getWindowSize(&width, &height);
 
@@ -211,29 +212,15 @@ SlangResult VulkanSwapChain::_createSwapChain()
     m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);
     m_desc.m_imageCount = numSwapChainImages;
     {
-        List<VkImage> images;
-        images.setCount(numSwapChainImages);
-
-        m_api->vkGetSwapchainImagesKHR(m_api->m_device, m_swapChain, &numSwapChainImages, images.getBuffer());
-
         m_images.setCount(numSwapChainImages);
-        for (int i = 0; i < int(numSwapChainImages); ++i)
-        {
-            m_images[i] = images[i];
-        }
+        m_api->vkGetSwapchainImagesKHR(
+            m_api->m_device, m_swapChain, &numSwapChainImages, m_images.getBuffer());
     }
     return SLANG_OK;
 }
 
 void VulkanSwapChain::_destroySwapChain()
 {
-    if (!hasValidSwapChain())
-    {
-        return;
-    }
-
-    m_deviceQueue->waitForIdle();
-
     if (m_swapChain != VK_NULL_HANDLE)
     {
         m_api->vkDestroySwapchainKHR(m_api->m_device, m_swapChain, nullptr);
@@ -261,20 +248,11 @@ VulkanSwapChain::~VulkanSwapChain()
     destroy();
 }
 
-int VulkanSwapChain::nextFrontImageIndex()
+int VulkanSwapChain::nextFrontImageIndex(VkSemaphore signalSemaphore)
 {
-    if (!hasValidSwapChain())
-    {
-        if (SLANG_FAILED(_createSwapChain()))
-        {
-            return -1;
-        }
-    }
-
-    VkSemaphore beginFrameSemaphore = m_deviceQueue->makeCurrent(VulkanDeviceQueue::EventType::BeginFrame);
-
     uint32_t swapChainIndex = 0;
-    VkResult result = m_api->vkAcquireNextImageKHR(m_api->m_device, m_swapChain, UINT64_MAX, beginFrameSemaphore, VK_NULL_HANDLE, &swapChainIndex);
+    VkResult result = m_api->vkAcquireNextImageKHR(
+        m_api->m_device, m_swapChain, UINT64_MAX, signalSemaphore, VK_NULL_HANDLE, &swapChainIndex);
 
     if (result != VK_SUCCESS)
     {
@@ -285,18 +263,8 @@ int VulkanSwapChain::nextFrontImageIndex()
     return swapChainIndex;
 }
 
-void VulkanSwapChain::present(bool vsync)
+void VulkanSwapChain::present(VkSemaphore waitSemaphore)
 {
-    if (!hasValidSwapChain())
-    {
-        m_deviceQueue->flush();
-        return;
-    }
-
-    VkSemaphore endFrameSemaphore = m_deviceQueue->getSemaphore(VulkanDeviceQueue::EventType::EndFrame);
-
-    m_deviceQueue->flushStepA();
-
     uint32_t swapChainIndices[] = { uint32_t(m_currentSwapChainIndex) };
 
     VkPresentInfoKHR presentInfo = {};
@@ -304,21 +272,12 @@ void VulkanSwapChain::present(bool vsync)
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &m_swapChain;
     presentInfo.pImageIndices = swapChainIndices;
-    if (endFrameSemaphore != VK_NULL_HANDLE)
+    if (waitSemaphore != VK_NULL_HANDLE)
     {
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &endFrameSemaphore;
+        presentInfo.pWaitSemaphores = &waitSemaphore;
     }
-    VkResult result = m_api->vkQueuePresentKHR(m_deviceQueue->getQueue(), &presentInfo);
-
-    m_deviceQueue->makeCompleted(VulkanDeviceQueue::EventType::EndFrame);
-
-    m_deviceQueue->flushStepB();
-
-    if (result != VK_SUCCESS)
-    {
-        _destroySwapChain();
-    }
+    m_api->vkQueuePresentKHR(m_queue, &presentInfo);
 }
 
 } // renderer_test

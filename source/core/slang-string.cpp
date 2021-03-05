@@ -340,6 +340,51 @@ namespace Slang
         }
     }
 
+    void String::reduceLength(Index newLength)
+    {
+        Index oldLength = getLength();
+        SLANG_ASSERT(newLength <= oldLength);
+        if (oldLength == newLength)
+        {
+            return;
+        }
+
+        // It must have a buffer, because only 0 length allows for nullptr
+        // and being 0 sized is already covered
+        SLANG_ASSERT(m_buffer);
+
+        if (m_buffer->isUniquelyReferenced())
+        {
+            m_buffer->length = newLength;
+            m_buffer->getData()[newLength] = 0;
+        }
+        else
+        {
+            // If 0 length is wanted we can just free
+            if (newLength == 0)
+            {
+                m_buffer.setNull();
+            }
+            else
+            {
+                // We need to make a new copy, that we will shrink
+
+                // We'll just go with capacity enough for the new length
+                const Index newCapacity = newLength;
+                StringRepresentation* newRepresentation = StringRepresentation::createWithCapacityAndLength(newCapacity, newLength);
+
+                // Copy 
+                char* dst = newRepresentation->getData();
+                memcpy(dst, m_buffer->getData(), sizeof(char) * newLength);
+                // Zero terminate
+                dst[newLength] = 0;
+
+                // Set the new rep
+                m_buffer = newRepresentation;
+            }
+        }
+    }
+
     void String::append(const char* textBegin, char const* textEnd)
     {
         auto oldLength = getLength();

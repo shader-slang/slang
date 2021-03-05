@@ -482,6 +482,12 @@ class HLSLCentroidModifier : public InterpolationModeModifier
     SLANG_AST_CLASS(HLSLCentroidModifier)
 };
 
+    /// Slang-defined `pervertex` modifier
+class PerVertexModifier : public InterpolationModeModifier
+{
+    SLANG_AST_CLASS(PerVertexModifier)
+};
+
 
 // HLSL `precise` modifier
 class PreciseModifier : public Modifier 

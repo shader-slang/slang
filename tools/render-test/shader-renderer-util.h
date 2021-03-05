@@ -33,7 +33,7 @@ struct BindingStateImpl : public Slang::RefObject
         uint16_t size;              ///< The amount of register indices
     };
 
-    void apply(IRenderer* renderer, PipelineType pipelineType);
+    void apply(ICommandEncoder* encoder, PipelineType pipelineType);
 
     struct OutputBinding
     {
@@ -77,15 +77,6 @@ struct ShaderRendererUtil
         /// Create BindingState::Desc from the contents of layout
     static Slang::Result createBindingState(
         const ShaderInputLayout& layout,
-        IRenderer* renderer,
-        IBufferResource* addedConstantBuffer,
-        BindingStateImpl** outBindingState);
-
-private:
-        /// Create BindingState::Desc from a list of ShaderInputLayout entries
-    static Slang::Result _createBindingState(
-        ShaderInputLayoutEntry* srcEntries,
-        int numEntries,
         IRenderer* renderer,
         IBufferResource* addedConstantBuffer,
         BindingStateImpl** outBindingState);

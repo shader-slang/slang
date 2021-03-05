@@ -8,7 +8,7 @@ namespace Slang {
 float RandomGenerator::nextUnitFloat32()
 {
     int32_t intValue = nextInt32();
-    return (intValue & 0x7fffffff) * (1.0f / 0x7fffffff);
+    return (intValue & 0x7fffffff) * (1.0f / float(0x7fffffff));
 }
 
 bool RandomGenerator::nextBool()
