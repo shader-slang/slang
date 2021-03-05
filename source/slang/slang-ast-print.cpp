@@ -85,41 +85,91 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
     if (parentGenericDeclRef)
     {
         auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
-        SLANG_RELEASE_ASSERT(genSubst);
-        SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
-
-        // If the name we printed previously was an operator
-        // that ends with `<`, then immediately printing the
-        // generic arguments inside `<...>` may cause it to
-        // be hard to parse the operator name visually.
-        //
-        // We thus include a space between the declaration name
-        // and its generic arguments in this case.
-        //
-        if (sb.endsWith("<"))
+        if (genSubst)
         {
-            sb << " ";
-        }
+            SLANG_RELEASE_ASSERT(genSubst);
+            SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
-        sb << "<";
-        bool first = true;
-        for (auto arg : genSubst->args)
-        {
-            // When printing the representation of a specialized
-            // generic declaration we don't want to include the
-            // argument values for subtype witnesses since these
-            // do not correspond to parameters of the generic
-            // as the user sees it.
+            // If the name we printed previously was an operator
+            // that ends with `<`, then immediately printing the
+            // generic arguments inside `<...>` may cause it to
+            // be hard to parse the operator name visually.
             //
-            if (as<Witness>(arg))
-                continue;
+            // We thus include a space between the declaration name
+            // and its generic arguments in this case.
+            //
+            if (sb.endsWith("<"))
+            {
+                sb << " ";
+            }
 
-            if (!first) sb << ", ";
-            addVal(arg);
-            first = false;
+            sb << "<";
+            bool first = true;
+            for (auto arg : genSubst->args)
+            {
+                // When printing the representation of a specialized
+                // generic declaration we don't want to include the
+                // argument values for subtype witnesses since these
+                // do not correspond to parameters of the generic
+                // as the user sees it.
+                //
+                if (as<Witness>(arg))
+                    continue;
+
+                if (!first) sb << ", ";
+                addVal(arg);
+                first = false;
+            }
+            sb << ">";
         }
-        sb << ">";
+        else
+        {
+            // Write out the generic parameters
+            addGenericParams(parentGenericDeclRef);
+        }
     }
+}
+
+void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+{
+    auto& sb = m_builder;
+
+    sb << "<";
+    bool first = true;
+    for (auto paramDeclRef : getMembers(genericDeclRef))
+    {
+        if (auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamType);
+                sb << getText(genericTypeParam.getName());
+            }
+        }
+        else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << getText(genericValParam.getName());
+            }
+
+            sb << ":";
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValueType);
+                addType(getType(m_astBuilder, genericValParam));
+            }
+        }
+        else
+        {
+        }
+    }
+    sb << ">";
 }
 
 void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
@@ -161,42 +211,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        sb << "<";
-        bool first = true;
-        for (auto paramDeclRef : getMembers(genericDeclRef))
-        {
-            if (auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
-            {
-                if (!first) sb << ", ";
-                first = false;
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamType);
-                    sb << getText(genericTypeParam.getName());
-                }
-            }
-            else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
-            {
-                if (!first) sb << ", ";
-                first = false;
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamValue);
-                    sb << getText(genericValParam.getName());
-                }
-
-                sb << ":";
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamValueType);
-                    addType(getType(m_astBuilder, genericValParam));
-                }
-            }
-            else
-            {
-            }
-        }
-        sb << ">";
+        addGenericParams(genericDeclRef);
 
         addDeclParams(DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions));
     }

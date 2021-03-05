@@ -165,14 +165,7 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
 
     GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
 
-    if (genericDecl)
-    {
-        printer.addDeclSignature(DeclRef<Decl>(genericDecl, nullptr));
-    }
-    else
-    {
-        printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
-    }
+    printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
 
     Signature signature;
     getSignature(parts, signature);
@@ -257,6 +250,8 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
         // The parameters, in order
         List<Decl*> params;
 
+        // We list generic parameters, as types of parameters, if they are directly associated with this
+        // callable.
         if (genericDecl)
         {
             for (Decl* decl : genericDecl->members)
@@ -336,20 +331,25 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
 
     auto& out = m_builder;
 
+    // We can write out he name using the printer
+
+    ASTPrinter printer(m_astBuilder);
+    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl, nullptr));
+
     // This could be lots of different things - struct/class/extension/interface/..
 
     out << toSlice("# ");
     if (as<StructDecl>(aggTypeDecl))
     {
-        out << toSlice("struct ");
+        out << toSlice("struct ") << printer.getStringBuilder();
     }
     else if (as<ClassDecl>(aggTypeDecl))
     {
-        out << toSlice("class ");
+        out << toSlice("class ") << printer.getStringBuilder();
     }
     else if (as<InterfaceDecl>(aggTypeDecl))
     {
-        out << toSlice("interface ");
+        out << toSlice("interface ") << printer.getStringBuilder();
     }
     else if (ExtensionDecl* extensionDecl = as<ExtensionDecl>(aggTypeDecl))
     {
@@ -361,11 +361,6 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         out << toSlice("?");
     }
 
-    Name* name = aggTypeDecl->getName();
-    if (name)
-    {
-        out << name->text;
-    }
     out << toSlice("\n\n");
 
     {
@@ -374,7 +369,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
 
         if (inheritanceDecls.getCount())
         {
-            out << "*Derives from:* ";
+            out << "*Implements:* ";
 
             for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
             {
@@ -387,6 +382,28 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
             out << toSlice("\n\n");
         }
     }
+
+    if (GenericDecl* genericDecl = as<GenericDecl>(aggTypeDecl->parentDecl))
+    {
+        // The parameters, in order
+        List<Decl*> params;
+        for (Decl* decl : genericDecl->members)
+        {
+            if (as<GenericTypeParamDecl>(decl) ||
+                as<GenericValueParamDecl>(decl))
+            {
+                params.add(decl);
+            }
+        }
+    
+        if (params.getCount())
+        {
+            out << "## Generic Parameters\n\n";
+            // We have generic params and regular parameters, in this list
+            _appendAsBullets(params);
+        }
+    }
+
 
     {
         List<Decl*> fields;

@@ -1,4 +1,44 @@
-//DISABLE_TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
+//TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
+
+/// Testing out nested generics
+struct ParentStruct<T> ///< Some type
+{
+    /// Testing out a child
+    struct ChildStruct<S> ///< Some other type
+    {
+        /// A useless method hey ho
+        T getValue(S v) { T t; S s; return t; }
+    };
+};
+
+struct GenericStruct<T>
+{
+        /// Let's try a typedef too
+    typedef T Element;
+
+    T getValue() { return value; }
+    
+    T value;
+};
+
+/// A rather silly generic function to test out doc extraction
+T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
+    /// Just testing out a 
+    /// non type based generic
+    let U : int,
+    let V : int>    ///< And another one                       
+    (
+    /// CHECKING!!
+    T z,           ///< The Z parameter
+    T b)            ///< The B parameter
+{
+    return z + b;
+}
+
+namespace Hey
+{
+    void doAnotherThing(int a);
+}
 
     /// Let's test indent
     /// 
@@ -86,19 +126,6 @@ int doThing(int a,  ///< a parameter
     return a;
 }
 
-/// A rather silly generic function to test out doc extraction
-T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
-    /// Just testing out a 
-    /// non type based generic
-    let U : int,
-    let V : int>    ///< And another one                       
-    (
-    /// CHECKING!!
-    T z,           ///< The Z parameter
-    T b)            ///< The B parameter
-{
-    return z + b;
-}
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

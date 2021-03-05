@@ -126,6 +126,9 @@ public:
         /// Add the signature for the decl
     void addDeclSignature(const DeclRef<Decl>& declRef);
 
+        /// Add generic parameters 
+    void addGenericParams(const DeclRef<GenericDecl>& genericDeclRef);
+
         /// Get the specified part type. Returns empty slice if not found
     UnownedStringSlice getPart(Part::Type partType) const;
         /// Get the slice for a part
