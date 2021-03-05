@@ -119,12 +119,12 @@ String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
     return String::fromWString(filenameBuffer);
 
 #elif defined(__linux__)
-    Dl_info DlInfo;
-    if (!dladdr((void*)func, &DlInfo))
+    Dl_info dllInfo;
+    if (!dladdr(symbolInLib, &dllInfo))
     {
         return String();
     }
-    return DlInfo.dli_fname;
+    return dllInfo.dli_fname;
 
 #else
     return String();
