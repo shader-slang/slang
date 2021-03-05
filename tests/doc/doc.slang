@@ -10,6 +10,41 @@
     ///
 RWStructuredBuffer<int> inputBuffer;       
 
+
+/// An interface to do things
+interface IDoThing
+{
+        /// Add two integers
+    int add(int a,      ///< First parameter 
+        int b           ///< Second parameter
+    );
+    
+        /// Subtract
+        /// Multi-line
+    int sub(int a,      ///< First
+            int b       ///< Second
+    );
+}
+
+interface IThing
+{
+    float getValue();
+};
+
+/// Implement IThing on float
+extension float : IThing
+{
+        /// Just return the float itself!
+	float getValue() { return this; }
+}
+
+struct Thing : IThing, IDoThing
+{
+    int add(int a, int b) { return a + b; }
+    int sub(int a, int b ) { return a - b; }
+    float getValue() { return 1.0f; }
+};
+
 /// A struct with some fields
 struct SomeStruct
 {
@@ -19,6 +54,9 @@ struct SomeStruct
     /// is a thing
     int anotherField;
     int yetAnother; ///< A field with stuff 
+    
+        /// Get a value 
+    int getMethod() { return yetAnother; }
 };
 
 /// An enum
@@ -46,6 +84,20 @@ int doThing(int a,  ///< a parameter
     }
     
     return a;
+}
+
+/// A rather silly generic function to test out doc extraction
+T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
+    /// Just testing out a 
+    /// non type based generic
+    let U : int,
+    let V : int>    ///< And another one                       
+    (
+    /// CHECKING!!
+    T z,           ///< The Z parameter
+    T b)            ///< The B parameter
+{
+    return z + b;
 }
 
 [numthreads(4, 1, 1)]

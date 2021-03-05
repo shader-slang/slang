@@ -94,6 +94,13 @@ protected:
     String m_path;
 };
 
+class SharedLibraryUtils
+{
+public:
+    static String getSharedLibraryFileName(void* symbolInLib);
+    static uint64_t getSharedLibraryTimestamp(void* symbolInLib);
+};
+
 }
 
 #endif // SLANG_SHARED_LIBRARY_H_INCLUDED
