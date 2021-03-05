@@ -5,6 +5,18 @@
 #include "slang-io.h"
 #include "slang-string-util.h"
 
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#elif defined(__linux__)
+#include <dlfcn.h>
+#endif
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifndef WIN32
+#    include <unistd.h>
+#endif
+
 namespace Slang
 {
 
@@ -85,6 +97,52 @@ DefaultSharedLibrary::~DefaultSharedLibrary()
 void* DefaultSharedLibrary::findSymbolAddressByName(char const* name)
 {
     return SharedLibrary::findSymbolAddressByName(m_sharedLibraryHandle, name);
+}
+
+
+String SharedLibraryUtils::getSharedLibraryFileName(void* symbolInLib)
+{
+#if defined(_WIN32)
+    HMODULE moduleHandle;
+    GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        (LPCSTR)symbolInLib,
+        &moduleHandle);
+    const int maxLength = 1024;
+    wchar_t filenameBuffer[maxLength];
+    auto length = GetModuleFileNameW(moduleHandle, filenameBuffer, maxLength);
+    if (length == maxLength)
+    {
+        // Insufficient buffer, return empty.
+        return String();
+    }
+    return String::fromWString(filenameBuffer);
+
+#elif defined(__linux__)
+    Dl_info dllInfo;
+    if (!dladdr(symbolInLib, &dllInfo))
+    {
+        return String();
+    }
+    return dllInfo.dli_fname;
+
+#else
+    return String();
+#endif
+}
+
+uint64_t SharedLibraryUtils::getSharedLibraryTimestamp(void* symbolInLib)
+{
+    auto fileName = getSharedLibraryFileName(symbolInLib);
+    if (fileName.getLength() == 0)
+        return 0;
+    struct stat result;
+    if (stat(fileName.getBuffer(), &result) == 0)
+    {
+        auto mod_time = result.st_mtime;
+        return (uint64_t)mod_time;
+    }
+    return 0;
 }
 
 } 
