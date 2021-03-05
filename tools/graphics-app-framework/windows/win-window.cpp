@@ -287,8 +287,8 @@ Window* createWindow(WindowDesc const& desc)
         windowStyle,
         CW_USEDEFAULT,
         0, // x, y
-        windowRect.right,
-        windowRect.bottom,
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top,
         NULL, // parent
         NULL, // menu
         instance,
