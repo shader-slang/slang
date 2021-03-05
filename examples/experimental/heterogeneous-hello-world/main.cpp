@@ -1,3 +1,9 @@
+// This example is out of date and currently disabled from build.
+// The `gfx` layer has been refactored with a new command list based
+// model. The example must be updated to use the new `gfx` interface
+// before it can be included in build.
+
+#if 0
 // main.cpp
 
 // This file implements an extremely simple example of loading and
@@ -236,7 +242,7 @@ void printInitialValues(float* initialArray, int length)
 }
 
 void dispatchComputation(
-    gfx::IRenderer* gRenderer,
+    gfx::ICommandQueue* gQueue,
     gfx::IPipelineState* gPipelineState,
     gfx::IPipelineLayout* gPipelineLayout,
     gfx::IDescriptorSet* gDescriptorSet,
@@ -244,11 +250,13 @@ void dispatchComputation(
     unsigned int gridDimsY,
     unsigned int gridDimsZ)
 {
-
-    gRenderer->setPipelineState(gPipelineState);
-    gRenderer->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
-
-    gRenderer->dispatchCompute(gridDimsX, gridDimsY, gridDimsZ);
+    auto cmdBuf = gQueue->createCommandBuffer();
+    auto encoder = cmdBuf->encodeComputeCommands();
+    encoder->setPipelineState(gPipelineState);
+    encoder->setDescriptorSet(PipelineType::Compute, gPipelineLayout, 0, gDescriptorSet);
+    encoder->dispatchCompute(gridDimsX, gridDimsY, gridDimsZ);
+    encoder->endEncoding();
+    gQueue->executeCommandBuffer(cmdBuf);
 }
 
 void print_output(
@@ -256,7 +264,9 @@ void print_output(
     gfx::IBufferResource* structuredBuffer,
     int length)
 {
-    if (float* outputData = (float*)renderer->map(structuredBuffer, MapFlavor::HostRead))
+    ComPtr<ISlangBlob> blob;
+    renderer->readBufferResource(structuredBuffer, 0, length * sizeof(float), blob.writeRef());
+    if (float* outputData = (float*)blob->getBufferPointer())
     {
         // Print out the values the the kernel produced
         printf("After: \n");
@@ -265,8 +275,6 @@ void print_output(
             printf("%f, ", outputData[i]);
         }
         printf("\n");
-
-        renderer->unmap(structuredBuffer);
     }
 }
 
@@ -321,10 +329,10 @@ void printInitialValues_0(FixedArray<float, 4> _0, int32_t _1)
     printInitialValues((float*)&_0, _1);
 }
 
-void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, unsigned int gridDimsX, unsigned int gridDimsY, unsigned int gridDimsZ)
+void dispatchComputation_0(gfx_CommandQueue_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, unsigned int gridDimsX, unsigned int gridDimsY, unsigned int gridDimsZ)
 {
     dispatchComputation(
-        (gfx::IRenderer*)_0,
+        (gfx::ICommandQueue*)_0,
         (gfx::IPipelineState*)_1,
         (gfx::IPipelineLayout*)_2,
         (gfx::IDescriptorSet*)_3,
@@ -343,9 +351,9 @@ gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0) {
     return (gfx_BufferResource_0*)(_0.data);
 }
 
-void print_output_0(gfx_Renderer_0* _0, gfx_BufferResource_0* _1, int32_t _2)
+void print_output_0(gfx_CommandQueue_0* _0, gfx_BufferResource_0* _1, int32_t _2)
 {
-    print_output((gfx::IRenderer*)_0, (gfx::IBufferResource*)_1, _2);
+    print_output((gfx::ICommandQueue*)_0, (gfx::IBufferResource*)_1, _2);
 }
 
 // This "inner" main function is used by the platform abstraction
@@ -368,3 +376,5 @@ void innerMain(ApplicationContext* context)
 // invoke the `innerMain` above.
 //
 GFX_CONSOLE_MAIN(innerMain)
+
+#endif

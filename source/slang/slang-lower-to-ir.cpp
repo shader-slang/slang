@@ -1820,6 +1820,10 @@ void addVarDecorations(
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
         }
+        else if(as<PerVertexModifier>(mod))
+        {
+            builder->addInterpolationModeDecoration(inst, IRInterpolationMode::PerVertex);
+        }
         else if(as<HLSLNoPerspectiveModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoPerspective);

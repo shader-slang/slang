@@ -52,8 +52,95 @@ public:
         kESemanticMask_Default = kESemanticMask_NoPackOffset,
     };
 
-    struct IRDeclaratorInfo;
-    struct EDeclarator;
+        /// A C-style declarator, used for emitting types and declarations.
+        ///
+        /// A C-style declaration typically has a *type specifier* (like
+        /// `int` or `MyType`) and a *declarator* (like `myVar` or
+        /// `myArray[]` or `*myPtr`).
+        ///
+        /// The type of a declaration depends on both the type specifier
+        /// the declarator, and we already have logic to "unwrap" the
+        /// syntax of a declarator as part of the parser.
+        ///
+        /// A `DeclaratorInfo` is used for the inverse process: taking
+        /// a complete type and splitting out the parts that need to be
+        /// handled as declarators when emitting code in a C-like language.
+        ///
+    struct DeclaratorInfo
+    {
+    public:
+        enum class Flavor
+        {
+            Name,
+            Ptr,
+            SizedArray,
+            UnsizedArray,
+            LiteralSizedArray,
+        };
+        Flavor flavor;
+
+    protected:
+        DeclaratorInfo(Flavor flavor)
+            : flavor(flavor)
+        {}
+    };
+
+        /// A simple declarator that only includes a name
+    struct NameDeclaratorInfo : DeclaratorInfo
+    {
+        const StringSliceLoc* nameAndLoc;
+
+        NameDeclaratorInfo(StringSliceLoc const* nameAndLoc)
+            : DeclaratorInfo(Flavor::Name), nameAndLoc(nameAndLoc)
+        {}
+    };
+
+        /// A "chained" declarator that may a nested declarator.
+    struct ChainedDeclaratorInfo : DeclaratorInfo
+    {
+        DeclaratorInfo* next = nullptr;
+
+    protected:
+        ChainedDeclaratorInfo(Flavor flavor, DeclaratorInfo* next)
+            : DeclaratorInfo(flavor)
+            , next(next)
+        {}
+    };
+
+    struct PtrDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        PtrDeclaratorInfo(DeclaratorInfo* next)
+            : ChainedDeclaratorInfo(Flavor::Ptr, next)
+        {}
+    };
+
+    struct SizedArrayDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        IRInst* elementCount;
+
+        SizedArrayDeclaratorInfo(DeclaratorInfo* next, IRInst* elementCount)
+            : ChainedDeclaratorInfo(Flavor::SizedArray, next)
+            , elementCount(elementCount)
+        {}
+    };
+
+    struct UnsizedArrayDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        UnsizedArrayDeclaratorInfo(DeclaratorInfo* next)
+            : ChainedDeclaratorInfo(Flavor::UnsizedArray, next)
+        {}
+    };
+
+    struct LiteralSizedArrayDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        IRIntegerValue elementCount;
+
+        LiteralSizedArrayDeclaratorInfo(DeclaratorInfo* next, IRIntegerValue elementCount)
+            : ChainedDeclaratorInfo(Flavor::LiteralSizedArray, next)
+            , elementCount(elementCount)
+        {}
+    };
+
     struct ComputeEmitActionsContext;
 
     // An action to be performed during code emit.
@@ -120,7 +207,7 @@ public:
     // Types
     //
 
-    void emitDeclarator(EDeclarator* declarator);
+    void emitDeclarator(DeclaratorInfo* declarator);
 
     void emitType(IRType* type, const StringSliceLoc* nameLoc) { emitTypeImpl(type, nameLoc); }
     void emitType(IRType* type, Name* name);
@@ -164,7 +251,6 @@ public:
 
     String getName(IRInst* inst);
 
-    void emitDeclarator(IRDeclaratorInfo* declarator);    
     void emitSimpleValue(IRInst* inst) { emitSimpleValueImpl(inst); }
     
     bool shouldFoldInstIntoUseSites(IRInst* inst);
@@ -374,9 +460,9 @@ public:
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
 
-    void _emitArrayType(IRArrayType* arrayType, EDeclarator* declarator);
-    void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator);
-    void _emitType(IRType* type, EDeclarator* declarator);
+    void _emitArrayType(IRArrayType* arrayType, DeclaratorInfo* declarator);
+    void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, DeclaratorInfo* declarator);
+    void _emitType(IRType* type, DeclaratorInfo* declarator);
     void _emitInst(IRInst* inst);
 
         // Emit the argument list (including paranthesis) in a `CallInst`

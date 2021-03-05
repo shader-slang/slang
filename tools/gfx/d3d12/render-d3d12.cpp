@@ -6,6 +6,7 @@
 //WORKING:#include "options.h"
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
+#include "../simple-render-pass-layout.h"
 #include "core/slang-blob.h"
 #include "core/slang-basic.h"
 
@@ -62,17 +63,15 @@ struct ID3D12GraphicsCommandList1 {};
 namespace gfx {
 using namespace Slang;
 
+static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage);
+
 class D3D12Renderer : public GraphicsAPIRenderer
 {
 public:
     // Renderer    implementation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        makeSwapchainImagePresentable(ISwapchain* swapchain) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc,
         WindowHandle window,
@@ -104,6 +103,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFramebufferLayout(IFramebufferLayout::Desc const& desc, IFramebufferLayout** outLayout) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRenderPassLayout(
+        const IRenderPassLayout::Desc& desc,
+        IRenderPassLayout** outRenderPassLayout) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         const InputElementDesc* inputElements,
         UInt inputElementCount,
@@ -126,49 +129,23 @@ public:
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
-        ITextureResource* resource, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
+        ITextureResource* resource,
+        ResourceState state,
+        ISlangBlob** outBlob,
+        size_t* outRowPitch,
+        size_t* outPixelSize) override;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL
-        map(IBufferResource* buffer, MapFlavor flavor) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
-    //    virtual void setInputLayout(InputLayout* inputLayout) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPrimitiveTopology(PrimitiveTopology topology) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readBufferResource(
+        IBufferResource* resource,
+        size_t offset,
+        size_t size,
+        ISlangBlob** outBlob) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) override;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
-        IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setViewports(UInt count, Viewport const* viewports) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override;
     virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
     {
         return RendererType::DirectX12;
     }
-    virtual PipelineStateBase* getCurrentPipeline() override
-    {
-        return m_currentPipelineState;
-    }
+
     ~D3D12Renderer();
 
 protected:
@@ -244,77 +221,23 @@ protected:
     public:
         typedef BufferResource Parent;
 
-        enum class BackingStyle
-        {
-            Unknown,
-            ResourceBacked,             ///< The contents is only held within the resource
-            MemoryBacked,               ///< The current contents is held in m_memory and copied to GPU every time it's used (typically used for constant buffers)
-        };
-
         void bindConstantBufferView(D3D12CircularResourceHeap& circularHeap, int index, Submitter* submitter) const
         {
-            switch (m_backingStyle)
-            {
-                case BackingStyle::MemoryBacked:
-                {
-                    const size_t bufferSize = m_memory.getCount();
-                    D3D12CircularResourceHeap::Cursor cursor = circularHeap.allocateConstantBuffer(bufferSize);
-                    ::memcpy(cursor.m_position, m_memory.getBuffer(), bufferSize);
-                    // Set the constant buffer
-                    submitter->setRootConstantBufferView(index, circularHeap.getGpuHandle(cursor));
-                    break;
-                }
-                case BackingStyle::ResourceBacked:
-                {
-                    // Set the constant buffer
-                    submitter->setRootConstantBufferView(index, m_resource.getResource()->GetGPUVirtualAddress());
-                    break;
-                }
-                default: break;
-            }
+            // Set the constant buffer
+            submitter->setRootConstantBufferView(index, m_resource.getResource()->GetGPUVirtualAddress());
         }
 
         BufferResourceImpl(IResource::Usage initialUsage, const Desc& desc):
-            Parent(desc),
-            m_mapFlavor(MapFlavor::HostRead),
-            m_initialUsage(initialUsage)
+            Parent(desc), m_initialUsage(initialUsage)
+            , m_defaultState(_calcResourceState(initialUsage))
         {
         }
 
-        static BackingStyle _calcResourceBackingStyle(Usage usage)
-        {
-            // Note: the D3D12 back-end has support for "versioning" of constant buffers,
-            // where the same logical `BufferResource` can actually point to different
-            // backing storage over its lifetime, to emulate the ability to modify the
-            // buffer contents as in D3D11, etc.
-            //
-            // The VK back-end doesn't have the same behavior, and it is difficult
-            // to both support this degree of flexibility *and* efficeintly exploit
-            // descriptor tables (since any table referencing the buffer would need
-            // to be updated when a new buffer "version" gets allocated).
-            //
-            // I'm choosing to disable this for now, and make all buffers be memory-backed,
-            // although this creates synchronization issues that we'll have to address
-            // next.
-
-            return BackingStyle::ResourceBacked;
-#if 0
-            switch (usage)
-            {
-                case Usage::ConstantBuffer:     return BackingStyle::MemoryBacked;
-                default:                        return BackingStyle::ResourceBacked;
-            }
-#endif
-        }
-
-        BackingStyle m_backingStyle;        ///< How the resource is 'backed' - either as a resource or cpu memory. Cpu memory is typically used for constant buffers.
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
         Usage m_initialUsage;
-
-        List<uint8_t> m_memory;             ///< Cpu memory buffer, used if the m_backingStyle is MemoryBacked
-        MapFlavor m_mapFlavor;              ///< If the resource is mapped holds the current mapping flavor
+        D3D12_RESOURCE_STATES m_defaultState;
     };
 
     class TextureResourceImpl: public TextureResource
@@ -325,9 +248,11 @@ protected:
         TextureResourceImpl(const Desc& desc):
             Parent(desc)
         {
+            m_defaultState = _calcResourceState(desc.initialUsage);
         }
 
         D3D12Resource m_resource;
+        D3D12_RESOURCE_STATES m_defaultState;
     };
 
     class SamplerStateImpl : public ISamplerState, public RefObject
@@ -400,151 +325,24 @@ protected:
         ShortList<ComPtr<IResourceView>> renderTargetViews;
         ComPtr<IResourceView> depthStencilView;
         ShortList<D3D12_CPU_DESCRIPTOR_HANDLE> renderTargetDescriptors;
+        struct Color4f
+        {
+            float values[4];
+        };
+        ShortList<Color4f> renderTargetClearValues;
         D3D12_CPU_DESCRIPTOR_HANDLE depthStencilDescriptor;
+        DepthStencilClearValue depthStencilClearValue;
     };
 
-    class SwapchainImpl
-        : public ISwapchain
-        , public RefObject
+    class RenderPassLayoutImpl : public SimpleRenderPassLayout
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        ISwapchain* getInterface(const Guid& guid)
+        RefPtr<FramebufferLayoutImpl> m_framebufferLayout;
+        void init(const IRenderPassLayout::Desc& desc)
         {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
-                return static_cast<ISwapchain*>(this);
-            return nullptr;
+            SimpleRenderPassLayout::init(desc);
+            m_framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
         }
-
-    public:
-        Result init(D3D12Renderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
-        {
-            // Return fail on non-supported platforms.
-            switch (window.type)
-            {
-            case WindowHandle::Type::Win32Handle:
-                break;
-            default:
-                return SLANG_FAIL;
-            }
-
-            m_renderer = renderer;
-            m_desc = desc;
-
-            // Describe the swap chain.
-            DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-            swapChainDesc.BufferCount = desc.imageCount;
-            swapChainDesc.BufferDesc.Width = desc.width;
-            swapChainDesc.BufferDesc.Height = desc.height;
-            swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(desc.format);
-            swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-            swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-            swapChainDesc.OutputWindow = (HWND)window.handleValues[0];
-            swapChainDesc.SampleDesc.Count = 1;
-            swapChainDesc.Windowed = TRUE;
-
-            if (!desc.enableVSync)
-            {
-                swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
-            }
-
-            // Swap chain needs the queue so that it can force a flush on it.
-            ComPtr<IDXGISwapChain> swapChain;
-            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->CreateSwapChain(
-                m_renderer->m_commandQueue, &swapChainDesc, swapChain.writeRef()));
-            SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
-
-            if (!desc.enableVSync)
-            {
-                m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
-
-                int maxLatency = desc.imageCount - 2;
-
-                // Make sure the maximum latency is in the range required by dx12 runtime
-                maxLatency = (maxLatency < 1) ? 1 : maxLatency;
-                maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS)
-                                    ? DXGI_MAX_SWAP_CHAIN_BUFFERS
-                                    : maxLatency;
-
-                m_swapChain->SetMaximumFrameLatency(maxLatency);
-            }
-
-            // This sample does not support fullscreen transitions.
-            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(
-                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER));
-
-            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
-
-            for (uint32_t i = 0; i < desc.imageCount; i++)
-            {
-                ComPtr<ID3D12Resource> d3dResource;
-                m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
-                ITextureResource::Desc imageDesc = {};
-                imageDesc.init2D(
-                    IResource::Type::Texture2D, desc.format, desc.width, desc.height, 0);
-                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
-                image->m_resource.setResource(d3dResource.get(), D3D12_RESOURCE_STATE_COMMON);
-                m_images.add(image);
-            }
-            return SLANG_OK;
-        }
-        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
-        virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) override
-        {
-            m_images[index]->addRef();
-            *outResource = m_images[index].Ptr();
-            return SLANG_OK;
-        }
-        void makeBackbufferPresentable()
-        {
-            D3D12BarrierSubmitter submitter(m_renderer->m_commandList);
-            m_images[m_renderTargetIndex]->m_resource.transition(
-                D3D12_RESOURCE_STATE_PRESENT, submitter);
-        }
-        virtual SLANG_NO_THROW Result present() override
-        {
-            if (m_swapChainWaitableObject)
-            {
-                // check if now is good time to present
-                // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it
-                // means that no frame is waiting to be be displayed so there is no point doing a
-                // present.
-                const bool shouldPresent =
-                    (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
-                if (shouldPresent)
-                {
-                    m_swapChain->Present(0, 0);
-                }
-            }
-            else
-            {
-                if (SLANG_FAILED(m_swapChain->Present(1, 0)))
-                {
-                    return SLANG_FAIL;
-                }
-            }
-            // Update the render target index.
-            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
-            return SLANG_OK;
-        }
-
-        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
-        {
-            // `IRenderer::beginFrame()` must be called before `acquireNextImage`.
-            SLANG_RELEASE_ASSERT(m_renderer->m_commandListOpenCount == 1);
-
-            D3D12BarrierSubmitter submitter(m_renderer->m_commandList);
-            m_images[m_renderTargetIndex]->m_resource.transition(
-                D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
-            return m_renderTargetIndex;
-        }
-    public:
-        D3D12Renderer* m_renderer = nullptr;
-        ISwapchain::Desc m_desc;
-        HANDLE m_swapChainWaitableObject = nullptr;
-        ComPtr<IDXGISwapChain3> m_swapChain;
-        uint32_t m_renderTargetIndex;
-        ShortList<RefPtr<TextureResourceImpl>> m_images;
     };
 
     class InputLayoutImpl: public IInputLayout, public RefObject
@@ -731,10 +529,10 @@ protected:
 
         ~DescriptorSetImpl()
         {
-            if (m_resourceObjects.getCount())
-                m_resourceHeap->free((int)m_resourceTable, (int)m_resourceObjects.getCount());
-            if (m_samplerObjects.getCount())
-                m_samplerHeap->free((int)m_samplerTable, (int)m_samplerObjects.getCount());
+            if (m_layout->m_resourceCount)
+                m_resourceHeap->free((int)m_resourceTable, (int)m_layout->m_resourceCount);
+            if (m_layout->m_samplerCount)
+                m_samplerHeap->free((int)m_samplerTable, (int)m_layout->m_samplerCount);
         }
     };
 
@@ -754,7 +552,6 @@ protected:
     class PipelineStateImpl : public PipelineStateBase
     {
     public:
-        RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
         ComPtr<ID3D12PipelineState> m_pipelineState;
         void init(const GraphicsPipelineStateDesc& inDesc)
         {
@@ -841,84 +638,1100 @@ protected:
         ID3D12GraphicsCommandList* m_commandList;
     };
 
+    static Result _uploadBufferData(
+        ID3D12GraphicsCommandList* cmdList,
+        BufferResourceImpl* buffer,
+        size_t offset,
+        size_t size,
+        void* data)
+    {
+        D3D12_RANGE readRange = {};
+        readRange.Begin = offset;
+        readRange.End = offset + size;
+
+        void* uploadData;
+        SLANG_RETURN_ON_FAIL(buffer->m_uploadResource.getResource()->Map(
+            0, &readRange, reinterpret_cast<void**>(&uploadData)));
+        memcpy(uploadData, data, size);
+        buffer->m_uploadResource.getResource()->Unmap(0, &readRange);
+        {
+            D3D12BarrierSubmitter submitter(cmdList);
+            submitter.transition(
+                buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
+        }
+        cmdList->CopyBufferRegion(
+            buffer->m_resource.getResource(),
+            offset,
+            buffer->m_uploadResource.getResource(),
+            offset,
+            size);
+        {
+            D3D12BarrierSubmitter submitter(cmdList);
+            submitter.transition(
+                buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
+        }
+        return SLANG_OK;
+    }
+    
+    // Use a circular buffer of execution frames to manage in-flight GPU command buffers.
+    // Each call to `executeCommandLists` advances the frame by 1.
+    // If we run out of avaialble frames, wait for the earliest submitted frame to finish.
+    struct ExecutionFrameResources
+    {
+        ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+        List<ComPtr<ID3D12GraphicsCommandList>> m_commandListPool;
+        uint32_t m_commandListAllocId = 0;
+        HANDLE fenceEvent;
+
+        // During command submission, we need all the descriptor tables that get
+        // used to come from a single heap (for each descriptor heap type).
+        //
+        // We will thus keep a single heap of each type that we hope will hold
+        // all the descriptors that actually get needed in a frame.
+        //
+        // TODO: we need an allocation policy to reallocate and resize these
+        // if/when we run out of space during a frame.
+        D3D12DescriptorHeap m_viewHeap; // Cbv, Srv, Uav
+        D3D12DescriptorHeap m_samplerHeap; // Heap for samplers
+
+        ~ExecutionFrameResources() { CloseHandle(fenceEvent); }
+        Result init(ID3D12Device* device, uint32_t viewHeapSize, uint32_t samplerHeapSize)
+        {
+            SLANG_RETURN_ON_FAIL(device->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+            fenceEvent = CreateEventEx(
+                nullptr,
+                false,
+                CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+                EVENT_ALL_ACCESS);
+            SLANG_RETURN_ON_FAIL(m_viewHeap.init(
+                device,
+                viewHeapSize,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
+            SLANG_RETURN_ON_FAIL(m_samplerHeap.init(
+                device,
+                samplerHeapSize,
+                D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
+            return SLANG_OK;
+        }
+        void reset()
+        {
+            WaitForSingleObject(fenceEvent, INFINITE);
+            m_viewHeap.deallocateAll();
+            m_samplerHeap.deallocateAll();
+            m_commandListAllocId = 0;
+            m_commandAllocator->Reset();
+            for (auto cmdBuffer : m_commandListPool)
+                cmdBuffer->Reset(m_commandAllocator, nullptr);
+        }
+        ComPtr<ID3D12GraphicsCommandList> createCommandList(ID3D12Device* device)
+        {
+            if (m_commandListAllocId == m_commandListPool.getCount())
+            {
+                ComPtr<ID3D12GraphicsCommandList> cmdList;
+                device->CreateCommandList(
+                    0,
+                    D3D12_COMMAND_LIST_TYPE_DIRECT,
+                    m_commandAllocator,
+                    nullptr,
+                    IID_PPV_ARGS(cmdList.writeRef()));
+                m_commandListPool.add(cmdList);
+            }
+            assert((Index)m_commandListAllocId < m_commandListPool.getCount());
+            auto& result = m_commandListPool[m_commandListAllocId];
+            ++m_commandListAllocId;
+            return result;
+        }
+    };
+
+    class CommandBufferImpl
+        : public ICommandBuffer
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ICommandBuffer* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
+                return static_cast<ICommandBuffer*>(this);
+            return nullptr;
+        }
+    public:
+        ComPtr<ID3D12GraphicsCommandList> m_cmdList;
+        ExecutionFrameResources* m_frame;
+        D3D12Renderer* m_renderer;
+        void init(D3D12Renderer* renderer, ExecutionFrameResources* frame)
+        {
+            m_frame = frame;
+            m_renderer = renderer;
+            m_cmdList = m_frame->createCommandList(renderer->m_device);
+        }
+        class PipelineCommandEncoder : public GraphicsComputeCommandEncoderBase
+        {
+        public:
+            bool m_isOpen = false;
+            CommandBufferImpl* m_commandBuffer;
+            ExecutionFrameResources* m_frame;
+            ID3D12Device* m_device;
+            ID3D12GraphicsCommandList* m_d3dCmdList;
+            ID3D12GraphicsCommandList* m_preCmdList = nullptr;
+
+            ID3D12PipelineState* m_boundPipelines[3] = {};
+            RefPtr<DescriptorSetImpl> m_boundDescriptorSets[int(PipelineType::CountOf)]
+                                                           [kMaxDescriptorSetCount];
+            static int getBindPointIndex(PipelineType type)
+            {
+                switch (type)
+                {
+                case PipelineType::Graphics:
+                    return 0;
+                case PipelineType::Compute:
+                    return 1;
+                case PipelineType::RayTracing:
+                    return 2;
+                default:
+                    assert(!"unknown pipeline type.");
+                    return -1;
+                }
+            }
+
+            RefPtr<PipelineLayoutImpl> m_currentPipelineLayout;
+
+            void init(CommandBufferImpl* commandBuffer)
+            {
+                m_commandBuffer = commandBuffer;
+                m_rendererBase = static_cast<RendererBase*>(commandBuffer->m_renderer);
+                m_d3dCmdList = m_commandBuffer->m_cmdList;
+            }
+
+            void endEncodingImpl()
+            {
+                m_isOpen = false;
+                for (int i = 0; i < int(PipelineType::CountOf); i++)
+                {
+                    for (auto& descSet : m_boundDescriptorSets[i])
+                    {
+                        descSet = nullptr;
+                    }
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSetImpl(
+                PipelineType pipelineType,
+                IPipelineLayout* layout,
+                UInt index,
+                IDescriptorSet* descriptorSet) override
+            {
+                // In D3D12, unlike Vulkan, binding a root signature invalidates *all* descriptor
+                // table
+                // bindings (rather than preserving those that are part of the longest common prefix
+                // between the old and new layout).
+                //
+                // In order to accomodate having descriptor-set bindings that persist across changes
+                // in pipeline state (which may also change pipeline layout), we will shadow the
+                // descriptor-set bindings and only flush them on-demand at draw tiume once the
+                // final pipline layout is known.
+                //
+
+                auto descriptorSetImpl = (DescriptorSetImpl*)descriptorSet;
+                m_boundDescriptorSets[int(pipelineType)][index] = descriptorSetImpl;
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferDataImpl(
+                IBufferResource* buffer,
+                size_t offset,
+                size_t size,
+                void* data) override
+            {
+                _uploadBufferData(
+                    m_commandBuffer->m_cmdList,
+                    static_cast<BufferResourceImpl*>(buffer),
+                    offset,
+                    size,
+                    data);
+            }
+
+            void setPipelineStateImpl(IPipelineState* state)
+            {
+                m_currentPipeline = static_cast<PipelineStateImpl*>(state);
+            }
+
+            Result _bindRenderState(
+                PipelineStateImpl* pipelineStateImpl,
+                Submitter* submitter);
+        };
+
+        class RenderCommandEncoderImpl
+            : public IRenderCommandEncoder
+            , public PipelineCommandEncoder
+        {
+        public:
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
+            {
+                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                    uuid == GfxGUID::IID_IRenderCommandEncoder)
+                {
+                    *outObject = static_cast<IRenderCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+        public:
+            RefPtr<RenderPassLayoutImpl> m_renderPass;
+            RefPtr<FramebufferImpl> m_framebuffer;
+
+            List<BoundVertexBuffer> m_boundVertexBuffers;
+
+            RefPtr<BufferResourceImpl> m_boundIndexBuffer;
+
+            D3D12_VIEWPORT m_viewports[kMaxRTVCount];
+            D3D12_RECT m_scissorRects[kMaxRTVCount];
+
+            DXGI_FORMAT m_boundIndexFormat;
+            UINT m_boundIndexOffset;
+
+            D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType;
+            D3D12_PRIMITIVE_TOPOLOGY m_primitiveTopology;
+
+            void init(
+                D3D12Renderer* renderer,
+                ExecutionFrameResources* frame,
+                CommandBufferImpl* cmdBuffer,
+                RenderPassLayoutImpl* renderPass,
+                FramebufferImpl* framebuffer)
+            {
+                m_commandBuffer = cmdBuffer;
+                m_d3dCmdList = cmdBuffer->m_cmdList;
+                m_preCmdList = nullptr;
+                m_device = renderer->m_device;
+                m_rendererBase = renderer;
+                m_renderPass = renderPass;
+                m_framebuffer = framebuffer;
+                m_frame = frame;
+                m_boundVertexBuffers.clear();
+                m_boundIndexBuffer = nullptr;
+                m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+                m_primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+                m_boundIndexFormat = DXGI_FORMAT_UNKNOWN;
+                m_boundIndexOffset = 0;
+                for (auto& boundPipeline : m_boundPipelines)
+                    boundPipeline = nullptr;
+
+                // Set render target states.
+                m_d3dCmdList->OMSetRenderTargets(
+                    (UINT)framebuffer->renderTargetViews.getCount(),
+                    framebuffer->renderTargetDescriptors.getArrayView().getBuffer(),
+                    FALSE,
+                    framebuffer->depthStencilView ? &framebuffer->depthStencilDescriptor : nullptr);
+
+                // Issue clear commands based on render pass set up.
+                for (Index i = 0; i < renderPass->m_renderTargetAccesses.getCount(); i++)
+                {
+                    auto& access = renderPass->m_renderTargetAccesses[i];
+
+                    // Transit resource states.
+                    {
+                        D3D12BarrierSubmitter submitter(m_d3dCmdList);
+                        auto resourceViewImpl =
+                            static_cast<ResourceViewImpl*>(framebuffer->renderTargetViews[i].get());
+                        auto textureResource =
+                            static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
+                        D3D12_RESOURCE_STATES initialState;
+                        if (access.initialState == ResourceState::Undefined)
+                        {
+                            initialState = textureResource->m_defaultState;
+                        }
+                        else
+                        {
+                            initialState = D3DUtil::translateResourceState(access.initialState);
+                        }
+                        textureResource->m_resource.transition(
+                            initialState,
+                            D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            submitter);
+                    }
+                    // Clear.
+                    if (access.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
+                    {
+                        m_d3dCmdList->ClearRenderTargetView(
+                            framebuffer->renderTargetDescriptors[i],
+                            framebuffer->renderTargetClearValues[i].values,
+                            0,
+                            nullptr);
+                    }
+                }
+
+                if (renderPass->m_hasDepthStencil)
+                {
+                    // Transit resource states.
+                    {
+                        D3D12BarrierSubmitter submitter(m_d3dCmdList);
+                        auto resourceViewImpl =
+                            static_cast<ResourceViewImpl*>(framebuffer->depthStencilView.get());
+                        auto textureResource =
+                            static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
+                        D3D12_RESOURCE_STATES initialState;
+                        if (renderPass->m_depthStencilAccess.initialState ==
+                            ResourceState::Undefined)
+                        {
+                            initialState = textureResource->m_defaultState;
+                        }
+                        else
+                        {
+                            initialState = D3DUtil::translateResourceState(
+                                renderPass->m_depthStencilAccess.initialState);
+                        }
+                        textureResource->m_resource.transition(
+                            initialState,
+                            D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                            submitter);
+                    }
+                    // Clear.
+                    uint32_t clearFlags = 0;
+                    if (renderPass->m_depthStencilAccess.loadOp ==
+                        IRenderPassLayout::AttachmentLoadOp::Clear)
+                    {
+                        clearFlags |= D3D12_CLEAR_FLAG_DEPTH;
+                    }
+                    if (renderPass->m_depthStencilAccess.stencilLoadOp ==
+                        IRenderPassLayout::AttachmentLoadOp::Clear)
+                    {
+                        clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+                    }
+                    if (clearFlags)
+                    {
+                        m_d3dCmdList->ClearDepthStencilView(
+                            framebuffer->depthStencilDescriptor,
+                            (D3D12_CLEAR_FLAGS)clearFlags,
+                            framebuffer->depthStencilClearValue.depth,
+                            framebuffer->depthStencilClearValue.stencil,
+                            0,
+                            nullptr);
+                    }
+                }
+            }
+            
+            virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+            {
+                setPipelineStateImpl(state);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                bindRootShaderObject(IShaderObject* object) override
+            {
+                bindRootShaderObjectImpl(PipelineType::Graphics, object);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
+                IPipelineLayout* layout,
+                UInt index,
+                IDescriptorSet* descriptorSet) override
+            {
+                setDescriptorSetImpl(PipelineType::Graphics, layout, index, descriptorSet);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                setViewports(uint32_t count, const Viewport* viewports) override
+            {
+                static const int kMaxViewports =
+                    D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+                assert(count <= kMaxViewports && count <= kMaxRTVCount);
+                for (UInt ii = 0; ii < count; ++ii)
+                {
+                    auto& inViewport = viewports[ii];
+                    auto& dxViewport = m_viewports[ii];
+
+                    dxViewport.TopLeftX = inViewport.originX;
+                    dxViewport.TopLeftY = inViewport.originY;
+                    dxViewport.Width = inViewport.extentX;
+                    dxViewport.Height = inViewport.extentY;
+                    dxViewport.MinDepth = inViewport.minZ;
+                    dxViewport.MaxDepth = inViewport.maxZ;
+                }
+                m_d3dCmdList->RSSetViewports(UINT(count), m_viewports);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                setScissorRects(uint32_t count, const ScissorRect* rects) override
+            {
+                static const int kMaxScissorRects =
+                    D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
+                assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
+
+                for (UInt ii = 0; ii < count; ++ii)
+                {
+                    auto& inRect = rects[ii];
+                    auto& dxRect = m_scissorRects[ii];
+
+                    dxRect.left = LONG(inRect.minX);
+                    dxRect.top = LONG(inRect.minY);
+                    dxRect.right = LONG(inRect.maxX);
+                    dxRect.bottom = LONG(inRect.maxY);
+                }
+
+                m_d3dCmdList->RSSetScissorRects(UINT(count), m_scissorRects);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                setPrimitiveTopology(PrimitiveTopology topology) override
+            {
+                switch (topology)
+                {
+                case PrimitiveTopology::TriangleList:
+                    {
+                        m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+                        m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
+                        break;
+                    }
+                default:
+                    {
+                        assert(!"Unhandled type");
+                    }
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
+                UInt startSlot,
+                UInt slotCount,
+                IBufferResource* const* buffers,
+                const UInt* strides,
+                const UInt* offsets) override
+            {
+                {
+                    const Index num = startSlot + slotCount;
+                    if (num > m_boundVertexBuffers.getCount())
+                    {
+                        m_boundVertexBuffers.setCount(num);
+                    }
+                }
+
+                for (UInt i = 0; i < slotCount; i++)
+                {
+                    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
+                    if (buffer)
+                    {
+                        assert(buffer->m_initialUsage == IResource::Usage::VertexBuffer);
+                    }
+
+                    BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
+                    boundBuffer.m_buffer = buffer;
+                    boundBuffer.m_stride = int(strides[i]);
+                    boundBuffer.m_offset = int(offsets[i]);
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
+                IBufferResource* buffer,
+                Format indexFormat,
+                UInt offset = 0) override
+            {
+                m_boundIndexBuffer = (BufferResourceImpl*)buffer;
+                m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
+                m_boundIndexOffset = UINT(offset);
+            }
+
+            void prepareDraw()
+            {
+                auto pipelineState = m_currentPipeline.Ptr();
+                if (!pipelineState || (pipelineState->desc.type != PipelineType::Graphics))
+                {
+                    assert(!"No graphics pipeline state set");
+                    return;
+                }
+
+                // Submit - setting for graphics
+                {
+                    GraphicsSubmitter submitter(m_d3dCmdList);
+                    _bindRenderState(static_cast<PipelineStateImpl*>(pipelineState), &submitter);
+                }
+
+                m_d3dCmdList->IASetPrimitiveTopology(m_primitiveTopology);
+
+                // Set up vertex buffer views
+                {
+                    int numVertexViews = 0;
+                    D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
+                    for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
+                    {
+                        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
+                        BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
+                        if (buffer)
+                        {
+                            D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
+                            vertexView.BufferLocation =
+                                buffer->m_resource.getResource()->GetGPUVirtualAddress() +
+                                boundVertexBuffer.m_offset;
+                            vertexView.SizeInBytes =
+                                UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
+                            vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
+                        }
+                    }
+                    m_d3dCmdList->IASetVertexBuffers(0, numVertexViews, vertexViews);
+                }
+                // Set up index buffer
+                if (m_boundIndexBuffer)
+                {
+                    D3D12_INDEX_BUFFER_VIEW indexBufferView;
+                    indexBufferView.BufferLocation =
+                        m_boundIndexBuffer->m_resource.getResource()->GetGPUVirtualAddress() +
+                        m_boundIndexOffset;
+                    indexBufferView.SizeInBytes =
+                        UINT(m_boundIndexBuffer->getDesc()->sizeInBytes - m_boundIndexOffset);
+                    indexBufferView.Format = m_boundIndexFormat;
+
+                    m_d3dCmdList->IASetIndexBuffer(&indexBufferView);
+                }
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                draw(UInt vertexCount, UInt startVertex = 0) override
+            {
+                prepareDraw();
+                m_d3dCmdList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override
+            {
+                prepareDraw();
+                m_d3dCmdList->DrawIndexedInstanced(
+                    (UINT)indexCount, 1, (UINT)startIndex, (UINT)baseVertex, 0);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
+            {
+                PipelineCommandEncoder::endEncodingImpl();
+                // Issue clear commands based on render pass set up.
+                for (Index i = 0; i < m_renderPass->m_renderTargetAccesses.getCount(); i++)
+                {
+                    auto& access = m_renderPass->m_renderTargetAccesses[i];
+
+                    // Transit resource states.
+                    {
+                        D3D12BarrierSubmitter submitter(m_d3dCmdList);
+                        auto resourceViewImpl = static_cast<ResourceViewImpl*>(
+                            m_framebuffer->renderTargetViews[i].get());
+                        auto textureResource =
+                            static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
+                        textureResource->m_resource.transition(
+                            D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            D3DUtil::translateResourceState(access.finalState),
+                            submitter);
+                    }
+                }
+
+                if (m_renderPass->m_hasDepthStencil)
+                {
+                    // Transit resource states.
+                    D3D12BarrierSubmitter submitter(m_d3dCmdList);
+                    auto resourceViewImpl =
+                        static_cast<ResourceViewImpl*>(m_framebuffer->depthStencilView.get());
+                    auto textureResource =
+                        static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
+                    textureResource->m_resource.transition(
+                        D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                        D3DUtil::translateResourceState(
+                            m_renderPass->m_depthStencilAccess.finalState),
+                        submitter);
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                setStencilReference(uint32_t referenceValue) override
+            {
+                m_d3dCmdList->OMSetStencilRef((UINT)referenceValue);
+            }
+        };
+
+        RenderCommandEncoderImpl m_renderCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
+            IRenderPassLayout* renderPass,
+            IFramebuffer* framebuffer,
+            IRenderCommandEncoder** outEncoder) override
+        {
+            m_renderCommandEncoder.init(
+                m_renderer,
+                m_frame,
+                this,
+                static_cast<RenderPassLayoutImpl*>(renderPass),
+                static_cast<FramebufferImpl*>(framebuffer));
+            *outEncoder = &m_renderCommandEncoder;
+        }
+
+        class ComputeCommandEncoderImpl
+            : public IComputeCommandEncoder
+            , public PipelineCommandEncoder
+        {
+        public:
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
+            {
+                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                    uuid == GfxGUID::IID_IComputeCommandEncoder)
+                {
+                    *outObject = static_cast<IComputeCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
+        public:
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
+            {
+                PipelineCommandEncoder::endEncodingImpl();
+            }
+            void init(
+                D3D12Renderer* renderer,
+                ExecutionFrameResources* frame,
+                CommandBufferImpl* cmdBuffer)
+            {
+                m_rendererBase = renderer;
+                m_commandBuffer = cmdBuffer;
+                m_d3dCmdList = cmdBuffer->m_cmdList;
+                m_preCmdList = nullptr;
+                m_device = renderer->m_device;
+                m_frame = frame;
+                for (auto& boundPipeline : m_boundPipelines)
+                    boundPipeline = nullptr;
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+            {
+                setPipelineStateImpl(state);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                bindRootShaderObject(IShaderObject* object) override
+            {
+                bindRootShaderObjectImpl(PipelineType::Compute, object);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
+                IPipelineLayout* layout,
+                UInt index,
+                IDescriptorSet* descriptorSet) override
+            {
+                setDescriptorSetImpl(PipelineType::Compute, layout, index, descriptorSet);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
+            {
+                auto pipelineStateImpl = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
+
+                // Submit binding for compute
+                {
+                    ComputeSubmitter submitter(m_d3dCmdList);
+                    _bindRenderState(pipelineStateImpl, &submitter);
+                }
+
+                m_d3dCmdList->Dispatch(x, y, z);
+            }
+        };
+
+        ComputeCommandEncoderImpl m_computeCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
+        {
+            m_computeCommandEncoder.init(m_renderer, m_frame, this);
+            *outEncoder = &m_computeCommandEncoder;
+        }
+
+        class ResourceCommandEncoderImpl : public IResourceCommandEncoder
+        {
+        public:
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
+            {
+                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                    uuid == GfxGUID::IID_IResourceCommandEncoder)
+                {
+                    *outObject = static_cast<IResourceCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
+        public:
+            CommandBufferImpl* m_commandBuffer;
+            void init(D3D12Renderer* renderer, CommandBufferImpl* commandBuffer)
+            {
+                m_commandBuffer = commandBuffer;
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                IBufferResource* src,
+                size_t srcOffset,
+                size_t size) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(size);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
+                IBufferResource* dst,
+                size_t offset,
+                size_t size,
+                void* data) override
+            {
+                _uploadBufferData(
+                    m_commandBuffer->m_cmdList,
+                    static_cast<BufferResourceImpl*>(dst),
+                    offset,
+                    size,
+                    data);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+        };
+
+        ResourceCommandEncoderImpl m_resourceCommandEncoder;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeResourceCommands(IResourceCommandEncoder** outEncoder) override
+        {
+            m_resourceCommandEncoder.init(m_renderer, this);
+            *outEncoder = &m_resourceCommandEncoder;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
+    };
+
+    class CommandQueueImpl
+        : public ICommandQueue
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ICommandQueue* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandQueue)
+                return static_cast<ICommandQueue*>(this);
+            return nullptr;
+        }
+
+    public:
+        struct CommandBufferPool
+        {
+            List<RefPtr<CommandBufferImpl>> pool;
+            uint32_t allocIndex = 0;
+            RefPtr<CommandBufferImpl> allocCommandBuffer(D3D12Renderer* renderer, ExecutionFrameResources* frame)
+            {
+                if ((Index)allocIndex < pool.getCount())
+                {
+                    RefPtr<CommandBufferImpl> result = pool[allocIndex];
+                    result->init(renderer, frame);
+                    allocIndex++;
+                    return result;
+                }
+                RefPtr<CommandBufferImpl> cmdBuffer = new CommandBufferImpl();
+                cmdBuffer->init(renderer, frame);
+                pool.add(cmdBuffer);
+                return cmdBuffer;
+            }
+            void reset()
+            {
+                allocIndex = 0;
+            }
+        };
+        List<CommandBufferPool> m_commandBufferPools;
+        List<ExecutionFrameResources> m_frames;
+        uint32_t m_frameIndex = 0;
+        D3D12Renderer* m_renderer;
+        ComPtr<ID3D12Device> m_device;
+        ComPtr<ID3D12CommandQueue> m_d3dQueue;
+        ComPtr<ID3D12Fence> m_fence;
+        uint64_t m_fenceValue = 0;
+        HANDLE globalWaitHandle;
+        Desc m_desc;
+        Result init(
+            D3D12Renderer* renderer,
+            uint32_t frameCount,
+            uint32_t viewHeapSize,
+            uint32_t samplerHeapSize)
+        {
+            m_renderer = renderer;
+            m_device = renderer->m_device;
+            m_frames.setCount(frameCount);
+            m_commandBufferPools.setCount(frameCount);
+            for (uint32_t i = 0; i < frameCount; i++)
+            {
+                SLANG_RETURN_ON_FAIL(m_frames[i].init(m_device, viewHeapSize, samplerHeapSize));
+            }
+            D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+            queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+            SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_d3dQueue.writeRef())));
+            SLANG_RETURN_ON_FAIL(
+                m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+            globalWaitHandle = CreateEventEx(
+                nullptr,
+                nullptr,
+                CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+                EVENT_ALL_ACCESS);
+            return SLANG_OK;
+        }
+        ~CommandQueueImpl()
+        {
+            wait();
+            CloseHandle(globalWaitHandle);
+        }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override
+        {
+            return m_desc;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            createCommandBuffer(ICommandBuffer** outCommandBuffer) override
+        {
+            RefPtr<CommandBufferImpl> result =
+                m_commandBufferPools[m_frameIndex].allocCommandBuffer(
+                    m_renderer, &m_frames[m_frameIndex]);
+            *outCommandBuffer = result.detach();
+            return SLANG_OK;
+        }
+        
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+        {
+            ShortList<ID3D12CommandList*> commandLists;
+            for (uint32_t i = 0; i < count; i++)
+            {
+                auto cmdImpl = static_cast<CommandBufferImpl*>(commandBuffers[i]);
+                commandLists.add(cmdImpl->m_cmdList);
+            }
+            m_d3dQueue->ExecuteCommandLists((UINT)count, commandLists.getArrayView().getBuffer());
+
+            auto& frame = m_frames[m_frameIndex];
+            m_fenceValue++;
+            m_d3dQueue->Signal(m_fence, m_fenceValue);
+            ResetEvent(frame.fenceEvent);
+            ResetEvent(globalWaitHandle);
+            m_fence->SetEventOnCompletion(m_fenceValue, frame.fenceEvent);
+            swapExecutionFrame();
+        }
+
+        void swapExecutionFrame()
+        {
+            m_frameIndex = (m_frameIndex + 1) % m_frames.getCount();
+            auto& frame = m_frames[m_frameIndex];
+            frame.reset();
+            m_commandBufferPools[m_frameIndex].reset();
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        {
+            m_fenceValue++;
+            m_d3dQueue->Signal(m_fence, m_fenceValue);
+            ResetEvent(globalWaitHandle);
+            m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
+            WaitForSingleObject(globalWaitHandle, INFINITE);
+        }
+    };
+
+    class SwapchainImpl
+        : public ISwapchain
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ISwapchain* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
+                return static_cast<ISwapchain*>(this);
+            return nullptr;
+        }
+
+    public:
+        Result init(D3D12Renderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+        {
+            // Return fail on non-supported platforms.
+            switch (window.type)
+            {
+            case WindowHandle::Type::Win32Handle:
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+
+            m_renderer = renderer;
+            m_desc = desc;
+            m_queue = static_cast<CommandQueueImpl*>(desc.queue);
+
+            // Describe the swap chain.
+            DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+            swapChainDesc.BufferCount = desc.imageCount;
+            swapChainDesc.BufferDesc.Width = desc.width;
+            swapChainDesc.BufferDesc.Height = desc.height;
+            swapChainDesc.BufferDesc.Format = D3DUtil::getMapFormat(desc.format);
+            swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+            swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+            swapChainDesc.OutputWindow = (HWND)window.handleValues[0];
+            swapChainDesc.SampleDesc.Count = 1;
+            swapChainDesc.Windowed = TRUE;
+
+            if (!desc.enableVSync)
+            {
+                swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+            }
+
+            // Swap chain needs the queue so that it can force a flush on it.
+            ComPtr<IDXGISwapChain> swapChain;
+            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->CreateSwapChain(
+                m_queue->m_d3dQueue, &swapChainDesc, swapChain.writeRef()));
+            SLANG_RETURN_ON_FAIL(swapChain->QueryInterface(m_swapChain.writeRef()));
+
+            if (!desc.enableVSync)
+            {
+                m_swapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+
+                int maxLatency = desc.imageCount - 2;
+
+                // Make sure the maximum latency is in the range required by dx12 runtime
+                maxLatency = (maxLatency < 1) ? 1 : maxLatency;
+                maxLatency = (maxLatency > DXGI_MAX_SWAP_CHAIN_BUFFERS)
+                                 ? DXGI_MAX_SWAP_CHAIN_BUFFERS
+                                 : maxLatency;
+
+                m_swapChain->SetMaximumFrameLatency(maxLatency);
+            }
+
+            // This sample does not support fullscreen transitions.
+            SLANG_RETURN_ON_FAIL(m_renderer->m_deviceInfo.m_dxgiFactory->MakeWindowAssociation(
+                (HWND)window.handleValues[0], DXGI_MWA_NO_ALT_ENTER));
+
+            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+            for (uint32_t i = 0; i < desc.imageCount; i++)
+            {
+                ComPtr<ID3D12Resource> d3dResource;
+                m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
+                ITextureResource::Desc imageDesc = {};
+                imageDesc.setDefaults(IResource::Usage::RenderTarget);
+                imageDesc.init2D(
+                    IResource::Type::Texture2D, desc.format, desc.width, desc.height, 0);
+                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
+                image->m_resource.setResource(d3dResource.get());
+                image->m_defaultState = D3D12_RESOURCE_STATE_PRESENT;
+                m_images.add(image);
+            }
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
+        virtual SLANG_NO_THROW Result
+            getImage(uint32_t index, ITextureResource** outResource) override
+        {
+            m_images[index]->addRef();
+            *outResource = m_images[index].Ptr();
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW Result present() override
+        {
+            if (m_swapChainWaitableObject)
+            {
+                // check if now is good time to present
+                // This doesn't wait - because the wait time is 0. If it returns WAIT_TIMEOUT it
+                // means that no frame is waiting to be be displayed so there is no point doing a
+                // present.
+                const bool shouldPresent =
+                    (WaitForSingleObjectEx(m_swapChainWaitableObject, 0, TRUE) != WAIT_TIMEOUT);
+                if (shouldPresent)
+                {
+                    m_swapChain->Present(0, 0);
+                }
+            }
+            else
+            {
+                if (SLANG_FAILED(m_swapChain->Present(1, 0)))
+                {
+                    return SLANG_FAIL;
+                }
+            }
+            // Update the render target index.
+            m_renderTargetIndex = m_swapChain->GetCurrentBackBufferIndex();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
+        {
+            return m_renderTargetIndex;
+        }
+
+    public:
+        D3D12Renderer* m_renderer = nullptr;
+        ISwapchain::Desc m_desc;
+        HANDLE m_swapChainWaitableObject = nullptr;
+        ComPtr<IDXGISwapChain3> m_swapChain;
+        RefPtr<CommandQueueImpl> m_queue;
+        uint32_t m_renderTargetIndex;
+        ShortList<RefPtr<TextureResourceImpl>> m_images;
+    };
+
     static PROC loadProc(HMODULE module, char const* name);
-    Result createFrameResources();
-        /// Blocks until gpu has completed all work
-    void releaseFrameResources();
 
-    Result createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut);
+    Result createCommandQueueImpl(
+        uint32_t frameCount,
+        uint32_t viewHeapSize,
+        uint32_t samplerHeapSize,
+        CommandQueueImpl** outQueue);
 
-    void submitGpuWorkAndWait();
-    void _resetCommandList();
+    Result createBuffer(
+        const D3D12_RESOURCE_DESC& resourceDesc,
+        const void* srcData,
+        size_t srcDataSize,
+        D3D12Resource& uploadResource,
+        D3D12_RESOURCE_STATES finalState,
+        D3D12Resource& resourceOut);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
+        ResourceState state,
         ISlangBlob** blob,
         size_t* outRowPitch,
         size_t* outPixelSize);
 
-    FrameInfo& getFrame() { return m_frameInfos[m_frameIndex]; }
-    const FrameInfo& getFrame() const { return m_frameInfos[m_frameIndex]; }
+    Result _createDevice(
+        DeviceCheckFlags deviceCheckFlags,
+        const UnownedStringSlice& nameMatch,
+        D3D_FEATURE_LEVEL featureLevel,
+        DeviceInfo& outDeviceInfo);
 
-    ID3D12GraphicsCommandList* getCommandList() const { return m_commandList; }
-
-    Result _bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3D12GraphicsCommandList* commandList, Submitter* submitter);
-
-    Result _createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo);
     
-    int m_commandListOpenCount = 0;            ///< If >0 the command list should be open
-
-    List<BoundVertexBuffer> m_boundVertexBuffers;
-
-    RefPtr<BufferResourceImpl> m_boundIndexBuffer;
-    DXGI_FORMAT m_boundIndexFormat;
-    UINT m_boundIndexOffset;
-
-    RefPtr<PipelineStateImpl> m_currentPipelineState;
-
-    RefPtr<DescriptorSetImpl> m_boundDescriptorSets[int(PipelineType::CountOf)][kMaxDescriptorSetCount];
+    struct ResourceCommandRecordInfo
+    {
+        ComPtr<ICommandBuffer> commandBuffer;
+        ID3D12GraphicsCommandList* d3dCommandList;
+    };
+    ResourceCommandRecordInfo encodeResourceCommands()
+    {
+        ResourceCommandRecordInfo info;
+        m_resourceCommandQueue->createCommandBuffer(info.commandBuffer.writeRef());
+        info.d3dCommandList = static_cast<CommandBufferImpl*>(info.commandBuffer.get())->m_cmdList;
+        return info;
+    }
+    void submitResourceCommandsAndWait(const ResourceCommandRecordInfo& info)
+    {
+        info.commandBuffer->close();
+        m_resourceCommandQueue->executeCommandBuffer(info.commandBuffer);
+        m_resourceCommandQueue->wait();
+    }
 
     Desc m_desc;
 
     bool m_isInitialized = false;
-
-    D3D12_PRIMITIVE_TOPOLOGY_TYPE m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    D3D12_PRIMITIVE_TOPOLOGY m_primitiveTopology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-
-    float m_clearColor[4] = { 0, 0, 0, 0 };
-
-    D3D12_VIEWPORT m_viewports[kMaxRTVCount] = {};
 
     ComPtr<ID3D12Debug> m_dxDebug;
 
     DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
 
-    ComPtr<ID3D12CommandQueue> m_commandQueue;
-    ComPtr<ID3D12GraphicsCommandList> m_commandList;
-
-    D3D12_RECT m_scissorRects[kMaxRTVCount] = {};
-
-    UINT m_rtvDescriptorSize = 0;
-
-    UINT m_dsvDescriptorSize = 0;
-
-    // Synchronization objects.
-    D3D12CounterFence m_fence;
-
-    HANDLE m_swapChainWaitableObject;
-
-    // Frame specific data
-    int m_numRenderFrames = 0;
-    UINT m_frameIndex = 0;
-    FrameInfo m_frameInfos[kMaxNumRenderFrames];
-
-    int m_numRenderTargets = 2;
-    
-    RefPtr<FramebufferImpl> m_frameBuffer;
-
-    int32_t m_depthStencilUsageFlags = 0;    ///< D3DUtil::UsageFlag combination for depth stencil
-    int32_t m_targetUsageFlags = 0;            ///< D3DUtil::UsageFlag combination for target
+    RefPtr<CommandQueueImpl> m_resourceCommandQueue;
 
     // Dll entry points
     PFN_D3D12_GET_DEBUG_INTERFACE m_D3D12GetDebugInterface = nullptr;
@@ -927,6 +1740,109 @@ protected:
 
     bool m_nvapi = false;
 };
+
+
+Result D3D12Renderer::CommandBufferImpl::PipelineCommandEncoder::_bindRenderState(
+    PipelineStateImpl* pipelineStateImpl,
+    Submitter* submitter)
+{
+    auto commandList = m_commandBuffer->m_cmdList;
+    // TODO: we should only set some of this state as needed...
+
+    auto pipelineTypeIndex = (int)pipelineStateImpl->desc.type;
+    auto pipelineLayout = static_cast<PipelineLayoutImpl*>(pipelineStateImpl->m_pipelineLayout.get());
+
+    submitter->setRootSignature(pipelineLayout->m_rootSignature);
+    commandList->SetPipelineState(pipelineStateImpl->m_pipelineState);
+
+    ID3D12DescriptorHeap* heaps[] = {
+        m_frame->m_viewHeap.getHeap(),
+        m_frame->m_samplerHeap.getHeap(),
+    };
+    commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
+
+    // We need to copy descriptors over from the descriptor sets
+    // (where they are stored in CPU-visible heaps) to the GPU-visible
+    // heaps so that they can be accessed by shader code.
+
+    Int descriptorSetCount = pipelineLayout->m_descriptorSetCount;
+    Int rootParameterIndex = 0;
+    for (Int dd = 0; dd < descriptorSetCount; ++dd)
+    {
+        auto descriptorSet = m_boundDescriptorSets[pipelineTypeIndex][dd];
+        auto descriptorSetLayout = descriptorSet->m_layout;
+
+        // TODO: require that `descriptorSetLayout` is compatible with
+        // `pipelineLayout->descriptorSetlayouts[dd]`.
+
+        {
+            if (auto descriptorCount = descriptorSetLayout->m_resourceCount)
+            {
+                auto& gpuHeap = m_frame->m_viewHeap;
+                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
+
+                auto& cpuHeap = *descriptorSet->m_resourceHeap;
+                auto cpuDescriptorTable = descriptorSet->m_resourceTable;
+
+                m_device->CopyDescriptorsSimple(
+                    UINT(descriptorCount),
+                    gpuHeap.getCpuHandle(gpuDescriptorTable),
+                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+                submitter->setRootDescriptorTable(
+                    int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
+            }
+        }
+        {
+            if (auto descriptorCount = descriptorSetLayout->m_samplerCount)
+            {
+                auto& gpuHeap = m_frame->m_samplerHeap;
+                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
+
+                auto& cpuHeap = *descriptorSet->m_samplerHeap;
+                auto cpuDescriptorTable = descriptorSet->m_samplerTable;
+
+                m_device->CopyDescriptorsSimple(
+                    UINT(descriptorCount),
+                    gpuHeap.getCpuHandle(gpuDescriptorTable),
+                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
+                    D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+
+                submitter->setRootDescriptorTable(
+                    int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
+            }
+        }
+        if (auto rootConstantRangeCount = descriptorSetLayout->m_rootConstantRanges.getCount())
+        {
+            auto srcData = descriptorSet->m_rootConstantData.getBuffer();
+
+            for (auto& rootConstantRangeInfo : descriptorSetLayout->m_rootConstantRanges)
+            {
+                auto countOf32bitValues = rootConstantRangeInfo.size / sizeof(uint32_t);
+                submitter->setRootConstants(
+                    rootConstantRangeInfo.rootParamIndex,
+                    0,
+                    countOf32bitValues,
+                    srcData + rootConstantRangeInfo.offset);
+            }
+        }
+    }
+
+    return SLANG_OK;
+}
+
+Result D3D12Renderer::createCommandQueueImpl(
+    uint32_t frameCount,
+    uint32_t viewHeapSize,
+    uint32_t samplerHeapSize,
+    D3D12Renderer::CommandQueueImpl** outQueue)
+{
+    RefPtr<D3D12Renderer::CommandQueueImpl> queue = new D3D12Renderer::CommandQueueImpl();
+    SLANG_RETURN_ON_FAIL(queue->init(this, frameCount, viewHeapSize, samplerHeapSize));
+    *outQueue = queue.detach();
+    return SLANG_OK;
+}
 
 SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
 {
@@ -947,29 +1863,8 @@ SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, IRender
     return proc;
 }
 
-void D3D12Renderer::releaseFrameResources()
-{
-    for (int i = 0; i < m_numRenderFrames; i++)
-    {
-        FrameInfo& info = m_frameInfos[i];
-        info.reset();
-        info.m_fenceValue = m_fence.getCurrentValue();
-    }
-}
-
-void D3D12Renderer::waitForGpu()
-{
-    m_fence.nextSignalAndWait(m_commandQueue);
-}
-
 D3D12Renderer::~D3D12Renderer()
 {
-    if (m_isInitialized)
-    {
-        // Ensure that the GPU is no longer referencing resources that are about to be
-        // cleaned up by the destructor.
-        waitForGpu();
-    }
 }
 
 static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
@@ -1098,105 +1993,22 @@ Result D3D12Renderer::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, cons
         ::memcpy(dstData, srcData, srcDataSize);
         dxUploadResource->Unmap(0, nullptr);
 
-        m_commandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
-
-        // Make sure it's in the right state
-        {
-            D3D12BarrierSubmitter submitter(m_commandList);
-            resourceOut.transition(finalState, submitter);
-        }
-
-        submitGpuWorkAndWait();
+        auto encodeInfo = encodeResourceCommands();
+        encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
+        submitResourceCommandsAndWait(encodeInfo);
     }
 
     return SLANG_OK;
 }
 
-void D3D12Renderer::_resetCommandList()
-{
-    const FrameInfo& frame = getFrame();
-
-    ID3D12GraphicsCommandList* commandList = getCommandList();
-    commandList->Reset(frame.m_commandAllocator, nullptr);
-}
-
-void D3D12Renderer::beginFrame()
-{
-}
-
-void D3D12Renderer::makeSwapchainImagePresentable(ISwapchain* swapchain)
-{
-    static_cast<SwapchainImpl*>(swapchain)->makeBackbufferPresentable();
-}
-
-void D3D12Renderer::endFrame()
-{
-    assert(m_commandListOpenCount == 1);
-    SLANG_ASSERT_VOID_ON_FAIL(m_commandList->Close());
-    {
-        // Execute the command list.
-        ID3D12CommandList* commandLists[] = { m_commandList };
-        m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
-    }
-
-    assert(m_commandListOpenCount == 1);
-    // Must be 0
-    m_commandListOpenCount = 0;
-
-    
-    // Increment the fence value. Save on the frame - we'll know that frame is done when the fence
-    // value >=
-    m_frameInfos[m_frameIndex].m_fenceValue = m_fence.nextSignal(m_commandQueue);
-
-    // increment frame index after signal
-    m_frameIndex = (m_frameIndex + 1) % m_numRenderFrames;
-
-    // On the current frame wait until it is completed
-    {
-        FrameInfo& frame = m_frameInfos[m_frameIndex];
-        // If the next frame is not ready to be rendered yet, wait until it is ready.
-        m_fence.waitUntilCompleted(frame.m_fenceValue);
-    }
-
-    getFrame().m_commandAllocator->Reset();
-
-    _resetCommandList();
-
-    m_commandListOpenCount = 1;
-
-    getFrame().m_viewHeap.deallocateAll();
-    getFrame().m_samplerHeap.deallocateAll();
-}
-
-void D3D12Renderer::submitGpuWork()
-{
-    assert(m_commandListOpenCount);
-    ID3D12GraphicsCommandList* commandList = getCommandList();
-
-    SLANG_ASSERT_VOID_ON_FAIL(commandList->Close());
-    {
-        // Execute the command list.
-        ID3D12CommandList* commandLists[] = { commandList };
-        m_commandQueue->ExecuteCommandLists(SLANG_COUNT_OF(commandLists), commandLists);
-    }
-
-    // Reset the render target
-    _resetCommandList();
-}
-
-void D3D12Renderer::submitGpuWorkAndWait()
-{
-    submitGpuWork();
-    waitForGpu();
-}
-
 Result D3D12Renderer::captureTextureToSurface(
     D3D12Resource& resource,
+    ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    const D3D12_RESOURCE_STATES initialState = resource.getState();
+    const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
     const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
 
@@ -1230,9 +2042,12 @@ Result D3D12Renderer::captureTextureToSurface(
         SLANG_RETURN_ON_FAIL(stagingResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
     }
 
+    auto encodeInfo = encodeResourceCommands();
+    auto currentState = D3DUtil::translateResourceState(state);
+
     {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
+        D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
+        resource.transition(currentState, D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
     }
 
     // Do the copy
@@ -1252,16 +2067,16 @@ Result D3D12Renderer::captureTextureToSurface(
         dstLoc.PlacedFootprint.Footprint.Depth = 1;
         dstLoc.PlacedFootprint.Footprint.RowPitch = UINT(rowPitch);
 
-        m_commandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
+        encodeInfo.d3dCommandList->CopyTextureRegion(&dstLoc, 0, 0, 0, &srcLoc, nullptr);
     }
 
     {
-        D3D12BarrierSubmitter submitter(m_commandList);
-        resource.transition(initialState, submitter);
+        D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
+        resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, currentState, submitter);
     }
 
     // Submit the copy, and wait for copy to complete
-    submitGpuWorkAndWait();
+    submitResourceCommandsAndWait(encodeInfo);
 
     {
         ID3D12Resource* dxResource = stagingResource;
@@ -1278,88 +2093,6 @@ Result D3D12Renderer::captureTextureToSurface(
         *outBlob = resultBlob.detach();
         return SLANG_OK;
     }
-}
-
-Result D3D12Renderer::_bindRenderState(PipelineStateImpl* pipelineStateImpl, ID3D12GraphicsCommandList* commandList, Submitter* submitter)
-{
-    // TODO: we should only set some of this state as needed...
-
-    auto pipelineTypeIndex = (int) pipelineStateImpl->desc.type;
-    auto pipelineLayout = pipelineStateImpl->m_pipelineLayout;
-
-    submitter->setRootSignature(pipelineLayout->m_rootSignature);
-    commandList->SetPipelineState(pipelineStateImpl->m_pipelineState);
-
-    ID3D12DescriptorHeap* heaps[] =
-    {
-        getFrame().m_viewHeap.getHeap(),
-        getFrame().m_samplerHeap.getHeap(),
-    };
-    commandList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
-
-    // We need to copy descriptors over from the descriptor sets
-    // (where they are stored in CPU-visible heaps) to the GPU-visible
-    // heaps so that they can be accessed by shader code.
-
-    Int descriptorSetCount = pipelineLayout->m_descriptorSetCount;
-    Int rootParameterIndex = 0;
-    for(Int dd = 0; dd < descriptorSetCount; ++dd)
-    {
-        auto descriptorSet = m_boundDescriptorSets[pipelineTypeIndex][dd];
-        auto descriptorSetLayout = descriptorSet->m_layout;
-
-        // TODO: require that `descriptorSetLayout` is compatible with
-        // `pipelineLayout->descriptorSetlayouts[dd]`.
-
-        {
-            if(auto descriptorCount = descriptorSetLayout->m_resourceCount)
-            {
-                auto& gpuHeap = getFrame().m_viewHeap;
-                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
-
-                auto& cpuHeap = *descriptorSet->m_resourceHeap;
-                auto cpuDescriptorTable = descriptorSet->m_resourceTable;
-
-                m_device->CopyDescriptorsSimple(
-                    UINT(descriptorCount),
-                    gpuHeap.getCpuHandle(gpuDescriptorTable),
-                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
-                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-                submitter->setRootDescriptorTable(int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
-            }
-        }
-        {
-            if(auto descriptorCount = descriptorSetLayout->m_samplerCount)
-            {
-                auto& gpuHeap = getFrame().m_samplerHeap;
-                auto gpuDescriptorTable = gpuHeap.allocate(int(descriptorCount));
-
-                auto& cpuHeap = *descriptorSet->m_samplerHeap;
-                auto cpuDescriptorTable = descriptorSet->m_samplerTable;
-
-                m_device->CopyDescriptorsSimple(
-                    UINT(descriptorCount),
-                    gpuHeap.getCpuHandle(gpuDescriptorTable),
-                    cpuHeap.getCpuHandle(int(cpuDescriptorTable)),
-                    D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-
-                submitter->setRootDescriptorTable(int(rootParameterIndex++), gpuHeap.getGpuHandle(gpuDescriptorTable));
-            }
-        }
-        if(auto rootConstantRangeCount = descriptorSetLayout->m_rootConstantRanges.getCount())
-        {
-            auto srcData = descriptorSet->m_rootConstantData.getBuffer();
-
-            for(auto& rootConstantRangeInfo : descriptorSetLayout->m_rootConstantRanges)
-            {
-                auto countOf32bitValues = rootConstantRangeInfo.size / sizeof(uint32_t);
-                submitter->setRootConstants(rootConstantRangeInfo.rootParamIndex, 0, countOf32bitValues, srcData + rootConstantRangeInfo.offset);
-            }
-        }
-    }
-
-    return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -1616,32 +2349,11 @@ Result D3D12Renderer::initialize(const Desc& desc)
         }
     }
 
-    m_numRenderFrames = 3;
-    m_numRenderTargets = 2;
-
     m_desc = desc;
 
-    // Describe and create the command queue.
-    D3D12_COMMAND_QUEUE_DESC queueDesc = {};
-    queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-    queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    // Create a command queue for internal resource transfer operations.
+    SLANG_RETURN_ON_FAIL(createCommandQueueImpl(1, 32, 4, m_resourceCommandQueue.writeRef()));
 
-    SLANG_RETURN_ON_FAIL(m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_commandQueue.writeRef())));
-
-    // Create descriptor heaps.
-    for (int i = 0; i < m_numRenderFrames; i++)
-    {
-        SLANG_RETURN_ON_FAIL(m_frameInfos[i].m_viewHeap.init(
-            m_device,
-            256,
-            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-            D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-        SLANG_RETURN_ON_FAIL(m_frameInfos[i].m_samplerHeap.init(
-            m_device,
-            16,
-            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
-            D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE));
-    }
     SLANG_RETURN_ON_FAIL(m_cpuViewHeap.init   (m_device, 1024, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap.init(m_device, 64,   D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
 
@@ -1650,57 +2362,16 @@ Result D3D12Renderer::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(m_viewAllocator.init   (m_device, 64, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
     SLANG_RETURN_ON_FAIL(m_samplerAllocator.init(m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER));
 
-    // Setup frame resources
-    SLANG_RETURN_ON_FAIL(createFrameResources());
-
-    // Setup fence, and close the command list (as default state without begin/endRender is closed)
-    {
-        SLANG_RETURN_ON_FAIL(m_fence.init(m_device));
-        // Create the command list. When command lists are created they are open, so close it.
-        FrameInfo& frame = m_frameInfos[m_frameIndex];
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frame.m_commandAllocator, nullptr, IID_PPV_ARGS(m_commandList.writeRef())));
-        m_commandList->Close();
-    }
-
-    _resetCommandList();
-
-    m_commandListOpenCount = 1;
-
     m_isInitialized = true;
     return SLANG_OK;
 }
 
-Result D3D12Renderer::createFrameResources()
+Result D3D12Renderer::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
-    // Set up frames
-    for (int i = 0; i < m_numRenderFrames; i++)
-    {
-        FrameInfo& frame = m_frameInfos[i];
-        SLANG_RETURN_ON_FAIL(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(frame.m_commandAllocator.writeRef())));
-    }
-
+    RefPtr<CommandQueueImpl> queue;
+    SLANG_RETURN_ON_FAIL(createCommandQueueImpl(8, 4096, 1024, queue.writeRef()));
+    *outQueue = queue.detach();
     return SLANG_OK;
-}
-
-void D3D12Renderer::setClearColor(const float color[4])
-{
-    memcpy(m_clearColor, color, sizeof(m_clearColor));
-}
-
-void D3D12Renderer::clearFrame()
-{
-    // Record commands
-    if (!m_frameBuffer)
-        return;
-    for (auto rtv : m_frameBuffer->renderTargetDescriptors)
-    {
-        m_commandList->ClearRenderTargetView(rtv, m_clearColor, 0, nullptr);
-    }
-    if (m_frameBuffer->depthStencilView)
-    {
-        m_commandList->ClearDepthStencilView(
-            m_frameBuffer->depthStencilDescriptor, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-    }
 }
 
 SLANG_NO_THROW Result SLANG_MCALL D3D12Renderer::createSwapchain(
@@ -1714,11 +2385,17 @@ SLANG_NO_THROW Result SLANG_MCALL D3D12Renderer::createSwapchain(
 
 SlangResult D3D12Renderer::readTextureResource(
     ITextureResource* resource,
+    ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    return captureTextureToSurface(static_cast<TextureResourceImpl*>(resource)->m_resource, outBlob, outRowPitch, outPixelSize);
+    return captureTextureToSurface(
+        static_cast<TextureResourceImpl*>(resource)->m_resource,
+        state,
+        outBlob,
+        outRowPitch,
+        outPixelSize);
 }
 
 static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
@@ -1736,6 +2413,8 @@ static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
         case Usage::UnorderedAccess:        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         case Usage::PixelShaderResource:    return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         case Usage::NonPixelShaderResource: return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        case Usage::ShaderResource:         return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
+                                                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         case Usage::GenericRead:            return D3D12_RESOURCE_STATE_GENERIC_READ;
         default: return D3D12_RESOURCE_STATES(0);
     }
@@ -1859,7 +2538,9 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
             clearValuePtr = nullptr;
         }
         clearValue.Format = pixelFormat;
-        memcpy(clearValue.Color, descIn.optimalClearValue, sizeof(clearValue.Color));
+        memcpy(clearValue.Color, &descIn.optimalClearValue.color, sizeof(clearValue.Color));
+        clearValue.DepthStencil.Depth = descIn.optimalClearValue.depthStencil.depth;
+        clearValue.DepthStencil.Stencil = descIn.optimalClearValue.depthStencil.stencil;
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
@@ -1960,6 +2641,7 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
             }
             uploadResource->Unmap(0, nullptr);
 
+            auto encodeInfo = encodeResourceCommands();
             for (int mipIndex = 0; mipIndex < numMipMaps; ++mipIndex)
             {
                 // https://msdn.microsoft.com/en-us/library/windows/desktop/dn903862(v=vs.85).aspx
@@ -1973,21 +2655,23 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
                 dst.pResource = texture->m_resource;
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
                 dst.SubresourceIndex = subResourceIndex;
-                m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+                encodeInfo.d3dCommandList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
                 subResourceIndex++;
             }
 
             // Block - waiting for copy to complete (so can drop upload texture)
-            submitGpuWorkAndWait();
+            submitResourceCommandsAndWait(encodeInfo);
         }
     }
     {
+        auto encodeInfo = encodeResourceCommands();
         const D3D12_RESOURCE_STATES finalState = _calcResourceState(initialUsage);
-        D3D12BarrierSubmitter submitter(m_commandList);
-        texture->m_resource.transition(finalState, submitter);
-
-        submitGpuWorkAndWait();
+        {
+            D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
+            texture->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, finalState, submitter);
+        }
+        submitResourceCommandsAndWait(encodeInfo);
     }
 
     *outResource = texture.detach();
@@ -1996,8 +2680,6 @@ Result D3D12Renderer::createTextureResource(IResource::Usage initialUsage, const
 
 Result D3D12Renderer::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
-    typedef BufferResourceImpl::BackingStyle Style;
-
     BufferResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
@@ -2009,37 +2691,13 @@ Result D3D12Renderer::createBufferResource(IResource::Usage initialUsage, const 
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, srcDesc));
 
-    // Save the style
-    buffer->m_backingStyle = BufferResourceImpl::_calcResourceBackingStyle(initialUsage);
-
     D3D12_RESOURCE_DESC bufferDesc;
     _initBufferResourceDesc(alignedSizeInBytes, bufferDesc);
 
     bufferDesc.Flags = _calcResourceBindFlags(initialUsage, srcDesc.bindFlags);
 
-    switch (buffer->m_backingStyle)
-    {
-        case Style::MemoryBacked:
-        {
-            // Assume the constant buffer will change every frame. We'll just keep a copy of the contents
-            // in regular memory until it needed
-            buffer->m_memory.setCount(UInt(alignedSizeInBytes));
-            // Initialize
-            if (initData)
-            {
-                ::memcpy(buffer->m_memory.getBuffer(), initData, srcDesc.sizeInBytes);
-            }
-            break;
-        }
-        case Style::ResourceBacked:
-        {
-            const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
-            SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
-            break;
-        }
-        default:
-            return SLANG_FAIL;
-    }
+    const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
 
     *outResource = buffer.detach();
     return SLANG_OK;
@@ -2351,15 +3009,27 @@ Result D3D12Renderer::createFramebuffer(IFramebuffer::Desc const& desc, IFramebu
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl();
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
     framebuffer->renderTargetDescriptors.setCount(desc.renderTargetCount);
+    framebuffer->renderTargetClearValues.setCount(desc.renderTargetCount);
     for (uint32_t i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] = desc.renderTargetViews[i];
         framebuffer->renderTargetDescriptors[i] =
             static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_descriptor.cpuHandle;
+        auto clearValue =
+            static_cast<TextureResourceImpl*>(
+                static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
+                ->getDesc()
+                ->optimalClearValue.color;
+        memcpy(&framebuffer->renderTargetClearValues[i], &clearValue, sizeof(ColorClearValue));
     }
     framebuffer->depthStencilView = desc.depthStencilView;
     if (desc.depthStencilView)
     {
+        framebuffer->depthStencilClearValue =
+            static_cast<TextureResourceImpl*>(
+                static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_resource.Ptr())
+                ->getDesc()
+                ->optimalClearValue.depthStencil;
         framebuffer->depthStencilDescriptor =
             static_cast<ResourceViewImpl*>(desc.depthStencilView)->m_descriptor.cpuHandle;
     }
@@ -2391,6 +3061,16 @@ Result D3D12Renderer::createFramebufferLayout(
         layout->m_hasDepthStencil = false;
     }
     *outLayout = layout.detach();
+    return SLANG_OK;
+}
+
+Result D3D12Renderer::createRenderPassLayout(
+    const IRenderPassLayout::Desc& desc,
+    IRenderPassLayout** outRenderPassLayout)
+{
+    RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl();
+    result->init(desc);
+    *outRenderPassLayout = result.detach();
     return SLANG_OK;
 }
 
@@ -2429,7 +3109,7 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
         }
 
         dstEle.SemanticName = semanticName;
-         dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
+        dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
         dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
         dstEle.InputSlot = 0;
         dstEle.AlignedByteOffset = (UINT)srcEle.offset;
@@ -2441,337 +3121,58 @@ Result D3D12Renderer::createInputLayout(const InputElementDesc* inputElements, U
     return SLANG_OK;
 }
 
-void* D3D12Renderer::map(IBufferResource* bufferIn, MapFlavor flavor)
+Result D3D12Renderer::readBufferResource(
+    IBufferResource* bufferIn,
+    size_t offset,
+    size_t size,
+    ISlangBlob** outBlob)
 {
-    typedef BufferResourceImpl::BackingStyle Style;
+    auto encodeInfo = encodeResourceCommands();
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
-    buffer->m_mapFlavor = flavor;
 
     const size_t bufferSize = buffer->getDesc()->sizeInBytes;
 
-    switch (buffer->m_backingStyle)
+    // This will be slow!!! - it blocks CPU on GPU completion
+    D3D12Resource& resource = buffer->m_resource;
+
+    // Readback heap
+    D3D12_HEAP_PROPERTIES heapProps;
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+
+    // Resource to readback to
+    D3D12_RESOURCE_DESC stagingDesc;
+    _initBufferResourceDesc(bufferSize, stagingDesc);
+
+    D3D12Resource stageBuf;
+    SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+    // Do the copy
+    encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, 0, bufferSize);
+
+    // Wait until complete
+    submitResourceCommandsAndWait(encodeInfo);
+
+    // Map and copy
+    RefPtr<ListBlob> blob = new ListBlob();
     {
-        case Style::ResourceBacked:
-        {
-            // We need this in a state so we can upload
-            switch (flavor)
-            {
-                case MapFlavor::HostWrite:
-                case MapFlavor::WriteDiscard:
-                {
-                    D3D12BarrierSubmitter submitter(m_commandList);
-                    buffer->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
-                    buffer->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
+        UINT8* data;
+        D3D12_RANGE readRange = { 0, bufferSize };
 
-                    const D3D12_RANGE readRange = {};
+        SLANG_RETURN_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
-                    void* uploadData;
-                    SLANG_RETURN_NULL_ON_FAIL(buffer->m_uploadResource.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&uploadData)));
-                    return uploadData;
+        // Copy to memory buffer
+        blob->m_data.setCount(bufferSize);
+        ::memcpy(blob->m_data.getBuffer(), data, bufferSize);
 
-                    break;
-                }
-                case MapFlavor::HostRead:
-                {
-                    // This will be slow!!! - it blocks CPU on GPU completion
-                    D3D12Resource& resource = buffer->m_resource;
-
-                    // Readback heap
-                    D3D12_HEAP_PROPERTIES heapProps;
-                    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-                    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-                    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-                    heapProps.CreationNodeMask = 1;
-                    heapProps.VisibleNodeMask = 1;
-
-                    // Resource to readback to
-                    D3D12_RESOURCE_DESC stagingDesc;
-                    _initBufferResourceDesc(bufferSize, stagingDesc);
-
-                    D3D12Resource stageBuf;
-                    SLANG_RETURN_NULL_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
-
-                    const D3D12_RESOURCE_STATES initialState = resource.getState();
-
-                    // Make it a source
-                    {
-                        D3D12BarrierSubmitter submitter(m_commandList);
-                        resource.transition(D3D12_RESOURCE_STATE_COPY_SOURCE, submitter);
-                    }
-                    // Do the copy
-                    m_commandList->CopyBufferRegion(stageBuf, 0, resource, 0, bufferSize);
-                    // Switch it back
-                    {
-                        D3D12BarrierSubmitter submitter(m_commandList);
-                        resource.transition(initialState, submitter);
-                    }
-
-                    // Wait until complete
-                    submitGpuWorkAndWait();
-
-                    // Map and copy
-                    {
-                        UINT8* data;
-                        D3D12_RANGE readRange = { 0, bufferSize };
-
-                        SLANG_RETURN_NULL_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
-
-                        // Copy to memory buffer
-                        buffer->m_memory.setCount(bufferSize);
-                        ::memcpy(buffer->m_memory.getBuffer(), data, bufferSize);
-
-                        stageBuf.getResource()->Unmap(0, nullptr);
-                    }
-
-                    return buffer->m_memory.getBuffer();
-                }
-            }
-            break;
-        }
-        case Style::MemoryBacked:
-        {
-            return buffer->m_memory.getBuffer();
-        }
-        default: return nullptr;
+        stageBuf.getResource()->Unmap(0, nullptr);
     }
-
-    return nullptr;
-}
-
-void D3D12Renderer::unmap(IBufferResource* bufferIn)
-{
-    typedef BufferResourceImpl::BackingStyle Style;
-    BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
-
-    switch (buffer->m_backingStyle)
-    {
-        case Style::MemoryBacked:
-        {
-            // Don't need to do anything, as will be uploaded automatically when used
-            break;
-        }
-        case Style::ResourceBacked:
-        {
-            // We need this in a state so we can upload
-            switch (buffer->m_mapFlavor)
-            {
-                case MapFlavor::HostWrite:
-                case MapFlavor::WriteDiscard:
-                {
-                    // Unmap
-                    ID3D12Resource* uploadResource = buffer->m_uploadResource;
-                    ID3D12Resource* resource = buffer->m_resource;
-
-                    uploadResource->Unmap(0, nullptr);
-
-                    const D3D12_RESOURCE_STATES initialState = buffer->m_resource.getState();
-
-                    {
-                        D3D12BarrierSubmitter submitter(m_commandList);
-                        buffer->m_uploadResource.transition(D3D12_RESOURCE_STATE_GENERIC_READ, submitter);
-                        buffer->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, submitter);
-                    }
-
-                    m_commandList->CopyBufferRegion(resource, 0, uploadResource, 0, buffer->getDesc()->sizeInBytes);
-
-                    {
-                        D3D12BarrierSubmitter submitter(m_commandList);
-                        buffer->m_resource.transition(initialState, submitter);
-                    }
-                    break;
-                }
-                case MapFlavor::HostRead:
-                {
-                    break;
-                }
-            }
-        }
-    }
-}
-
-#if 0
-void D3D12Renderer::setInputLayout(InputLayout* inputLayout)
-{
-    m_boundInputLayout = static_cast<InputLayoutImpl*>(inputLayout);
-}
-#endif
-
-void D3D12Renderer::setPrimitiveTopology(PrimitiveTopology topology)
-{
-    switch (topology)
-    {
-        case PrimitiveTopology::TriangleList:
-        {
-            m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-            m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
-            break;
-        }
-        default:
-        {
-            assert(!"Unhandled type");
-        }
-    }
-}
-
-void D3D12Renderer::setVertexBuffers(UInt startSlot, UInt slotCount, IBufferResource*const* buffers, const UInt* strides, const UInt* offsets)
-{
-    {
-        const Index num = startSlot + slotCount;
-        if (num > m_boundVertexBuffers.getCount())
-        {
-            m_boundVertexBuffers.setCount(num);
-        }
-    }
-
-    for (UInt i = 0; i < slotCount; i++)
-    {
-        BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-        if (buffer)
-        {
-            assert(buffer->m_initialUsage == IResource::Usage::VertexBuffer);
-        }
-
-        BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
-        boundBuffer.m_buffer = buffer;
-        boundBuffer.m_stride = int(strides[i]);
-        boundBuffer.m_offset = int(offsets[i]);
-    }
-}
-
-void D3D12Renderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
-{
-    m_boundIndexBuffer = (BufferResourceImpl*) buffer;
-    m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
-    m_boundIndexOffset = UINT(offset);
-}
-
-void D3D12Renderer::setViewports(UInt count, Viewport const* viewports)
-{
-    static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxViewports && count <= kMaxRTVCount);
-    for(UInt ii = 0; ii < count; ++ii)
-    {
-        auto& inViewport = viewports[ii];
-        auto& dxViewport = m_viewports[ii];
-
-        dxViewport.TopLeftX = inViewport.originX;
-        dxViewport.TopLeftY = inViewport.originY;
-        dxViewport.Width    = inViewport.extentX;
-        dxViewport.Height   = inViewport.extentY;
-        dxViewport.MinDepth = inViewport.minZ;
-        dxViewport.MaxDepth = inViewport.maxZ;
-    }
-    m_commandList->RSSetViewports(UINT(count), m_viewports);
-}
-
-void D3D12Renderer::setScissorRects(UInt count, ScissorRect const* rects)
-{
-    static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
-
-    for(UInt ii = 0; ii < count; ++ii)
-    {
-        auto& inRect = rects[ii];
-        auto& dxRect = m_scissorRects[ii];
-
-        dxRect.left     = LONG(inRect.minX);
-        dxRect.top      = LONG(inRect.minY);
-        dxRect.right    = LONG(inRect.maxX);
-        dxRect.bottom   = LONG(inRect.maxY);
-    }
-
-    m_commandList->RSSetScissorRects(UINT(count), m_scissorRects);
-}
-
-void D3D12Renderer::setPipelineState(IPipelineState* state)
-{
-    m_currentPipelineState = (PipelineStateImpl*)state;
-}
-
-void D3D12Renderer::setFramebuffer(IFramebuffer* frameBuffer)
-{
-    ID3D12GraphicsCommandList* commandList = m_commandList;
-    auto framebufferImpl = static_cast<FramebufferImpl*>(frameBuffer);
-    commandList->OMSetRenderTargets(
-        (UINT)framebufferImpl->renderTargetViews.getCount(),
-        framebufferImpl->renderTargetDescriptors.getArrayView().getBuffer(),
-        FALSE,
-        framebufferImpl->depthStencilView ? &framebufferImpl->depthStencilDescriptor : nullptr);
-    m_frameBuffer = framebufferImpl;
-}
-
-
-void D3D12Renderer::draw(UInt vertexCount, UInt startVertex)
-{
-    ID3D12GraphicsCommandList* commandList = m_commandList;
-
-    auto pipelineState = m_currentPipelineState.Ptr();
-    if (!pipelineState || (pipelineState->desc.type != PipelineType::Graphics))
-    {
-        assert(!"No graphics pipeline state set");
-        return;
-    }
-
-    // Submit - setting for graphics
-    {
-        GraphicsSubmitter submitter(commandList);
-        _bindRenderState(pipelineState, commandList, &submitter);
-    }
-
-    commandList->IASetPrimitiveTopology(m_primitiveTopology);
-
-    // Set up vertex buffer views
-    {
-        int numVertexViews = 0;
-        D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
-        for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
-        {
-            const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
-            BufferResourceImpl* buffer = boundVertexBuffer.m_buffer;
-            if (buffer)
-            {
-                D3D12_VERTEX_BUFFER_VIEW& vertexView = vertexViews[numVertexViews++];
-                vertexView.BufferLocation = buffer->m_resource.getResource()->GetGPUVirtualAddress()
-                    + boundVertexBuffer.m_offset;
-                vertexView.SizeInBytes = UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
-                vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
-            }
-        }
-        commandList->IASetVertexBuffers(0, numVertexViews, vertexViews);
-    }
-
-    // Set up index buffer
-    if(m_boundIndexBuffer)
-    {
-        D3D12_INDEX_BUFFER_VIEW indexBufferView;
-        indexBufferView.BufferLocation = m_boundIndexBuffer->m_resource.getResource()->GetGPUVirtualAddress()
-            + m_boundIndexOffset;
-        indexBufferView.SizeInBytes = UINT(m_boundIndexBuffer->getDesc()->sizeInBytes - m_boundIndexOffset);
-        indexBufferView.Format = m_boundIndexFormat;
-
-        commandList->IASetIndexBuffer(&indexBufferView);
-    }
-
-    commandList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
-}
-
-void D3D12Renderer::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
-{
-}
-
-void D3D12Renderer::dispatchCompute(int x, int y, int z)
-{
-    ID3D12GraphicsCommandList* commandList = m_commandList;
-    auto pipelineStateImpl = m_currentPipelineState;
-
-    // Submit binding for compute
-    {
-        ComputeSubmitter submitter(commandList);
-        _bindRenderState(pipelineStateImpl, commandList, &submitter);
-    }
-
-    commandList->Dispatch(x, y, z);
+    *outBlob = blob.detach();
+    return SLANG_OK;
 }
 
 void D3D12Renderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, IBufferResource* buffer)
@@ -2935,22 +3336,6 @@ void D3D12Renderer::DescriptorSetImpl::setRootConstants(
     SLANG_ASSERT(offset + size <= UInt(rootConstantRangeInfo.size));
 
     memcpy((char*)m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
-}
-
-void D3D12Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout* layout, UInt index, IDescriptorSet* descriptorSet)
-{
-    // In D3D12, unlike Vulkan, binding a root signature invalidates *all* descriptor table
-    // bindings (rather than preserving those that are part of the longest common prefix
-    // between the old and new layout).
-    //
-    // In order to accomodate having descriptor-set bindings that persist across changes
-    // in pipeline state (which may also change pipeline layout), we will shadow the
-    // descriptor-set bindings and only flush them on-demand at draw tiume once the final
-    // pipline layout is known.
-    //
-
-    auto descriptorSetImpl = (DescriptorSetImpl*) descriptorSet;
-    m_boundDescriptorSets[int(pipelineType)][index] = descriptorSetImpl;
 }
 
 Result D3D12Renderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
@@ -3656,7 +4041,7 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), SIZE_T(programImpl->m_pixelShader .getCount()) };
 
     psoDesc.InputLayout = { inputLayoutImpl->m_elements.getBuffer(), UINT(inputLayoutImpl->m_elements.getCount()) };
-    psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
+    psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.primitiveType);
 
     {
         auto framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
@@ -3720,30 +4105,24 @@ Result D3D12Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     {
         auto& ds = psoDesc.DepthStencilState;
 
-        ds.DepthEnable = FALSE;
-        ds.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-        ds.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-        //ds.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-        ds.StencilEnable = FALSE;
-        ds.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-        ds.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp =
-        {
-            D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS
-        };
-        ds.FrontFace = defaultStencilOp;
-        ds.BackFace = defaultStencilOp;
+        ds.DepthEnable = inDesc.depthStencil.depthTestEnable;
+        ds.DepthWriteMask = inDesc.depthStencil.depthWriteEnable ? D3D12_DEPTH_WRITE_MASK_ALL
+                                                                 : D3D12_DEPTH_WRITE_MASK_ZERO;
+        ds.DepthFunc = D3DUtil::getComparisonFunc(inDesc.depthStencil.depthFunc);
+        ds.StencilEnable = inDesc.depthStencil.stencilEnable;
+        ds.StencilReadMask = (UINT8)inDesc.depthStencil.stencilReadMask;
+        ds.StencilWriteMask = (UINT8)inDesc.depthStencil.stencilWriteMask;
+        ds.FrontFace = D3DUtil::translateStencilOpDesc(inDesc.depthStencil.frontFace);
+        ds.BackFace = D3DUtil::translateStencilOpDesc(inDesc.depthStencil.backFace);
     }
 
-    psoDesc.PrimitiveTopologyType = m_primitiveTopologyType;
+    psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.primitiveType);
 
     ComPtr<ID3D12PipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(m_device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(pipelineState.writeRef())));
 
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
-    pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_pipelineState = pipelineState;
-    pipelineStateImpl->m_program = programImpl;
     pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
     return SLANG_OK;
@@ -3806,7 +4185,6 @@ Result D3D12Renderer::createComputePipelineState(const ComputePipelineStateDesc&
         }
     }
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
-    pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_pipelineState = pipelineState;
     pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();

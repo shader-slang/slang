@@ -3,8 +3,7 @@
 
 #include "../nvapi/nvapi-util.h"
 
-#include "../renderer-shared.h"
-#include "../render-graphics-common.h"
+#include "../immediate-renderer-base.h"
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -52,6 +51,7 @@
     F(glGenBuffers,         PFNGLGENBUFFERSPROC)        \
     F(glBindBuffer,         PFNGLBINDBUFFERPROC)        \
     F(glBufferData,         PFNGLBUFFERDATAPROC)        \
+    F(glCopyBufferSubData,  PFNGLCOPYBUFFERSUBDATAPROC) \
 	F(glDeleteBuffers,		PFNGLDELETEBUFFERSPROC)		\
 	F(glMapBuffer,          PFNGLMAPBUFFERPROC)         \
     F(glUnmapBuffer,        PFNGLUNMAPBUFFERPROC)       \
@@ -71,6 +71,7 @@
     F(glGenFramebuffers, PFNGLGENFRAMEBUFFERSPROC) \
     F(glDeleteFramebuffers, PFNGLDELETEFRAMEBUFFERSPROC) \
     F(glBindFramebuffer, PFNGLBINDFRAMEBUFFERPROC) \
+    F(glDrawBuffers, PFNGLDRAWBUFFERSPROC) \
     F(glFramebufferTexture2D, PFNGLFRAMEBUFFERTEXTURE2DPROC) \
     F(glFramebufferTextureLayer, PFNGLFRAMEBUFFERTEXTURELAYERPROC) \
     F(glBlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC) \
@@ -87,20 +88,12 @@ using namespace Slang;
 
 namespace gfx {
 
-class GLRenderer : public GraphicsAPIRenderer
+class GLRenderer : public ImmediateRendererBase
 {
 public:
     // Renderer    implementation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        makeSwapchainImagePresentable(ISwapchain* swapchain) override
-    {
-        SLANG_UNUSED(swapchain);
-    }
+    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame(uint32_t mask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
@@ -108,6 +101,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -146,11 +140,17 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
-        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        IBufferResource* src,
+        size_t srcOffset,
+        size_t size) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL readTextureResource(
+        ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
+    virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(IBufferResource* buffer) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setPrimitiveTopology(PrimitiveTopology topology) override;
 
@@ -182,10 +182,6 @@ public:
     virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
     {
         return RendererType::OpenGl;
-    }
-    virtual PipelineStateBase* getCurrentPipeline() override
-    {
-        return m_currentPipelineState.Ptr();
     }
     HGLRC createGLContext(HDC hdc);
     GLRenderer();
@@ -354,9 +350,14 @@ public:
 
     public:
         GLuint m_framebuffer;
+        ShortList<GLenum> m_drawBuffers;
         WeakSink<GLRenderer>* m_renderer;
         ShortList<RefPtr<TextureViewImpl>> renderTargetViews;
         RefPtr<TextureViewImpl> depthStencilView;
+        ShortList<ColorClearValue> m_colorClearValues;
+        bool m_sameClearValues = true;
+        DepthStencilClearValue m_depthStencilClearValue;
+
         FramebufferImpl(WeakSink<GLRenderer>* renderer) :m_renderer(renderer) {}
         ~FramebufferImpl()
         {
@@ -370,11 +371,28 @@ public:
             auto renderer = m_renderer->get();
             renderer->glGenFramebuffers(1, &m_framebuffer);
             renderer->glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+            m_drawBuffers.clear();
+            m_colorClearValues.clear();
             for (Index i = 0; i < renderTargetViews.getCount(); i++)
             {
                 auto rtv = renderTargetViews[i].Ptr();
                 renderer->glFramebufferTexture2D(
                     GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + (uint32_t)i, GL_TEXTURE_2D, rtv->m_textureID, 0);
+                m_drawBuffers.add((GLenum)(GL_COLOR_ATTACHMENT0 + i));
+                m_colorClearValues.add(rtv->m_resource->getDesc()->optimalClearValue.color);
+            }
+            m_sameClearValues = true;
+            for (Index i = 1; i < m_colorClearValues.getCount() && m_sameClearValues; i++)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    if (m_colorClearValues[i].floatValues[j] !=
+                        m_colorClearValues[0].floatValues[j])
+                    {
+                        m_sameClearValues = false;
+                        break;
+                    }
+                }
             }
             if (depthStencilView)
             {
@@ -384,6 +402,8 @@ public:
                     GL_TEXTURE_2D,
                     depthStencilView->m_textureID,
                     0);
+                m_depthStencilClearValue =
+                    depthStencilView->m_resource->getDesc()->optimalClearValue.depthStencil;
             }
             auto error = renderer->glCheckFramebufferStatus(GL_FRAMEBUFFER);
             if (error != GL_FRAMEBUFFER_COMPLETE)
@@ -518,7 +538,7 @@ public:
     {
         ConstantBuffer,
         CombinedTextureSampler,
-
+        StorageBuffer,
         CountOf,
     };
 
@@ -595,6 +615,7 @@ public:
 
         RefPtr<DescriptorSetLayoutImpl>     m_layout;
         List<RefPtr<BufferResourceImpl>>    m_constantBuffers;
+        List<RefPtr<BufferResourceImpl>>    m_storageBuffers;
         List<RefPtr<TextureViewImpl>>       m_textures;
         List<RefPtr<SamplerStateImpl>>      m_samplers;
     };
@@ -622,8 +643,6 @@ public:
     class PipelineStateImpl : public PipelineStateBase
     {
     public:
-        RefPtr<ShaderProgramImpl>   m_program;
-        RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
         RefPtr<InputLayoutImpl>     m_inputLayout;
         void init(const GraphicsPipelineStateDesc& inDesc)
         {
@@ -674,7 +693,8 @@ public:
 
     HDC     m_hdc;
     HGLRC   m_glContext = 0;
-    float   m_clearColor[4] = { 0, 0, 0, 0 };
+    uint32_t m_stencilRef = 0;
+
     GLuint m_vao;
     RefPtr<PipelineStateImpl> m_currentPipelineState;
     RefPtr<FramebufferImpl> m_currentFramebuffer;
@@ -791,7 +811,11 @@ void GLRenderer::flushStateForDraw()
     if (m_currentFramebuffer)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, m_currentFramebuffer->m_framebuffer);
+        glDrawBuffers(
+            (GLsizei)m_currentFramebuffer->m_drawBuffers.getCount(),
+            m_currentFramebuffer->m_drawBuffers.getArrayView().getBuffer());
     }
+    
     glBindVertexArray(m_vao);
     auto inputLayout = m_currentPipelineState->m_inputLayout.Ptr();
     auto attrCount = Index(inputLayout->m_attributeCount);
@@ -818,7 +842,8 @@ void GLRenderer::flushStateForDraw()
         glDisableVertexAttribArray((GLuint)ii);
     }
     // Next bind the descriptor sets as required by the layout
-    auto pipelineLayout = m_currentPipelineState->m_pipelineLayout;
+    auto pipelineLayout =
+        static_cast<PipelineLayoutImpl*>(m_currentPipelineState->m_pipelineLayout.get());
     auto descriptorSetCount = pipelineLayout->m_sets.getCount();
     for(Index ii = 0; ii < descriptorSetCount; ++ii)
     {
@@ -843,6 +868,19 @@ void GLRenderer::flushStateForDraw()
             }
         }
 
+        {
+            // Then we will bind any storage buffers that were specified.
+
+            auto slotTypeIndex = int(GLDescriptorSlotType::StorageBuffer);
+            auto count = descriptorSetLayout->m_counts[slotTypeIndex];
+            auto baseIndex = descriptorSetInfo.baseArrayIndex[slotTypeIndex];
+
+            for (Int ii = 0; ii < count; ++ii)
+            {
+                auto bufferImpl = descriptorSet->m_storageBuffers[ii];
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, GLuint(ii), bufferImpl->m_handle);
+            }
+        }
 
         {
             // Next we will bind any combined texture/sampler slots.
@@ -1179,21 +1217,71 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setClearColor(const float color[4])
+SLANG_NO_THROW void SLANG_MCALL
+    GLRenderer::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
 {
-    glClearColor(color[0], color[1], color[2], color[3]);
-}
-
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::clearFrame()
-{
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-}
-
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::beginFrame() { }
-
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::endFrame()
-{
-    glFlush();
+    uint32_t clearMask = 0;
+    if (clearDepth)
+    {
+        clearMask |= GL_DEPTH_BUFFER_BIT;
+        glClearDepth(m_currentFramebuffer->m_depthStencilClearValue.depth);
+    }
+    if (clearStencil)
+    {
+        clearMask |= GL_STENCIL_BUFFER_BIT;
+        glClearStencil(m_currentFramebuffer->m_depthStencilClearValue.stencil);
+    }
+    if (clearMask)
+    {
+        // If clear value for all attachments are the same, issue one `glClear` command.
+        if (m_currentFramebuffer->m_sameClearValues &&
+            m_currentFramebuffer->m_colorClearValues.getCount() > 0)
+        {
+            ShortList<GLenum> clearBuffers;
+            auto clearColor = m_currentFramebuffer->m_colorClearValues[0];
+            glClearColor(
+                clearColor.floatValues[0],
+                clearColor.floatValues[1],
+                clearColor.floatValues[2],
+                clearColor.floatValues[3]);
+            for (Index i = 0; i < m_currentFramebuffer->m_colorClearValues.getCount(); i++)
+            {
+                if (mask & uint32_t(1 << i))
+                    clearBuffers.add(GLenum(GL_COLOR_ATTACHMENT0 + i));
+            }
+            if (clearBuffers.getCount())
+            {
+                glDrawBuffers((GLsizei)clearBuffers.getCount(), clearBuffers.getArrayView().getBuffer());
+                clearMask |= GL_COLOR_BUFFER_BIT;
+            }
+            glClear(clearMask);
+            glDrawBuffers(
+                (GLsizei)m_currentFramebuffer->m_drawBuffers.getCount(),
+                m_currentFramebuffer->m_drawBuffers.getArrayView().getBuffer());
+            return;
+        }
+        // If clear values are different, clear attachments separately.
+        for (Index i = 0; i < m_currentFramebuffer->m_colorClearValues.getCount(); i++)
+        {
+            if (mask & uint32_t(1 << i))
+            {
+                GLenum drawBuffer = GLenum(GL_COLOR_ATTACHMENT0 + i);
+                glDrawBuffers(1, &drawBuffer);
+                auto clearColor = m_currentFramebuffer->m_colorClearValues[i];
+                glClearColor(
+                    clearColor.floatValues[0],
+                    clearColor.floatValues[1],
+                    clearColor.floatValues[2],
+                    clearColor.floatValues[3]);
+                glClear(GL_COLOR_BUFFER_BIT);
+            }
+        }
+        // Clear depth/stencil attachments.
+        glClear(clearMask);
+        glDrawBuffers(
+            (GLsizei)m_currentFramebuffer->m_drawBuffers.getCount(),
+            m_currentFramebuffer->m_drawBuffers.getArrayView().getBuffer());
+    }
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createSwapchain(
@@ -1250,9 +1338,30 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setFramebuffer(IFramebuffer* frameBu
     m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
-    ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+void GLRenderer::setStencilReference(uint32_t referenceValue)
 {
+    m_stencilRef = referenceValue;
+    // TODO: actually set the stencil state.
+}
+
+void GLRenderer::copyBuffer(
+    IBufferResource* dst,
+    size_t dstOffset,
+    IBufferResource* src,
+    size_t srcOffset,
+    size_t size)
+{
+    auto dstImpl = static_cast<BufferResourceImpl*>(dst);
+    auto srcImpl = static_cast<BufferResourceImpl*>(src);
+    glBindBuffer(GL_COPY_READ_BUFFER, srcImpl->m_handle);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, dstImpl->m_handle);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
+    ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+{
+    SLANG_UNUSED(state);
     auto resource = static_cast<TextureResourceImpl*>(texture);
     auto size = resource->getDesc()->size;
     size_t requiredSize = size.width * size.height * sizeof(uint32_t);
@@ -1585,7 +1694,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createInputLayout(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void* SLANG_MCALL GLRenderer::map(IBufferResource* bufferIn, MapFlavor flavor)
+void* GLRenderer::map(IBufferResource* bufferIn, MapFlavor flavor)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
@@ -1608,7 +1717,7 @@ SLANG_NO_THROW void* SLANG_MCALL GLRenderer::map(IBufferResource* bufferIn, MapF
     return glMapBuffer(buffer->m_target, access);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::unmap(IBufferResource* bufferIn)
+void GLRenderer::unmap(IBufferResource* bufferIn)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     glUnmapBuffer(buffer->m_target);
@@ -1695,11 +1804,11 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setScissorRects(UInt count, ScissorR
 
 SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPipelineState(IPipelineState* state)
 {
-    auto pipelineStateImpl = (PipelineStateImpl*) state;
+    auto pipelineStateImpl = static_cast<PipelineStateImpl*>(state);
 
     m_currentPipelineState = pipelineStateImpl;
 
-    auto program = pipelineStateImpl->m_program;
+    auto program = static_cast<ShaderProgramImpl*>(pipelineStateImpl->m_program.get());
     GLuint programID = program ? program->m_id : 0;
     glUseProgram(programID);
 }
@@ -1737,13 +1846,21 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setConstantBuffer
 SLANG_NO_THROW void SLANG_MCALL
     GLRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
 {
-    auto viewImpl = (ResourceViewImpl*) view;
+    auto viewImpl = static_cast<ResourceViewImpl*>(view);
 
     auto layout = m_layout;
     auto rangeInfo = layout->m_ranges[range];
     auto arrayIndex = rangeInfo.arrayIndex + index;
 
-    assert(!"unimplemented");
+    switch (rangeInfo.type)
+    {
+    case GLDescriptorSlotType::StorageBuffer:
+        m_storageBuffers[arrayIndex] = static_cast<BufferViewImpl*>(viewImpl)->m_resource;
+        break;
+    default:
+        assert(!"unimplemented");
+        break;
+    }
 }
 
 SLANG_NO_THROW void SLANG_MCALL
@@ -1808,9 +1925,9 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createDescriptorSetLayout(
             assert(!"unsupported");
             break;
 
-        // TODO: There are many other slot types we could support here,
-        // in particular including storage buffers.
-
+        case DescriptorSlotType::StorageBuffer:
+            glSlotType = GLDescriptorSlotType::StorageBuffer;
+            break;
         case DescriptorSlotType::CombinedImageSampler:
             glSlotType = GLDescriptorSlotType::CombinedTextureSampler;
             break;
@@ -1888,7 +2005,11 @@ SLANG_NO_THROW Result SLANG_MCALL
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
         descriptorSetImpl->m_constantBuffers.setCount(slotCount);
     }
-
+    {
+        auto slotTypeIndex = int(GLDescriptorSlotType::StorageBuffer);
+        auto slotCount = layoutImpl->m_counts[slotTypeIndex];
+        descriptorSetImpl->m_storageBuffers.setCount(slotCount);
+    }
     {
         auto slotTypeIndex = int(GLDescriptorSlotType::CombinedTextureSampler);
         auto slotCount = layoutImpl->m_counts[slotTypeIndex];
@@ -1978,12 +2099,9 @@ Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     preparePipelineDesc(desc);
 
     auto programImpl        = (ShaderProgramImpl*)  desc.program;
-    auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
     auto inputLayoutImpl    = (InputLayoutImpl*)    desc.inputLayout;
 
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
-    pipelineStateImpl->m_program = programImpl;
-    pipelineStateImpl->m_pipelineLayout = pipelineLayoutImpl;
     pipelineStateImpl->m_inputLayout = inputLayoutImpl;
     pipelineStateImpl->init(desc);
     *outState = pipelineStateImpl.detach();
@@ -2008,3 +2126,4 @@ Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& in
 
 
 } // renderer_test
+

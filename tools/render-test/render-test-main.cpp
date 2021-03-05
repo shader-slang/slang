@@ -6,7 +6,6 @@
 #include "slang-gfx.h"
 #include "tools/gfx-util/shader-cursor.h"
 #include "slang-support.h"
-#include "surface.h"
 #include "png-serialize-util.h"
 
 #include "shader-renderer-util.h"
@@ -25,6 +24,14 @@
 #include "../../source/core/slang-test-tool-util.h"
 
 #include "cpu-compute-util.h"
+
+#define ENABLE_RENDERDOC_INTEGRATION 0
+
+#if ENABLE_RENDERDOC_INTEGRATION
+#    include "external/renderdoc_app.h"
+#    define WIN32_LEAN_AND_MEAN
+#    include <Windows.h>
+#endif
 
 #if RENDER_TEST_CUDA
 #   include "cuda/cuda-compute-util.h"
@@ -92,12 +99,12 @@ public:
         IRenderer* renderer,
         const Options& options,
         const ShaderCompilerUtil::Input& input) = 0;
-    void runCompute();
-    void renderFrame();
+    void runCompute(IComputeCommandEncoder* encoder);
+    void renderFrame(IRenderCommandEncoder* encoder);
     void finalize();
 
-    virtual void applyBinding(PipelineType pipelineType) = 0;
-    virtual void setProjectionMatrix() = 0;
+    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) = 0;
+    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) = 0;
     virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) = 0;
 
     Result writeScreen(const char* filename);
@@ -109,7 +116,7 @@ protected:
         IRenderer* renderer,
         Options::ShaderProgramType shaderType,
         const ShaderCompilerUtil::Input& input);
-    void _initializeFramebuffer();
+    void _initializeRenderPass();
     virtual void finalizeImpl();
 
     uint64_t m_startTicks;
@@ -118,7 +125,8 @@ protected:
     uintptr_t m_constantBufferSize;
 
     ComPtr<IRenderer> m_renderer;
-
+    ComPtr<ICommandQueue> m_queue;
+    ComPtr<IRenderPassLayout> m_renderPass;
     ComPtr<IInputLayout> m_inputLayout;
     ComPtr<IBufferResource> m_vertexBuffer;
     ComPtr<IShaderProgram> m_shaderProgram;
@@ -137,8 +145,8 @@ protected:
 class LegacyRenderTestApp : public RenderTestApp
 {
 public:
-    virtual void applyBinding(PipelineType pipelineType) SLANG_OVERRIDE;
-    virtual void setProjectionMatrix() SLANG_OVERRIDE;
+    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) SLANG_OVERRIDE;
+    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) SLANG_OVERRIDE;
     virtual Result initialize(
         SlangSession* session,
         IRenderer* renderer,
@@ -148,6 +156,7 @@ public:
     BindingStateImpl* getBindingState() const { return m_bindingState; }
 
     virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) override;
+    virtual void finalizeImpl() SLANG_OVERRIDE;
 
 protected:
 	uintptr_t m_constantBufferSize;
@@ -159,8 +168,8 @@ protected:
 class ShaderObjectRenderTestApp : public RenderTestApp
 {
 public:
-    virtual void applyBinding(PipelineType pipelineType) SLANG_OVERRIDE;
-    virtual void setProjectionMatrix() SLANG_OVERRIDE;
+    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) SLANG_OVERRIDE;
+    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) SLANG_OVERRIDE;
     virtual Result initialize(
         SlangSession* session,
         IRenderer* renderer,
@@ -456,14 +465,34 @@ SlangResult _assignVarsFromLayout(
     return SLANG_OK;
 }
 
-void LegacyRenderTestApp::applyBinding(PipelineType pipelineType)
+void LegacyRenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
 {
-    m_bindingState->apply(m_renderer.get(), pipelineType);
+    m_bindingState->apply(encoder, pipelineType);
 }
 
-void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType)
+void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
 {
-    m_renderer->bindRootShaderObject(pipelineType, m_programVars);
+    switch (pipelineType)
+    {
+    case PipelineType::Compute:
+        {
+            ComPtr<IComputeCommandEncoder> computeEncoder;
+            encoder->queryInterface(
+                SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
+            computeEncoder->bindRootShaderObject(m_programVars);
+        }
+        break;
+    case PipelineType::Graphics:
+        {
+            ComPtr<IRenderCommandEncoder> renderEncoder;
+            encoder->queryInterface(
+                SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
+            renderEncoder->bindRootShaderObject(m_programVars);
+        }
+        break;
+    default:
+        throw "unknown pipeline type";
+    }
 }
 
 SlangResult LegacyRenderTestApp::initialize(
@@ -478,7 +507,7 @@ SlangResult LegacyRenderTestApp::initialize(
 
     SLANG_RETURN_ON_FAIL(_initializeShaders(session, renderer, options.shaderType, input));
 
-    _initializeFramebuffer();
+    _initializeRenderPass();
 
     m_numAddedConstantBuffers = 0;
 
@@ -607,7 +636,7 @@ SlangResult ShaderObjectRenderTestApp::initialize(
 
 	m_renderer = renderer;
 
-    _initializeFramebuffer();
+    _initializeRenderPass();
 
     {
         switch(m_options.shaderType)
@@ -664,6 +693,13 @@ SlangResult ShaderObjectRenderTestApp::initialize(
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
+void LegacyRenderTestApp::finalizeImpl()
+{
+    m_constantBuffer = nullptr;
+    m_bindingState = nullptr;
+    RenderTestApp::finalizeImpl();
+}
+
 void ShaderObjectRenderTestApp::finalizeImpl()
 {
     m_programVars = nullptr;
@@ -682,8 +718,11 @@ Result RenderTestApp::_initializeShaders(
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
 }
 
-void RenderTestApp::_initializeFramebuffer()
+void RenderTestApp::_initializeRenderPass()
 {
+    ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
+    m_queue = m_renderer->createCommandQueue(queueDesc);
+
     gfx::ITextureResource::Desc depthBufferDesc;
     depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
     depthBufferDesc.init2D(
@@ -730,29 +769,43 @@ void RenderTestApp::_initializeFramebuffer()
     framebufferLayoutDesc.renderTargets = &colorAttachment;
     framebufferLayoutDesc.depthStencil = &depthAttachment;
     m_renderer->createFramebufferLayout(framebufferLayoutDesc, m_framebufferLayout.writeRef());
+
     gfx::IFramebuffer::Desc framebufferDesc;
     framebufferDesc.renderTargetCount = 1;
     framebufferDesc.depthStencilView = dsv.get();
     framebufferDesc.renderTargetViews = rtv.readRef();
     framebufferDesc.layout = m_framebufferLayout;
     m_renderer->createFramebuffer(framebufferDesc, m_framebuffer.writeRef());
+    
+    IRenderPassLayout::Desc renderPassDesc = {};
+    renderPassDesc.framebufferLayout = m_framebufferLayout;
+    renderPassDesc.renderTargetCount = 1;
+    IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
+    IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
+    renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
+    renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    renderTargetAccess.initialState = ResourceState::Undefined;
+    renderTargetAccess.finalState = ResourceState::RenderTarget;
+    depthStencilAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
+    depthStencilAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+    depthStencilAccess.initialState = ResourceState::Undefined;
+    depthStencilAccess.finalState = ResourceState::DepthWrite;
+    renderPassDesc.renderTargetAccess = &renderTargetAccess;
+    renderPassDesc.depthStencilAccess = &depthStencilAccess;
+    m_renderer->createRenderPassLayout(renderPassDesc, m_renderPass.writeRef());
 }
 
-void LegacyRenderTestApp::setProjectionMatrix()
+void LegacyRenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
 {
-    auto mappedData = m_renderer->map(m_constantBuffer, MapFlavor::WriteDiscard);
-    if (mappedData)
-    {
-        const ProjectionStyle projectionStyle =
-            gfxGetProjectionStyle(m_renderer->getRendererType());
-        gfxGetIdentityProjection(projectionStyle, (float*)mappedData);
-
-        m_renderer->unmap(m_constantBuffer);
-    }
+    float matrix[16];
+    const ProjectionStyle projectionStyle = gfxGetProjectionStyle(m_renderer->getRendererType());
+    gfxGetIdentityProjection(projectionStyle, matrix);
+    encoder->uploadBufferData(m_constantBuffer, 0, sizeof(float) * 16, matrix);
 }
 
-void ShaderObjectRenderTestApp::setProjectionMatrix()
+void ShaderObjectRenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
 {
+    SLANG_UNUSED(encoder);
     const ProjectionStyle projectionStyle =
         gfxGetProjectionStyle(m_renderer->getRendererType());
 
@@ -764,31 +817,29 @@ void ShaderObjectRenderTestApp::setProjectionMatrix()
         .setData(projectionMatrix, sizeof(projectionMatrix));
 }
 
-void RenderTestApp::renderFrame()
+void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 {
-    setProjectionMatrix();
-
     auto pipelineType = PipelineType::Graphics;
 
-    m_renderer->setPipelineState(m_pipelineState);
+    encoder->setPipelineState(m_pipelineState);
 
-	m_renderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-	m_renderer->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
+	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+    encoder->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
 
-    applyBinding(pipelineType);
+    applyBinding(pipelineType, encoder);
 
-	m_renderer->draw(3);
+	encoder->draw(3);
 }
 
-void RenderTestApp::runCompute()
+void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Compute;
-    m_renderer->setPipelineState(m_pipelineState);
-    applyBinding(pipelineType);
-
-    m_startTicks = ProcessUtil::getClockTick();
-
-	m_renderer->dispatchCompute(m_options.computeDispatchSize[0], m_options.computeDispatchSize[1], m_options.computeDispatchSize[2]);
+    encoder->setPipelineState(m_pipelineState);
+    applyBinding(pipelineType, encoder);
+	encoder->dispatchCompute(
+        m_options.computeDispatchSize[0],
+        m_options.computeDispatchSize[1],
+        m_options.computeDispatchSize[2]);
 }
 
 void RenderTestApp::finalize()
@@ -799,7 +850,11 @@ void RenderTestApp::finalize()
     m_vertexBuffer = nullptr;
     m_shaderProgram = nullptr;
     m_pipelineState = nullptr;
-
+    m_renderPass = nullptr;
+    m_framebuffer = nullptr;
+    m_framebufferLayout = nullptr;
+    m_colorBuffer = nullptr;
+    m_queue = nullptr;
     m_renderer = nullptr;
 }
 
@@ -809,10 +864,8 @@ void RenderTestApp::finalizeImpl()
 
 Result LegacyRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
 {
-    // Submit the work
-    m_renderer->submitGpuWork();
     // Wait until everything is complete
-    m_renderer->waitForGpu();
+    m_queue->wait();
 
     FILE * f = fopen(fileName, "wb");
     if (!f)
@@ -832,17 +885,15 @@ Result LegacyRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* f
         {
             IBufferResource* bufferResource = static_cast<IBufferResource*>(binding.resource.get());
             const size_t bufferSize = bufferResource->getDesc()->sizeInBytes;
-
-            unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
-            if (!ptr)
+            ComPtr<ISlangBlob> blob;
+            m_renderer->readBufferResource(bufferResource, 0, bufferSize, blob.writeRef());
+            if (!blob)
             {
                 return SLANG_FAIL;
             }
 
-            const SlangResult res = ShaderInputLayout::writeBinding(bindRoot, m_shaderInputLayout.entries[i], ptr, bufferSize, &writer);
-
-            m_renderer->unmap(bufferResource);
-
+            const SlangResult res = ShaderInputLayout::writeBinding(
+                bindRoot, m_shaderInputLayout.entries[i], blob->getBufferPointer(), bufferSize, &writer);
             SLANG_RETURN_ON_FAIL(res);
         }
         else
@@ -856,10 +907,8 @@ Result LegacyRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* f
 
 Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
 {
-    // Submit the work
-    m_renderer->submitGpuWork();
     // Wait until everything is complete
-    m_renderer->waitForGpu();
+    m_queue->wait();
 
     FILE * f = fopen(fileName, "wb");
     if (!f)
@@ -879,16 +928,14 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const c
             IBufferResource* bufferResource = static_cast<IBufferResource*>(resource.get());
             const size_t bufferSize = bufferResource->getDesc()->sizeInBytes;
 
-            unsigned int* ptr = (unsigned int*)m_renderer->map(bufferResource, MapFlavor::HostRead);
-            if (!ptr)
+            ComPtr<ISlangBlob> blob;
+            m_renderer->readBufferResource(bufferResource, 0, bufferSize, blob.writeRef());
+            if (!blob)
             {
                 return SLANG_FAIL;
             }
-
-            const SlangResult res = ShaderInputLayout::writeBinding(bindRoot, inputEntry, ptr, bufferSize, &writer);
-
-            m_renderer->unmap(bufferResource);
-
+            const SlangResult res =
+                ShaderInputLayout::writeBinding(bindRoot, inputEntry, blob->getBufferPointer(), bufferSize, &writer);
             SLANG_RETURN_ON_FAIL(res);
         }
         else
@@ -904,52 +951,48 @@ Result RenderTestApp::writeScreen(const char* filename)
 {
     size_t rowPitch, pixelSize;
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(m_renderer->readTextureResource(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
+    SLANG_RETURN_ON_FAIL(m_renderer->readTextureResource(
+        m_colorBuffer, ResourceState::RenderTarget, blob.writeRef(), &rowPitch, &pixelSize));
     auto bufferSize = blob->getBufferSize();
-    Surface surface;
-    size_t width = rowPitch / pixelSize;
-    size_t height = bufferSize / rowPitch;
-    surface.setUnowned(
-        (int)width,
-        (int)height,
-        gfx::Format::RGBA_Unorm_UInt8,
-        (int)rowPitch,
-        (void*)blob->getBufferPointer());
-    return PngSerializeUtil::write(filename, surface);
+    uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
+    uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
+    return PngSerializeUtil::write(filename, blob, width, height);
 }
 
 Result RenderTestApp::update()
 {
-    m_renderer->beginFrame();
-
-    // Whenever we don't have Windows events to process, we render a frame.
+    auto commandBuffer = m_queue->createCommandBuffer();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        runCompute();
+        auto encoder = commandBuffer->encodeComputeCommands();
+        runCompute(encoder);
+        encoder->endEncoding();
     }
     else
     {
-        static const float kClearColor[] = { 0.25, 0.25, 0.25, 1.0 };
-        m_renderer->setFramebuffer(m_framebuffer);
+        auto resEncoder = commandBuffer->encodeResourceCommands();
+        setProjectionMatrix(resEncoder);
+        resEncoder->endEncoding();
 
+        auto encoder = commandBuffer->encodeRenderCommands(m_renderPass, m_framebuffer);
         gfx::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = (float)gWindowWidth;
         viewport.extentY = (float)gWindowHeight;
-        m_renderer->setViewportAndScissor(viewport);
-
-        m_renderer->setClearColor(kClearColor);
-        m_renderer->clearFrame();
-        renderFrame();
+        encoder->setViewportAndScissor(viewport);
+        renderFrame(encoder);
+        encoder->endEncoding();
     }
+    commandBuffer->close();
+
+    m_startTicks = ProcessUtil::getClockTick();
+    m_queue->executeCommandBuffer(commandBuffer);
+    m_queue->wait();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
     if (m_options.outputPath || m_options.performanceProfile)
     {
-        // Submit the work
-        m_renderer->submitGpuWork();
         // Wait until everything is complete
-        m_renderer->waitForGpu();
 
         if (m_options.performanceProfile)
         {
@@ -1013,8 +1056,6 @@ Result RenderTestApp::update()
         }
         return SLANG_OK;
     }
-
-    m_renderer->endFrame();
     return SLANG_OK;
 }
 
@@ -1049,10 +1090,37 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
 
 } //  namespace renderer_test
 
+#if ENABLE_RENDERDOC_INTEGRATION
+static RENDERDOC_API_1_1_2* rdoc_api = NULL;
+static void initializeRenderDoc()
+{
+    if (HMODULE mod = GetModuleHandleA("renderdoc.dll"))
+    {
+        pRENDERDOC_GetAPI RENDERDOC_GetAPI =
+            (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+        int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
+        assert(ret == 1);
+    }
+}
+static void renderDocBeginFrame() { if (rdoc_api) rdoc_api->StartFrameCapture(nullptr, nullptr); }
+static void renderDocEndFrame()
+{
+    if (rdoc_api)
+        rdoc_api->EndFrameCapture(nullptr, nullptr);
+    _fgetchar();
+}
+#else
+static void initializeRenderDoc(){}
+static void renderDocBeginFrame(){}
+static void renderDocEndFrame(){}
+#endif
+
 static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
 {
     using namespace renderer_test;
     using namespace Slang;
+
+    initializeRenderDoc();
 
     StdWriters::setSingleton(stdWriters);
 
@@ -1400,8 +1468,10 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             app = new ShaderObjectRenderTestApp();
         else
             app = new LegacyRenderTestApp();
+        renderDocBeginFrame();
 		SLANG_RETURN_ON_FAIL(app->initialize(session, renderer, options, input));
         app->update();
+        renderDocEndFrame();
         app->finalize();
         return SLANG_OK;
 	}

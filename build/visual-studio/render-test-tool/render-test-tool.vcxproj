@@ -186,8 +186,6 @@
     <ClInclude Include="..\..\..\tools\render-test\shader-input-layout.h" />
     <ClInclude Include="..\..\..\tools\render-test\shader-renderer-util.h" />
     <ClInclude Include="..\..\..\tools\render-test\slang-support.h" />
-    <ClInclude Include="..\..\..\tools\render-test\surface.h" />
-    <ClInclude Include="..\..\..\tools\render-test\window.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\render-test\bind-location.cpp" />
@@ -198,9 +196,6 @@
     <ClCompile Include="..\..\..\tools\render-test\shader-input-layout.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\shader-renderer-util.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\slang-support.cpp" />
-    <ClCompile Include="..\..\..\tools\render-test\surface.cpp" />
-    <ClCompile Include="..\..\..\tools\render-test\window.cpp" />
-    <ClCompile Include="..\..\..\tools\render-test\windows\win-window.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

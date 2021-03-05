@@ -644,27 +644,29 @@ protected:
             m_renderTargetCount = fragmentEntryPoint.layout->getVaryingOutputs().getCount();
         }
 
-        IPipelineLayout::Desc pipelineLayoutDesc;
+        if (m_program->getSpecializationParamCount() == 0)
+        {
+            IPipelineLayout::Desc pipelineLayoutDesc;
 
-        // HACK: we set `renderTargetCount` to zero here becasue otherwise the D3D12
-        // render back-end will adjust all UAV registers by this value to account
-        // for the `SV_Target<N>` outputs implicitly consuming `u<N>` registers for
-        // Shader Model 5.0.
-        //
-        // When using the shader object path, all registers are being set via Slang
-        // reflection information, and we do not need/want the automatic adjustment.
-        //
-        // TODO: Once we eliminate the non-shader-object path, this whole issue should
-        // be moot, because the `ProgramLayout` should own/be the pipeline layout anyway.
-        //
-        pipelineLayoutDesc.renderTargetCount = 0;
+            // HACK: we set `renderTargetCount` to zero here becasue otherwise the D3D12
+            // render back-end will adjust all UAV registers by this value to account
+            // for the `SV_Target<N>` outputs implicitly consuming `u<N>` registers for
+            // Shader Model 5.0.
+            //
+            // When using the shader object path, all registers are being set via Slang
+            // reflection information, and we do not need/want the automatic adjustment.
+            //
+            // TODO: Once we eliminate the non-shader-object path, this whole issue should
+            // be moot, because the `ProgramLayout` should own/be the pipeline layout anyway.
+            //
+            pipelineLayoutDesc.renderTargetCount = 0;
 
-        pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
-        pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
+            pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
+            pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 
-        SLANG_RETURN_ON_FAIL(
-            renderer->createPipelineLayout(pipelineLayoutDesc, m_pipelineLayout.writeRef()));
-
+            SLANG_RETURN_ON_FAIL(
+                renderer->createPipelineLayout(pipelineLayoutDesc, m_pipelineLayout.writeRef()));
+        }
         return SLANG_OK;
     }
 
@@ -1082,7 +1084,8 @@ protected:
     }
 
     Result apply(
-        IRenderer* renderer,
+        RendererBase* renderer,
+        GraphicsComputeCommandEncoderBase* encoder,
         PipelineType pipelineType,
         IPipelineLayout* pipelineLayout,
         Index& ioRootIndex)
@@ -1100,11 +1103,11 @@ protected:
             descriptorSets.add(descriptorSet);
         }
 
-        SLANG_RETURN_ON_FAIL(_bindIntoDescriptorSets(descriptorSets.getBuffer()));
+        SLANG_RETURN_ON_FAIL(_bindIntoDescriptorSets(encoder, descriptorSets.getBuffer()));
 
         for (auto descriptorSet : descriptorSets)
         {
-            renderer->setDescriptorSet(pipelineType, pipelineLayout, ioRootIndex++, descriptorSet);
+            encoder->setDescriptorSetImpl(pipelineType, pipelineLayout, ioRootIndex++, descriptorSet);
         }
 
         return SLANG_OK;
@@ -1112,7 +1115,9 @@ protected:
 
         /// Write the uniform/ordinary data of this object into the given `dest` buffer at the given `offset`
     Result _writeOrdinaryData(
-        char*                               dest,
+        GraphicsComputeCommandEncoderBase* encoder,
+        IBufferResource* buffer,
+        size_t offset,
         size_t                              destSize,
         GraphicsCommonShaderObjectLayout*   specializedLayout)
     {
@@ -1121,7 +1126,7 @@ protected:
 
         SLANG_ASSERT(srcSize <= destSize);
 
-        memcpy(dest, src, srcSize);
+        encoder->uploadBufferDataImpl(buffer, offset, srcSize, src);
 
         // In the case where this object has any sub-objects of
         // existential/interface type, we need to recurse on those objects
@@ -1197,7 +1202,7 @@ protected:
 
                 auto subObjectOffset = subObjectRangePendingDataOffset + i*subObjectRangePendingDataStride;
 
-                subObject->_writeOrdinaryData(dest + subObjectOffset, destSize - subObjectOffset, subObjectLayout);
+                subObject->_writeOrdinaryData(encoder, buffer, offset + subObjectOffset, destSize - subObjectOffset, subObjectLayout);
             }
         }
 
@@ -1211,7 +1216,7 @@ protected:
     size_t _getSubObjectRangePendingDataStride(GraphicsCommonShaderObjectLayout* specializedLayout, Index subObjectRangeIndex) { return 0; }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
-    Result _ensureOrdinaryDataBufferCreatedIfNeeded()
+    Result _ensureOrdinaryDataBufferCreatedIfNeeded(GraphicsComputeCommandEncoderBase* encoder)
     {
         // If we have already created a buffer to hold ordinary data, then we should
         // simply re-use that buffer rather than re-create it.
@@ -1259,15 +1264,17 @@ protected:
         // where this object contains interface/existential-type fields, so we
         // don't need or want to inline it into this call site.
         //
-        char* dest = (char*)renderer->map(m_ordinaryDataBuffer, MapFlavor::HostWrite);
-        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(dest, specializedOrdinaryDataSize, specializedLayout));
-        renderer->unmap(m_ordinaryDataBuffer);
-
+        SLANG_RETURN_ON_FAIL(_writeOrdinaryData(
+            encoder, m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize, specializedLayout));
         return SLANG_OK;
     }
 
         /// Bind the buffer for ordinary/uniform data, if needed
-    Result _bindOrdinaryDataBufferIfNeeded(IDescriptorSet* descriptorSet, Index* ioBaseRangeIndex, Index subObjectRangeArrayIndex)
+    Result _bindOrdinaryDataBufferIfNeeded(
+        GraphicsComputeCommandEncoderBase* encoder,
+        IDescriptorSet* descriptorSet,
+        Index* ioBaseRangeIndex,
+        Index subObjectRangeArrayIndex)
     {
         // We are going to need to tweak the base binding range index
         // used for descriptor-set writes if and only if we actually
@@ -1277,7 +1284,7 @@ protected:
 
         // We start by ensuring that the buffer is created, if it is needed.
         //
-        SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded());
+        SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded(encoder));
 
         // If we did indeed need/create a buffer, then we must bind it into
         // the given `descriptorSet` and update the base range index for
@@ -1293,11 +1300,15 @@ protected:
     }
 
     Result _bindIntoDescriptorSet(
-        IDescriptorSet* descriptorSet, Index baseRangeIndex, Index subObjectRangeArrayIndex)
+        GraphicsComputeCommandEncoderBase* encoder,
+        IDescriptorSet* descriptorSet,
+        Index baseRangeIndex,
+        Index subObjectRangeArrayIndex)
     {
         GraphicsCommonShaderObjectLayout* layout = getLayout();
 
-        _bindOrdinaryDataBufferIfNeeded(descriptorSet, &baseRangeIndex, subObjectRangeArrayIndex);
+        _bindOrdinaryDataBufferIfNeeded(
+            encoder, descriptorSet, &baseRangeIndex, subObjectRangeArrayIndex);
 
         for (auto bindingRangeInfo : layout->getBindingRanges())
         {
@@ -1373,12 +1384,12 @@ protected:
     }
 
 public:
-    virtual Result _bindIntoDescriptorSets(ComPtr<IDescriptorSet>* descriptorSets)
+    virtual Result _bindIntoDescriptorSets(GraphicsComputeCommandEncoderBase* encoder, ComPtr<IDescriptorSet>* descriptorSets)
     {
         GraphicsCommonShaderObjectLayout* layout = getLayout();
 
         Index baseRangeIndex = 0;
-        _bindOrdinaryDataBufferIfNeeded(descriptorSets[0], &baseRangeIndex, 0);
+        _bindOrdinaryDataBufferIfNeeded(encoder, descriptorSets[0], &baseRangeIndex, 0);
 
         // Fill in the descriptor sets based on binding ranges
         //
@@ -1396,7 +1407,7 @@ public:
                 {
                     GraphicsCommonShaderObject* subObject = m_objects[baseIndex + i];
 
-                    subObject->_bindIntoDescriptorSet(descriptorSet, rangeIndex, i);
+                    subObject->_bindIntoDescriptorSet(encoder, descriptorSet, rangeIndex, i);
                 }
                 break;
 
@@ -1428,7 +1439,7 @@ public:
                 {
                     GraphicsCommonShaderObject* subObject = m_objects[baseIndex + i];
 
-                    subObject->_bindIntoDescriptorSet(descriptorSet, rangeIndex, i);
+                    subObject->_bindIntoDescriptorSet(encoder, descriptorSet, rangeIndex, i);
                 }
                 break;
 
@@ -1541,12 +1552,12 @@ public:
 
     GraphicsCommonProgramLayout* getLayout() { return static_cast<GraphicsCommonProgramLayout*>(m_layout.Ptr()); }
 
-    void apply(IRenderer* renderer, PipelineType pipelineType)
+    void apply(RendererBase* renderer, GraphicsComputeCommandEncoderBase* encoder, PipelineType pipelineType)
     {
-        auto pipelineLayout = getLayout()->getPipelineLayout();
+        auto pipelineLayout = encoder->m_currentPipeline->m_pipelineLayout.get();
 
         Index rootIndex = 0;
-        GraphicsCommonShaderObject::apply(renderer, pipelineType, pipelineLayout, rootIndex);
+        GraphicsCommonShaderObject::apply(renderer, encoder, pipelineType, pipelineLayout, rootIndex);
 
 #if 0
 
@@ -1587,9 +1598,10 @@ public:
     }
 
 protected:
-    virtual Result _bindIntoDescriptorSets(ComPtr<IDescriptorSet>* descriptorSets) override
+    virtual Result _bindIntoDescriptorSets(
+        GraphicsComputeCommandEncoderBase* encoder, ComPtr<IDescriptorSet>* descriptorSets) override
     {
-        SLANG_RETURN_ON_FAIL(Super::_bindIntoDescriptorSets(descriptorSets));
+        SLANG_RETURN_ON_FAIL(Super::_bindIntoDescriptorSets(encoder, descriptorSets));
 
         auto entryPointCount = m_entryPoints.getCount();
         for (Index i = 0; i < entryPointCount; ++i)
@@ -1598,7 +1610,7 @@ protected:
             auto& entryPointInfo = getLayout()->getEntryPoint(i);
 
             SLANG_RETURN_ON_FAIL(entryPoint->_bindIntoDescriptorSet(
-                descriptorSets[0], entryPointInfo.rangeOffset, 0));
+                encoder, descriptorSets[0], entryPointInfo.rangeOffset, 0));
         }
 
         return SLANG_OK;
@@ -1760,17 +1772,20 @@ Result GraphicsAPIRenderer::initProgramCommon(
     return SLANG_OK;
 }
 
-Result SLANG_MCALL
-    GraphicsAPIRenderer::bindRootShaderObject(PipelineType pipelineType, IShaderObject* object)
+Result GraphicsComputeCommandEncoderBase::bindRootShaderObjectImpl(
+    PipelineType pipelineType,
+    IShaderObject* object)
 {
     auto programVars = dynamic_cast<ProgramVars*>(object);
     if (!programVars)
         return SLANG_E_INVALID_HANDLE;
 
-    SLANG_RETURN_ON_FAIL(maybeSpecializePipeline(programVars));
-
+    RefPtr<PipelineStateBase> specializedPipeline;
+    SLANG_RETURN_ON_FAIL(m_rendererBase->maybeSpecializePipeline(m_currentPipeline, programVars, specializedPipeline));
+    m_currentPipeline = specializedPipeline;
+    
     // Apply shader parameter bindings.
-    programVars->apply(this, pipelineType);
+    programVars->apply(m_rendererBase, this, pipelineType);
     return SLANG_OK;
 }
 

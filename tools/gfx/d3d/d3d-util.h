@@ -15,6 +15,7 @@
 #include <D3Dcommon.h>
 #include <DXGIFormat.h>
 #include <dxgi.h>
+#include <d3d12.h>
 
 namespace gfx {
 
@@ -38,6 +39,12 @@ class D3DUtil
         /// Get primitive topology as D3D primitive topology
     static D3D_PRIMITIVE_TOPOLOGY getPrimitiveTopology(PrimitiveTopology prim);
 
+    static D3D12_PRIMITIVE_TOPOLOGY_TYPE getPrimitiveType(PrimitiveType type);
+
+    static D3D12_COMPARISON_FUNC getComparisonFunc(ComparisonFunc func);
+
+    static D3D12_DEPTH_STENCILOP_DESC translateStencilOpDesc(DepthStencilOpDesc desc);
+
         /// Calculate size taking into account alignment. Alignment must be a power of 2
     static UInt calcAligned(UInt size, UInt alignment) { return (size + alignment - 1) & ~(alignment - 1); }
 
@@ -46,6 +53,8 @@ class D3DUtil
 
         /// Given a slang pixel format returns the equivalent DXGI_ pixel format. If the format is not known, will return DXGI_FORMAT_UNKNOWN
     static DXGI_FORMAT getMapFormat(Format format);
+
+    static D3D12_RESOURCE_STATES translateResourceState(ResourceState state);
 
         /// Given the usage, flags, and format will return the most suitable format. Will return DXGI_UNKNOWN if combination is not possible
     static DXGI_FORMAT calcFormat(UsageType usage, DXGI_FORMAT format);

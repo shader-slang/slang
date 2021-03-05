@@ -31,45 +31,6 @@
 
 namespace Slang {
 
-// represents a declarator for use in emitting types
-struct CLikeSourceEmitter::EDeclarator
-{
-    enum class Flavor
-    {
-        Name,
-        Array,
-        UnsizedArray,
-    };
-    Flavor flavor;
-    EDeclarator* next = nullptr;
-
-    // Used for `Flavor::name`
-    const StringSliceLoc* nameAndLoc;
-    
-    // Used for `Flavor::Array`
-    IRInst* elementCount;
-};
-
-struct CLikeSourceEmitter::IRDeclaratorInfo
-{
-    enum class Flavor
-    {
-        Simple,
-        Ptr,
-        Array,
-    };
-
-    Flavor flavor;
-    IRDeclaratorInfo* next;
-    union
-    {
-        String const* name;
-        IRInst* elementCount;
-    };
-};
-
-
-
 struct CLikeSourceEmitter::ComputeEmitActionsContext
 {
     IRInst*             moduleInst;
@@ -148,7 +109,7 @@ SlangResult CLikeSourceEmitter::init()
 // Types
 //
 
-void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
+void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
 {
     if (!declarator) return;
 
@@ -156,24 +117,57 @@ void CLikeSourceEmitter::emitDeclarator(EDeclarator* declarator)
 
     switch (declarator->flavor)
     {
-    case EDeclarator::Flavor::Name:
-        m_writer->emitName(*declarator->nameAndLoc);
-        break;
-
-    case EDeclarator::Flavor::Array:
-        emitDeclarator(declarator->next);
-        m_writer->emit("[");
-        if(auto elementCount = declarator->elementCount)
+    case DeclaratorInfo::Flavor::Name:
         {
-            emitVal(elementCount, getInfo(EmitOp::General));
+            auto nameDeclarator = (NameDeclaratorInfo*)declarator;
+            m_writer->emitName(*nameDeclarator->nameAndLoc);
         }
-        m_writer->emit("]");
         break;
 
-    case EDeclarator::Flavor::UnsizedArray:
-        emitDeclarator(declarator->next);
-        m_writer->emit("[]");
+    case DeclaratorInfo::Flavor::SizedArray:
+        {
+            auto arrayDeclarator = (SizedArrayDeclaratorInfo*)declarator;
+            emitDeclarator(arrayDeclarator->next);
+            m_writer->emit("[");
+            if(auto elementCount = arrayDeclarator->elementCount)
+            {
+                emitVal(elementCount, getInfo(EmitOp::General));
+            }
+            m_writer->emit("]");
+        }
         break;
+
+    case DeclaratorInfo::Flavor::UnsizedArray:
+        {
+            auto arrayDeclarator = (UnsizedArrayDeclaratorInfo*)declarator;
+            emitDeclarator(arrayDeclarator->next);
+            m_writer->emit("[]");
+        }
+        break;
+
+    case DeclaratorInfo::Flavor::Ptr:
+        {
+            // TODO: When there are both pointer and array declarators
+            // as part of a type, paranetheses may be needed in order
+            // to disambiguate between a pointer-to-array and an
+            // array-of-poiners.
+            //
+            auto ptrDeclarator = (PtrDeclaratorInfo*)declarator;
+            m_writer->emit("*");
+            emitDeclarator(ptrDeclarator->next);
+        }
+        break;
+
+    case DeclaratorInfo::Flavor::LiteralSizedArray:
+        {
+            auto arrayDeclarator = (LiteralSizedArrayDeclaratorInfo*)declarator;
+            emitDeclarator(arrayDeclarator->next);
+            m_writer->emit("[");
+            m_writer->emit(arrayDeclarator->elementCount);
+            m_writer->emit("]");
+        }
+        break;
+
 
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
@@ -253,26 +247,19 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     return sortedWitnessTableEntries;
 }
 
-void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, EDeclarator* declarator)
+void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, DeclaratorInfo* declarator)
 {
-    EDeclarator arrayDeclarator;
-    arrayDeclarator.flavor = EDeclarator::Flavor::Array;
-    arrayDeclarator.next = declarator;
-    arrayDeclarator.elementCount = arrayType->getElementCount();
-
+    SizedArrayDeclaratorInfo arrayDeclarator(declarator, arrayType->getElementCount());
     _emitType(arrayType->getElementType(), &arrayDeclarator);
 }
 
-void CLikeSourceEmitter::_emitUnsizedArrayType(IRUnsizedArrayType* arrayType, EDeclarator* declarator)
+void CLikeSourceEmitter::_emitUnsizedArrayType(IRUnsizedArrayType* arrayType, DeclaratorInfo* declarator)
 {
-    EDeclarator arrayDeclarator;
-    arrayDeclarator.flavor = EDeclarator::Flavor::UnsizedArray;
-    arrayDeclarator.next = declarator;
-
+    UnsizedArrayDeclaratorInfo arrayDeclarator(declarator);
     _emitType(arrayType->getElementType(), &arrayDeclarator);
 }
 
-void CLikeSourceEmitter::_emitType(IRType* type, EDeclarator* declarator)
+void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
     switch (type->getOp())
     {
@@ -327,9 +314,7 @@ void CLikeSourceEmitter::emitTypeImpl(IRType* type, const StringSliceLoc* nameAn
         // be done so before the type name appears.
         m_writer->advanceToSourceLocationIfValid(nameAndLoc->loc);
 
-        EDeclarator nameDeclarator;
-        nameDeclarator.flavor = EDeclarator::Flavor::Name;
-        nameDeclarator.nameAndLoc = nameAndLoc;
+        NameDeclaratorInfo nameDeclarator(nameAndLoc);
         _emitType(type, &nameDeclarator);
     }
     else
@@ -620,6 +605,37 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
         out.appendChar(c);
         prevChar = c;
     }
+
+    if (getSourceLanguage() == SourceLanguage::GLSL)
+    {
+        // It looks like the default glslang name limit is 1024, but let's go a little less so there is some wiggle room
+        const Index maxTokenLength = 1024 - 8;
+
+        const Index length = out.getLength();
+
+        if (length > maxTokenLength)
+        {
+            // We are going to output with a prefix and a hash of the full name
+            const HashCode64 hash = getStableHashCode64(out.getBuffer(), length);
+            // Two hex chars per byte
+            const Index hashSize = sizeof(hash) * 2; 
+
+            // Work out a size that is within range taking into account the hash size and extra chars
+            Index reducedBaseLength = maxTokenLength - hashSize - 1;
+            // If it has a trailing _ remove it.
+            // We know because of scrubbing there can only be single _
+            reducedBaseLength -= Index(out[reducedBaseLength - 1] == '_');
+
+            // Reduce the length
+            out.reduceLength(reducedBaseLength);
+            // Let's add a _ to separate from the rest of the name
+            out.appendChar('_');
+            // Append the hash in hex
+            out.append(uint64_t(hash), 16);
+
+            SLANG_ASSERT(out.getLength() <= maxTokenLength);
+        }
+    }
 }
 
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
@@ -744,32 +760,6 @@ String CLikeSourceEmitter::getName(IRInst* inst)
         m_mapInstToName.Add(inst, name);
     }
     return name;
-}
-
-void CLikeSourceEmitter::emitDeclarator(IRDeclaratorInfo* declarator)
-{
-    if(!declarator)
-        return;
-
-    switch( declarator->flavor )
-    {
-    case IRDeclaratorInfo::Flavor::Simple:
-        m_writer->emit(" ");
-        m_writer->emit(*declarator->name);
-        break;
-
-    case IRDeclaratorInfo::Flavor::Ptr:
-        m_writer->emit("*");
-        emitDeclarator(declarator->next);
-        break;
-
-    case IRDeclaratorInfo::Flavor::Array:
-        emitDeclarator(declarator->next);
-        m_writer->emit("[");
-        emitOperand(declarator->elementCount, getInfo(EmitOp::General));
-        m_writer->emit("]");
-        break;
-    }
 }
 
 void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)

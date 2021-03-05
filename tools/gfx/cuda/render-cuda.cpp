@@ -3,7 +3,9 @@
 #include "slang-com-ptr.h"
 #include "slang-com-helper.h"
 #include "core/slang-basic.h"
+#include "core/slang-blob.h"
 
+#include "../command-writer.h"
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
 #include "../slang-context.h"
@@ -954,13 +956,366 @@ private:
     int m_deviceIndex = -1;
     CUdevice m_device = 0;
     CUcontext m_context = nullptr;
-    RefPtr<CUDAPipelineState> currentPipeline = nullptr;
-    RefPtr<CUDARootShaderObject> currentRootObject = nullptr;
- public:
+
+public:
+    class CommandQueueImpl;
+
+    class CommandBufferImpl
+        : public ICommandBuffer
+        , public CommandWriter
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ICommandBuffer* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
+                return static_cast<ICommandBuffer*>(this);
+            return nullptr;
+        }
+    public:
+        virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
+            IRenderPassLayout* renderPass,
+            IFramebuffer* framebuffer,
+            IRenderCommandEncoder** outEncoder) override
+        {
+            SLANG_UNUSED(renderPass);
+            SLANG_UNUSED(framebuffer);
+            *outEncoder = nullptr;
+        }
+
+        class ComputeCommandEncoderImpl
+            : public IComputeCommandEncoder
+        {
+        public:
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
+            {
+                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                    uuid == GfxGUID::IID_IComputeCommandEncoder)
+                {
+                    *outObject = static_cast<IComputeCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
+        public:
+            CommandWriter* m_writer;
+
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
+            void init(CommandBufferImpl* cmdBuffer)
+            {
+                m_writer = cmdBuffer;
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+            {
+                m_writer->setPipelineState(state);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                bindRootShaderObject(IShaderObject* object) override
+            {
+                m_writer->bindRootShaderObject(PipelineType::Compute, object);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
+                IPipelineLayout* layout,
+                UInt index,
+                IDescriptorSet* descriptorSet) override
+            {
+                m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
+            {
+                m_writer->dispatchCompute(x, y, z);
+            }
+        };
+
+        ComputeCommandEncoderImpl m_computeCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeComputeCommands(IComputeCommandEncoder** outEncoder) override
+        {
+            m_computeCommandEncoder.init(this);
+            *outEncoder = &m_computeCommandEncoder;
+        }
+
+        class ResourceCommandEncoderImpl
+            : public IResourceCommandEncoder
+        {
+        public:
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
+            {
+                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                    uuid == GfxGUID::IID_IResourceCommandEncoder)
+                {
+                    *outObject = static_cast<IResourceCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
+            }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+
+        public:
+            CommandWriter* m_writer;
+
+            void init(CommandBufferImpl* cmdBuffer)
+            {
+                m_writer = cmdBuffer;
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
+            virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                IBufferResource* src,
+                size_t srcOffset,
+                size_t size) override
+            {
+                m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+            {
+                m_writer->uploadBufferData(dst, offset, size, data);
+            }
+        };
+
+        ResourceCommandEncoderImpl m_resourceCommandEncoder;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeResourceCommands(IResourceCommandEncoder** outEncoder) override
+        {
+            m_resourceCommandEncoder.init(this);
+            *outEncoder = &m_resourceCommandEncoder;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
+    };
+
+    class CommandQueueImpl
+        : public ICommandQueue
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ICommandQueue* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandQueue)
+                return static_cast<ICommandQueue*>(this);
+            return nullptr;
+        }
+
+    public:
+        RefPtr<CUDAPipelineState> currentPipeline;
+        RefPtr<CUDARootShaderObject> currentRootObject;
+        RefPtr<CUDARenderer> renderer;
+        CUstream stream;
+        Desc m_desc;
+    public:
+        void init(CUDARenderer* inRenderer)
+        {
+            renderer = inRenderer;
+            m_desc.type = ICommandQueue::QueueType::Graphics;
+            cuStreamCreate(&stream, 0);
+        }
+        ~CommandQueueImpl()
+        {
+            cuStreamSynchronize(stream);
+            cuStreamDestroy(stream);
+            currentPipeline = nullptr;
+            currentRootObject = nullptr;
+        }
+
+    public:
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override
+        {
+            return m_desc;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            createCommandBuffer(ICommandBuffer** outCommandBuffer) override
+        {
+            RefPtr<CommandBufferImpl> result = new CommandBufferImpl();
+            *outCommandBuffer = result.detach();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+        {
+            for (uint32_t i = 0; i < count; i++)
+            {
+                execute(static_cast<CommandBufferImpl*>(commandBuffers[i]));
+            }
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        {
+            cuStreamSynchronize(stream);
+        }
+
+    public:
+        void setPipelineState(IPipelineState* state)
+        {
+            currentPipeline = dynamic_cast<CUDAPipelineState*>(state);
+        }
+
+        Result bindRootShaderObject(PipelineType pipelineType, IShaderObject* object)
+        {
+            currentRootObject = dynamic_cast<CUDARootShaderObject*>(object);
+            if (currentRootObject)
+                return SLANG_OK;
+            return SLANG_E_INVALID_ARG;
+        }
+
+        void dispatchCompute(int x, int y, int z)
+        {
+            // Specialize the compute kernel based on the shader object bindings.
+            RefPtr<PipelineStateBase> newPipeline;
+            renderer->maybeSpecializePipeline(currentPipeline, currentRootObject, newPipeline);
+            currentPipeline = static_cast<CUDAPipelineState*>(newPipeline.Ptr());
+
+            // Find out thread group size from program reflection.
+            auto& kernelName = currentPipeline->shaderProgram->kernelName;
+            auto programLayout = static_cast<CUDAProgramLayout*>(currentRootObject->getLayout());
+            int kernelId = programLayout->getKernelIndex(kernelName.getUnownedSlice());
+            SLANG_ASSERT(kernelId != -1);
+            UInt threadGroupSize[3];
+            programLayout->getKernelThreadGroupSize(kernelId, threadGroupSize);
+
+            int sharedSizeInBytes;
+            cuFuncGetAttribute(
+                &sharedSizeInBytes,
+                CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES,
+                currentPipeline->shaderProgram->cudaKernel);
+
+            // Copy global parameter data to the `SLANG_globalParams` symbol.
+            {
+                CUdeviceptr globalParamsSymbol = 0;
+                size_t globalParamsSymbolSize = 0;
+                cuModuleGetGlobal(
+                    &globalParamsSymbol,
+                    &globalParamsSymbolSize,
+                    currentPipeline->shaderProgram->cudaModule,
+                    "SLANG_globalParams");
+
+                CUdeviceptr globalParamsCUDAData =
+                    currentRootObject->bufferResource
+                        ? (CUdeviceptr)currentRootObject->bufferResource->getBindlessHandle()
+                        : 0;
+                cudaMemcpyAsync(
+                    (void*)globalParamsSymbol,
+                    (void*)globalParamsCUDAData,
+                    globalParamsSymbolSize,
+                    cudaMemcpyDeviceToDevice,
+                    0);
+            }
+            //
+            // The argument data for the entry-point parameters are already
+            // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
+            //
+            auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
+            auto entryPointDataSize =
+                currentRootObject->entryPointObjects[kernelId]->getBufferSize();
+
+            void* extraOptions[] = {
+                CU_LAUNCH_PARAM_BUFFER_POINTER,
+                entryPointBuffer,
+                CU_LAUNCH_PARAM_BUFFER_SIZE,
+                &entryPointDataSize,
+                CU_LAUNCH_PARAM_END,
+            };
+
+            // Once we have all the decessary data extracted and/or
+            // set up, we can launch the kernel and see what happens.
+            //
+            auto cudaLaunchResult = cuLaunchKernel(
+                currentPipeline->shaderProgram->cudaKernel,
+                x,
+                y,
+                z,
+                int(threadGroupSize[0]),
+                int(threadGroupSize[1]),
+                int(threadGroupSize[2]),
+                sharedSizeInBytes,
+                stream,
+                nullptr,
+                extraOptions);
+
+            SLANG_ASSERT(cudaLaunchResult == CUDA_SUCCESS);
+        }
+
+        void copyBuffer(
+            IBufferResource* dst,
+            size_t dstOffset,
+            IBufferResource* src,
+            size_t srcOffset,
+            size_t size)
+        {
+            auto dstImpl = static_cast<MemoryCUDAResource*>(dst);
+            auto srcImpl = static_cast<MemoryCUDAResource*>(src);
+            cudaMemcpy(
+                (uint8_t*)dstImpl->m_cudaMemory + dstOffset,
+                (uint8_t*)srcImpl->m_cudaMemory + srcOffset,
+                size,
+                cudaMemcpyDefault);
+        }
+
+        void uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+        {
+            auto dstImpl = static_cast<MemoryCUDAResource*>(dst);
+            cudaMemcpy((uint8_t*)dstImpl->m_cudaMemory + offset, data, size, cudaMemcpyDefault);
+        }
+
+        void execute(CommandBufferImpl* commandBuffer)
+        {
+            for (auto& cmd : commandBuffer->m_commands)
+            {
+                switch (cmd.name)
+                {
+                case CommandName::SetPipelineState:
+                    setPipelineState(commandBuffer->getObject<IPipelineState>(cmd.operands[0]));
+                    break;
+                case CommandName::BindRootShaderObject:
+                    bindRootShaderObject(
+                        (PipelineType)cmd.operands[0],
+                        commandBuffer->getObject<IShaderObject>(cmd.operands[1]));
+                    break;
+                case CommandName::DispatchCompute:
+                    dispatchCompute(
+                        int(cmd.operands[0]), int(cmd.operands[1]), int(cmd.operands[2]));
+                    break;
+                case CommandName::CopyBuffer:
+                    copyBuffer(
+                        commandBuffer->getObject<IBufferResource>(cmd.operands[0]),
+                        cmd.operands[1],
+                        commandBuffer->getObject<IBufferResource>(cmd.operands[2]),
+                        cmd.operands[3],
+                        cmd.operands[4]);
+                    break;
+                case CommandName::UploadBufferData:
+                    uploadBufferData(
+                        commandBuffer->getObject<IBufferResource>(cmd.operands[0]),
+                        cmd.operands[1],
+                        cmd.operands[2],
+                        commandBuffer->getData<uint8_t>(cmd.operands[3]));
+                    break;
+                }
+            }
+        }
+    };
+
+public:
     ~CUDARenderer()
     {
-        currentPipeline = nullptr;
-        currentRootObject = nullptr;
         if (m_context)
         {
             cuCtxDestroy(m_context);
@@ -1470,15 +1825,6 @@ private:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        bindRootShaderObject(PipelineType pipelineType, IShaderObject* object) override
-    {
-        currentRootObject = dynamic_cast<CUDARootShaderObject*>(object);
-        if (currentRootObject)
-            return SLANG_OK;
-        return SLANG_E_INVALID_ARG;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override
     {
         // If this is a specializable program, we just keep a reference to the slang program and
@@ -1535,101 +1881,14 @@ private:
         return Result();
     }
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override
+    void* map(IBufferResource* buffer)
     {
         return dynamic_cast<MemoryCUDAResource*>(buffer)->m_cudaMemory;
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override
+    void unmap(IBufferResource* buffer)
     {
         SLANG_UNUSED(buffer);
-    }
-
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
-    {
-        currentPipeline = dynamic_cast<CUDAPipelineState*>(state);
-    }
-
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
-    {
-        // Specialize the compute kernel based on the shader object bindings.
-        maybeSpecializePipeline(currentRootObject);
-
-        // Find out thread group size from program reflection.
-        auto& kernelName = currentPipeline->shaderProgram->kernelName;
-        auto programLayout = static_cast<CUDAProgramLayout*>(currentRootObject->getLayout());
-        int kernelId = programLayout->getKernelIndex(kernelName.getUnownedSlice());
-        SLANG_ASSERT(kernelId != -1);
-        UInt threadGroupSize[3];
-        programLayout->getKernelThreadGroupSize(kernelId, threadGroupSize);
-
-        int sharedSizeInBytes;
-        cuFuncGetAttribute(
-            &sharedSizeInBytes,
-            CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES,
-            currentPipeline->shaderProgram->cudaKernel);
-
-        // Copy global parameter data to the `SLANG_globalParams` symbol.
-        {
-            CUdeviceptr globalParamsSymbol = 0;
-            size_t globalParamsSymbolSize = 0;
-            cuModuleGetGlobal(
-                &globalParamsSymbol,
-                &globalParamsSymbolSize,
-                currentPipeline->shaderProgram->cudaModule,
-                "SLANG_globalParams");
-
-            CUdeviceptr globalParamsCUDAData =
-                currentRootObject->bufferResource
-                    ? (CUdeviceptr)currentRootObject->bufferResource->getBindlessHandle()
-                    : 0;
-            cudaMemcpyAsync(
-                (void*)globalParamsSymbol,
-                (void*)globalParamsCUDAData,
-                globalParamsSymbolSize,
-                cudaMemcpyDeviceToDevice,
-                0);
-        }
-        //
-        // The argument data for the entry-point parameters are already
-        // stored in host memory in a CUDAEntryPointShaderObject, as expected by cuLaunchKernel.
-        //
-        auto entryPointBuffer = currentRootObject->entryPointObjects[kernelId]->getBuffer();
-        auto entryPointDataSize = currentRootObject->entryPointObjects[kernelId]->getBufferSize();
-        
-        void* extraOptions[] = {
-            CU_LAUNCH_PARAM_BUFFER_POINTER,
-            entryPointBuffer,
-            CU_LAUNCH_PARAM_BUFFER_SIZE,
-            &entryPointDataSize,
-            CU_LAUNCH_PARAM_END,
-        };
-
-        // Once we have all the decessary data extracted and/or
-        // set up, we can launch the kernel and see what happens.
-        //
-        auto cudaLaunchResult = cuLaunchKernel(
-            currentPipeline->shaderProgram->cudaKernel,
-            x,
-            y,
-            z,
-            int(threadGroupSize[0]),
-            int(threadGroupSize[1]),
-            int(threadGroupSize[2]),
-            sharedSizeInBytes,
-            0,
-            nullptr,
-            extraOptions);
-
-        SLANG_ASSERT(cudaLaunchResult == CUDA_SUCCESS);
-    }
-
-    virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override {}
-
-    virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override
-    {
-        auto result = cudaDeviceSynchronize();
-        SLANG_ASSERT(result == CUDA_SUCCESS);
     }
 
     virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
@@ -1637,23 +1896,14 @@ private:
         return RendererType::CUDA;
     }
 
-    virtual PipelineStateBase* getCurrentPipeline() override
-    {
-        return currentPipeline;
-    }
-
 public:
-    virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override
     {
-        SLANG_UNUSED(color);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        makeSwapchainImagePresentable(ISwapchain* swapchain) override
-    {
-        SLANG_UNUSED(swapchain);
+        RefPtr<CommandQueueImpl> queue = new CommandQueueImpl();
+        queue->init(this);
+        *outQueue = queue.detach();
+        return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override
@@ -1677,9 +1927,13 @@ public:
         SLANG_UNUSED(outFramebuffer);
         return SLANG_FAIL;
     }
-    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRenderPassLayout(
+        const IRenderPassLayout::Desc& desc,
+        IRenderPassLayout** outRenderPassLayout) override
     {
-        SLANG_UNUSED(frameBuffer);
+        SLANG_UNUSED(desc);
+        SLANG_UNUSED(outRenderPassLayout);
+        return SLANG_FAIL;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override
@@ -1699,6 +1953,7 @@ public:
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
         const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override
     {
@@ -1706,6 +1961,7 @@ public:
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override
     {
@@ -1713,6 +1969,7 @@ public:
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flags, IDescriptorSet** outDescriptorSet) override
     {
@@ -1721,6 +1978,7 @@ public:
         SLANG_UNUSED(outDescriptorSet);
         return SLANG_E_NOT_AVAILABLE;
     }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc, IPipelineState** outState) override
     {
@@ -1728,8 +1986,13 @@ public:
         SLANG_UNUSED(outState);
         return SLANG_E_NOT_AVAILABLE;
     }
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
-        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override
+        ITextureResource* texture,
+        ResourceState state,
+        ISlangBlob** outBlob,
+        size_t* outRowPitch,
+        size_t* outPixelSize) override
     {
         SLANG_UNUSED(texture);
         SLANG_UNUSED(outBlob);
@@ -1738,65 +2001,23 @@ public:
 
         return SLANG_E_NOT_AVAILABLE;
     }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPrimitiveTopology(PrimitiveTopology topology) override
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL readBufferResource(
+        IBufferResource* buffer,
+        size_t offset,
+        size_t size,
+        ISlangBlob** outBlob) override
     {
-        SLANG_UNUSED(topology);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) override
-    {
-        SLANG_UNUSED(pipelineType);
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(index);
-        SLANG_UNUSED(descriptorSet);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
-        IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) override
-    {
-        SLANG_UNUSED(startSlot);
-        SLANG_UNUSED(slotCount);
-        SLANG_UNUSED(buffers);
-        SLANG_UNUSED(strides);
-        SLANG_UNUSED(offsets);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset = 0) override
-    {
-        SLANG_UNUSED(buffer);
-        SLANG_UNUSED(indexFormat);
-        SLANG_UNUSED(offset);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setViewports(UInt count, Viewport const* viewports) override
-    {
-        SLANG_UNUSED(count);
-        SLANG_UNUSED(viewports);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setScissorRects(UInt count, ScissorRect const* rects) override
-    {
-        SLANG_UNUSED(count);
-        SLANG_UNUSED(rects);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override
-    {
-        SLANG_UNUSED(vertexCount);
-        SLANG_UNUSED(startVertex);
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override
-    {
-        SLANG_UNUSED(indexCount);
-        SLANG_UNUSED(startIndex);
-        SLANG_UNUSED(baseVertex);
+        auto bufferImpl = static_cast<MemoryCUDAResource*>(buffer);
+        RefPtr<ListBlob> blob = new ListBlob();
+        blob->m_data.setCount((Index)size);
+        cudaMemcpy(
+            blob->m_data.getBuffer(),
+            (uint8_t*)bufferImpl->m_cudaMemory + offset,
+            size,
+            cudaMemcpyDefault);
+        *outBlob = blob.detach();
+        return SLANG_OK;
     }
 };
 

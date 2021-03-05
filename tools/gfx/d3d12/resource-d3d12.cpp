@@ -60,13 +60,15 @@ void D3D12BarrierSubmitter::transition(ID3D12Resource* resource, D3D12_RESOURCE_
 	return resource ? D3DUtil::calcFormat(usage, resource->GetDesc().Format) : DXGI_FORMAT_UNKNOWN;
 }
 
-void D3D12ResourceBase::transition(D3D12_RESOURCE_STATES nextState, D3D12BarrierSubmitter& submitter)
+void D3D12ResourceBase::transition(
+    D3D12_RESOURCE_STATES oldState,
+    D3D12_RESOURCE_STATES nextState,
+    D3D12BarrierSubmitter& submitter)
 {
 	// Transition only if there is a resource
-	if (m_resource)
+    if (m_resource && oldState != nextState)
 	{
-        submitter.transition(m_resource, m_state, nextState);
-        m_state = nextState;
+        submitter.transition(m_resource, oldState, nextState);
     }
 }
 
@@ -155,7 +157,7 @@ void D3D12Resource::setDebugName(const wchar_t* name)
 	}
 }
 
-void D3D12Resource::setResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES initialState)
+void D3D12Resource::setResource(ID3D12Resource* resource)
 {
 	if (resource != m_resource)
 	{
@@ -169,8 +171,6 @@ void D3D12Resource::setResource(ID3D12Resource* resource, D3D12_RESOURCE_STATES 
 		}
 		m_resource = resource;
 	}
-	m_prevState = initialState;
-	m_state = initialState;
 }
 
 void D3D12Resource::setResourceNull()
@@ -187,7 +187,7 @@ Result D3D12Resource::initCommitted(ID3D12Device* device, const D3D12_HEAP_PROPE
 	setResourceNull();
 	ComPtr<ID3D12Resource> resource;
 	SLANG_RETURN_ON_FAIL(device->CreateCommittedResource(&heapProps, heapFlags, &resourceDesc, initState, clearValue, IID_PPV_ARGS(resource.writeRef())));
-	setResource(resource, initState);
+	setResource(resource);
 	return SLANG_OK;
 }
 
@@ -203,12 +203,6 @@ void D3D12Resource::swap(ComPtr<ID3D12Resource>& resourceInOut)
 	ID3D12Resource* tmp = m_resource;
 	m_resource = resourceInOut.detach();
 	resourceInOut.attach(tmp);
-}
-
-void D3D12Resource::setState(D3D12_RESOURCE_STATES state)
-{
-	m_prevState = state;
-	m_state = state;
 }
 
 } // renderer_test
