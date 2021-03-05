@@ -4,6 +4,7 @@
 #include "../core/slang-string-util.h"
 
 #include "slang-ast-builder.h"
+#include "slang-lookup.h"
 
 namespace Slang {
 
@@ -458,12 +459,24 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
     }
 
     {
-        List<Decl*> methods;
-        _getDeclsOfType<CallableDecl>(aggTypeDecl, methods);
-        if (methods.getCount())
+        // Make sure we've got a query-able member dictionary
+        buildMemberDictionary(aggTypeDecl);
+        SLANG_ASSERT(aggTypeDecl->isMemberDictionaryValid());
+
+        List<Decl*> uniqueMethods;
+        for (const auto pair : aggTypeDecl->memberDictionary)
+        {
+            CallableDecl* callableDecl = as<CallableDecl>(pair.Value);
+            if (callableDecl)
+            {
+                uniqueMethods.add(callableDecl);
+            }
+        }
+
+        if (uniqueMethods.getCount())
         {
             out << "## Methods\n\n";
-            _appendAsBullets(methods);
+            _appendAsBullets(uniqueMethods);
         }
     }
 

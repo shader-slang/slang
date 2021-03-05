@@ -190,6 +190,29 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
 
             {
                 ScopePart scopePart(this, Part::Type::ParamType);
+
+                // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
+                // but seems more appropriate to put in the Type Part
+
+                if (paramDecl->hasModifier<InOutModifier>())
+                {
+                    sb << toSlice("inout ");
+                }
+                else if (paramDecl->hasModifier<OutModifier>())
+                {
+                    sb << toSlice("out ");
+                }
+                else if (paramDecl->hasModifier<InModifier>())
+                {
+                    sb << toSlice("in ");
+                }
+
+                // And this to params/variables (not the type)
+                if (paramDecl->hasModifier<ConstModifier>())
+                {
+                    sb << toSlice("const ");
+                }
+
                 addType(getType(m_astBuilder, paramDeclRef));
             }
 

@@ -1,5 +1,10 @@
 //TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
 
+void outFunc(out int v)
+{
+    v = 10;
+}
+
 /// Testing out nested generics
 struct ParentStruct<T> ///< Some type
 {
