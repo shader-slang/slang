@@ -853,7 +853,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 if (SLANG_SUCCEEDED(spawnAndWaitSharedLibrary(context, "device-startup", cmdLine, exeRes))
                     && TestToolUtil::getReturnCodeFromInt(exeRes.resultCode) == ToolReturnCode::Success)
                 {
-                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);   
+                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
                 }
             }
         }

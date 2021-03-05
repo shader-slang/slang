@@ -1,3 +1,9 @@
+// This example is out of date and currently disabled from build.
+// The `gfx` layer has been refactored with a new shader-object model
+// that will greatly simplify shader binding and specialization.
+// This example should be updated to use the shader-object API in `gfx`.
+
+#if 0
 // main.cpp
 
 //
@@ -2214,7 +2220,6 @@ Result initialize()
 //
 void renderFrame()
 {
-    gRenderer->beginFrame();
     gui->beginFrame();
 
     // In order to see that things are rendering properly we need some
@@ -2402,10 +2407,6 @@ void renderFrame()
 
     ImGui::End();
 
-    gui->endFrame();
-
-    gRenderer->makeSwapchainImagePresentable(gSwapchain);
-    gRenderer->endFrame();
     gSwapchain->present();
 
 }
@@ -2441,3 +2442,5 @@ void innerMain(ApplicationContext* context)
     app.finalize();
 }
 GFX_UI_MAIN(innerMain)
+
+#endif

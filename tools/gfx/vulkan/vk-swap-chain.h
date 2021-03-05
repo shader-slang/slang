@@ -57,7 +57,12 @@ struct VulkanSwapChain
     };
 
         /// Must be called before the swap chain can be used
-    SlangResult init(VulkanDeviceQueue* deviceQueue, const Desc& desc, const PlatformDesc* platformDesc);
+    SlangResult init(
+        VulkanApi* vkapi,
+        VkQueue queue,
+        uint32_t queueFamilyIndex,
+        const Desc& desc,
+        const PlatformDesc* platformDesc);
 
         /// Returned the desc used to construct the swap chain.
         /// Is invalid if init hasn't returned with successful result.
@@ -67,7 +72,7 @@ struct VulkanSwapChain
     bool hasValidSwapChain() const { return m_images.getCount() > 0; }
 
         /// Present to the display
-    void present(bool vsync);
+    void present(VkSemaphore waitSemaphore);
 
         /// Get the current size of the window (in pixels written to widthOut, heightOut)
     void getWindowSize(int* widthOut, int* heightOut) const;
@@ -84,7 +89,7 @@ struct VulkanSwapChain
     const Slang::List<VkImage>& getImages() const { return m_images; }
 
         /// Get the next front render image index. Returns -1, if image couldn't be found
-    int nextFrontImageIndex();
+    int nextFrontImageIndex(VkSemaphore signalSemaphore);
 
     void destroy();
 
@@ -120,7 +125,7 @@ struct VulkanSwapChain
 
     Slang::List<VkImage> m_images;
 
-    VulkanDeviceQueue* m_deviceQueue = nullptr;
+    VkQueue m_queue;
     const VulkanApi* m_api = nullptr;
 
     Desc m_desc;                                            ///< The desc used to init this swap chain

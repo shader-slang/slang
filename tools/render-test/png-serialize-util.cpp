@@ -12,25 +12,14 @@
 namespace renderer_test {
 using namespace Slang;
 
-/* static */Slang::Result PngSerializeUtil::write(const char* filename, const Surface& surface)
+/* static */ Slang::Result PngSerializeUtil::write(
+    const char* filename,
+    ISlangBlob* pixels,
+    uint32_t width,
+    uint32_t height)
 {
-    int numComps = 0;
-    switch (surface.m_format)
-    {
-        case Format::RGBA_Unorm_UInt8:
-        {
-            numComps = 4;
-            break;
-        }
-        default: break;
-    }
-
-    if (numComps <= 0)
-    {
-        return SLANG_FAIL;
-    }
-
-    int stbResult = stbi_write_png(filename, surface.m_width, surface.m_height, numComps, surface.m_data, surface.m_rowStrideInBytes);
+    int stbResult =
+        stbi_write_png(filename, width, height, 4, pixels->getBufferPointer(), width * 4);
 
     return stbResult ? SLANG_OK : SLANG_FAIL;
 }

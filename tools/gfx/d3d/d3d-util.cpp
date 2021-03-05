@@ -1,8 +1,8 @@
 // d3d-util.cpp
 #include "d3d-util.h"
 
+#include <d3d12.h>
 #include <d3dcompiler.h>
-
 #include <dxgi1_4.h>
 
 // We will use the C standard library just for printing error messages.
@@ -26,6 +26,84 @@ using namespace Slang;
     return D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
 }
 
+D3D12_PRIMITIVE_TOPOLOGY_TYPE D3DUtil::getPrimitiveType(PrimitiveType type)
+{
+    switch (type)
+    {
+    case PrimitiveType::Point:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    case PrimitiveType::Line:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    case PrimitiveType::Triangle:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    case PrimitiveType::Patch:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    default:
+        break;
+    }
+    return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+}
+
+D3D12_COMPARISON_FUNC D3DUtil::getComparisonFunc(ComparisonFunc func)
+{
+    switch (func)
+    {
+    case gfx::ComparisonFunc::Never:
+        return D3D12_COMPARISON_FUNC_NEVER;
+    case gfx::ComparisonFunc::Less:
+        return D3D12_COMPARISON_FUNC_LESS;
+    case gfx::ComparisonFunc::Equal:
+        return D3D12_COMPARISON_FUNC_EQUAL;
+    case gfx::ComparisonFunc::LessEqual:
+        return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    case gfx::ComparisonFunc::Greater:
+        return D3D12_COMPARISON_FUNC_GREATER;
+    case gfx::ComparisonFunc::NotEqual:
+        return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+    case gfx::ComparisonFunc::GreaterEqual:
+        return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+    case gfx::ComparisonFunc::Always:
+        return D3D12_COMPARISON_FUNC_ALWAYS;
+    default:
+        return D3D12_COMPARISON_FUNC_NEVER;
+    }
+}
+
+static D3D12_STENCIL_OP translateStencilOp(StencilOp op)
+{
+    switch (op)
+    {
+    case gfx::StencilOp::Keep:
+        return D3D12_STENCIL_OP_KEEP;
+    case gfx::StencilOp::Zero:
+        return D3D12_STENCIL_OP_ZERO;
+    case gfx::StencilOp::Replace:
+        return D3D12_STENCIL_OP_REPLACE;
+    case gfx::StencilOp::IncrementSaturate:
+        return D3D12_STENCIL_OP_INCR_SAT;
+    case gfx::StencilOp::DecrementSaturate:
+        return D3D12_STENCIL_OP_DECR_SAT;
+    case gfx::StencilOp::Invert:
+        return D3D12_STENCIL_OP_INVERT;
+    case gfx::StencilOp::IncrementWrap:
+        return D3D12_STENCIL_OP_INCR;
+    case gfx::StencilOp::DecrementWrap:
+        return D3D12_STENCIL_OP_DECR;
+    default:
+        return D3D12_STENCIL_OP_KEEP;
+    }
+}
+
+D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc desc)
+{
+    D3D12_DEPTH_STENCILOP_DESC rs;
+    rs.StencilDepthFailOp = translateStencilOp(desc.stencilDepthFailOp);
+    rs.StencilFailOp = translateStencilOp(desc.stencilFailOp);
+    rs.StencilFunc = getComparisonFunc(desc.stencilFunc);
+    rs.StencilPassOp = translateStencilOp(desc.stencilPassOp);
+    return rs;
+}
+
 /* static */DXGI_FORMAT D3DUtil::getMapFormat(Format format)
 {
     switch (format)
@@ -46,6 +124,40 @@ using namespace Slang;
         default:                            return DXGI_FORMAT_UNKNOWN;
     }
 }
+
+D3D12_RESOURCE_STATES D3DUtil::translateResourceState(ResourceState state)
+{
+    switch (state)
+    {
+    case gfx::ResourceState::Undefined:
+        return D3D12_RESOURCE_STATE_COMMON;
+    case gfx::ResourceState::ShaderResource:
+        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    case gfx::ResourceState::UnorderedAccess:
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    case gfx::ResourceState::RenderTarget:
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    case gfx::ResourceState::DepthRead:
+        return D3D12_RESOURCE_STATE_DEPTH_READ;
+    case gfx::ResourceState::DepthWrite:
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    case gfx::ResourceState::Present:
+        return D3D12_RESOURCE_STATE_PRESENT;
+    case gfx::ResourceState::CopySource:
+        return D3D12_RESOURCE_STATE_COPY_SOURCE;
+    case gfx::ResourceState::CopyDestination:
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case gfx::ResourceState::ResolveSource:
+        return D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+    case gfx::ResourceState::ResolveDestination:
+        return D3D12_RESOURCE_STATE_RESOLVE_DEST;
+    default:
+        return D3D12_RESOURCE_STATE_COMMON;
+    }
+}
+
 
 /* static */DXGI_FORMAT D3DUtil::calcResourceFormat(UsageType usage, Int usageFlags, DXGI_FORMAT format)
 {
