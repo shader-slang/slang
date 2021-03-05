@@ -75,7 +75,20 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
     if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
     {
         _addDeclPathRec(aggTypeDeclRef);
-        sb << ".";
+        sb << toSlice(".");
+    }
+    else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
+    {
+        _addDeclPathRec(namespaceDeclRef);
+        // Hmm, it could be argued that we follow the . as seen in AggType as is followed in some other languages
+        // like Java.
+        // That it is useful to have a distinction between something that is a member/method and something that is
+        // in a scope (such as a namespace), and is something that has returned to later languages probably for that
+        // reason (Slang accepts . or ::). So for now this is follows the :: convention.
+        //
+        // It could be argued them that the previous '.' use should vary depending on that distinction.
+        
+        sb << toSlice("::");
     }
 
     _addDeclName(declRef.getDecl());
