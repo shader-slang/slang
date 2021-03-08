@@ -324,6 +324,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             name = "gl_SampleMask[0]";
         }
     }
+    else if(semanticName == "sv_innercoverage")
+    {
+        // uint in hlsl, bool in glsl
+        // https://www.khronos.org/registry/OpenGL/extensions/NV/NV_conservative_raster_underestimation.txt
+
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_conservative_raster_underestimation"));
+
+        name = "gl_FragFullyCoveredNV";
+        requiredType = builder->getBasicType(BaseType::Bool);
+    }
     else if(semanticName == "sv_depth")
     {
         // Float in hlsl & glsl
