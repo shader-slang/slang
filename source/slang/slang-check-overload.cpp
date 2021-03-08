@@ -1051,19 +1051,19 @@ namespace Slang
             Index argCount = context.getArgCount();
             Index paramCount = params.getCount();
 
-            // Bail out on mismatch.
-            // TODO(tfoley): need more nuance here
-            if (argCount != paramCount)
+            // If there are too many arguments, we cannot possibly have a match.
+            //
+            // Note that if there are *too few* arguments, we might still have
+            // a match, because the other arguments might have default values
+            // that can be used.
+            //
+            if (argCount > paramCount)
             {
                 return DeclRef<Decl>(nullptr, nullptr);
             }
 
             for (Index aa = 0; aa < argCount; ++aa)
             {
-#if 0
-                if (!TryUnifyArgAndParamTypes(constraints, args[aa], params[aa]))
-                    return DeclRef<Decl>(nullptr, nullptr);
-#else
                 // The question here is whether failure to "unify" an argument
                 // and parameter should lead to immediate failure.
                 //
@@ -1083,7 +1083,6 @@ namespace Slang
                 // unification step should be taken as an immediate failure...
 
                 TryUnifyTypes(constraints, context.getArgTypeForInference(aa, this), getType(m_astBuilder, params[aa]));
-#endif
             }
         }
         else
