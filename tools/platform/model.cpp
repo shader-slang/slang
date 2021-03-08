@@ -231,7 +231,7 @@ Result ModelLoader::load(
 
     if(!diagnostics.empty())
     {
-        log("%s", diagnostics.c_str());
+        printf("%s", diagnostics.c_str());
     }
     if(!success)
     {

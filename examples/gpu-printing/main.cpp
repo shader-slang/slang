@@ -6,7 +6,7 @@
 using Slang::ComPtr;
 
 #include "slang-gfx.h"
-#include "tools/graphics-app-framework/window.h"
+#include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
 using namespace gfx;
 
@@ -44,7 +44,7 @@ ComPtr<slang::IModule> compileShaderModuleFromFile(slang::ISession* slangSession
     const SlangResult compileRes = spCompile(slangRequest);
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        reportError("%s", diagnostics);
+        printf("%s", diagnostics);
     }
 
     if(SLANG_FAILED(compileRes))
@@ -63,7 +63,6 @@ struct ExampleProgram
 int gWindowWidth = 640;
 int gWindowHeight = 480;
 
-gfx::ApplicationContext*    gAppContext;
 ComPtr<gfx::IRenderer>      gRenderer;
 
 ComPtr<slang::ISession> gSlangSession;
@@ -151,8 +150,6 @@ Result execute()
     auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
-//    descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);
-
     gDescriptorSet = descriptorSet;
 
     ComputePipelineStateDesc desc;
@@ -201,21 +198,12 @@ Result execute()
 
 };
 
-// This "inner" main function is used by the platform abstraction
-// layer to deal with differences in how an entry point needs
-// to be defined for different platforms.
-//
-void innerMain(ApplicationContext* context)
+int main()
 {
     ExampleProgram app;
-
     if (SLANG_FAILED(app.execute()))
     {
-        return exitApplication(context, 1);
+        return -1;
     }
+    return 0;
 }
-
-// This macro instantiates an appropriate main function to
-// invoke the `innerMain` above.
-//
-GFX_CONSOLE_MAIN(innerMain)

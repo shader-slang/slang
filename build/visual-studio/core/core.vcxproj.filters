@@ -54,6 +54,9 @@
     <ClInclude Include="..\..\..\source\core\slang-free-list.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-func-ptr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-gcc-compiler-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>

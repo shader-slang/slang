@@ -47,7 +47,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx", "build\visual-studio\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx-util", "build\visual-studio\gfx-util\gfx-util.vcxproj", "{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "graphics-app-framework", "build\visual-studio\graphics-app-framework\graphics-app-framework.vcxproj", "{3565FE5E-4FA3-11EB-AE93-0242AC130002}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "platform", "build\visual-studio\platform\platform.vcxproj", "{3565FE5E-4FA3-11EB-AE93-0242AC130002}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-cpp-extractor", "build\visual-studio\slang-cpp-extractor\slang-cpp-extractor.vcxproj", "{CA8A30D1-8FA9-4330-B7F7-84709246D8DC}"
 EndProject

@@ -181,7 +181,7 @@
     <ProjectReference Include="..\gfx-util\gfx-util.vcxproj">
       <Project>{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\graphics-app-framework\graphics-app-framework.vcxproj">
+    <ProjectReference Include="..\platform\platform.vcxproj">
       <Project>{3565FE5E-4FA3-11EB-AE93-0242AC130002}</Project>
     </ProjectReference>
   </ItemGroup>
