@@ -95,6 +95,7 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
         CASE(430);
         CASE(440);
         CASE(450);
+        CASE(460);
 
 #undef CASE
     }
@@ -916,6 +917,45 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(IRFunc* irFunc, IREntryPoin
     }
 }
 
+void GLSLSourceEmitter::_emitGLSLPerVertexVaryingFragmentInput(IRGlobalParam* param, IRType* type)
+{
+    // Note: The logic here is almost identical to the default
+    // emit logic for global shader parameters. The main difference
+    // is that we emit a parameter of type `X` as an array of
+    // type `X[3]` to account for the per-vertex-ness of the
+    // parameter.
+    //
+
+        // Need to emit appropriate modifiers here.
+
+    // We expect/require all shader parameters to
+    // have some kind of layout information associated with them.
+    //
+    auto layout = getVarLayout(param);
+    SLANG_ASSERT(layout);
+
+    emitVarModifiers(layout, param, type);
+
+    emitRateQualifiers(param);
+
+    auto name = getName(param);
+    StringSliceLoc nameAndLoc(name.getUnownedSlice());
+    NameDeclaratorInfo nameDeclarator(&nameAndLoc);
+
+    LiteralSizedArrayDeclaratorInfo arrayDeclarator(&nameDeclarator, 3);
+
+    // Note: We are invoking `_emitType` here directly because there
+    // is no overload of `emitType` that works with a declarator.
+    //
+    _emitType(type, &arrayDeclarator);
+
+    emitSemantics(param);
+
+    emitLayoutSemantics(param);
+
+    m_writer->emit(";\n\n");
+}
+
 bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType)
 {
     // There are a number of types that are (or can be)
@@ -992,6 +1032,21 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         if (isResourceType(unwrapArray(varType)))
         {
             _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_EXT_nonuniform_qualifier"));
+        }
+    }
+
+    // A varying fragment input parameter with the `pervertex` modifier
+    // needs to be emitted as an array.
+    //
+    if( auto interpolationModeDecor = varDecl->findDecoration<IRInterpolationModeDecoration>() )
+    {
+        if( interpolationModeDecor->getMode() == IRInterpolationMode::PerVertex )
+        {
+            if( m_entryPointStage == Stage::Fragment )
+            {
+                _emitGLSLPerVertexVaryingFragmentInput(varDecl, varType);
+                return true;
+            }
         }
     }
 
@@ -1747,14 +1802,46 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                _requireRayTracing();
-
+                // Note: We have the problem here that we want to do `_requireRayTracing()`,
+                // but just based on the use of a ray-tracing acceleration structure we
+                // cannot know which extension the user means to use. The current options are:
+                //
+                //  * GL_NV_ray_tracing
+                //  * GL_EXT_ray_tracing
+                //  * GL_EXT_ray_query
+                //
+                // The first two options there are basically equivalent extensions with
+                // different GLSL syntax. We end up requiring the user to opt in to
+                // `GL_NV_ray_tracing` using target capabilities, and will always default
+                // to `GL_EXT_ray_tracing` otherwise.
+                //
                 if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
                 {
+                    // If the user has explicitly opted in to `GL_NV_ray_tracing`,
+                    // then we don't need to explicitly request the extentsion again.
+                    // We know that the acceleration structure type will translate
+                    // to the one from that extension:
+                    //
                     m_writer->emit("accelerationStructureNV");
                 }
                 else
                 {
+                    // If the user does *not* opt into a specific extension, then we
+                    // have the problem that either `GL_EXT_ray_tracing` or `GL_EXT_ray-query`
+                    // could provide the `accelerationSturctureEXT` type, but there
+                    // can be drivers that provide only one and not the other.
+                    //
+                    // Because we can't pick one upon just seeing the type, we need to
+                    // emit the type here but *not* call `_requireRayTracing()` or
+                    // anything like it, because we don't yet know the specific extension
+                    // we should ask for.
+                    //
+                    // TODO: We might eventually want to have this step set a flag that
+                    // will cause a compilation error if nothing else in the code requires
+                    // a specific concrete ray-tracing extension. Ideally all of these
+                    // details could be subusmed under the capability system sooner or
+                    // later.
+                    // 
                     m_writer->emit("accelerationStructureEXT");
                 }
                 break;
@@ -1770,6 +1857,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 break;
         }
 
+        return;
+    }
+
+    auto decorated = getResolvedInstForDecorations(type);
+    if(auto targetIntrinsicDecor = findBestTargetIntrinsicDecoration(decorated))
+    {
+        m_writer->emit(targetIntrinsicDecor->getDefinition());
         return;
     }
 
@@ -1789,7 +1883,7 @@ void GLSLSourceEmitter::emitRateQualifiersImpl(IRRate* rate)
     }
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
+static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode, Stage stage, bool isInput)
 {
     switch (mode)
     {
@@ -1798,6 +1892,17 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
         case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("smooth");
         case IRInterpolationMode::Sample:               return UnownedStringSlice::fromLiteral("sample");
         case IRInterpolationMode::Centroid:             return UnownedStringSlice::fromLiteral("centroid");
+
+        case IRInterpolationMode::PerVertex:
+            if( stage == Stage::Fragment )
+            {
+                if( isInput )
+                {
+                    return UnownedStringSlice::fromLiteral("pervertexNV");
+                }
+            }
+            return UnownedStringSlice::fromLiteral("flat");
+
         default:                                        return UnownedStringSlice();
     }
 }
@@ -1806,19 +1911,39 @@ void GLSLSourceEmitter::emitInterpolationModifiersImpl(IRInst* varInst, IRType* 
 {
     bool anyModifiers = false;
 
+    auto stage = layout->getStage();
+    auto isInput = layout->findOffsetAttr(LayoutResourceKind::VaryingInput) != nullptr;
+
     for (auto dd : varInst->getDecorations())
     {
         if (dd->getOp() != kIROp_InterpolationModeDecoration)
             continue;
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
-        const UnownedStringSlice slice = _getInterpolationModifierText(decoration->getMode());
+        const UnownedStringSlice slice = _getInterpolationModifierText(decoration->getMode(), stage, isInput);
 
         if (slice.getLength())
         {
             m_writer->emit(slice);
             m_writer->emitChar(' ');
             anyModifiers = true;
+        }
+
+        switch( decoration->getMode() )
+        {
+        default:
+            break;
+
+        case IRInterpolationMode::PerVertex:
+            if( stage == Stage::Fragment )
+            {
+                if( isInput )
+                {
+                    _requireGLSLVersion(ProfileVersion::GLSL_450);
+                    _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_fragment_shader_barycentric"));
+                }
+            }
+            break;
         }
     }
 

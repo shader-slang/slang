@@ -525,7 +525,7 @@ function example(name)
     -- and the `gfx` abstraction layer (which in turn
     -- depends on the `core` library). We specify all of that here,
     -- rather than in each example.
-    links { "slang", "core", "gfx", "gfx-util", "graphics-app-framework" }
+    links { "slang", "core", "gfx", "gfx-util", "platform" }
 end
 
 --
@@ -567,11 +567,6 @@ if isTargetWindows then
     --
 
     -- Let's go ahead and set up the projects for our other example now.
-    example "model-viewer"
-
-    example "heterogeneous-hello-world"
-        kind "ConsoleApp"
-
     example "gpu-printing"
         kind "ConsoleApp"
 
@@ -700,8 +695,8 @@ toolSharedLibrary "slang-reflection-test"
 toolSharedLibrary "render-test"
     uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
     
-    includedirs { ".", "external", "source", "tools/gfx", "tools/graphics-app-framework" }
-    links { "core", "slang", "gfx", "gfx-util", "graphics-app-framework" }
+    includedirs { ".", "external", "source", "tools/gfx", "tools/platform" }
+    links { "core", "slang", "gfx", "gfx-util", "platform" }
    
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
@@ -829,21 +824,21 @@ tool "gfx-util"
 
     addSourceDir "tools/gfx-util"
 --
--- `graphics-app-framework` contains all the utils for a simple graphics application.
+-- `platform` contains all the platform abstractions for a GUI application.
 --
-tool "graphics-app-framework" 
+tool "platform" 
     uuid "3565fe5e-4fa3-11eb-ae93-0242ac130002"
     kind "StaticLib"
     pic "On"
     
     includedirs { ".", "external", "source", "external/imgui", "tools/gfx" }
 
-    addSourceDir "tools/graphics-app-framework"
-
+    addSourceDir "tools/platform"
+    addSourceDir "tools/platform/linux"
+    addSourceDir "tools/platform/windows"
     -- Include windowing support on Windows.
     if isTargetWindows then
         systemversion "10.0.14393.0"
-        addSourceDir "tools/graphics-app-framework/windows"
     end
 
 --

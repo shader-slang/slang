@@ -324,6 +324,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             name = "gl_SampleMask[0]";
         }
     }
+    else if(semanticName == "sv_innercoverage")
+    {
+        // uint in hlsl, bool in glsl
+        // https://www.khronos.org/registry/OpenGL/extensions/NV/NV_conservative_raster_underestimation.txt
+
+        context->requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_NV_conservative_raster_underestimation"));
+
+        name = "gl_FragFullyCoveredNV";
+        requiredType = builder->getBasicType(BaseType::Bool);
+    }
     else if(semanticName == "sv_depth")
     {
         // Float in hlsl & glsl
@@ -609,7 +619,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     Stage                       stage,
     UInt                        bindingIndex,
     UInt                        bindingSpace,
-    GlobalVaryingDeclarator*    declarator)
+    GlobalVaryingDeclarator*    declarator,
+    IRInst*                     leafVar)
 {
     // Check if we have a system value on our hands.
     GLSLSystemValueInfo systemValueInfoStorage;
@@ -685,6 +696,14 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
+    if( leafVar )
+    {
+        if( auto interpolationModeDecor = leafVar->findDecoration<IRInterpolationModeDecoration>() )
+        {
+            builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
+        }
+    }
+
     ScalarizedVal val = isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
 
     if( systemValueInfo )
@@ -729,7 +748,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     Stage                       stage,
     UInt                        bindingIndex,
     UInt                        bindingSpace,
-    GlobalVaryingDeclarator*    declarator)
+    GlobalVaryingDeclarator*    declarator,
+    IRInst*                     leafVar)
 {
     if (as<IRVoidType>(type))
     {
@@ -739,20 +759,20 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     {
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( as<IRVectorType>(type) )
     {
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( as<IRMatrixType>(type) )
     {
         // TODO: a matrix-type varying should probably be handled like an array of rows
         return createSimpleGLSLGlobalVarying(
             context,
-            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
+            builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
     }
     else if( auto arrayType = as<IRArrayType>(type) )
     {
@@ -779,7 +799,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             stage,
             bindingIndex,
             bindingSpace,
-            &arrayDeclarator);
+            &arrayDeclarator,
+            leafVar);
     }
     else if( auto streamType = as<IRHLSLStreamOutputType>(type))
     {
@@ -798,7 +819,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
             stage,
             bindingIndex,
             bindingSpace,
-            declarator);
+            declarator,
+            leafVar);
     }
     else if(auto structType = as<IRStructType>(type))
     {
@@ -849,7 +871,8 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 stage,
                 fieldBindingIndex,
                 fieldBindingSpace,
-                declarator);
+                declarator,
+                field->getKey());
             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
             {
                 ScalarizedTupleValImpl::Element element;
@@ -866,7 +889,7 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
     // Default case is to fall back on the simple behavior
     return createSimpleGLSLGlobalVarying(
         context,
-        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator);
+        builder, type, varLayout, typeLayout, kind, stage, bindingIndex, bindingSpace, declarator, leafVar);
 }
 
 ScalarizedVal createGLSLGlobalVaryings(
@@ -875,7 +898,8 @@ ScalarizedVal createGLSLGlobalVaryings(
     IRType*                     type,
     IRVarLayout*                layout,
     LayoutResourceKind          kind,
-    Stage                       stage)
+    Stage                       stage,
+    IRInst*                     leafVar)
 {
     UInt bindingIndex = 0;
     UInt bindingSpace = 0;
@@ -886,7 +910,7 @@ ScalarizedVal createGLSLGlobalVaryings(
     }
     return createGLSLGlobalVaryingsImpl(
         context,
-        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr);
+        builder, type, layout, layout->getTypeLayout(), kind, stage, bindingIndex, bindingSpace, nullptr, leafVar);
 }
 
 ScalarizedVal extractField(
@@ -1377,7 +1401,8 @@ void legalizeEntryPointParameterForGLSL(
                 valueType,
                 paramLayout,
                 LayoutResourceKind::VaryingOutput,
-                stage);
+                stage,
+                pp);
 
             // TODO: a GS output stream might be passed into other
             // functions, so that we should really be modifying
@@ -1533,7 +1558,7 @@ void legalizeEntryPointParameterForGLSL(
             // side and one for the `out` side.
             auto globalInputVal = createGLSLGlobalVaryings(
                 context,
-                builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage);
+                builder, valueType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
 
             assign(builder, localVal, globalInputVal);
         }
@@ -1548,7 +1573,7 @@ void legalizeEntryPointParameterForGLSL(
         // when the function is done. We create them here.
         auto globalOutputVal = createGLSLGlobalVaryings(
                 context,
-                builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage);
+                builder, valueType, paramLayout, LayoutResourceKind::VaryingOutput, stage, pp);
 
         // Now we need to iterate over all the blocks in the function looking
         // for any `return*` instructions, so that we can write to the output variable
@@ -1591,7 +1616,7 @@ void legalizeEntryPointParameterForGLSL(
 
         auto globalValue = createGLSLGlobalVaryings(
             context,
-            builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage);
+            builder, paramType, paramLayout, LayoutResourceKind::VaryingInput, stage, pp);
 
         // Next we need to replace uses of the parameter with
         // references to the variable(s). We are going to do that
@@ -1693,7 +1718,8 @@ void legalizeEntryPointForGLSL(
             resultType,
             entryPointLayout->getResultLayout(),
             LayoutResourceKind::VaryingOutput,
-            stage);
+            stage,
+            func);
 
         for( auto bb = func->getFirstBlock(); bb; bb = bb->getNextBlock() )
         {

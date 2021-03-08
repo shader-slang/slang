@@ -9,6 +9,7 @@ namespace gfx {
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
     x(vkEnumerateInstanceLayerProperties) \
+    x(vkDestroyInstance) \
     /* */
 
 #define VK_API_INSTANCE_PROCS_OPT(x) \
@@ -89,6 +90,7 @@ namespace gfx {
     x(vkCmdPipelineBarrier) \
     x(vkCmdCopyBufferToImage)\
     x(vkCmdPushConstants) \
+    x(vkCmdSetStencilReference) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -143,6 +145,10 @@ namespace gfx {
     x(vkAcquireNextImageKHR) \
     /* */
 
+#define VK_API_DEVICE_OPT_PROCS(x) \
+    x(vkCmdSetPrimitiveTopologyEXT) \
+    /* */
+
 #define VK_API_ALL_GLOBAL_PROCS(x) \
     VK_API_GLOBAL_PROCS(x)
 
@@ -152,7 +158,8 @@ namespace gfx {
 
 #define VK_API_ALL_DEVICE_PROCS(x) \
     VK_API_DEVICE_PROCS(x) \
-    VK_API_DEVICE_KHR_PROCS(x)
+    VK_API_DEVICE_KHR_PROCS(x) \
+    VK_API_DEVICE_OPT_PROCS(x)
 
 #define VK_API_ALL_PROCS(x) \
     VK_API_ALL_GLOBAL_PROCS(x) \

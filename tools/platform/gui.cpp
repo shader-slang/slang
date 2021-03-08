@@ -7,8 +7,10 @@
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
+using namespace gfx;
 
-namespace gfx {
+namespace platform
+{
 
 #ifdef _WIN32
 LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -36,14 +38,19 @@ void setNativeWindowHook(Window* window, WNDPROC proc);
 #endif
 
 
-GUI::GUI(Window* window, IRenderer* inRenderer, IFramebufferLayout* framebufferLayout)
+GUI::GUI(
+    Window* window,
+    IRenderer* inRenderer,
+    ICommandQueue* inQueue,
+    IFramebufferLayout* framebufferLayout)
     : renderer(inRenderer)
+    , queue(inQueue)
 {
      ImGui::CreateContext();
      ImGuiIO& io = ImGui::GetIO();
 
 #ifdef _WIN32
-     ImGui_ImplWin32_Init(getPlatformWindowHandle(window));
+     ImGui_ImplWin32_Init((HWND)window->getNativeHandle().handleValues[0]);
 
      setNativeWindowHook(window, &guiWindowProc);
 #endif
@@ -108,7 +115,7 @@ GUI::GUI(Window* window, IRenderer* inRenderer, IFramebufferLayout* framebufferL
     const SlangResult compileRes = spCompile(slangRequest);
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        reportError("%s", diagnostics);
+        printf("%s", diagnostics);
     }
     if(SLANG_FAILED(compileRes))
     {
@@ -236,6 +243,20 @@ GUI::GUI(Window* window, IRenderer* inRenderer, IFramebufferLayout* framebufferL
         ISamplerState::Desc desc;
         samplerState = renderer->createSamplerState(desc);
     }
+
+    {
+        IRenderPassLayout::Desc desc;
+        desc.framebufferLayout = framebufferLayout;
+        IRenderPassLayout::AttachmentAccessDesc colorAccess;
+        desc.depthStencilAccess = nullptr;
+        colorAccess.initialState = ResourceState::Present;
+        colorAccess.finalState = ResourceState::Present;
+        colorAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Load;
+        colorAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
+        desc.renderTargetAccess = &colorAccess;
+        desc.renderTargetCount = 1;
+        renderPass = renderer->createRenderPassLayout(desc);
+    }
 }
 
 
@@ -248,7 +269,7 @@ void GUI::beginFrame()
     ImGui::NewFrame();
 }
 
-void GUI::endFrame()
+void GUI::endFrame(IFramebuffer* framebuffer)
 {
     ImGui::Render();
 
@@ -278,22 +299,23 @@ void GUI::endFrame()
     auto indexBuffer = renderer->createBufferResource(
         IResource::Usage::IndexBuffer,
         indexBufferDesc);
-
+    auto cmdBuf = queue->createCommandBuffer();
+    auto encoder = cmdBuf->encodeResourceCommands();
     {
-        ImDrawVert* dstVertex = (ImDrawVert*) renderer->map(vertexBuffer, MapFlavor::WriteDiscard);
-        ImDrawIdx* dstIndex = (ImDrawIdx*) renderer->map(indexBuffer, MapFlavor::WriteDiscard);
-
         for(int ii = 0; ii < commandListCount; ++ii)
         {
             const ImDrawList* commandList = draw_data->CmdLists[ii];
-            memcpy(dstVertex, commandList->VtxBuffer.Data, commandList->VtxBuffer.Size * sizeof(ImDrawVert));
-            memcpy(dstIndex, commandList->IdxBuffer.Data, commandList->IdxBuffer.Size * sizeof(ImDrawIdx));
-            dstVertex += commandList->VtxBuffer.Size;
-            dstIndex += commandList->IdxBuffer.Size;
+            encoder->uploadBufferData(
+                vertexBuffer,
+                commandList->VtxBuffer.Size * ii * sizeof(ImDrawVert),
+                commandList->VtxBuffer.Size * sizeof(ImDrawVert),
+                commandList->VtxBuffer.Data);
+            encoder->uploadBufferData(
+                indexBuffer,
+                commandList->IdxBuffer.Size * ii * sizeof(ImDrawIdx),
+                commandList->IdxBuffer.Size * sizeof(ImDrawIdx),
+                commandList->IdxBuffer.Data);
         }
-
-        renderer->unmap(vertexBuffer);
-        renderer->unmap(indexBuffer);
     }
 
     // Allocate a transient constant buffer for projection matrix
@@ -306,8 +328,6 @@ void GUI::endFrame()
         constantBufferDesc);
 
     {
-        glm::mat4x4* dstMVP = (glm::mat4x4*) renderer->map(constantBuffer, MapFlavor::WriteDiscard);
-
         float L = draw_data->DisplayPos.x;
         float R = draw_data->DisplayPos.x + draw_data->DisplaySize.x;
         float T = draw_data->DisplayPos.y;
@@ -319,10 +339,10 @@ void GUI::endFrame()
             { 0.0f,         0.0f,           0.5f,       0.0f },
             { (R+L)/(L-R),  (T+B)/(B-T),    0.5f,       1.0f },
         };
-        memcpy(dstMVP, mvp, sizeof(mvp));
-
-        renderer->unmap(constantBuffer);
+        encoder->uploadBufferData(constantBuffer, 0, sizeof(mvp), mvp);
     }
+
+    encoder->endEncoding();
 
     gfx::Viewport viewport;
     viewport.originX = 0;
@@ -333,13 +353,15 @@ void GUI::endFrame()
     viewport.minZ = 0;
     viewport.maxZ = 1;
 
-    renderer->setViewport(viewport);
+    auto renderEncoder = cmdBuf->encodeRenderCommands(renderPass, framebuffer);
+    renderEncoder->setViewportAndScissor(viewport);
 
-    renderer->setPipelineState(pipelineState);
+    renderEncoder->setPipelineState(pipelineState);
 
-    renderer->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
-    renderer->setIndexBuffer(indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R_UInt16 : Format::R_UInt32);
-    renderer->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+    renderEncoder->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
+    renderEncoder->setIndexBuffer(
+        indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R_UInt16 : Format::R_UInt32);
+    renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
     UInt vertexOffset = 0;
     UInt indexOffset = 0;
@@ -364,7 +386,7 @@ void GUI::endFrame()
                     (Int)(command->ClipRect.z - pos.x),
                     (Int)(command->ClipRect.w - pos.y)
                 };
-                renderer->setScissorRect(rect);
+                renderEncoder->setScissorRects(1, &rect);
 
                 // TODO: This should be a dynamic/transient descriptor set...
                 auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
@@ -374,18 +396,20 @@ void GUI::endFrame()
                 descriptorSet->setSampler(2, 0,
                     samplerState);
 
-                renderer->setDescriptorSet(
-                    PipelineType::Graphics,
+                renderEncoder->setDescriptorSet(
                     pipelineLayout,
                     0,
                     descriptorSet);
 
-                renderer->drawIndexed(command->ElemCount, indexOffset, vertexOffset);
+                renderEncoder->drawIndexed(command->ElemCount, indexOffset, vertexOffset);
             }
             indexOffset += command->ElemCount;
         }
         vertexOffset += commandList->VtxBuffer.Size;
     }
+    renderEncoder->endEncoding();
+    cmdBuf->close();
+    queue->executeCommandBuffer(cmdBuf);
 }
 
 GUI::~GUI()

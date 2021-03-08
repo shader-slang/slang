@@ -136,7 +136,7 @@ int main()
     // interacting with the graphics API.
     Slang::ComPtr<gfx::IRenderer> renderer;
     IRenderer::Desc rendererDesc = {};
-    rendererDesc.rendererType = RendererType::CUDA;
+    rendererDesc.rendererType = RendererType::DirectX11;
     SLANG_RETURN_ON_FAIL(gfxCreateRenderer(&rendererDesc, renderer.writeRef()));
 
     // Now we can load the shader code.
@@ -146,7 +146,7 @@ int main()
     slang::ProgramLayout* slangReflection;
     SLANG_RETURN_ON_FAIL(loadShaderProgram(renderer, shaderProgram, slangReflection));
 
-    // Create a pipelien state with the loaded shader.
+    // Create a pipeline state with the loaded shader.
     gfx::ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<gfx::IPipelineState> pipelineState;
@@ -211,17 +211,26 @@ int main()
 
     // We have set up all required parameters in entry-point object, now it is time
     // to bind the pipeline and root object and launch the kernel.
-    renderer->beginFrame();
-    renderer->setPipelineState(pipelineState);
-    SLANG_RETURN_ON_FAIL(renderer->bindRootShaderObject(gfx::PipelineType::Compute, rootObject));
-    renderer->dispatchCompute(1, 1, 1);
-    renderer->endFrame();
+    {
+        ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
+        auto queue = renderer->createCommandQueue(queueDesc);
+        auto commandBuffer = queue->createCommandBuffer();
+        auto encoder = commandBuffer->encodeComputeCommands();
+        encoder->setPipelineState(pipelineState);
+        encoder->bindRootShaderObject(rootObject);
+        encoder->dispatchCompute(1, 1, 1);
+        encoder->endEncoding();
+        commandBuffer->close();
+        queue->executeCommandBuffer(commandBuffer);
+        queue->wait();
+    }
     // Read back the results.
-    renderer->waitForGpu();
-    float* result = (float*)renderer->map(numbersBuffer, gfx::MapFlavor::HostRead);
+    ComPtr<ISlangBlob> resultBlob;
+    SLANG_RETURN_ON_FAIL(renderer->readBufferResource(
+        numbersBuffer, 0, numberCount * sizeof(float), resultBlob.writeRef()));
+    auto result = reinterpret_cast<const float*>(resultBlob->getBufferPointer());
     for (int i = 0; i < numberCount; i++)
         printf("%f\n", result[i]);
-    renderer->unmap(numbersBuffer);
 
     return SLANG_OK;
 }

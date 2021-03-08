@@ -11,10 +11,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gpu-printing", "build\visua
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hello-world", "build\visual-studio\hello-world\hello-world.vcxproj", "{010BE414-ED5B-CF56-16C0-BD18027062C0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "heterogeneous-hello-world", "build\visual-studio\heterogeneous-hello-world\heterogeneous-hello-world.vcxproj", "{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "model-viewer", "build\visual-studio\model-viewer\model-viewer.vcxproj", "{2F8724C6-1BC3-2730-84D5-3F277030D04A}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "shader-object", "build\visual-studio\shader-object\shader-object.vcxproj", "{25512BFB-1138-EDF2-BA88-5310A64E6659}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "shader-toy", "build\visual-studio\shader-toy\shader-toy.vcxproj", "{0FC5DE93-FBEA-A8FA-E430-2EC6D0F5CDC6}"
@@ -51,7 +47,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx", "build\visual-studio\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx-util", "build\visual-studio\gfx-util\gfx-util.vcxproj", "{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "graphics-app-framework", "build\visual-studio\graphics-app-framework\graphics-app-framework.vcxproj", "{3565FE5E-4FA3-11EB-AE93-0242AC130002}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "platform", "build\visual-studio\platform\platform.vcxproj", "{3565FE5E-4FA3-11EB-AE93-0242AC130002}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-cpp-extractor", "build\visual-studio\slang-cpp-extractor\slang-cpp-extractor.vcxproj", "{CA8A30D1-8FA9-4330-B7F7-84709246D8DC}"
 EndProject
@@ -101,22 +97,6 @@ Global
 		{010BE414-ED5B-CF56-16C0-BD18027062C0}.Release|Win32.Build.0 = Release|Win32
 		{010BE414-ED5B-CF56-16C0-BD18027062C0}.Release|x64.ActiveCfg = Release|x64
 		{010BE414-ED5B-CF56-16C0-BD18027062C0}.Release|x64.Build.0 = Release|x64
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Debug|Win32.ActiveCfg = Debug|Win32
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Debug|Win32.Build.0 = Debug|Win32
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Debug|x64.ActiveCfg = Debug|x64
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Debug|x64.Build.0 = Debug|x64
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Release|Win32.ActiveCfg = Release|Win32
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Release|Win32.Build.0 = Release|Win32
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Release|x64.ActiveCfg = Release|x64
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49}.Release|x64.Build.0 = Release|x64
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Debug|Win32.ActiveCfg = Debug|Win32
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Debug|Win32.Build.0 = Debug|Win32
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Debug|x64.ActiveCfg = Debug|x64
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Debug|x64.Build.0 = Debug|x64
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|Win32.ActiveCfg = Release|Win32
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|Win32.Build.0 = Release|Win32
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|x64.ActiveCfg = Release|x64
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A}.Release|x64.Build.0 = Release|x64
 		{25512BFB-1138-EDF2-BA88-5310A64E6659}.Debug|Win32.ActiveCfg = Debug|Win32
 		{25512BFB-1138-EDF2-BA88-5310A64E6659}.Debug|Win32.Build.0 = Debug|Win32
 		{25512BFB-1138-EDF2-BA88-5310A64E6659}.Debug|x64.ActiveCfg = Debug|x64
@@ -253,8 +233,6 @@ Global
 		{4B47A364-37C4-96A7-6041-97BB4C1D333B} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{57C81DD3-4304-213D-AC16-39349871C957} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{010BE414-ED5B-CF56-16C0-BD18027062C0} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
-		{150CAA5A-0177-6A66-AA92-CFCB96DC2D49} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
-		{2F8724C6-1BC3-2730-84D5-3F277030D04A} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{25512BFB-1138-EDF2-BA88-5310A64E6659} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{0FC5DE93-FBEA-A8FA-E430-2EC6D0F5CDC6} = {EB5FC2C6-D72D-B6CC-C0C1-26F3AC2E9231}
 		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {F3AB4ED5-5F37-BC99-6848-3F8ED452189A}

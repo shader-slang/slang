@@ -985,6 +985,7 @@ static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode
 {
     switch (mode)
     {
+        case IRInterpolationMode::PerVertex:
         case IRInterpolationMode::NoInterpolation:      return UnownedStringSlice::fromLiteral("nointerpolation");
         case IRInterpolationMode::NoPerspective:        return UnownedStringSlice::fromLiteral("noperspective");
         case IRInterpolationMode::Linear:               return UnownedStringSlice::fromLiteral("linear");

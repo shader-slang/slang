@@ -27,6 +27,13 @@ struct GfxGUID
     static const Slang::Guid IID_IRenderer;
     static const Slang::Guid IID_IShaderObjectLayout;
     static const Slang::Guid IID_IShaderObject;
+    static const Slang::Guid IID_IRenderPassLayout;
+    static const Slang::Guid IID_ICommandEncoder;
+    static const Slang::Guid IID_IRenderCommandEncoder;
+    static const Slang::Guid IID_IComputeCommandEncoder;
+    static const Slang::Guid IID_IResourceCommandEncoder;
+    static const Slang::Guid IID_ICommandBuffer;
+    static const Slang::Guid IID_ICommandQueue;
 };
 
 gfx::StageType translateStage(SlangStage slangStage);
@@ -244,6 +251,9 @@ public:
     // pipeline cannot be used directly and must be specialized first.
     bool isSpecializable = false;
     ComPtr<IShaderProgram> m_program;
+
+    ComPtr<IPipelineLayout> m_pipelineLayout;
+
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);
 };
@@ -338,8 +348,6 @@ public:
     ShaderComponentID getComponentId(Slang::UnownedStringSlice name);
     ShaderComponentID getComponentId(ComponentKey key);
 
-    void init(ISlangFileSystem* cacheFileSystem);
-    void writeToFileSystem(ISlangMutableFileSystem* outputFileSystem);
     Slang::ComPtr<IPipelineState> getSpecializedPipelineState(PipelineKey programKey)
     {
         Slang::ComPtr<IPipelineState> result;
@@ -347,15 +355,16 @@ public:
             return result;
         return nullptr;
     }
-    Slang::RefPtr<ShaderBinary> tryLoadShaderBinary(ShaderComponentID componentId);
-    void addShaderBinary(ShaderComponentID componentId, ShaderBinary* binary);
     void addSpecializedPipeline(PipelineKey key, Slang::ComPtr<IPipelineState> specializedPipeline);
+    void free()
+    {
+        specializedPipelines = decltype(specializedPipelines)();
+        componentIds = decltype(componentIds)();
+    }
 
 protected:
-    Slang::ComPtr<ISlangFileSystem> fileSystem;
     Slang::OrderedDictionary<OwningComponentKey, ShaderComponentID> componentIds;
     Slang::OrderedDictionary<PipelineKey, Slang::ComPtr<IPipelineState>> specializedPipelines;
-    Slang::OrderedDictionary<ShaderComponentID, Slang::RefPtr<ShaderBinary>> shaderBinaries;
 };
 
 // Renderer implementation shared by all platforms.
@@ -378,13 +387,13 @@ public:
         slang::TypeReflection*      type,
         ShaderObjectLayoutBase**    outLayout);
 
-protected:
-    // Retrieves the currently bound unspecialized pipeline.
-    // If the bound pipeline is not created from a Slang component, an implementation should return null.
-    virtual PipelineStateBase* getCurrentPipeline() = 0;
+public:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
-    Result maybeSpecializePipeline(ShaderObjectBase* inRootShaderObject);
+    Result maybeSpecializePipeline(
+        PipelineStateBase* currentPipeline,
+        ShaderObjectBase* rootObject,
+        Slang::RefPtr<PipelineStateBase>& outNewPipeline);
 
 
     virtual Result createShaderObjectLayout(

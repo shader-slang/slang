@@ -27,7 +27,6 @@ void VulkanDeviceQueue::destroy()
             m_api->vkFreeCommandBuffers(m_api->m_device, m_commandPools[i], 1, &m_commandBuffers[i]);
             m_api->vkDestroyFence(m_api->m_device, m_fences[i].fence, nullptr);
             m_api->vkDestroyCommandPool(m_api->m_device, m_commandPools[i], nullptr);
-            m_descSetAllocator[i].close();
         }
         m_api = nullptr;
     }
@@ -74,8 +73,6 @@ SlangResult VulkanDeviceQueue::init(const VulkanApi& api, VkQueue queue, int que
         api.vkCreateFence(api.m_device, &fenceCreateInfo, nullptr, &fence.fence);
         fence.active = false;
         fence.value = 0;
-
-        m_descSetAllocator[i].m_api = &api;
     }
 
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
@@ -175,7 +172,6 @@ void VulkanDeviceQueue::flushStepB()
     // blocking update of fence values
     _updateFenceAtIndex(m_commandBufferIndex, true);
 
-    m_descSetAllocator[m_commandBufferIndex].reset();
     m_api->vkResetCommandPool(m_api->m_device, m_commandPool, 0);
 
     VkCommandBufferBeginInfo beginInfo = {};

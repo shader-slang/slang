@@ -6,8 +6,7 @@
 #include "core/slang-blob.h"
 
 //WORKING: #include "options.h"
-#include "../renderer-shared.h"
-#include "../render-graphics-common.h"
+#include "../immediate-renderer-base.h"
 #include "../d3d/d3d-util.h"
 #include "../nvapi/nvapi-util.h"
 
@@ -51,7 +50,7 @@ using namespace Slang;
 
 namespace gfx {
 
-class D3D11Renderer : public GraphicsAPIRenderer
+class D3D11Renderer : public ImmediateRendererBase
 {
 public:
     enum
@@ -64,15 +63,8 @@ public:
 
     // Renderer    implementation
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setClearColor(const float color[4]) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL beginFrame() override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endFrame() override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        makeSwapchainImagePresentable(ISwapchain* swapchain) override
-    {
-        SLANG_UNUSED(swapchain);
-    }
+        clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
@@ -80,6 +72,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -120,11 +113,17 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
+    virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
+    virtual void unmap(IBufferResource* buffer) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        IBufferResource* src,
+        size_t srcOffset,
+        size_t size) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
-        ITextureResource* texture, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
+        ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
-    virtual SLANG_NO_THROW void* SLANG_MCALL map(IBufferResource* buffer, MapFlavor flavor) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL unmap(IBufferResource* buffer) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setPrimitiveTopology(PrimitiveTopology topology) override;
 
@@ -157,11 +156,8 @@ public:
     {
         return RendererType::DirectX11;
     }
-    virtual PipelineStateBase* getCurrentPipeline() override
-    {
-        return m_currentPipelineState;
-    }
-    protected:
+
+protected:
 
     class ScopeNVAPI
     {
@@ -436,12 +432,14 @@ public:
     {
     public:
         ComPtr<ID3D11DepthStencilView>      m_dsv;
+        DepthStencilClearValue m_clearValue;
     };
 
     class RenderTargetViewImpl : public ResourceViewImpl
     {
     public:
         ComPtr<ID3D11RenderTargetView>      m_rtv;
+        float m_clearValue[4];
     };
 
     class FramebufferLayoutImpl
@@ -630,8 +628,6 @@ public:
     class PipelineStateImpl : public PipelineStateBase
     {
     public:
-        RefPtr<ShaderProgramImpl>   m_program;
-        RefPtr<PipelineLayoutImpl>  m_pipelineLayout;
     };
 
 
@@ -645,7 +641,6 @@ public:
         ComPtr<ID3D11RasterizerState>   m_rasterizerState;
         ComPtr<ID3D11BlendState>        m_blendState;
 
-        UINT                            m_stencilRef;
         float                           m_blendColor[4];
         UINT                            m_sampleMask;
 
@@ -687,6 +682,9 @@ public:
 
     bool m_framebufferBindingDirty = true;
     bool m_shaderBindingDirty = true;
+
+    uint32_t m_stencilRef = 0;
+    bool m_depthStencilStateDirty = true;
 
     Desc m_desc;
 
@@ -910,29 +908,33 @@ SlangResult D3D11Renderer::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-void D3D11Renderer::setClearColor(const float color[4])
+void D3D11Renderer::clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil)
 {
-    memcpy(m_clearColor, color, sizeof(m_clearColor));
-}
-
-void D3D11Renderer::clearFrame()
-{
+    uint32_t mask = 1;
     for (auto rtv : m_currentFramebuffer->renderTargetViews)
-        m_immediateContext->ClearRenderTargetView(rtv->m_rtv, m_clearColor);
+    {
+        if (colorBufferMask & mask)
+            m_immediateContext->ClearRenderTargetView(rtv->m_rtv, rtv->m_clearValue);
+        mask <<= 1;
+    }
 
     if (m_currentFramebuffer->depthStencilView)
     {
-        m_immediateContext->ClearDepthStencilView(
-            m_currentFramebuffer->depthStencilView->m_dsv,
-            D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
-            1.0f,
-            0);
+        UINT clearFlags = 0;
+        if (clearDepth)
+            clearFlags = D3D11_CLEAR_DEPTH;
+        if (clearStencil)
+            clearFlags |= D3D11_CLEAR_STENCIL;
+        if (clearFlags)
+        {
+            m_immediateContext->ClearDepthStencilView(
+                m_currentFramebuffer->depthStencilView->m_dsv,
+                clearFlags,
+                m_currentFramebuffer->depthStencilView->m_clearValue.depth,
+                m_currentFramebuffer->depthStencilView->m_clearValue.stencil);
+        }
     }
 }
-
-void D3D11Renderer::beginFrame() { }
-
-void D3D11Renderer::endFrame() {}
 
 Result D3D11Renderer::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
@@ -989,9 +991,21 @@ void D3D11Renderer::setFramebuffer(IFramebuffer* frameBuffer)
     m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
 }
 
-SlangResult D3D11Renderer::readTextureResource(
-    ITextureResource* resource, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
+void D3D11Renderer::setStencilReference(uint32_t referenceValue)
 {
+    m_stencilRef = referenceValue;
+    m_depthStencilStateDirty = true;
+}
+
+SlangResult D3D11Renderer::readTextureResource(
+    ITextureResource* resource,
+    ResourceState state,
+    ISlangBlob** outBlob,
+    size_t* outRowPitch,
+    size_t* outPixelSize)
+{
+    SLANG_UNUSED(state);
+
     auto texture = static_cast<TextureResourceImpl*>(resource);
     // Don't bother supporting MSAA for right now
     if (texture->getDesc()->sampleDesc.numSamples > 1)
@@ -1458,6 +1472,10 @@ Result D3D11Renderer::createTextureView(ITextureResource* texture, IResourceView
             RefPtr<RenderTargetViewImpl> viewImpl = new RenderTargetViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::RTV;
             viewImpl->m_rtv = rtv;
+            memcpy(
+                viewImpl->m_clearValue,
+                &resourceImpl->getDesc()->optimalClearValue.color,
+                sizeof(float) * 4);
             *outView = viewImpl.detach();
             return SLANG_OK;
         }
@@ -1471,6 +1489,7 @@ Result D3D11Renderer::createTextureView(ITextureResource* texture, IResourceView
             RefPtr<DepthStencilViewImpl> viewImpl = new DepthStencilViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::DSV;
             viewImpl->m_dsv = dsv;
+            viewImpl->m_clearValue = resourceImpl->getDesc()->optimalClearValue.depthStencil;
             *outView = viewImpl.detach();
             return SLANG_OK;
         }
@@ -1806,7 +1825,7 @@ void D3D11Renderer::setPipelineState(IPipelineState* state)
     case PipelineType::Graphics:
         {
             auto stateImpl = (GraphicsPipelineStateImpl*) state;
-            auto programImpl = stateImpl->m_program;
+            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.get());
 
             // TODO: We could conceivably do some lightweight state
             // differencing here (e.g., check if `programImpl` is the
@@ -1840,16 +1859,17 @@ void D3D11Renderer::setPipelineState(IPipelineState* state)
             // OM
 
             m_immediateContext->OMSetBlendState(stateImpl->m_blendState, stateImpl->m_blendColor, stateImpl->m_sampleMask);
-            m_immediateContext->OMSetDepthStencilState(stateImpl->m_depthStencilState, stateImpl->m_stencilRef);
 
             m_currentPipelineState = stateImpl;
+
+            m_depthStencilStateDirty = true;
         }
         break;
 
     case PipelineType::Compute:
         {
             auto stateImpl = (ComputePipelineStateImpl*) state;
-            auto programImpl = stateImpl->m_program;
+            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.get());
 
             // CS
 
@@ -2176,12 +2196,9 @@ Result D3D11Renderer::createGraphicsPipelineState(const GraphicsPipelineStateDes
     }
 
     RefPtr<GraphicsPipelineStateImpl> state = new GraphicsPipelineStateImpl();
-    state->m_program = programImpl;
-    state->m_stencilRef = desc.depthStencil.stencilRef;
     state->m_depthStencilState = depthStencilState;
     state->m_rasterizerState = rasterizerState;
     state->m_blendState = blendState;
-    state->m_pipelineLayout = static_cast<PipelineLayoutImpl*>(desc.pipelineLayout);
     state->m_inputLayout = static_cast<InputLayoutImpl*>(desc.inputLayout);
     state->m_rtvCount = (UINT) static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout)
                             ->m_renderTargets.getCount();
@@ -2200,15 +2217,27 @@ Result D3D11Renderer::createComputePipelineState(const ComputePipelineStateDesc&
     ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
 
-    auto programImpl = (ShaderProgramImpl*) desc.program;
-    auto pipelineLayoutImpl = (PipelineLayoutImpl*) desc.pipelineLayout;
-
     RefPtr<ComputePipelineStateImpl> state = new ComputePipelineStateImpl();
-    state->m_program = programImpl;
-    state->m_pipelineLayout = pipelineLayoutImpl;
     state->init(desc);
     *outState = state.detach();
     return SLANG_OK;
+}
+
+void D3D11Renderer::copyBuffer(
+    IBufferResource* dst,
+    size_t dstOffset,
+    IBufferResource* src,
+    size_t srcOffset,
+    size_t size)
+{
+    auto dstImpl = static_cast<BufferResourceImpl*>(dst);
+    auto srcImpl = static_cast<BufferResourceImpl*>(src);
+    D3D11_BOX srcBox = {};
+    srcBox.left = (UINT)srcOffset;
+    srcBox.right = (UINT)(srcOffset + size);
+    srcBox.bottom = srcBox.back = 1;
+    m_immediateContext->CopySubresourceRegion(
+        dstImpl->m_buffer, 0, (UINT)dstOffset, 0, 0, srcImpl->m_buffer, 0, &srcBox);
 }
 
 void D3D11Renderer::dispatchCompute(int x, int y, int z)
@@ -2414,9 +2443,10 @@ void D3D11Renderer::_flushGraphicsState()
         m_shaderBindingDirty = false;
 
         auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
-
+        auto pipelineLayout =
+            static_cast<PipelineLayoutImpl*>(pipelineState->m_pipelineLayout.get());
         auto rtvCount = (UINT)m_currentFramebuffer->renderTargetViews.getCount();
-        auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
+        auto uavCount = pipelineLayout->m_uavCount;
         m_immediateContext->OMSetRenderTargetsAndUnorderedAccessViews(
             rtvCount,
             m_currentFramebuffer->d3dRenderTargetViews.getArrayView().getBuffer(),
@@ -2425,6 +2455,13 @@ void D3D11Renderer::_flushGraphicsState()
             uavCount,
             m_uavBindings[pipelineType][0].readRef(),
             nullptr);
+    }
+    if (m_depthStencilStateDirty)
+    {
+        m_depthStencilStateDirty = false;
+        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
+        m_immediateContext->OMSetDepthStencilState(
+            pipelineState->m_depthStencilState, m_stencilRef);
     }
 }
 
@@ -2436,8 +2473,10 @@ void D3D11Renderer::_flushComputeState()
         m_shaderBindingDirty = false;
 
         auto pipelineState = static_cast<ComputePipelineStateImpl*>(m_currentPipelineState.get());
+        auto pipelineLayout =
+            static_cast<PipelineLayoutImpl*>(pipelineState->m_pipelineLayout.get());
 
-        auto uavCount = pipelineState->m_pipelineLayout->m_uavCount;
+        auto uavCount = pipelineLayout->m_uavCount;
 
         m_immediateContext->CSSetUnorderedAccessViews(
             0,
@@ -2660,4 +2699,5 @@ void D3D11Renderer::setDescriptorSet(PipelineType pipelineType, IPipelineLayout*
     }
 }
 
-} // renderer_test
+}
+

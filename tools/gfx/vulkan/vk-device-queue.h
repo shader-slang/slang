@@ -45,11 +45,6 @@ struct VulkanDeviceQueue
         /// Get the command buffer
     VkCommandBuffer getCommandBuffer() const { return m_commandBuffer; }
 
-    VulkanDescriptorSet allocTransientDescriptorSet(VkDescriptorSetLayout layout)
-    {
-        return m_descSetAllocator[m_commandBufferIndex].allocate(layout);
-    }
-
         /// Get the queue
     VkQueue getQueue() const { return m_queue; }
 
@@ -95,8 +90,6 @@ struct VulkanDeviceQueue
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
     VkSemaphore m_semaphores[int(EventType::CountOf)];
     VkSemaphore m_currentSemaphores[int(EventType::CountOf)];
-
-    DescriptorSetAllocator m_descSetAllocator[kMaxCommandBuffers];
 
     uint64_t m_lastFenceCompleted = 1;
     uint64_t m_nextFenceValue = 2;

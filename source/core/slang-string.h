@@ -559,7 +559,9 @@ namespace Slang
         {
             return m_buffer ? m_buffer->getLength() : 0;
         }
-
+            /// Make the length of the string the amount specified. Must be less than current size
+        void reduceLength(Index length);
+        
         friend String operator+(const char*op1, const String & op2);
         friend String operator+(const String & op1, const char * op2);
         friend String operator+(const String & op1, const String & op2);
