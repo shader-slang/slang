@@ -31,7 +31,9 @@ struct DocMarkDownWriter
         /// Write out all documentation to the output buffer
     void writeAll();
 
-    void writeCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
+        /// NOTE! This will write information about *all* of the overridden versions of a function/method
+    void writeOverridableCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
+
     void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
     void writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);
     void writeDecl(const DocMarkup::Entry& entry, Decl* decl);
@@ -39,7 +41,9 @@ struct DocMarkDownWriter
 
     void writePreamble(const DocMarkup::Entry& entry);
     void writeDescription(const DocMarkup::Entry& entry);
-    
+
+    void writeSignature(CallableDecl* callableDecl);
+
         /// Get the output string
     const StringBuilder& getOutput() const { return m_builder; }
 
@@ -50,12 +54,22 @@ struct DocMarkDownWriter
     {
     }
 
+    
         /// Given a list of ASTPrinter::Parts, works out the different parts of the sig
     static void getSignature(const List<Part>& parts, Signature& outSig);
+
+    struct NameAndMarkup
+    {
+        Name* name;
+        String markup;
+    };
+    void _getUniqueParams(const List<Decl*>& decls, List<NameAndMarkup>& out);
 
     template <typename T>
     void _appendAsBullets(FilteredMemberList<T>& in);
     void _appendAsBullets(const List<Decl*>& in);
+
+    void _appendAsBullets(const List<NameAndMarkup>& values);
 
     void _appendCommaList(List<InheritanceDecl*>& inheritanceDecls);
 

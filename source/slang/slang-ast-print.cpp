@@ -90,6 +90,15 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
         
         sb << toSlice("::");
     }
+    
+#if 0
+    // TODO(JS): Need to do something about extensions.
+    else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
+    {
+        _addDeclPathRec(extensionDeclRef);
+        sb << toSlice(".");
+    }
+#endif
 
     _addDeclName(declRef.getDecl());
 
@@ -316,7 +325,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     return index >= 0 ? getPart(slice, parts[index]) : UnownedStringSlice();
 }
 
-UnownedStringSlice ASTPrinter::getPart(Part::Type partType) const
+UnownedStringSlice ASTPrinter::getPartSlice(Part::Type partType) const
 {
     return m_parts ? getPart(partType, getSlice(), *m_parts) : UnownedStringSlice();
 }

@@ -130,10 +130,10 @@ public:
     void addGenericParams(const DeclRef<GenericDecl>& genericDeclRef);
 
         /// Get the specified part type. Returns empty slice if not found
-    UnownedStringSlice getPart(Part::Type partType) const;
+    UnownedStringSlice getPartSlice(Part::Type partType) const;
         /// Get the slice for a part
     UnownedStringSlice getPartSlice(const Part& part) const { return getPart(getSlice(), part); }
-    
+
         /// Gets the specified part type
     static UnownedStringSlice getPart(const UnownedStringSlice& slice, const Part& part) { return UnownedStringSlice(slice.begin() + part.start, slice.begin() + part.end); }
     static UnownedStringSlice getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts);

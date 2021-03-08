@@ -52,6 +52,30 @@ static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out
     StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
 }
 
+void DocMarkDownWriter::_appendAsBullets(const List<NameAndMarkup>& values)
+{
+    auto& out = m_builder;
+    for (const auto& value : values)
+    {
+        out << "* ";
+
+        Name* name = value.name;
+        if (name)
+        {
+            out << toSlice("_") << name->text << toSlice("_ ");
+        }
+
+        if (value.markup.getLength())
+        {
+            // Hmm, we'll want to make something multiline into a single line
+            _appendAsSingleLine(value.markup.getUnownedSlice(), out);
+        }
+
+        out << "\n";
+    }
+}
+
+
 void DocMarkDownWriter::_appendAsBullets(const List<Decl*>& in)
 {
     auto& out = m_builder;
@@ -167,17 +191,13 @@ void DocMarkDownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl
     writeDescription(entry);
 }
 
-void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
+void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
 {
-    writePreamble(entry);
-
     auto& out = m_builder;
 
     List<ASTPrinter::Part> parts;
+   
     ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
-
-    GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
-
     printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
 
     Signature signature;
@@ -185,112 +205,236 @@ void DocMarkDownWriter::writeCallable(const DocMarkup::Entry& entry, CallableDec
 
     const Index paramCount = signature.params.getCount();
 
+    out << printer.getPartSlice(signature.returnType) << toSlice(" ");
+
+    out << printer.getPartSlice(signature.name);
+
+    if (signature.genericParams.getCount())
+    {
+        out << toSlice("<");
+        const Index count = signature.genericParams.getCount();
+        for (Index i = 0; i < count; ++i)
+        {
+            const auto& genericParam = signature.genericParams[i];
+            if (i > 0)
+            {
+                out << toSlice(", ");
+            }
+            out << printer.getPartSlice(genericParam.name);
+
+            if (genericParam.type.type != Part::Type::None)
+            {
+                out << toSlice(" : ");
+                out << printer.getPartSlice(genericParam.type);
+            }
+        }
+        out << toSlice(">");
+    }
+
+    if (paramCount > 0)
+    {
+        out << toSlice("(\n");
+
+        StringBuilder line;
+        for (Index i = 0; i < paramCount; ++i)
+        {
+            const auto& param = signature.params[i];
+            line.Clear();
+            // If we want to tab these over... we'll need to know how must space I have
+            line << "    " << printer.getPartSlice(param.first);
+
+            Index indent = 25;
+            if (line.getLength() < indent)
+            {
+                line.appendRepeatedChar(' ', indent - line.getLength());
+            }
+            else
+            {
+                line.appendChar(' ');
+            }
+
+            line << printer.getPartSlice(param.second);
+            if (i < paramCount - 1)
+            {
+                line << ",\n";
+            }
+
+            out << line;
+        }
+
+        out << ");\n";
+    }
+    else
+    {
+        out << toSlice("();\n");
+    }
+}
+
+void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndMarkup>& out)
+{
+    Dictionary<Name*, Index> nameDict;
+
+    for (auto decl : decls)
+    {
+        Name* name = decl->getName();
+        if (!name)
+        {
+            continue;
+        }
+
+        Index index = nameDict.GetOrAddValue(name, out.getCount());
+
+        if (index >= out.getCount())
+        {
+            out.add(NameAndMarkup{ name, String() });
+        }
+
+        NameAndMarkup& nameAndMarkup = out[index];
+        if (nameAndMarkup.markup.getLength() > 0)
+        {
+            continue;
+        }
+
+        auto entry = m_markup->getEntry(decl);
+        if (entry && entry->m_markup.getLength())
+        {
+            nameAndMarkup.markup = entry->m_markup;
+        }
+    }
+}
+
+void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
+{
+    auto& out = m_builder;
+
+    writePreamble(entry);
+
+    {
+        List<ASTPrinter::Part> parts;
+        ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
+ 
+        printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+
+        // We just want the name
+        UnownedStringSlice name = printer.getPartSlice(Part::Type::DeclPath);
+
+        // Extract the name
+        out << toSlice("# ") << name << toSlice("\n\n");
+
+    }
+
+    writeDescription(entry);
+
+    List<CallableDecl*> sigs;
+
     // Output the signature
     {        
-        // Extract the name
-        out << toSlice("# ") << printer.getPartSlice(signature.name) << toSlice("\n\n");
+        
+        for (Decl* curDecl = callableDecl; curDecl; curDecl = curDecl->nextInContainerWithSameName)
+        {
+            CallableDecl* sig = as<CallableDecl>(curDecl);
+            if (sig)
+            {
+                sigs.add(sig);
+            }
+        }
+
+        // Lets put back into source order
+        sigs.sort([](CallableDecl* a, CallableDecl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
 
         out << toSlice("## Signature \n");
         out << toSlice("```\n");
-        out << printer.getPartSlice(signature.returnType) << toSlice(" ");
-
-        out << printer.getPartSlice(signature.name);
-
-        if (signature.genericParams.getCount())
+        for (auto sig : sigs)
         {
-            out << toSlice("<");
-            const Index count = signature.genericParams.getCount();
-            for (Index i = 0; i < count; ++i)
-            {
-                const auto& genericParam = signature.genericParams[i];
-                if (i > 0)
-                {
-                    out << toSlice(", ");
-                }
-                out << printer.getPartSlice(genericParam.name);
-
-                if (genericParam.type.type != Part::Type::None)
-                {
-                    out << toSlice(" : ");
-                    out << printer.getPartSlice(genericParam.type);
-                }
-            }
-            out << toSlice(">");
+            writeSignature(sig);
         }
-
-        if (paramCount > 0)
-        {
-            out << toSlice("(\n");
-
-            StringBuilder line;
-            for (Index i = 0; i < paramCount; ++i)
-            {
-                const auto& param = signature.params[i];
-                line.Clear();
-                // If we want to tab these over... we'll need to know how must space I have
-                line << "    " << printer.getPartSlice(param.first);
-
-                Index indent = 25;
-                if (line.getLength() < indent)
-                {
-                    line.appendRepeatedChar(' ', indent - line.getLength());
-                }
-                else
-                {
-                    line.appendChar(' ');
-                }
-
-                line << printer.getPartSlice(param.second);
-                if (i < paramCount - 1)
-                {
-                    line << ",\n";
-                }
-
-                out << line;
-            }
-
-            out << ");\n";
-        }
-        else
-        {
-            out << toSlice("();\n");
-        }
-
         out << "```\n\n";
     }
 
     {
-        // The parameters, in order
-        List<Decl*> params;
+        // We will use the first documentation found for each parameter type
 
-        // We list generic parameters, as types of parameters, if they are directly associated with this
-        // callable.
-        if (genericDecl)
+#if 1
         {
-            for (Decl* decl : genericDecl->members)
+            List<Decl*> paramDecls;
+            List<Decl*> genericDecls;
+            for (auto sig : sigs)
             {
-                if (as<GenericTypeParamDecl>(decl) ||
-                    as<GenericValueParamDecl>(decl))
+                GenericDecl* genericDecl = as<GenericDecl>(sig->parentDecl);
+
+                // NOTE!
+                // Here we assume the names of generic parameters are such that they are 
+
+                // We list generic parameters, as types of parameters, if they are directly associated with this
+                // callable.
+                if (genericDecl)
                 {
-                    params.add(decl);
+                    for (Decl* decl : genericDecl->members)
+                    {
+                        if (as<GenericTypeParamDecl>(decl) ||
+                            as<GenericValueParamDecl>(decl))
+                        {
+                            genericDecls.add(decl);
+                        }
+                    }
+                }
+
+                for (ParamDecl* paramDecl : sig->getParameters())
+                {
+                    paramDecls.add(paramDecl);
                 }
             }
-        }
 
-        for (ParamDecl* paramDecl : callableDecl->getParameters())
-        {
-            params.add(paramDecl);
-        }
+            if (paramDecls.getCount() > 0 || paramDecls.getCount() > 0)
+            {
+                out << "## Parameters\n\n";
 
-        if (params.getCount())
-        {
-            out << "## Parameters\n\n";
-            // We have generic params and regular parameters, in this list
-            _appendAsBullets(params);
+                // Get the unique generics
+                List<NameAndMarkup> params;
+                _getUniqueParams(genericDecls, params);
+                _appendAsBullets(params);
+
+                params.clear();
+                _getUniqueParams(paramDecls, params);
+                _appendAsBullets(params);
+            }
         }
+#else
+
+        {
+            GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
+
+            // The parameters, in order
+            List<Decl*> params;
+
+            // We list generic parameters, as types of parameters, if they are directly associated with this
+            // callable.
+            if (genericDecl)
+            {
+                for (Decl* decl : genericDecl->members)
+                {
+                    if (as<GenericTypeParamDecl>(decl) ||
+                        as<GenericValueParamDecl>(decl))
+                    {
+                        params.add(decl);
+                    }
+                }
+            }
+
+            for (ParamDecl* paramDecl : callableDecl->getParameters())
+            {
+                params.add(paramDecl);
+            }
+
+            if (params.getCount())
+            {
+                out << "## Parameters\n\n";
+                // We have generic params and regular parameters, in this list
+                _appendAsBullets(params);
+            }
+        }
+#endif
     }
-
-    writeDescription(entry);
 }
 
 void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl)
@@ -390,6 +534,8 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         }
     }
 
+    writeDescription(entry);
+
     {
         List<AssocTypeDecl*> assocTypeDecls;
         _getDecls<AssocTypeDecl>(aggTypeDecl, assocTypeDecls);
@@ -479,8 +625,6 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
             _appendAsBullets(uniqueMethods);
         }
     }
-
-    writeDescription(entry);
 }
 
 void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
@@ -493,13 +637,15 @@ void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
     out << toSlice("\n");
 }
 
-
 void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
 {
     auto& out = m_builder;
 
-    out << toSlice("\n## Description\n\n");
-    out << entry.m_markup;
+    if (entry.m_markup.getLength() > 0)
+    {
+        out << toSlice("\n## Description\n\n");
+        out << entry.m_markup;
+    }
 }
 
 void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
@@ -512,7 +658,23 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
 
     if (CallableDecl* callableDecl = as<CallableDecl>(decl))
     {
-        writeCallable(entry, callableDecl);
+        ContainerDecl* parentDecl = decl->parentDecl;
+
+        // Make sure we have the member dictionary.
+        buildMemberDictionary(decl->parentDecl);
+
+        // We only write out for the primary/first
+        bool isFirst = false;
+        if (callableDecl->getName())
+        {
+            Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(callableDecl->getName());
+            isFirst = (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
+        }
+
+        if (isFirst)
+        {
+            writeOverridableCallable(entry, callableDecl);
+        }
     }
     else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
     {
