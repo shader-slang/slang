@@ -595,8 +595,8 @@ void finalize()
 void handleEvent(const platform::MouseEventArgs& event)
 {
     isMouseDown = ((int)event.buttons & (int)platform::ButtonState::Enum::LeftButton) != 0;
-    lastMouseX = event.x;
-    lastMouseY = event.y;
+    lastMouseX = (float)event.x;
+    lastMouseY = (float)event.y;
 }
 
 };
@@ -613,6 +613,8 @@ int innerMain()
     platform::Application::run(app.gWindow);
 
     app.finalize();
+
+    return 0;
 }
 
 PLATFORM_UI_MAIN(innerMain)
