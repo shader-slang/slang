@@ -5,5 +5,5 @@
 namespace gfx
 {
 
-SlangResult SLANG_MCALL createCUDARenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice);
 }

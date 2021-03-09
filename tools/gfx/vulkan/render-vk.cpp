@@ -11,7 +11,6 @@
 #include "vk-api.h"
 #include "vk-util.h"
 #include "vk-device-queue.h"
-#include "vk-swap-chain.h"
 
 // Vulkan has a different coordinate system to ogl
 // http://anki3d.org/vulkan-coordinate-system/
@@ -34,7 +33,7 @@
 namespace gfx {
 using namespace Slang;
 
-class VKRenderer : public GraphicsAPIRenderer
+class VKDevice : public GraphicsAPIRenderer
 {
 public:
     enum
@@ -111,12 +110,12 @@ public:
         size_t size,
         ISlangBlob** outBlob) override;
     void waitForGpu();
-    virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
+    virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
-        return RendererType::Vulkan;
+        return m_info;
     }
         /// Dtor
-    ~VKRenderer();
+    ~VKDevice();
 
     class Buffer
     {
@@ -167,7 +166,7 @@ public:
         public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(IResource::Usage initialUsage, const IBufferResource::Desc& desc, VKRenderer* renderer):
+        BufferResourceImpl(IResource::Usage initialUsage, const IBufferResource::Desc& desc, VKDevice* renderer):
             Parent(desc),
             m_renderer(renderer),
             m_initialUsage(initialUsage)
@@ -176,7 +175,7 @@ public:
         }
 
         IResource::Usage m_initialUsage;
-        VKRenderer* m_renderer;
+        VKDevice* m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
     };
@@ -322,7 +321,7 @@ public:
 
     public:
         VkRenderPass m_renderPass;
-        VKRenderer* m_renderer;
+        VKDevice* m_renderer;
         Array<VkAttachmentDescription, kMaxAttachments> m_attachmentDescs;
         Array<VkAttachmentReference, kMaxRenderTargets> m_colorReferences;
         VkAttachmentReference m_depthReference;
@@ -333,7 +332,7 @@ public:
         {
             m_renderer->m_api.vkDestroyRenderPass(m_renderer->m_api.m_device, m_renderPass, nullptr);
         }
-        Result init(VKRenderer* renderer, const IFramebufferLayout::Desc& desc)
+        Result init(VKDevice* renderer, const IFramebufferLayout::Desc& desc)
         {
             m_renderer = renderer;
             m_renderTargetCount = desc.renderTargetCount;
@@ -435,7 +434,7 @@ public:
 
     public:
         VkRenderPass m_renderPass;
-        VKRenderer* m_renderer;
+        VKDevice* m_renderer;
 
         ~RenderPassLayoutImpl()
         {
@@ -467,7 +466,7 @@ public:
             }
         }
 
-        Result init(VKRenderer* renderer, const IRenderPassLayout::Desc& desc)
+        Result init(VKDevice* renderer, const IRenderPassLayout::Desc& desc)
         {
             m_renderer = renderer;
 
@@ -548,7 +547,7 @@ public:
         ComPtr<IResourceView> depthStencilView;
         uint32_t m_width;
         uint32_t m_height;
-        VKRenderer* m_renderer;
+        VKDevice* m_renderer;
         VkClearValue m_clearValues[kMaxAttachments];
         RefPtr<FramebufferLayoutImpl> m_layout;
     public:
@@ -556,7 +555,7 @@ public:
         {
             m_renderer->m_api.vkDestroyFramebuffer(m_renderer->m_api.m_device, m_handle, nullptr);
         }
-        Result init(VKRenderer* renderer, const IFramebuffer::Desc& desc)
+        Result init(VKDevice* renderer, const IFramebuffer::Desc& desc)
         {
             m_renderer = renderer;
             auto dsv = desc.depthStencilView
@@ -791,7 +790,7 @@ public:
             return nullptr;
         }
     public:
-        DescriptorSetImpl(VKRenderer* renderer)
+        DescriptorSetImpl(VKDevice* renderer)
             : m_renderer(renderer)
         {
         }
@@ -818,7 +817,7 @@ public:
             UInt size,
             void const* data) override;
 
-        VKRenderer*                         m_renderer = nullptr;   ///< Weak pointer, can't be strong, because if set will become circular reference
+        VKDevice*                         m_renderer = nullptr;   ///< Weak pointer, can't be strong, because if set will become circular reference
         RefPtr<DescriptorSetLayoutImpl>     m_layout;
         VulkanDescriptorSet m_descriptorSet = {};
 
@@ -892,14 +891,14 @@ public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
         VkCommandPool m_pool;
-        VKRenderer* m_renderer;
+        VKDevice* m_renderer;
         DescriptorSetAllocator* m_transientDescSetAllocator;
         // Command buffers are deallocated by its command pool,
         // so no need to free individually.
         ~CommandBufferImpl() = default;
 
         Result init(
-            VKRenderer* renderer,
+            VKDevice* renderer,
             VkCommandPool pool,
             DescriptorSetAllocator* transientDescSetAllocator)
         {
@@ -1107,7 +1106,7 @@ public:
                     m_boundPipelines[pipelineBindPointId] = pipeline->m_pipeline;
                 }
 
-                // Next we bind all the descriptor sets that were set in the `VKRenderer`.
+                // Next we bind all the descriptor sets that were set in the `VKDevice`.
                 //
                 auto pipelineLayoutImpl = static_cast<PipelineLayoutImpl*>(pipeline->m_pipelineLayout.get());
                 auto vkPipelineLayout = pipelineLayoutImpl->m_pipelineLayout;
@@ -1656,7 +1655,7 @@ public:
     public:
         Desc m_desc;
         uint32_t m_poolIndex;
-        RefPtr<VKRenderer> m_renderer;
+        RefPtr<VKDevice> m_renderer;
         VkQueue m_queue;
         uint32_t m_queueFamilyIndex;
         VkSemaphore m_pendingWaitSemaphore = VK_NULL_HANDLE;
@@ -1682,7 +1681,7 @@ public:
             }
         }
 
-        void init(VKRenderer* renderer, VkQueue queue, uint32_t queueFamilyIndex)
+        void init(VKDevice* renderer, VkQueue queue, uint32_t queueFamilyIndex)
         {
             m_renderer = renderer;
             m_poolIndex = 0;
@@ -1803,94 +1802,347 @@ public:
         }
 
     public:
-        VulkanSwapChain m_swapChain;
+        struct PlatformDesc
+        {};
+
+#if SLANG_WINDOWS_FAMILY
+        struct WinPlatformDesc : public PlatformDesc
+        {
+            HINSTANCE m_hinstance;
+            HWND m_hwnd;
+        };
+#else
+        struct XPlatformDesc : public PlatformDesc
+        {
+            Display* m_display;
+            Window m_window;
+        };
+#endif
+    public:
+        VkSwapchainKHR m_swapChain;
+        VkSurfaceKHR m_surface;
         VkSemaphore m_nextImageSemaphore; // Semaphore to signal after `acquireNextImage`.
         ISwapchain::Desc m_desc;
+        VkFormat m_vkformat;
         RefPtr<CommandQueueImpl> m_queue;
         ShortList<RefPtr<TextureResourceImpl>> m_images;
-        RefPtr<VKRenderer> m_renderer;
+        RefPtr<VKDevice> m_renderer;
+        VulkanApi* m_api;
         uint32_t m_currentImageIndex = 0;
+        WindowHandle m_windowHandle;
+        void destroySwapchainAndImages()
+        {
+            m_api->vkQueueWaitIdle(m_queue->m_queue);
+            if (m_swapChain != VK_NULL_HANDLE)
+            {
+                m_api->vkDestroySwapchainKHR(m_api->m_device, m_swapChain, nullptr);
+                m_swapChain = VK_NULL_HANDLE;
+            }
 
+            // Mark that it is no longer used
+            m_images.clear();
+        }
+
+        void getWindowSize(int* widthOut, int* heightOut) const
+        {
+#if SLANG_WINDOWS_FAMILY
+            RECT rc;
+            ::GetClientRect((HWND)m_windowHandle.handleValues[0], &rc);
+            *widthOut = rc.right - rc.left;
+            *heightOut = rc.bottom - rc.top;
+#else
+            auto platformDesc = _getPlatformDesc<XPlatformDesc>();
+
+            XWindowAttributes winAttr = {};
+            XGetWindowAttributes(
+                (Display*)m_windowHandle.handleValues[0],
+                (Window)m_windowHandle.handleValues[1],
+                &winAttr);
+
+            *widthOut = winAttr.width;
+            *heightOut = winAttr.height;
+#endif
+        }
+
+        Result createSwapchainAndImages()
+        {
+            int width, height;
+            getWindowSize(&width, &height);
+
+            VkExtent2D imageExtent = {};
+            imageExtent.width = width;
+            imageExtent.height = height;
+
+            m_desc.width = width;
+            m_desc.height = height;
+
+            // catch this before throwing error
+            if (width == 0 || height == 0)
+            {
+                return SLANG_FAIL;
+            }
+
+            // It is necessary to query the caps -> otherwise the LunarG verification layer will
+            // issue an error
+            {
+                VkSurfaceCapabilitiesKHR surfaceCaps;
+
+                SLANG_VK_RETURN_ON_FAIL(m_api->vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
+                    m_api->m_physicalDevice, m_surface, &surfaceCaps));
+            }
+
+            VkPresentModeKHR presentMode;
+            List<VkPresentModeKHR> presentModes;
+            uint32_t numPresentModes = 0;
+            m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(
+                m_api->m_physicalDevice, m_surface, &numPresentModes, nullptr);
+            presentModes.setCount(numPresentModes);
+            m_api->vkGetPhysicalDeviceSurfacePresentModesKHR(
+                m_api->m_physicalDevice, m_surface, &numPresentModes, presentModes.getBuffer());
+
+            {
+                int numCheckPresentOptions = 3;
+                VkPresentModeKHR presentOptions[] = {
+                    VK_PRESENT_MODE_IMMEDIATE_KHR,
+                    VK_PRESENT_MODE_MAILBOX_KHR,
+                    VK_PRESENT_MODE_FIFO_KHR};
+                if (m_desc.enableVSync)
+                {
+                    presentOptions[0] = VK_PRESENT_MODE_FIFO_KHR;
+                    presentOptions[1] = VK_PRESENT_MODE_IMMEDIATE_KHR;
+                    presentOptions[2] = VK_PRESENT_MODE_MAILBOX_KHR;
+                }
+
+                presentMode = VK_PRESENT_MODE_MAX_ENUM_KHR; // Invalid
+
+                // Find the first option that's available on the device
+                for (int j = 0; j < numCheckPresentOptions; j++)
+                {
+                    if (presentModes.indexOf(presentOptions[j]) != Index(-1))
+                    {
+                        presentMode = presentOptions[j];
+                        break;
+                    }
+                }
+
+                if (presentMode == VK_PRESENT_MODE_MAX_ENUM_KHR)
+                {
+                    return SLANG_FAIL;
+                }
+            }
+
+            VkSwapchainKHR oldSwapchain = VK_NULL_HANDLE;
+
+            VkSwapchainCreateInfoKHR swapchainDesc = {};
+            swapchainDesc.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+            swapchainDesc.surface = m_surface;
+            swapchainDesc.minImageCount = m_desc.imageCount;
+            swapchainDesc.imageFormat = m_vkformat;
+            swapchainDesc.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+            swapchainDesc.imageExtent = imageExtent;
+            swapchainDesc.imageArrayLayers = 1;
+            swapchainDesc.imageUsage =
+                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            swapchainDesc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            swapchainDesc.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+            swapchainDesc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+            swapchainDesc.presentMode = presentMode;
+            swapchainDesc.clipped = VK_TRUE;
+            swapchainDesc.oldSwapchain = oldSwapchain;
+
+            SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateSwapchainKHR(
+                m_api->m_device, &swapchainDesc, nullptr, &m_swapChain));
+
+            uint32_t numSwapChainImages = 0;
+            m_api->vkGetSwapchainImagesKHR(
+                m_api->m_device, m_swapChain, &numSwapChainImages, nullptr);
+            List<VkImage> vkImages;
+            {
+                vkImages.setCount(numSwapChainImages);
+                m_api->vkGetSwapchainImagesKHR(
+                    m_api->m_device, m_swapChain, &numSwapChainImages, vkImages.getBuffer());
+            }
+
+            for (uint32_t i = 0; i < m_desc.imageCount; i++)
+            {
+                ITextureResource::Desc imageDesc = {};
+
+                imageDesc.init2D(
+                    IResource::Type::Texture2D, m_desc.format, m_desc.width, m_desc.height, 1);
+                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(
+                    imageDesc, gfx::IResource::Usage::RenderTarget, m_api);
+                image->m_image = vkImages[i];
+                image->m_imageMemory = 0;
+                image->m_vkformat = m_vkformat;
+                image->m_isWeakImageReference = true;
+                m_images.add(image);
+            }
+            return SLANG_OK;
+        }
     public:
         ~SwapchainImpl()
         {
-            m_swapChain.destroy();
+            destroySwapchainAndImages();
+            if (m_surface)
+            {
+                m_api->vkDestroySurfaceKHR(m_api->m_instance, m_surface, nullptr);
+                m_surface = VK_NULL_HANDLE;
+            }
             m_renderer->m_api.vkDestroySemaphore(
                 m_renderer->m_api.m_device, m_nextImageSemaphore, nullptr);
         }
-        Result init(VKRenderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+
+        static Index _indexOfFormat(List<VkSurfaceFormatKHR>& formatsIn, VkFormat format)
+        {
+            const Index numFormats = formatsIn.getCount();
+            const VkSurfaceFormatKHR* formats = formatsIn.getBuffer();
+
+            for (Index i = 0; i < numFormats; ++i)
+            {
+                if (formats[i].format == format)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        Result init(VKDevice* renderer, const ISwapchain::Desc& desc, WindowHandle window)
         {
             m_desc = desc;
             m_renderer = renderer;
+            m_api = &renderer->m_api;
             m_queue = static_cast<CommandQueueImpl*>(desc.queue);
+            m_windowHandle = window;
 
             VkSemaphoreCreateInfo semaphoreCreateInfo = {};
             semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
             SLANG_VK_RETURN_ON_FAIL(renderer->m_api.vkCreateSemaphore(
                 renderer->m_api.m_device, &semaphoreCreateInfo, nullptr, &m_nextImageSemaphore));
 
-            VulkanSwapChain::Desc swapchainDesc;
-            VulkanSwapChain::PlatformDesc* platformDesc = nullptr;
-            swapchainDesc.m_imageCount = desc.imageCount;
-            swapchainDesc.init();
-            swapchainDesc.m_format = desc.format;
-            swapchainDesc.m_vsync = desc.enableVSync;
+            m_queue = static_cast<CommandQueueImpl*>(desc.queue);
+
+             // Make sure it's not set initially
+            m_vkformat = VK_FORMAT_UNDEFINED;
+
 #if SLANG_WINDOWS_FAMILY
-            VulkanSwapChain::WinPlatformDesc winPlatformDesc;
-            winPlatformDesc.m_hinstance = ::GetModuleHandle(nullptr);
-            winPlatformDesc.m_hwnd = (HWND)window.handleValues[0];
-            platformDesc = &winPlatformDesc;
+            VkWin32SurfaceCreateInfoKHR surfaceCreateInfo = {};
+            surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.hinstance = ::GetModuleHandle(nullptr);
+            surfaceCreateInfo.hwnd = (HWND)window.handleValues[0];
+            SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateWin32SurfaceKHR(
+                m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
+#else
+            VkXlibSurfaceCreateInfoKHR surfaceCreateInfo = {};
+            surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.dpy = (Display*)window.handleValues[0];
+            surfaceCreateInfo.window = (Window)window.handleValues[1];
+            SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateXlibSurfaceKHR(
+                m_api->m_instance, &surfaceCreateInfo, nullptr, &m_surface));
 #endif
 
-            m_queue = static_cast<CommandQueueImpl*>(desc.queue);
-            SLANG_RETURN_ON_FAIL(m_swapChain.init(
-                &renderer->m_api,
-                m_queue->m_queue,
-                m_queue->m_queueFamilyIndex,
-                swapchainDesc,
-                platformDesc));
-            m_desc.format = m_swapChain.getDesc().m_format;
-            m_desc.width = m_swapChain.getWidth();
-            m_desc.height = m_swapChain.getHeight();
-            m_desc.imageCount = m_swapChain.getDesc().m_imageCount;
-            auto& images = m_swapChain.getImages();
-            for (uint32_t i = 0; i < desc.imageCount; i++)
-            {
-                ITextureResource::Desc imageDesc = {};
+            VkBool32 supported = false;
+            m_api->vkGetPhysicalDeviceSurfaceSupportKHR(
+                m_api->m_physicalDevice, renderer->m_queueFamilyIndex, m_surface, &supported);
 
-                imageDesc.init2D(
-                    IResource::Type::Texture2D,
-                    m_swapChain.getDesc().m_format,
-                    m_swapChain.getWidth(),
-                    m_swapChain.getHeight(),
-                    1);
-                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(
-                    imageDesc, gfx::IResource::Usage::RenderTarget, &renderer->m_api);
-                image->m_image = images[i];
-                image->m_imageMemory = 0;
-                image->m_vkformat = m_swapChain.getVkFormat();
-                image->m_isWeakImageReference = true;
-                m_images.add(image);
+            uint32_t numSurfaceFormats = 0;
+            List<VkSurfaceFormatKHR> surfaceFormats;
+            m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(
+                m_api->m_physicalDevice, m_surface, &numSurfaceFormats, nullptr);
+            surfaceFormats.setCount(int(numSurfaceFormats));
+            m_api->vkGetPhysicalDeviceSurfaceFormatsKHR(
+                m_api->m_physicalDevice, m_surface, &numSurfaceFormats, surfaceFormats.getBuffer());
+
+            // Look for a suitable format
+            List<VkFormat> formats;
+            formats.add(VulkanUtil::getVkFormat(desc.format));
+            // HACK! To check for a different format if couldn't be found
+            if (desc.format == Format::RGBA_Unorm_UInt8)
+            {
+                formats.add(VK_FORMAT_B8G8R8A8_UNORM);
             }
+
+            for (Index i = 0; i < formats.getCount(); ++i)
+            {
+                VkFormat format = formats[i];
+                if (_indexOfFormat(surfaceFormats, format) >= 0)
+                {
+                    m_vkformat = format;
+                }
+            }
+
+            if (m_vkformat == VK_FORMAT_UNDEFINED)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Save the desc
+            m_desc = desc;
+            if (m_desc.format == Format::RGBA_Unorm_UInt8 &&
+                m_vkformat == VK_FORMAT_B8G8R8A8_UNORM)
+            {
+                m_desc.format = Format::BGRA_Unorm_UInt8;
+            }
+
+            SLANG_RETURN_ON_FAIL(createSwapchainAndImages());
             return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() { return m_desc; }
-        virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource)
+        virtual SLANG_NO_THROW Result
+            SLANG_MCALL getImage(uint32_t index, ITextureResource** outResource)
         {
+            if (m_images.getCount() <= (Index)index)
+                return SLANG_FAIL;
             *outResource = m_images[index];
             m_images[index]->addRef();
             return SLANG_OK;
         }
-        virtual SLANG_NO_THROW Result present()
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height)
         {
-            m_swapChain.present(m_queue->m_pendingWaitSemaphore);
+            SLANG_UNUSED(width);
+            SLANG_UNUSED(height);
+            destroySwapchainAndImages();
+            return createSwapchainAndImages();
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL present()
+        {
+            uint32_t swapChainIndices[] = {uint32_t(m_currentImageIndex)};
+
+            VkPresentInfoKHR presentInfo = {};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            presentInfo.swapchainCount = 1;
+            presentInfo.pSwapchains = &m_swapChain;
+            presentInfo.pImageIndices = swapChainIndices;
+            if (m_queue->m_pendingWaitSemaphore != VK_NULL_HANDLE)
+            {
+                presentInfo.waitSemaphoreCount = 1;
+                presentInfo.pWaitSemaphores = &m_queue->m_pendingWaitSemaphore;
+            }
+            m_api->vkQueuePresentKHR(m_queue->m_queue, &presentInfo);
             m_queue->m_pendingWaitSemaphore = VK_NULL_HANDLE;
             return SLANG_OK;
         }
-        virtual SLANG_NO_THROW uint32_t acquireNextImage()
+        virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage()
         {
-            m_currentImageIndex = (uint32_t)m_swapChain.nextFrontImageIndex(m_nextImageSemaphore);
+            if (!m_images.getCount())
+                return -1;
+
+            m_currentImageIndex = -1;
+            VkResult result = m_api->vkAcquireNextImageKHR(
+                m_api->m_device,
+                m_swapChain,
+                UINT64_MAX,
+                m_nextImageSemaphore,
+                VK_NULL_HANDLE,
+                (uint32_t*)&m_currentImageIndex);
+
+            if (result != VK_SUCCESS)
+            {
+                m_currentImageIndex = -1;
+                destroySwapchainAndImages();
+                return m_currentImageIndex;
+            }
             // Make the queue's next submit wait on `m_nextImageSemaphore`.
             m_queue->m_pendingWaitSemaphore = m_nextImageSemaphore;
             return m_currentImageIndex;
@@ -1913,6 +2165,12 @@ public:
 
     void _transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout);
 
+public:
+    // VKDevice members.
+
+    DeviceInfo m_info;
+    String m_adapterName;
+
     VkDebugReportCallbackEXT m_debugReportCallback;
 
     VkDevice m_device = VK_NULL_HANDLE;
@@ -1930,9 +2188,9 @@ public:
     uint32_t m_queueAllocCount;
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VKDevice::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
+Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
 {
     assert(!isInitialized());
 
@@ -1964,17 +2222,17 @@ Result VKRenderer::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBuffe
     return SLANG_OK;
 }
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VkRenderer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VKDevice !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-Result SLANG_MCALL createVKRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
+Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outRenderer)
 {
-    RefPtr<VKRenderer> result = new VKRenderer();
+    RefPtr<VKDevice> result = new VKDevice();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
 
-VKRenderer::~VKRenderer()
+VKDevice::~VKDevice()
 {
     // Check the device queue is valid else, we can't wait on it..
     if (m_deviceQueue.isValid())
@@ -1999,7 +2257,7 @@ VKRenderer::~VKRenderer()
 }
 
 
-VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
+VkBool32 VKDevice::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
     size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg)
 {
     char const* severity = "message";
@@ -2031,13 +2289,13 @@ VkBool32 VKRenderer::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugRepo
     return VK_FALSE;
 }
 
-/* static */VKAPI_ATTR VkBool32 VKAPI_CALL VKRenderer::debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
+/* static */VKAPI_ATTR VkBool32 VKAPI_CALL VKDevice::debugMessageCallback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
     size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData)
 {
-    return ((VKRenderer*)pUserData)->handleDebugMessage(flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
+    return ((VKDevice*)pUserData)->handleDebugMessage(flags, objType, srcObject, location, msgCode, pLayerPrefix, pMsg);
 }
 
-VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
+VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
     IShaderProgram::KernelDesc const&    kernelDesc,
     VkShaderStageFlagBits stage,
     List<char>& outBuffer,
@@ -2073,7 +2331,7 @@ VkPipelineShaderStageCreateInfo VKRenderer::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result VKRenderer::initVulkanInstanceAndDevice(bool useValidationLayer)
+Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 {
     m_queueAllocCount = 0;
 
@@ -2211,6 +2469,14 @@ Result VKRenderer::initVulkanInstanceAndDevice(bool useValidationLayer)
     }
 
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
+
+    // Obtain the name of the selected adapter.
+    {
+        VkPhysicalDeviceProperties basicProps = {};
+        m_api.vkGetPhysicalDeviceProperties(physicalDevices[selectedDeviceIndex], &basicProps);
+        m_adapterName = basicProps.deviceName;
+        m_info.adapterName = m_adapterName.begin();
+    }
 
     List<const char*> deviceExtensions;
     deviceExtensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
@@ -2354,8 +2620,18 @@ Result VKRenderer::initVulkanInstanceAndDevice(bool useValidationLayer)
     return SLANG_OK;
 }
 
-SlangResult VKRenderer::initialize(const Desc& desc)
+SlangResult VKDevice::initialize(const Desc& desc)
 {
+    // Initialize device info.
+    {
+        m_info.apiName = "Vulkan";
+        m_info.bindingStyle = BindingStyle::Vulkan;
+        m_info.projectionStyle = ProjectionStyle::Vulkan;
+        m_info.deviceType = DeviceType::Vulkan;
+        static const float kIdentity[] = {1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
+    }
+
     m_desc = desc;
 
     SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
@@ -2374,12 +2650,12 @@ SlangResult VKRenderer::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-void VKRenderer::waitForGpu()
+void VKDevice::waitForGpu()
 {
     m_deviceQueue.flushAndWait();
 }
 
-Result VKRenderer::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
+Result VKDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
     // Only support one queue for now.
     if (m_queueAllocCount != 0)
@@ -2394,7 +2670,7 @@ Result VKRenderer::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQ
     return SLANG_OK;
 }
 
-Result VKRenderer::createSwapchain(
+Result VKDevice::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
     RefPtr<SwapchainImpl> sc = new SwapchainImpl();
@@ -2403,7 +2679,7 @@ Result VKRenderer::createSwapchain(
     return SLANG_OK;
 }
 
-Result VKRenderer::createFramebufferLayout(const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
+Result VKDevice::createFramebufferLayout(const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
@@ -2411,7 +2687,7 @@ Result VKRenderer::createFramebufferLayout(const IFramebufferLayout::Desc& desc,
     return SLANG_OK;
 }
 
-Result VKRenderer::createRenderPassLayout(
+Result VKDevice::createRenderPassLayout(
     const IRenderPassLayout::Desc& desc,
     IRenderPassLayout** outRenderPassLayout)
 {
@@ -2421,7 +2697,7 @@ Result VKRenderer::createRenderPassLayout(
     return SLANG_OK;
 }
 
-Result VKRenderer::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
+Result VKDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
     RefPtr<FramebufferImpl> fb = new FramebufferImpl();
     SLANG_RETURN_ON_FAIL(fb->init(this, desc));
@@ -2429,7 +2705,7 @@ Result VKRenderer::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffe
     return SLANG_OK;
 }
 
-SlangResult VKRenderer::readTextureResource(
+SlangResult VKDevice::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
     ISlangBlob** outBlob,
@@ -2443,7 +2719,7 @@ SlangResult VKRenderer::readTextureResource(
     return SLANG_FAIL;
 }
 
-SlangResult VKRenderer::readBufferResource(
+SlangResult VKDevice::readBufferResource(
     IBufferResource* inBuffer,
     size_t offset,
     size_t size,
@@ -2616,7 +2892,7 @@ bool isStencilFormat(VkFormat format)
     return false;
 }
 
-void VKRenderer::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout)
+void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -2724,7 +3000,7 @@ size_t calcNumRows(Format format, int height)
     return (size_t)height;
 }
 
-Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
+Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
 {
     TextureResource::Desc desc(descIn);
     desc.setDefaults(initialUsage);
@@ -2958,7 +3234,7 @@ Result VKRenderer::createTextureResource(IResource::Usage initialUsage, const IT
     return SLANG_OK;
 }
 
-Result VKRenderer::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
+Result VKDevice::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     BufferResource::Desc desc(descIn);
     desc.setDefaults(initialUsage);
@@ -3126,7 +3402,7 @@ static VkStencilOpState translateStencilState(DepthStencilOpDesc desc)
     return rs;
 }
 
-Result VKRenderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
+Result VKDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
     VkSamplerCreateInfo samplerInfo = { VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 
@@ -3157,7 +3433,7 @@ Result VKRenderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerS
     return SLANG_OK;
 }
 
-Result VKRenderer::createTextureView(ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
+Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
     RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(&m_api);
@@ -3234,7 +3510,7 @@ Result VKRenderer::createTextureView(ITextureResource* texture, IResourceView::D
     return SLANG_OK;
 }
 
-Result VKRenderer::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
+Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
@@ -3308,7 +3584,7 @@ Result VKRenderer::createBufferView(IBufferResource* buffer, IResourceView::Desc
     }
 }
 
-Result VKRenderer::createInputLayout(const InputElementDesc* elements, UInt numElements, IInputLayout** outLayout)
+Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numElements, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
@@ -3395,7 +3671,7 @@ static VkDescriptorType translateDescriptorType(DescriptorSlotType type)
     }
 }
 
-Result VKRenderer::createDescriptorSetLayout(const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout)
+Result VKDevice::createDescriptorSetLayout(const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout)
 {
     RefPtr<DescriptorSetLayoutImpl> descriptorSetLayoutImpl = new DescriptorSetLayoutImpl(m_api);
 
@@ -3507,7 +3783,7 @@ Result VKRenderer::createDescriptorSetLayout(const IDescriptorSetLayout::Desc& d
     return SLANG_OK;
 }
 
-Result VKRenderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout)
+Result VKDevice::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout)
 {
     UInt descriptorSetCount = desc.descriptorSetCount;
 
@@ -3569,7 +3845,7 @@ Result VKRenderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipe
     return SLANG_OK;
 }
 
-Result VKRenderer::createDescriptorSet(
+Result VKDevice::createDescriptorSet(
     IDescriptorSetLayout* layout,
     IDescriptorSet::Flag::Enum flag,
     IDescriptorSet** outDescriptorSet)
@@ -3588,7 +3864,7 @@ Result VKRenderer::createDescriptorSet(
     return SLANG_OK;
 }
 
-void VKRenderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, IBufferResource* buffer)
+void VKDevice::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, IBufferResource* buffer)
 {
     auto bufferImpl = (BufferResourceImpl*)buffer;
 
@@ -3614,7 +3890,7 @@ void VKRenderer::DescriptorSetImpl::setConstantBuffer(UInt range, UInt index, IB
     m_boundObjects[boundObjectIndex] = dynamic_cast<RefObject*>(buffer);
 }
 
-void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
+void VKDevice::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
 {
     SLANG_ASSERT(range < UInt(m_layout->m_ranges.getCount()));
     auto& rangeInfo = m_layout->m_ranges[range];
@@ -3685,7 +3961,7 @@ void VKRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourc
     m_boundObjects[boundObjectIndex] = dynamic_cast<RefObject*>(view);
 }
 
-void VKRenderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
+void VKDevice::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
 {
     SLANG_ASSERT(range < UInt(m_layout->m_ranges.getCount()));
     auto& rangeInfo = m_layout->m_ranges[range];
@@ -3708,7 +3984,7 @@ void VKRenderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerS
     m_boundObjects[boundObjectIndex] = dynamic_cast<RefObject*>(sampler);
 }
 
-void VKRenderer::DescriptorSetImpl::setCombinedTextureSampler(
+void VKDevice::DescriptorSetImpl::setCombinedTextureSampler(
     UInt range,
     UInt index,
     IResourceView*   textureView,
@@ -3731,7 +4007,7 @@ void VKRenderer::DescriptorSetImpl::setCombinedTextureSampler(
     m_boundObjects[boundObjectIndex + 1] = dynamic_cast<RefObject*>(sampler);
 }
 
-void VKRenderer::DescriptorSetImpl::setRootConstants(
+void VKDevice::DescriptorSetImpl::setRootConstants(
     UInt range,
     UInt offset,
     UInt size,
@@ -3756,7 +4032,7 @@ void VKRenderer::DescriptorSetImpl::setRootConstants(
     memcpy(m_rootConstantData.getBuffer() + rootConstantRangeInfo.offset + offset, data, size);
 }
 
-Result VKRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
     {
@@ -3791,7 +4067,7 @@ Result VKRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgra
     return SLANG_OK;
 }
 
-Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
+Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
@@ -3965,7 +4241,7 @@ Result VKRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     return SLANG_OK;
 }
 
-Result VKRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
+Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
 {
     ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
