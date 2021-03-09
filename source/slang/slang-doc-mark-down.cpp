@@ -327,6 +327,46 @@ void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndM
     }
 }
 
+static void _addRequirements(Decl* decl, List<String>& outRequirements)
+{
+    StringBuilder buf;
+
+    if (auto spirvRequiredModifier = decl->findModifier<RequiredSPIRVVersionModifier>())
+    {
+        buf.Clear();
+        buf << "SPIR-V ";
+        spirvRequiredModifier->version.append(buf);
+        outRequirements.add(buf);
+    }
+
+    if (auto glslRequiredModifier = decl->findModifier<RequiredGLSLVersionModifier>())
+    {
+        buf.Clear();
+        buf << "GLSL" << glslRequiredModifier->versionNumberToken.getContent();
+        outRequirements.add(buf);
+    }
+
+    if (auto cudaSMVersionModifier = decl->findModifier<RequiredCUDASMVersionModifier>())
+    {
+        buf.Clear();
+        buf << "CUDA ";
+        cudaSMVersionModifier->version.append(buf);
+        outRequirements.add(buf);
+    }
+
+    if (auto extensionModifier = decl->findModifier<RequiredGLSLExtensionModifier>())
+    {
+        buf.Clear();
+        buf << "GLSL " << extensionModifier->extensionNameToken.getContent();
+        outRequirements.add(buf);
+    }
+
+    if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
+    {
+        outRequirements.add("NVAPI");
+    }
+}
+
 void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
 {
     auto& out = m_builder;
@@ -350,14 +390,16 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
     writeDescription(entry);
 
     List<CallableDecl*> sigs;
-
-    // Output the signature
-    {        
-        
+    {
         for (Decl* curDecl = callableDecl; curDecl; curDecl = curDecl->nextInContainerWithSameName)
         {
             CallableDecl* sig = as<CallableDecl>(curDecl);
-            if (sig)
+            if (!sig)
+            {
+                continue;
+            }
+            // Want to add only the primary sig
+            if (sig->primaryDecl == nullptr || sig->primaryDecl == sig)
             {
                 sigs.add(sig);
             }
@@ -365,7 +407,26 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
 
         // Lets put back into source order
         sigs.sort([](CallableDecl* a, CallableDecl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
+    }
 
+    // We want to determine the unique signature, and then the requirements for the signature
+
+    {
+        for (auto sig : sigs)
+        {
+            // Add the requirements for all the different versions
+            List<String> requirement;
+            for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
+            {
+                _addRequirements(sig, requirement);
+            }
+
+            requirement.sort();
+        }
+    }
+
+    // Output the signature
+    {          
         out << toSlice("## Signature \n");
         out << toSlice("```\n");
         for (auto sig : sigs)
@@ -505,8 +566,6 @@ void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, Agg
         }
     }
 }
-
-
 
 void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
 {
