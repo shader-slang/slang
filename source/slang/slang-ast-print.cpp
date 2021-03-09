@@ -90,15 +90,14 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
         
         sb << toSlice("::");
     }
-    
-#if 0
-    // TODO(JS): Need to do something about extensions.
     else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
-        _addDeclPathRec(extensionDeclRef);
+        ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
+        Type* type = extensionDecl->targetType.type;
+        addType(type);
         sb << toSlice(".");
     }
-#endif
+
 
     _addDeclName(declRef.getDecl());
 

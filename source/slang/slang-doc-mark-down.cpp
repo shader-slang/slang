@@ -205,10 +205,18 @@ void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
 
     const Index paramCount = signature.params.getCount();
 
-    out << printer.getPartSlice(signature.returnType) << toSlice(" ");
+    {
+        // Some types (like constructors say) don't have any return type, so check before outputting
+        const UnownedStringSlice returnType = printer.getPartSlice(signature.returnType);
+        if (returnType.getLength() > 0)
+        {
+            out << returnType << toSlice(" ");
+        }
+    }
 
     out << printer.getPartSlice(signature.name);
 
+#if 0
     if (signature.genericParams.getCount())
     {
         out << toSlice("<");
@@ -230,43 +238,59 @@ void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
         }
         out << toSlice(">");
     }
+#endif
 
-    if (paramCount > 0)
+    switch (paramCount)
     {
-        out << toSlice("(\n");
-
-        StringBuilder line;
-        for (Index i = 0; i < paramCount; ++i)
+        case 0:
         {
-            const auto& param = signature.params[i];
-            line.Clear();
-            // If we want to tab these over... we'll need to know how must space I have
-            line << "    " << printer.getPartSlice(param.first);
-
-            Index indent = 25;
-            if (line.getLength() < indent)
-            {
-                line.appendRepeatedChar(' ', indent - line.getLength());
-            }
-            else
-            {
-                line.appendChar(' ');
-            }
-
-            line << printer.getPartSlice(param.second);
-            if (i < paramCount - 1)
-            {
-                line << ",\n";
-            }
-
-            out << line;
+            // Has no parameters
+            out << toSlice("();\n");
+            break;
         }
+        case 1:
+        {
+            // Place all on single line
+            out.appendChar('(');
+            const auto& param = signature.params[0];
+            out << printer.getPartSlice(param.first) << toSlice(" ") << printer.getPartSlice(param.second);
+            out << ");\n";
+            break;
+        }
+        default:
+        {
+            // Put each parameter on a line on it's own
+            out << toSlice("(\n");
+            StringBuilder line;
+            for (Index i = 0; i < paramCount; ++i)
+            {
+                const auto& param = signature.params[i];
+                line.Clear();
+                // If we want to tab these over... we'll need to know how must space I have
+                line << "    " << printer.getPartSlice(param.first);
 
-        out << ");\n";
-    }
-    else
-    {
-        out << toSlice("();\n");
+                Index indent = 25;
+                if (line.getLength() < indent)
+                {
+                    line.appendRepeatedChar(' ', indent - line.getLength());
+                }
+                else
+                {
+                    line.appendChar(' ');
+                }
+
+                line << printer.getPartSlice(param.second);
+                if (i < paramCount - 1)
+                {
+                    line << ",\n";
+                }
+
+                out << line;
+            }
+
+            out << ");\n";
+            break;
+        }
     }
 }
 
