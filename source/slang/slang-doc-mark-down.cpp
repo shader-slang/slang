@@ -798,9 +798,17 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
 
         // We only write out for the primary/first
         bool isFirst = false;
-        if (callableDecl->getName())
+        
+        Name* declName = callableDecl->getName();
+        if (declName)
         {
-            Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(callableDecl->getName());
+            // If name starts with __ assume it's internal and ignore
+            if (declName->text.startsWith(toSlice("__")))
+            {
+                return;
+            }
+            
+            Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(declName);
             isFirst = (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
         }
 
