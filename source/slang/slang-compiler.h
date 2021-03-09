@@ -2263,8 +2263,7 @@ namespace Slang
         void addBuiltinSource(
             RefPtr<Scope> const&    scope,
             String const&           path,
-            String const&           source,
-            slang::CompileStdLibFlags compileFlags);
+            String const&           source);
         ~Session();
 
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)

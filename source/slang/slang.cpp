@@ -214,8 +214,7 @@ void Session::addBuiltins(
     addBuiltinSource(
         coreLanguageScope,
         sourcePath,
-        sourceString,
-        0);
+        sourceString);
 }
 
 void Session::setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
@@ -255,12 +254,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     }
 
     // TODO(JS): Could make this return a SlangResult as opposed to exception
-    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode(), compileFlags);
-    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode(), compileFlags);
+    addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
+    addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
 
     if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
     {
-        
         // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
         // cause any problems with scoping
 
@@ -271,6 +269,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
         List<String> docStrings;
 
+        // For all the modules add their doc output to docStrings
         for (Module* stdlibModule : stdlibModules)
         { 
             RefPtr<DocMarkup> markup(new DocMarkup);
@@ -281,6 +280,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
             docStrings.add(writer.getOutput());
         }
 
+        // Combine all together in stdlib-doc.md output fiel
         {
             String fileName("stdlib-doc.md");
 
@@ -3644,11 +3644,8 @@ RefPtr<Module> findOrImportModule(
 void Session::addBuiltinSource(
     RefPtr<Scope> const&    scope,
     String const&           path,
-    String const&           source,
-    slang::CompileStdLibFlags flags)
+    String const&           source)
 {
-    SLANG_UNUSED(flags);
-
     SourceManager* sourceManager = getBuiltinSourceManager();
 
     DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
