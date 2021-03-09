@@ -731,7 +731,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
     {
         TokenList tokens;
 
-        MemoryArena memoryArena;
+        MemoryArena memoryArena(4096);
+
         RootNamePool rootNamePool;
         NamePool namePool;
         namePool.setRootNamePool(&rootNamePool);

@@ -257,6 +257,42 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode(), compileFlags);
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode(), compileFlags);
+
+    if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
+    {
+        
+        // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
+        // cause any problems with scoping
+
+        ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
+        SourceManager* sourceManager = getBuiltinSourceManager();
+
+        DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
+
+        List<String> docStrings;
+
+        for (Module* stdlibModule : stdlibModules)
+        { 
+            RefPtr<DocMarkup> markup(new DocMarkup);
+            DocMarkupExtractor::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
+
+            DocMarkDownWriter writer(markup, astBuilder);
+            writer.writeAll();
+            docStrings.add(writer.getOutput());
+        }
+
+        {
+            String fileName("stdlib-doc.md");
+
+            StreamWriter writer(new FileStream(fileName, FileMode::Create));
+
+            for (auto& docString : docStrings)
+            {
+                writer.Write(docString);
+            }
+        }
+    }
+
     return SLANG_OK;
 }
 
@@ -3611,6 +3647,8 @@ void Session::addBuiltinSource(
     String const&           source,
     slang::CompileStdLibFlags flags)
 {
+    SLANG_UNUSED(flags);
+
     SourceManager* sourceManager = getBuiltinSourceManager();
 
     DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
@@ -3618,8 +3656,6 @@ void Session::addBuiltinSource(
         m_builtinLinkage,
         &sink);
     compileRequest->m_isStandardLibraryCode = true;
-
-    compileRequest->shouldDocument = (flags & slang::CompileStdLibFlag::WriteDocumentation) != 0;
 
     // Set the source manager on the sink
     sink.setSourceManager(sourceManager);
