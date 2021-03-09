@@ -2118,10 +2118,10 @@ SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** ou
     return SLANG_OK;
 }
 #else
-SlangResult SLANG_MCALL createCUDADevice(const IRenderer::Desc* desc, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** outDevice)
 {
     SLANG_UNUSED(desc);
-    *outRenderer = nullptr;
+    *outDevice = nullptr;
     return SLANG_OK;
 }
 #endif
