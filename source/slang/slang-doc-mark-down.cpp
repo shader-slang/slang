@@ -111,7 +111,7 @@ void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
     _appendAsBullets(decls);
 }
 
-void DocMarkDownWriter::_appendCommaList(List<InheritanceDecl*>& inheritanceDecls)
+void DocMarkDownWriter::_appendCommaList(const List<InheritanceDecl*>& inheritanceDecls)
 {
     for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
     {
@@ -120,6 +120,18 @@ void DocMarkDownWriter::_appendCommaList(List<InheritanceDecl*>& inheritanceDecl
             m_builder << toSlice(", ");
         }
         m_builder << inheritanceDecls[i]->base;
+    }
+}
+
+void DocMarkDownWriter::_appendCommaList(const List<String>& strings)
+{
+    for (Index i = 0; i < strings.getCount(); ++i)
+    {
+        if (i > 0)
+        {
+            m_builder << toSlice(", ");
+        }
+        m_builder << strings[i];
     }
 }
 
@@ -327,7 +339,7 @@ void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndM
     }
 }
 
-static void _addRequirements(Decl* decl, List<String>& outRequirements)
+static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
 {
     StringBuilder buf;
 
@@ -336,14 +348,14 @@ static void _addRequirements(Decl* decl, List<String>& outRequirements)
         buf.Clear();
         buf << "SPIR-V ";
         spirvRequiredModifier->version.append(buf);
-        outRequirements.add(buf);
+        outRequirements.Add(buf);
     }
 
     if (auto glslRequiredModifier = decl->findModifier<RequiredGLSLVersionModifier>())
     {
         buf.Clear();
         buf << "GLSL" << glslRequiredModifier->versionNumberToken.getContent();
-        outRequirements.add(buf);
+        outRequirements.Add(buf);
     }
 
     if (auto cudaSMVersionModifier = decl->findModifier<RequiredCUDASMVersionModifier>())
@@ -351,19 +363,19 @@ static void _addRequirements(Decl* decl, List<String>& outRequirements)
         buf.Clear();
         buf << "CUDA ";
         cudaSMVersionModifier->version.append(buf);
-        outRequirements.add(buf);
+        outRequirements.Add(buf);
     }
 
     if (auto extensionModifier = decl->findModifier<RequiredGLSLExtensionModifier>())
     {
         buf.Clear();
         buf << "GLSL " << extensionModifier->extensionNameToken.getContent();
-        outRequirements.add(buf);
+        outRequirements.Add(buf);
     }
 
     if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
     {
-        outRequirements.add("NVAPI");
+        outRequirements.Add("NVAPI");
     }
 }
 
@@ -411,35 +423,108 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
 
     // We want to determine the unique signature, and then the requirements for the signature
 
+    List<Index> requirementMap;
+    List<List<String>> uniqueReqirements;
+
     {
-        for (auto sig : sigs)
+        requirementMap.setCount(sigs.getCount());
+
+        for (Index i = 0; i < sigs.getCount(); ++i)
         {
+            CallableDecl* sig = sigs[i];
             // Add the requirements for all the different versions
-            List<String> requirement;
+            HashSet<String> requirementsSet;
+
             for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
             {
-                _addRequirements(sig, requirement);
+                _addRequirements(sig, requirementsSet);
             }
 
-            requirement.sort();
+            // -1 means no specific requirements
+            Index index = -1;
+
+            if (requirementsSet.Count())
+            {
+                List<String> requirements;
+                for (auto& requirement : requirementsSet)
+                {
+                    requirements.add(requirement);
+                }
+
+                requirements.sort();
+
+                index = uniqueReqirements.indexOf(requirements);
+                if (index < 0)
+                {
+                    index = uniqueReqirements.getCount();
+                    uniqueReqirements.add(requirements);
+                }
+            }
+
+            requirementMap[i] = index;
         }
     }
-
+    
     // Output the signature
     {          
         out << toSlice("## Signature \n");
         out << toSlice("```\n");
-        for (auto sig : sigs)
+
+        Index prevRequirementsIndex = -1;
+
+        const Int sigCount = sigs.getCount();
+        for (Index i = 0; i < sigCount; ++i)
         {
+            auto sig = sigs[i];
+
+            // Output if needs unique requirements
+            if (uniqueReqirements.getCount() > 1)
+            {
+                const Index requirementsIndex = requirementMap[i];
+                if (requirementsIndex != prevRequirementsIndex)
+                {
+                    if (requirementsIndex >= 0)
+                    {
+                        out << toSlice("/// See ") << (requirementsIndex + 1) << toSlice("\n");
+                    }
+                    else
+                    {
+                        out << toSlice("/// No requirements\n");
+                    }
+                    prevRequirementsIndex = requirementsIndex;
+                }
+            }
+
             writeSignature(sig);
         }
         out << "```\n\n";
     }
 
     {
-        // We will use the first documentation found for each parameter type
+        const Index uniqueCount = uniqueReqirements.getCount();
+        if (uniqueCount > 0 && uniqueReqirements[0].getCount() > 0)
+        {
+            out << toSlice("## Requirements\n\n");
+            if (uniqueCount > 1)
+            {
+                for (Index i = 0; i < uniqueCount; ++i)
+                {
+                    out << toSlice("* _") << (i + 1) << ("_ ");
+                    _appendCommaList(uniqueReqirements[i]);
+                    out << toSlice("\n");
+                }
+            }
+            else
+            {
+                _appendCommaList(uniqueReqirements[0]);
+                out << toSlice("\n");
+            }
+            out << toSlice("\n");
+        }
+    }
 
-#if 1
+    {
+        // We will use the first documentation found for each parameter type
         {
             List<Decl*> paramDecls;
             List<Decl*> genericDecls;
@@ -484,41 +569,6 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
                 _appendAsBullets(params);
             }
         }
-#else
-
-        {
-            GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
-
-            // The parameters, in order
-            List<Decl*> params;
-
-            // We list generic parameters, as types of parameters, if they are directly associated with this
-            // callable.
-            if (genericDecl)
-            {
-                for (Decl* decl : genericDecl->members)
-                {
-                    if (as<GenericTypeParamDecl>(decl) ||
-                        as<GenericValueParamDecl>(decl))
-                    {
-                        params.add(decl);
-                    }
-                }
-            }
-
-            for (ParamDecl* paramDecl : callableDecl->getParameters())
-            {
-                params.add(paramDecl);
-            }
-
-            if (params.getCount())
-            {
-                out << "## Parameters\n\n";
-                // We have generic params and regular parameters, in this list
-                _appendAsBullets(params);
-            }
-        }
-#endif
     }
 }
 
