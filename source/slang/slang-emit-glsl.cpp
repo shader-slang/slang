@@ -95,6 +95,7 @@ void GLSLSourceEmitter::_requireGLSLVersion(int version)
         CASE(430);
         CASE(440);
         CASE(450);
+        CASE(460);
 
 #undef CASE
     }
@@ -1801,14 +1802,46 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         {
             case kIROp_RaytracingAccelerationStructureType:
             {
-                _requireRayTracing();
-
+                // Note: We have the problem here that we want to do `_requireRayTracing()`,
+                // but just based on the use of a ray-tracing acceleration structure we
+                // cannot know which extension the user means to use. The current options are:
+                //
+                //  * GL_NV_ray_tracing
+                //  * GL_EXT_ray_tracing
+                //  * GL_EXT_ray_query
+                //
+                // The first two options there are basically equivalent extensions with
+                // different GLSL syntax. We end up requiring the user to opt in to
+                // `GL_NV_ray_tracing` using target capabilities, and will always default
+                // to `GL_EXT_ray_tracing` otherwise.
+                //
                 if( getTargetCaps().implies(CapabilityAtom::GL_NV_ray_tracing) )
                 {
+                    // If the user has explicitly opted in to `GL_NV_ray_tracing`,
+                    // then we don't need to explicitly request the extentsion again.
+                    // We know that the acceleration structure type will translate
+                    // to the one from that extension:
+                    //
                     m_writer->emit("accelerationStructureNV");
                 }
                 else
                 {
+                    // If the user does *not* opt into a specific extension, then we
+                    // have the problem that either `GL_EXT_ray_tracing` or `GL_EXT_ray-query`
+                    // could provide the `accelerationSturctureEXT` type, but there
+                    // can be drivers that provide only one and not the other.
+                    //
+                    // Because we can't pick one upon just seeing the type, we need to
+                    // emit the type here but *not* call `_requireRayTracing()` or
+                    // anything like it, because we don't yet know the specific extension
+                    // we should ask for.
+                    //
+                    // TODO: We might eventually want to have this step set a flag that
+                    // will cause a compilation error if nothing else in the code requires
+                    // a specific concrete ray-tracing extension. Ideally all of these
+                    // details could be subusmed under the capability system sooner or
+                    // later.
+                    // 
                     m_writer->emit("accelerationStructureEXT");
                 }
                 break;
@@ -1824,6 +1857,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                 break;
         }
 
+        return;
+    }
+
+    auto decorated = getResolvedInstForDecorations(type);
+    if(auto targetIntrinsicDecor = findBestTargetIntrinsicDecoration(decorated))
+    {
+        m_writer->emit(targetIntrinsicDecor->getDefinition());
         return;
     }
 

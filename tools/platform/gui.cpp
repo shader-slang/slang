@@ -7,8 +7,10 @@
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
+using namespace gfx;
 
-namespace gfx {
+namespace platform
+{
 
 #ifdef _WIN32
 LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -48,7 +50,7 @@ GUI::GUI(
      ImGuiIO& io = ImGui::GetIO();
 
 #ifdef _WIN32
-     ImGui_ImplWin32_Init(getPlatformWindowHandle(window));
+     ImGui_ImplWin32_Init((HWND)window->getNativeHandle().handleValues[0]);
 
      setNativeWindowHook(window, &guiWindowProc);
 #endif
@@ -113,7 +115,7 @@ GUI::GUI(
     const SlangResult compileRes = spCompile(slangRequest);
     if(auto diagnostics = spGetDiagnosticOutput(slangRequest))
     {
-        reportError("%s", diagnostics);
+        printf("%s", diagnostics);
     }
     if(SLANG_FAILED(compileRes))
     {

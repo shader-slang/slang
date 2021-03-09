@@ -185,6 +185,7 @@
     <ClInclude Include="..\..\..\source\core\slang-downstream-compiler.h" />
     <ClInclude Include="..\..\..\source\core\slang-exception.h" />
     <ClInclude Include="..\..\..\source\core\slang-free-list.h" />
+    <ClInclude Include="..\..\..\source\core\slang-func-ptr.h" />
     <ClInclude Include="..\..\..\source\core\slang-gcc-compiler-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-hash.h" />
     <ClInclude Include="..\..\..\source\core\slang-hex-dump-util.h" />

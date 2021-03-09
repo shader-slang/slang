@@ -34,7 +34,7 @@
 //
 #include "slang-gfx.h"
 #include "gfx-util/shader-cursor.h"
-#include "tools/graphics-app-framework/window.h"
+#include "tools/platform/window.h"
 #include "slang-com-ptr.h"
 #include "source/core/slang-basic.h"
 
@@ -76,7 +76,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 {
     if( diagnosticsBlob != nullptr )
     {
-        reportError("%s", (const char*) diagnosticsBlob->getBufferPointer());
+        printf("%s", (const char*) diagnosticsBlob->getBufferPointer());
     }
 }
 
@@ -210,8 +210,7 @@ const uint32_t kSwapchainImageCount = 2;
 // of them come from the utility library we are using to simplify
 // building an example program.
 //
-gfx::ApplicationContext*    gAppContext;
-gfx::Window*                gWindow;
+RefPtr<platform::Window> gWindow;
 Slang::ComPtr<gfx::IRenderer>       gRenderer;
 
 ComPtr<gfx::IPipelineState> gPipelineState;
@@ -230,12 +229,12 @@ Slang::Result initialize()
 {
     // Create a window for our application to render into.
     //
-    WindowDesc windowDesc;
+    platform::WindowDesc windowDesc;
     windowDesc.title = "Hello, World!";
     windowDesc.width = gWindowWidth;
     windowDesc.height = gWindowHeight;
-    gWindow = createWindow(windowDesc);
-
+    gWindow = platform::Application::createWindow(windowDesc);
+    gWindow->events.mainLoop = [this]() { renderFrame(); };
     // Initialize the rendering layer.
     //
     // Note: for now we are hard-coding logic to use the
@@ -323,8 +322,9 @@ Slang::Result initialize()
     swapchainDesc.height = gWindowHeight;
     swapchainDesc.imageCount = kSwapchainImageCount;
     swapchainDesc.queue = gQueue;
-    gSwapchain = gRenderer->createSwapchain(
-        swapchainDesc, gfx::WindowHandle::FromHwnd(getPlatformWindowHandle(gWindow)));
+    gfx::WindowHandle windowHandle;
+    memcpy(&windowHandle, &gWindow->getNativeHandle(), sizeof(windowHandle));
+    gSwapchain = gRenderer->createSwapchain(swapchainDesc, windowHandle);
 
     IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
     IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
@@ -404,11 +404,6 @@ Slang::Result initialize()
     renderPassDesc.renderTargetAccess = &renderTargetAccess;
     renderPassDesc.depthStencilAccess = &depthStencilAccess;
     gRenderPass = gRenderer->createRenderPassLayout(renderPassDesc);
-
-    // Once we've initialized all the graphics API objects,
-    // it is time to show our application window and start rendering.
-    //
-    showWindow(gWindow);
 
     return SLANG_OK;
 }
@@ -526,7 +521,6 @@ void finalize()
 {
     gQueue->wait();
     gSwapchain = nullptr;
-    destroyWindow(gWindow);
 }
 
 };
@@ -535,7 +529,7 @@ void finalize()
 // layer to deal with differences in how an entry point needs
 // to be defined for different platforms.
 //
-void innerMain(ApplicationContext* context)
+int innerMain()
 {
     // We construct an instance of our example application
     // `struct` type, and then walk through the lifecyle
@@ -545,18 +539,17 @@ void innerMain(ApplicationContext* context)
 
     if (SLANG_FAILED(app.initialize()))
     {
-        return exitApplication(context, 1);
+        return -1;
     }
 
-    while(dispatchEvents(context))
-    {
-        app.renderFrame();
-    }
+    platform::Application::run(app.gWindow);
 
     app.finalize();
+
+    return 0;
 }
 
 // This macro instantiates an appropriate main function to
 // invoke the `innerMain` above.
 //
-GFX_UI_MAIN(innerMain)
+PLATFORM_UI_MAIN(innerMain)

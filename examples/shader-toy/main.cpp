@@ -20,8 +20,11 @@ using Slang::ComPtr;
 // compiler, and API.
 //
 #include "slang-gfx.h"
-#include "tools/graphics-app-framework/window.h"
+#include "tools/platform/window.h"
+#include "tools/platform/performance-counter.h"
 #include "source/core/slang-basic.h"
+
+#include <chrono>
 
 using namespace gfx;
 
@@ -82,7 +85,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 {
     if( diagnosticsBlob != nullptr )
     {
-        reportError("%s", (const char*) diagnosticsBlob->getBufferPointer());
+        printf("%s", (const char*) diagnosticsBlob->getBufferPointer());
     }
 }
 
@@ -329,8 +332,7 @@ int gWindowWidth = 1024;
 int gWindowHeight = 768;
 const uint32_t kSwapchainImageCount = 2;
 
-gfx::ApplicationContext*    gAppContext;
-gfx::Window*                gWindow;
+Slang::RefPtr<platform::Window> gWindow;
 Slang::ComPtr<gfx::IRenderer> gRenderer;
 ComPtr<gfx::IBufferResource> gConstantBuffer;
 ComPtr<gfx::IPipelineLayout> gPipelineLayout;
@@ -344,13 +346,15 @@ ComPtr<gfx::ICommandQueue> gQueue;
 
 Result initialize()
 {
-    WindowDesc windowDesc;
+    platform::WindowDesc windowDesc;
     windowDesc.title = "Slang Shader Toy";
     windowDesc.width = gWindowWidth;
     windowDesc.height = gWindowHeight;
-    windowDesc.eventHandler = &_handleEvent;
-    windowDesc.userData = this;
-    gWindow = createWindow(windowDesc);
+    gWindow = platform::Application::createWindow(windowDesc);
+    gWindow->events.mainLoop = [this]() { renderFrame(); };
+    gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
+    gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
+    gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
 
     IRenderer::Desc rendererDesc;
     rendererDesc.rendererType = RendererType::DirectX11;
@@ -430,8 +434,9 @@ Result initialize()
     swapchainDesc.height = gWindowHeight;
     swapchainDesc.imageCount = kSwapchainImageCount;
     swapchainDesc.queue = gQueue;
-    gSwapchain = gRenderer->createSwapchain(
-        swapchainDesc, gfx::WindowHandle::FromHwnd(getPlatformWindowHandle(gWindow)));
+    gfx::WindowHandle windowHandle;
+    memcpy(&windowHandle, &gWindow->getNativeHandle(), sizeof(windowHandle));
+    gSwapchain = gRenderer->createSwapchain(swapchainDesc, windowHandle);
 
     IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
     IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
@@ -513,9 +518,6 @@ Result initialize()
     renderPassDesc.renderTargetAccess = &renderTargetAccess;
     renderPassDesc.depthStencilAccess = &depthStencilAccess;
     gRenderPass = gRenderer->createRenderPassLayout(renderPassDesc);
-
-    showWindow(gWindow);
-
     return SLANG_OK;
 }
 
@@ -527,7 +529,7 @@ float clickMouseX = 0.0f;
 float clickMouseY = 0.0f;
 
 bool firstTime = true;
-uint64_t startTime = 0;
+platform::TimePoint startTime;
 
 void renderFrame()
 {
@@ -535,7 +537,7 @@ void renderFrame()
     auto commandBuffer = gQueue->createCommandBuffer();
     if( firstTime )
     {
-        startTime = getCurrentTime();
+        startTime = platform::PerformanceCounter::now();
         firstTime = false;
     }
 
@@ -557,7 +559,7 @@ void renderFrame()
         uniforms.iMouse[1] = lastMouseY;
         uniforms.iMouse[2] = isMouseDown ? clickMouseX : -clickMouseX;
         uniforms.iMouse[3] = isMouseClick ? clickMouseY : -clickMouseY;
-        uniforms.iTime = float( double(getCurrentTime() - startTime) / double(getTimerFrequency()) );
+        uniforms.iTime = platform::PerformanceCounter::getElapsedTimeInSeconds(startTime);
         uniforms.iResolution[0] = float(gWindowWidth);
         uniforms.iResolution[1] = float(gWindowHeight);
 
@@ -588,59 +590,31 @@ void renderFrame()
 void finalize()
 {
     gQueue->wait();
-    destroyWindow(gWindow);
 }
 
-void handleEvent(Event const& event)
+void handleEvent(const platform::MouseEventArgs& event)
 {
-    switch( event.code )
-    {
-    case EventCode::MouseDown:
-        isMouseDown = true;
-        lastMouseX = event.u.mouse.x;
-        lastMouseY = event.u.mouse.y;
-        break;
-
-    case EventCode::MouseMoved:
-        lastMouseX = event.u.mouse.x;
-        lastMouseY = event.u.mouse.y;
-        break;
-
-    case EventCode::MouseUp:
-        isMouseDown = false;
-        lastMouseX = event.u.mouse.x;
-        lastMouseY = event.u.mouse.y;
-        break;
-
-    default:
-        break;
-    }
+    isMouseDown = ((int)event.buttons & (int)platform::ButtonState::Enum::LeftButton) != 0;
+    lastMouseX = (float)event.x;
+    lastMouseY = (float)event.y;
 }
-
-static void _handleEvent(Event const& event)
-{
-    ShaderToyApp* app = (ShaderToyApp*) getUserData(event.window);
-    app->handleEvent(event);
-}
-
 
 };
 
-void innerMain(ApplicationContext* context)
+int innerMain()
 {
     ShaderToyApp app;
 
     if (SLANG_FAILED(app.initialize()))
     {
-        return exitApplication(context, 1);
+        return -1;
     }
 
-    while(dispatchEvents(context))
-    {
-        app.renderFrame();
-    }
+    platform::Application::run(app.gWindow);
 
     app.finalize();
+
+    return 0;
 }
 
-GFX_UI_MAIN(innerMain)
+PLATFORM_UI_MAIN(innerMain)
