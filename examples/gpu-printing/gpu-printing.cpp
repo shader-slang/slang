@@ -3,6 +3,8 @@
 
 #include <assert.h>
 
+#include <string.h>
+
 // This file implements the CPU side of a simple GPU printing
 // library. The CPU code is responsible for scanning through
 // buffers of "print commands" produced by GPU shaders, and

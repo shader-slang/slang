@@ -610,6 +610,11 @@ static SlangResult _locateFXCCompilers(const String& path, ISlangSharedLibraryLo
 
 static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
+#if SLANG_UNIX_FAMILY
+    // On unix systems we need to ensure pthread is loaded first.
+    ComPtr<ISlangSharedLibrary> pthreadLibrary;
+    DefaultSharedLibraryLoader::load(loader, path, "pthread", pthreadLibrary.writeRef());
+#endif
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "slang-glslang", sharedLibrary.writeRef())))
     {

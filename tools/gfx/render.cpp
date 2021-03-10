@@ -90,6 +90,12 @@ extern "C"
                 return SLANG_FAIL;
             }
             break;
+#elif SLANG_LINUX_FAMILY
+            case DeviceType::Default:
+            case DeviceType::Vulkan:
+            {
+                return createVKDevice(desc, outDevice);
+            }
 #endif
 
         default:

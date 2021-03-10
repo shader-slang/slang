@@ -171,7 +171,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 {
     handleOut = nullptr;
 
-	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_LOCAL);
+	void* h = dlopen(platformFileName, RTLD_NOW | RTLD_GLOBAL);
 	if(!h)
 	{
 #if 0

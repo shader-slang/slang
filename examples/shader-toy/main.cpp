@@ -442,9 +442,7 @@ Result initialize()
     swapchainDesc.height = gWindowHeight;
     swapchainDesc.imageCount = kSwapchainImageCount;
     swapchainDesc.queue = gQueue;
-    gfx::WindowHandle windowHandle;
-    memcpy(&windowHandle, &gWindow->getNativeHandle(), sizeof(windowHandle));
-    gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
+    gSwapchain = gDevice->createSwapchain(swapchainDesc, gWindow->getNativeHandle().convert<gfx::WindowHandle>());
 
     IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
     IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
