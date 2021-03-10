@@ -7,14 +7,22 @@
 
 namespace Slang {
 
+enum class MarkupAccess : uint8_t
+{
+    Public,                 ///< Always available
+    Internal,               ///< Can be available in more verbose 'internal' documentation
+    Hidden,                 ///< Not generally available
+};
+
 /* Holds the documentation markup that is associated with each node (typically a decl) from a module */
 class DocMarkup : public RefObject
 {
 public:
     struct Entry
     {
-        NodeBase* m_node;           ///< The node this documentation is associated with
-        String m_markup;            ///< The raw contents of of markup associated with the decoration
+        NodeBase* m_node;                                   ///< The node this documentation is associated with
+        String m_markup;                                    ///< The raw contents of of markup associated with the decoration
+        MarkupAccess m_access = MarkupAccess::Public;       ///< 
     };
 
         /// Adds an entry, returns the reference to pre-existing node if there is one
@@ -149,6 +157,7 @@ public:
         Index viewIndex;                    ///< Index into the array of views on the output
         Index inputIndex;                   ///< The index to this item in the input
         String text;                        ///< The found text
+        MarkupAccess access;                ///< Access to the markup
     };
 
     struct FindInfo

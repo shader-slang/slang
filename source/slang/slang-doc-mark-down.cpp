@@ -237,7 +237,7 @@ void DocMarkDownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl
 
     out << toSlice("```\n");
     out << varDecl->type << toSlice(" ") << varDecl <<  toSlice("\n");
-    out << toSlice("```\n");
+    out << toSlice("```\n\n");
 
     writeDescription(entry);
 }
@@ -511,11 +511,11 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
 
                     for (auto targetIntrinsic : sig->getModifiersOfType<TargetIntrinsicModifier>())
                     {
-                        targetSet.Add(targetIntrinsic->targetToken.getContent());
+                        targetSet.Add(String(targetIntrinsic->targetToken.getContent()).toUpper());
                     }
                     for (auto specializedForTarget : sig->getModifiersOfType<SpecializedForTargetModifier>())
                     {
-                        targetSet.Add(specializedForTarget->targetToken.getContent());
+                        targetSet.Add(String(specializedForTarget->targetToken.getContent()).toUpper());
                     }
                 }
                 
@@ -523,7 +523,7 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
 
                 // TODO(JS): This really isn't right, we ideally have markup that made hlsl availability explicit
                 // We *assume* that we have 'hlsl' for now
-                targetSet.Add(String("hlsl"));
+                targetSet.Add(String("HLSL"));
                 targetSetSet.add(targetSet);
             }
         }
@@ -858,8 +858,17 @@ void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
 
     if (entry.m_markup.getLength() > 0)
     {
-        out << toSlice("\n## Description\n\n");
-        out << entry.m_markup;
+        out << toSlice("## Description\n\n");
+
+        out << entry.m_markup.getUnownedSlice();
+#if 0
+        UnownedStringSlice text(entry.m_markup.getUnownedSlice()), line;
+        while (StringUtil::extractLine(text, line))
+        {
+            out << line << toSlice("\n");
+        }
+#endif
+        out << toSlice("\n");
     }
 }
 
@@ -928,6 +937,12 @@ void DocMarkDownWriter::writeAll()
 {
     for (const auto& entry : m_markup->getEntries())
     {
+        // Only output if it's public
+        if (entry.m_access != MarkupAccess::Public)
+        {
+            continue;
+        }
+
         NodeBase* node = entry.m_node;
         Decl* decl = as<Decl>(node);
         if (decl)

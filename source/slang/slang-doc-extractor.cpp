@@ -657,6 +657,70 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
     }
 }
 
+
+static void _calcAccess(SourceView* sourceView, const TokenList& toks, List<MarkupAccess>& outLineAccess)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    const auto& lineOffsets = sourceFile->getLineBreakOffsets();
+
+    outLineAccess.setCount(lineOffsets.getCount() + 1);
+
+    MarkupAccess lastAccess = MarkupAccess::Public;
+    Index lastLine = 0;
+
+    for (const auto& tok : toks)
+    {
+        if (tok.type == TokenType::LineComment)
+        {
+            UnownedStringSlice contents = tok.getContent();
+
+            MarkupAccess newAccess = lastAccess;
+
+            // Distinct from other markup
+            if (contents.startsWith(toSlice("//@")))
+            {
+                UnownedStringSlice access = contents.tail(4).trim();
+                if (access == "hidden:" || access == "private:")
+                {
+                    newAccess = MarkupAccess::Hidden;
+                }
+                else if (access == "internal:")
+                {
+                    newAccess = MarkupAccess::Internal;
+                }
+                else if (access == "public:")
+                {
+                    newAccess = MarkupAccess::Public;
+                }
+            }
+
+            if (newAccess != lastAccess)
+            {
+                // Work up the line it's on
+                const int offset = sourceView->getRange().getOffset(tok.loc);
+                Index line = sourceFile->calcLineIndexFromOffset(offset);
+
+                // Fill in the span
+                for (Index i = lastLine; i < line; ++i)
+                {
+                    outLineAccess[i] = lastAccess;
+                }
+
+                // Record the new access and where we are up to
+                lastLine = line;
+                lastAccess = newAccess;
+            }
+        }
+    }
+
+    // Fill in the remaining
+    for (Index i = lastLine; i < outLineAccess.getCount(); ++ i)
+    {
+        outLineAccess[i] = lastAccess;
+    }
+}
+
+
 SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out)
 {
     struct Entry
@@ -730,6 +794,7 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
     {
         TokenList tokens;
+        List<MarkupAccess> lineAccess;
 
         MemoryArena memoryArena(4096);
 
@@ -751,6 +816,7 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
             dst.viewIndex = -1;
             dst.inputIndex = entry.inputIndex;
+            dst.access = MarkupAccess::Public;
 
             // If there isn't a mechanism to search with, just move on
             if (entry.searchStyle == SearchStyle::None)
@@ -772,6 +838,10 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
                 // Lex everything
                 tokens = lexer.lexAllTokens();
+
+                // Let's work out the access
+
+                _calcAccess(sourceView, tokens, lineAccess);
             }
 
             dst.viewIndex = viewIndex;
@@ -785,6 +855,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             // Work out the line number
             SourceFile* sourceFile = sourceView->getSourceFile();
             const Index lineIndex = sourceFile->calcLineIndexFromOffset(int(offset));
+
+            dst.access = lineAccess[lineIndex];
 
             // Okay, lets find the token index with a binary chop
             Index tokenIndex = _findTokenIndex(loc, tokens.m_tokens.getBuffer(), tokens.m_tokens.getCount());
@@ -907,6 +979,7 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             // Add to the documentation
             DocMarkup::Entry& docEntry = outDoc->addEntry(decl);
             docEntry.m_markup = outputItem.text;
+            docEntry.m_access = outputItem.access;
         }
     }
     
