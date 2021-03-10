@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
+//DISABLE_TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
 
 void outFunc(out int v)
 {
