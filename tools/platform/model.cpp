@@ -98,7 +98,7 @@ namespace gfx
 {
 
 ComPtr<ITextureResource> loadTextureImage(
-    IRenderer*   renderer,
+    IDevice*   device,
     char const* path)
 {
     int extentX = 0;
@@ -187,10 +187,8 @@ ComPtr<ITextureResource> loadTextureImage(
     initData.subResources = &subresourceInitData[0];
     initData.mipRowStrides = &mipRowStrides[0];
 
-    auto texture = renderer->createTextureResource(
-        IResource::Usage::PixelShaderResource,
-        desc,
-        &initData);
+    auto texture =
+        device->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
 
     free(data);
 
@@ -262,7 +260,7 @@ Result ModelLoader::load(
         if(objMaterial.diffuse_texname.length())
         {
             materialData.diffuseMap = loadTextureImage(
-                renderer,
+                device,
                 objMaterial.diffuse_texname.c_str());
         }
 
@@ -542,7 +540,7 @@ Result ModelLoader::load(
     vertexBufferDesc.init(modelData.vertexCount * sizeof(Vertex));
     vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
 
-    modelData.vertexBuffer = renderer->createBufferResource(
+    modelData.vertexBuffer = device->createBufferResource(
         IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         flatVertices.data());
@@ -552,7 +550,7 @@ Result ModelLoader::load(
     indexBufferDesc.init(modelData.indexCount * sizeof(Index));
     vertexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
 
-    modelData.indexBuffer = renderer->createBufferResource(
+    modelData.indexBuffer = device->createBufferResource(
         IResource::Usage::IndexBuffer,
         indexBufferDesc,
         flatIndices.data());

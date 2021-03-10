@@ -146,11 +146,17 @@ struct Rect
     int width, height;
 };
 
+enum class WindowStyle
+{
+    Default, FixedSize,
+};
+
 struct WindowDesc
 {
     char const* title = nullptr;
     int width = 0;
     int height = 0;
+    WindowStyle style = WindowStyle::Default;
 };
 
 class Window : public Slang::RefObject
