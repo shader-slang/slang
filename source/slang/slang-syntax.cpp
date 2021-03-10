@@ -641,16 +641,36 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return declRef.substituteImpl(astBuilder, substitutions, &diff);
     }
 
-    Expr* DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, Expr* expr) const
+    SubstExpr<Expr> DeclRefBase::substitute(ASTBuilder* /* astBuilder*/, Expr* expr) const
     {
-        // No substitutions? Easy.
-        if (!substitutions)
-            return expr;
-
-        SLANG_UNIMPLEMENTED_X("generic substitution into expressions");
-
-        UNREACHABLE_RETURN(expr);
+        return SubstExpr<Expr>(expr, substitutions);
     }
+
+    SubstExpr<Expr> substituteExpr(SubstitutionSet const& substs, Expr* expr)
+    {
+        return SubstExpr<Expr>(expr, substs);
+    }
+
+    DeclRef<Decl> substituteDeclRef(SubstitutionSet const& substs, ASTBuilder* astBuilder, DeclRef<Decl> const& declRef)
+    {
+        if(!substs)
+            return declRef;
+
+        int diff = 0;
+        auto declRefBase = declRef.substituteImpl(astBuilder, substs, &diff);
+        return DeclRef<Decl>(declRefBase.decl, declRefBase.substitutions);
+    }
+
+    Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type)
+    {
+        if(!type) return nullptr;
+        if(!substs) return type;
+
+        SLANG_ASSERT(type);
+
+        return Slang::as<Type>(type->substitute(astBuilder, substs));
+    }
+
 
     void buildMemberDictionary(ContainerDecl* decl);
 
@@ -854,7 +874,7 @@ Index getFilterCountImpl(const ReflectClassInfo& clsInfo, MemberFilterStyle filt
         return nullptr;
     }
 
-    DeclRefBase DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff)
+    DeclRefBase DeclRefBase::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet substSet, int* ioDiff) const
     {
         // Nothing to do when we have no declaration.
         if(!decl)
