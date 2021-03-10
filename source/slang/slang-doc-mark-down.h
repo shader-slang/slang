@@ -54,6 +54,7 @@ struct DocMarkDownWriter
     {
     }
 
+    struct StringListSet;
     
         /// Given a list of ASTPrinter::Parts, works out the different parts of the sig
     static void getSignature(const List<Part>& parts, Signature& outSig);
@@ -73,6 +74,8 @@ struct DocMarkDownWriter
 
     void _appendCommaList(const List<InheritanceDecl*>& inheritanceDecls);
     void _appendCommaList(const List<String>& strings);
+
+    void _maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set);
 
         /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);

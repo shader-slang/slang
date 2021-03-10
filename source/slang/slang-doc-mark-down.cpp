@@ -8,6 +8,45 @@
 
 namespace Slang {
 
+
+struct DocMarkDownWriter::StringListSet
+{
+    Index add(const HashSet<String>& set)
+    {
+        // -1 means empty, which we don't explicitly store
+        Index index = -1;
+        if (set.Count())
+        {
+            List<String> values;
+            for (auto& value : set)
+            {
+                values.add(value);
+            }
+            // Sort so that can be compared for uniqueness
+            values.sort();
+
+            index = m_uniqueValues.indexOf(values);
+            if (index < 0)
+            {
+                index = m_uniqueValues.getCount();
+                m_uniqueValues.add(values);
+            }
+        }
+        m_map.add(index);
+        return index;
+    }
+
+    Index getValueIndex(Index index) const { return m_map[index]; }
+    List<String>& getValuesAt(Index valueIndex) { return m_uniqueValues[valueIndex]; }
+    const List<List<String>>& getUniqueValues() const { return m_uniqueValues; }
+
+    StringListSet() {}
+
+protected:
+    List<Index> m_map;
+    List<List<String>> m_uniqueValues;
+};
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 template <typename T>
@@ -361,7 +400,7 @@ static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
     if (auto cudaSMVersionModifier = decl->findModifier<RequiredCUDASMVersionModifier>())
     {
         buf.Clear();
-        buf << "CUDA ";
+        buf << "CUDA SM ";
         cudaSMVersionModifier->version.append(buf);
         outRequirements.Add(buf);
     }
@@ -376,6 +415,34 @@ static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
     if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
     {
         outRequirements.Add("NVAPI");
+    }
+}
+
+void DocMarkDownWriter::_maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set)
+{
+     auto& out = m_builder;
+
+    const auto& uniqueValues = set.getUniqueValues();
+
+    const Index uniqueCount = uniqueValues.getCount();
+    if (uniqueCount > 0 && uniqueValues[0].getCount() > 0)
+    {
+        out << title;
+        if (uniqueCount > 1)
+        {
+            for (Index i = 0; i < uniqueCount; ++i)
+            {
+                out << toSlice("* _") << (i + 1) << ("_ ");
+                _appendCommaList(uniqueValues[i]);
+                out << toSlice("\n");
+            }
+        }
+        else
+        {
+            _appendCommaList(uniqueValues[0]);
+            out << toSlice("\n");
+        }
+        out << toSlice("\n");
     }
 }
 
@@ -421,56 +488,54 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
         sigs.sort([](CallableDecl* a, CallableDecl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
     }
 
+    // Set of sets of requirements, holds index map from addition to the set entry 
+    StringListSet requirementsSetSet;
+
+    // Similarly for targets 
+    StringListSet targetSetSet;
+
     // We want to determine the unique signature, and then the requirements for the signature
-
-    List<Index> requirementMap;
-    List<List<String>> uniqueReqirements;
-
     {
-        requirementMap.setCount(sigs.getCount());
-
         for (Index i = 0; i < sigs.getCount(); ++i)
         {
             CallableDecl* sig = sigs[i];
             // Add the requirements for all the different versions
-            HashSet<String> requirementsSet;
-
-            for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
             {
-                _addRequirements(sig, requirementsSet);
-            }
-
-            // -1 means no specific requirements
-            Index index = -1;
-
-            if (requirementsSet.Count())
-            {
-                List<String> requirements;
-                for (auto& requirement : requirementsSet)
+                HashSet<String> requirementsSet;
+                HashSet<String> targetSet;
+                for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
                 {
-                    requirements.add(requirement);
-                }
+                    _addRequirements(sig, requirementsSet);
 
-                requirements.sort();
+                    // Handle Target info
 
-                index = uniqueReqirements.indexOf(requirements);
-                if (index < 0)
-                {
-                    index = uniqueReqirements.getCount();
-                    uniqueReqirements.add(requirements);
+                    for (auto targetIntrinsic : sig->getModifiersOfType<TargetIntrinsicModifier>())
+                    {
+                        targetSet.Add(targetIntrinsic->targetToken.getContent());
+                    }
+                    for (auto specializedForTarget : sig->getModifiersOfType<SpecializedForTargetModifier>())
+                    {
+                        targetSet.Add(specializedForTarget->targetToken.getContent());
+                    }
                 }
+                
+                requirementsSetSet.add(requirementsSet);
+
+                // TODO(JS): This really isn't right, we ideally have markup that made hlsl availability explicit
+                // We *assume* that we have 'hlsl' for now
+                targetSet.Add(String("hlsl"));
+                targetSetSet.add(targetSet);
             }
-
-            requirementMap[i] = index;
         }
     }
     
     // Output the signature
     {          
-        out << toSlice("## Signature \n");
+        out << toSlice("## Signature \n\n");
         out << toSlice("```\n");
 
         Index prevRequirementsIndex = -1;
+        Index prevTargetIndex = -1;
 
         const Int sigCount = sigs.getCount();
         for (Index i = 0; i < sigCount; ++i)
@@ -478,14 +543,14 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
             auto sig = sigs[i];
 
             // Output if needs unique requirements
-            if (uniqueReqirements.getCount() > 1)
+            if (requirementsSetSet.getUniqueValues().getCount() > 1)
             {
-                const Index requirementsIndex = requirementMap[i];
+                const Index requirementsIndex = requirementsSetSet.getValueIndex(i);
                 if (requirementsIndex != prevRequirementsIndex)
                 {
                     if (requirementsIndex >= 0)
                     {
-                        out << toSlice("/// See ") << (requirementsIndex + 1) << toSlice("\n");
+                        out << toSlice("/// See Requirement ") << (requirementsIndex + 1) << toSlice("\n");
                     }
                     else
                     {
@@ -495,31 +560,48 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
                 }
             }
 
+#if 1
+            if (targetSetSet.getUniqueValues().getCount() > 1)
+            {
+                const Index targetIndex = targetSetSet.getValueIndex(i);
+                if (targetIndex != prevTargetIndex)
+                {
+                    if (targetIndex >= 0)
+                    {
+                        out << toSlice("/// See Target Availability ") << (targetIndex + 1) << toSlice("\n");
+                    }
+                    else
+                    {
+                        out << toSlice("/// All Targets\n");
+                    }
+                    prevTargetIndex = targetIndex;
+                }
+            }
+#endif
+
             writeSignature(sig);
         }
         out << "```\n\n";
     }
 
+    _maybeAppendSet(toSlice("## Requirements\n\n"), requirementsSetSet);
+
+    // Target availability
+
     {
-        const Index uniqueCount = uniqueReqirements.getCount();
-        if (uniqueCount > 0 && uniqueReqirements[0].getCount() > 0)
+        const auto& uniqueValues = targetSetSet.getUniqueValues();
+        if (uniqueValues.getCount() == 1 && uniqueValues[0].getCount() == 1 && uniqueValues[0][0] == "hlsl")
         {
-            out << toSlice("## Requirements\n\n");
-            if (uniqueCount > 1)
-            {
-                for (Index i = 0; i < uniqueCount; ++i)
-                {
-                    out << toSlice("* _") << (i + 1) << ("_ ");
-                    _appendCommaList(uniqueReqirements[i]);
-                    out << toSlice("\n");
-                }
-            }
-            else
-            {
-                _appendCommaList(uniqueReqirements[0]);
-                out << toSlice("\n");
-            }
-            out << toSlice("\n");
+            // TODO(JS):
+            // If something is marked up for hlsl, and nothing else, that indicates it might *only* be available on hlsl, but
+            // we don't correctly handle that here.
+
+            // If the only thing we have is 'hlsl' - we injected that so we'll *assume* it's available everywhere, so
+            // don't bother outputting.
+        }
+        else
+        {
+            _maybeAppendSet(toSlice("## Target Availability\n\n"), targetSetSet);
         }
     }
 
