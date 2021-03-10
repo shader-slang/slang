@@ -122,13 +122,9 @@ void DocMarkDownWriter::_appendAsBullets(const List<Decl*>& in)
     {
         DocMarkup::Entry* paramEntry = m_markup->getEntry(decl);
 
-        out << "* ";
-
-        Name* name = decl->getName();
-        if (name)
-        {
-            out << toSlice("_") << name->text << toSlice("_ ");
-        }
+        out << toSlice("* _");
+        ASTPrinter::appendDeclName(decl, out);
+        out << toSlice("_ ");
 
         if (paramEntry)
         {
@@ -808,7 +804,6 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         }
     }
 
-
     {
         List<Decl*> fields;
         _getDeclsOfType<VarDecl>(aggTypeDecl, fields);
@@ -828,7 +823,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         for (const auto pair : aggTypeDecl->memberDictionary)
         {
             CallableDecl* callableDecl = as<CallableDecl>(pair.Value);
-            if (callableDecl)
+            if (callableDecl && isVisible(callableDecl))
             {
                 uniqueMethods.add(callableDecl);
             }
@@ -893,12 +888,6 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
         Name* declName = callableDecl->getName();
         if (declName)
         {
-            // If name starts with __ assume it's internal and ignore
-            if (declName->text.startsWith(toSlice("__")))
-            {
-                return;
-            }
-            
             Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(declName);
             isFirst = (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
         }
@@ -932,20 +921,41 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     }
 }
 
+bool DocMarkDownWriter::isVisible(const Name* name)
+{
+    return name == nullptr || !name->text.startsWith(toSlice("__"));
+}
+
+bool DocMarkDownWriter::isVisible(const DocMarkup::Entry& entry)
+{
+    // For now if it's not public it's not visible
+    if (entry.m_visibility != MarkupVisibility::Public)
+    {
+        return false;
+    }
+
+    Decl* decl = as<Decl>(entry.m_node);
+    return decl == nullptr || isVisible(decl->getName());
+}
+
+bool DocMarkDownWriter::isVisible(Decl* decl)
+{
+    if (!isVisible(decl->getName()))
+    {
+        return false;
+    }
+
+    auto entry = m_markup->getEntry(decl);
+    return entry == nullptr || entry->m_visibility == MarkupVisibility::Public;
+}
 
 void DocMarkDownWriter::writeAll()
 {
     for (const auto& entry : m_markup->getEntries())
     {
-        // Only output if it's public
-        if (entry.m_access != MarkupAccess::Public)
-        {
-            continue;
-        }
-
-        NodeBase* node = entry.m_node;
-        Decl* decl = as<Decl>(node);
-        if (decl)
+        Decl* decl = as<Decl>(entry.m_node);
+    
+        if (decl && isVisible(entry))
         {
             writeDecl(entry, decl);
         }

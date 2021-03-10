@@ -34,20 +34,26 @@ void ASTPrinter::addVal(Val* val)
     val->toText(m_builder);
 }
 
-void ASTPrinter::_addDeclName(Decl* decl)
+/* static */void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
     if (as<ConstructorDecl>(decl))
     {
-        m_builder << "init";
+        out << "init";
     }
     else if (as<SubscriptDecl>(decl))
     {
-        m_builder << "subscript";
+        out << "subscript";
     }
     else
     {
-        m_builder << getText(decl->getName());
+        out << getText(decl->getName());
     }
+}
+
+
+void ASTPrinter::_addDeclName(Decl* decl)
+{
+    appendDeclName(decl, m_builder);
 }
 
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)

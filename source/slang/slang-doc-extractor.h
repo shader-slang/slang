@@ -7,7 +7,7 @@
 
 namespace Slang {
 
-enum class MarkupAccess : uint8_t
+enum class MarkupVisibility : uint8_t
 {
     Public,                 ///< Always available
     Internal,               ///< Can be available in more verbose 'internal' documentation
@@ -20,9 +20,9 @@ class DocMarkup : public RefObject
 public:
     struct Entry
     {
-        NodeBase* m_node;                                   ///< The node this documentation is associated with
-        String m_markup;                                    ///< The raw contents of of markup associated with the decoration
-        MarkupAccess m_access = MarkupAccess::Public;       ///< 
+        NodeBase* m_node;                                           ///< The node this documentation is associated with
+        String m_markup;                                            ///< The raw contents of of markup associated with the decoration
+        MarkupVisibility m_visibility = MarkupVisibility::Public;   ///< How visible this decl is
     };
 
         /// Adds an entry, returns the reference to pre-existing node if there is one
@@ -157,7 +157,7 @@ public:
         Index viewIndex;                    ///< Index into the array of views on the output
         Index inputIndex;                   ///< The index to this item in the input
         String text;                        ///< The found text
-        MarkupAccess access;                ///< Access to the markup
+        MarkupVisibility visibilty;         ///< Visibility of the item
     };
 
     struct FindInfo

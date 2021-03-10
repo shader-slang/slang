@@ -44,6 +44,10 @@ struct DocMarkDownWriter
 
     void writeSignature(CallableDecl* callableDecl);
 
+    bool isVisible(const DocMarkup::Entry& entry);
+    bool isVisible(Decl* decl);
+    bool isVisible(const Name* name);
+
         /// Get the output string
     const StringBuilder& getOutput() const { return m_builder; }
 

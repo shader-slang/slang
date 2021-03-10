@@ -138,6 +138,8 @@ public:
     static UnownedStringSlice getPart(const UnownedStringSlice& slice, const Part& part) { return UnownedStringSlice(slice.begin() + part.start, slice.begin() + part.end); }
     static UnownedStringSlice getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts);
 
+    static void appendDeclName(Decl* decl, StringBuilder& out);
+
         /// Ctor
     ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Part>* parts = nullptr):
         m_astBuilder(astBuilder),
