@@ -2106,15 +2106,15 @@ GLSL, HLSL
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -2215,9 +2215,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -2273,9 +2273,9 @@ T Texture1D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -2362,8 +2362,8 @@ float Texture1D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2436,8 +2436,8 @@ T Texture1D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -2457,10 +2457,10 @@ T Texture1D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -2504,8 +2504,8 @@ vector<T,4> Texture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2559,8 +2559,8 @@ vector<T,4> Texture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2614,8 +2614,8 @@ vector<T,4> Texture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2669,8 +2669,8 @@ vector<T,4> Texture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2724,8 +2724,8 @@ vector<T,4> Texture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2744,10 +2744,10 @@ vector<T,4> Texture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -2791,8 +2791,8 @@ vector<float,4> Texture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2846,8 +2846,8 @@ vector<float,4> Texture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2901,8 +2901,8 @@ vector<float,4> Texture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -2956,8 +2956,8 @@ vector<float,4> Texture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3011,8 +3011,8 @@ vector<float,4> Texture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3031,10 +3031,10 @@ vector<float,4> Texture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -3078,8 +3078,8 @@ vector<int,4> Texture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3133,8 +3133,8 @@ vector<int,4> Texture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3188,8 +3188,8 @@ vector<int,4> Texture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3243,8 +3243,8 @@ vector<int,4> Texture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3298,8 +3298,8 @@ vector<int,4> Texture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3318,10 +3318,10 @@ vector<int,4> Texture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -3365,8 +3365,8 @@ vector<uint,4> Texture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3420,8 +3420,8 @@ vector<uint,4> Texture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3475,8 +3475,8 @@ vector<uint,4> Texture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3530,8 +3530,8 @@ vector<uint,4> Texture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3585,8 +3585,8 @@ vector<uint,4> Texture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3609,15 +3609,15 @@ vector<uint,4> Texture1D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -3718,9 +3718,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -3776,9 +3776,9 @@ T RWTexture1D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -3865,8 +3865,8 @@ float RWTexture1D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -3939,8 +3939,8 @@ T RWTexture1D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -3960,10 +3960,10 @@ T RWTexture1D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -4007,8 +4007,8 @@ vector<T,4> RWTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4062,8 +4062,8 @@ vector<T,4> RWTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4117,8 +4117,8 @@ vector<T,4> RWTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4172,8 +4172,8 @@ vector<T,4> RWTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4227,8 +4227,8 @@ vector<T,4> RWTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4247,10 +4247,10 @@ vector<T,4> RWTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -4294,8 +4294,8 @@ vector<float,4> RWTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4349,8 +4349,8 @@ vector<float,4> RWTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4404,8 +4404,8 @@ vector<float,4> RWTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4459,8 +4459,8 @@ vector<float,4> RWTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4514,8 +4514,8 @@ vector<float,4> RWTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4534,10 +4534,10 @@ vector<float,4> RWTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -4581,8 +4581,8 @@ vector<int,4> RWTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4636,8 +4636,8 @@ vector<int,4> RWTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4691,8 +4691,8 @@ vector<int,4> RWTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4746,8 +4746,8 @@ vector<int,4> RWTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4801,8 +4801,8 @@ vector<int,4> RWTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4821,10 +4821,10 @@ vector<int,4> RWTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -4868,8 +4868,8 @@ vector<uint,4> RWTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4923,8 +4923,8 @@ vector<uint,4> RWTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -4978,8 +4978,8 @@ vector<uint,4> RWTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5033,8 +5033,8 @@ vector<uint,4> RWTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5088,8 +5088,8 @@ vector<uint,4> RWTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5112,15 +5112,15 @@ vector<uint,4> RWTexture1D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -5220,8 +5220,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5277,9 +5277,9 @@ T RasterizerOrderedTexture1D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -5366,8 +5366,8 @@ float RasterizerOrderedTexture1D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5440,8 +5440,8 @@ T RasterizerOrderedTexture1D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -5461,10 +5461,10 @@ T RasterizerOrderedTexture1D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -5508,8 +5508,8 @@ vector<T,4> RasterizerOrderedTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5563,8 +5563,8 @@ vector<T,4> RasterizerOrderedTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5618,8 +5618,8 @@ vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5673,8 +5673,8 @@ vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5728,8 +5728,8 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5748,10 +5748,10 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -5795,8 +5795,8 @@ vector<float,4> RasterizerOrderedTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5850,8 +5850,8 @@ vector<float,4> RasterizerOrderedTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5905,8 +5905,8 @@ vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -5960,8 +5960,8 @@ vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6015,8 +6015,8 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6035,10 +6035,10 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -6082,8 +6082,8 @@ vector<int,4> RasterizerOrderedTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6137,8 +6137,8 @@ vector<int,4> RasterizerOrderedTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6192,8 +6192,8 @@ vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6247,8 +6247,8 @@ vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6302,8 +6302,8 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6322,10 +6322,10 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -6369,8 +6369,8 @@ vector<uint,4> RasterizerOrderedTexture1D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6424,8 +6424,8 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6479,8 +6479,8 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6534,8 +6534,8 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6589,8 +6589,8 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6612,10 +6612,10 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -6702,8 +6702,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6738,10 +6738,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -6828,8 +6828,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6864,10 +6864,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -6954,8 +6954,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -6991,15 +6991,15 @@ HLSL
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -7106,8 +7106,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7163,9 +7163,9 @@ T Texture1DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -7252,8 +7252,8 @@ float Texture1DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7326,8 +7326,8 @@ T Texture1DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -7347,10 +7347,10 @@ T Texture1DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -7394,8 +7394,8 @@ vector<T,4> Texture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7449,8 +7449,8 @@ vector<T,4> Texture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7504,8 +7504,8 @@ vector<T,4> Texture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7559,8 +7559,8 @@ vector<T,4> Texture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7614,8 +7614,8 @@ vector<T,4> Texture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7634,10 +7634,10 @@ vector<T,4> Texture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -7681,8 +7681,8 @@ vector<float,4> Texture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7736,8 +7736,8 @@ vector<float,4> Texture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7791,8 +7791,8 @@ vector<float,4> Texture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7846,8 +7846,8 @@ vector<float,4> Texture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7901,8 +7901,8 @@ vector<float,4> Texture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -7921,10 +7921,10 @@ vector<float,4> Texture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -7968,8 +7968,8 @@ vector<int,4> Texture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8023,8 +8023,8 @@ vector<int,4> Texture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8078,8 +8078,8 @@ vector<int,4> Texture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8133,8 +8133,8 @@ vector<int,4> Texture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8188,8 +8188,8 @@ vector<int,4> Texture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8208,10 +8208,10 @@ vector<int,4> Texture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -8255,8 +8255,8 @@ vector<uint,4> Texture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8310,8 +8310,8 @@ vector<uint,4> Texture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8365,8 +8365,8 @@ vector<uint,4> Texture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8420,8 +8420,8 @@ vector<uint,4> Texture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8475,8 +8475,8 @@ vector<uint,4> Texture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8499,15 +8499,15 @@ vector<uint,4> Texture1DArray.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -8615,9 +8615,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -8673,9 +8673,9 @@ T RWTexture1DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -8762,8 +8762,8 @@ float RWTexture1DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8836,8 +8836,8 @@ T RWTexture1DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -8857,10 +8857,10 @@ T RWTexture1DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -8904,8 +8904,8 @@ vector<T,4> RWTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -8959,8 +8959,8 @@ vector<T,4> RWTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9014,8 +9014,8 @@ vector<T,4> RWTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9069,8 +9069,8 @@ vector<T,4> RWTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9124,8 +9124,8 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9144,10 +9144,10 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -9191,8 +9191,8 @@ vector<float,4> RWTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9246,8 +9246,8 @@ vector<float,4> RWTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9301,8 +9301,8 @@ vector<float,4> RWTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9356,8 +9356,8 @@ vector<float,4> RWTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9411,8 +9411,8 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9431,10 +9431,10 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -9478,8 +9478,8 @@ vector<int,4> RWTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9533,8 +9533,8 @@ vector<int,4> RWTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9588,8 +9588,8 @@ vector<int,4> RWTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9643,8 +9643,8 @@ vector<int,4> RWTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9698,8 +9698,8 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9718,10 +9718,10 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -9765,8 +9765,8 @@ vector<uint,4> RWTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9820,8 +9820,8 @@ vector<uint,4> RWTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9875,8 +9875,8 @@ vector<uint,4> RWTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9930,8 +9930,8 @@ vector<uint,4> RWTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -9985,8 +9985,8 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10009,15 +10009,15 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -10124,8 +10124,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10181,9 +10181,9 @@ T RasterizerOrderedTexture1DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -10270,8 +10270,8 @@ float RasterizerOrderedTexture1DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10344,8 +10344,8 @@ T RasterizerOrderedTexture1DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -10365,10 +10365,10 @@ T RasterizerOrderedTexture1DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -10412,8 +10412,8 @@ vector<T,4> RasterizerOrderedTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10467,8 +10467,8 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10522,8 +10522,8 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10577,8 +10577,8 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10632,8 +10632,8 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10652,10 +10652,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -10699,8 +10699,8 @@ vector<float,4> RasterizerOrderedTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10754,8 +10754,8 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10809,8 +10809,8 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10864,8 +10864,8 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10919,8 +10919,8 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -10939,10 +10939,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -10986,8 +10986,8 @@ vector<int,4> RasterizerOrderedTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11041,8 +11041,8 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11096,8 +11096,8 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11151,8 +11151,8 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11206,8 +11206,8 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11226,10 +11226,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -11273,8 +11273,8 @@ vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11328,8 +11328,8 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11383,8 +11383,8 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11438,8 +11438,8 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11493,8 +11493,8 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11516,10 +11516,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -11611,8 +11611,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11647,10 +11647,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -11742,8 +11742,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11778,10 +11778,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -11873,8 +11873,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -11910,15 +11910,15 @@ HLSL
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -12025,8 +12025,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -12082,9 +12082,9 @@ T Texture2D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12171,8 +12171,8 @@ float Texture2D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -12245,8 +12245,8 @@ T Texture2D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -12266,10 +12266,10 @@ T Texture2D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -12314,9 +12314,9 @@ vector<T,4> Texture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12371,9 +12371,9 @@ vector<T,4> Texture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12428,9 +12428,9 @@ vector<T,4> Texture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12485,9 +12485,9 @@ vector<T,4> Texture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12542,9 +12542,9 @@ vector<T,4> Texture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12563,10 +12563,10 @@ vector<T,4> Texture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -12611,9 +12611,9 @@ vector<float,4> Texture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12668,9 +12668,9 @@ vector<float,4> Texture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12725,9 +12725,9 @@ vector<float,4> Texture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12782,9 +12782,9 @@ vector<float,4> Texture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12839,9 +12839,9 @@ vector<float,4> Texture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12860,10 +12860,10 @@ vector<float,4> Texture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -12908,9 +12908,9 @@ vector<int,4> Texture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -12965,9 +12965,9 @@ vector<int,4> Texture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13022,9 +13022,9 @@ vector<int,4> Texture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13079,9 +13079,9 @@ vector<int,4> Texture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13136,9 +13136,9 @@ vector<int,4> Texture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13157,10 +13157,10 @@ vector<int,4> Texture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -13205,9 +13205,9 @@ vector<uint,4> Texture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13262,9 +13262,9 @@ vector<uint,4> Texture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13319,9 +13319,9 @@ vector<uint,4> Texture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13376,9 +13376,9 @@ vector<uint,4> Texture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13433,9 +13433,9 @@ vector<uint,4> Texture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13458,15 +13458,15 @@ vector<uint,4> Texture2D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -13574,9 +13574,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13632,9 +13632,9 @@ T RWTexture2D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13721,8 +13721,8 @@ float RWTexture2D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -13795,8 +13795,8 @@ T RWTexture2D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -13816,10 +13816,10 @@ T RWTexture2D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -13864,9 +13864,9 @@ vector<T,4> RWTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13921,9 +13921,9 @@ vector<T,4> RWTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -13978,9 +13978,9 @@ vector<T,4> RWTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14035,9 +14035,9 @@ vector<T,4> RWTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14092,9 +14092,9 @@ vector<T,4> RWTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14113,10 +14113,10 @@ vector<T,4> RWTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -14161,9 +14161,9 @@ vector<float,4> RWTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14218,9 +14218,9 @@ vector<float,4> RWTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14275,9 +14275,9 @@ vector<float,4> RWTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14332,9 +14332,9 @@ vector<float,4> RWTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14389,9 +14389,9 @@ vector<float,4> RWTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14410,10 +14410,10 @@ vector<float,4> RWTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -14458,9 +14458,9 @@ vector<int,4> RWTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14515,9 +14515,9 @@ vector<int,4> RWTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14572,9 +14572,9 @@ vector<int,4> RWTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14629,9 +14629,9 @@ vector<int,4> RWTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14686,9 +14686,9 @@ vector<int,4> RWTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14707,10 +14707,10 @@ vector<int,4> RWTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -14755,9 +14755,9 @@ vector<uint,4> RWTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14812,9 +14812,9 @@ vector<uint,4> RWTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14869,9 +14869,9 @@ vector<uint,4> RWTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14926,9 +14926,9 @@ vector<uint,4> RWTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -14983,9 +14983,9 @@ vector<uint,4> RWTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15008,15 +15008,15 @@ vector<uint,4> RWTexture2D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -15123,8 +15123,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -15180,9 +15180,9 @@ T RasterizerOrderedTexture2D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15269,8 +15269,8 @@ float RasterizerOrderedTexture2D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -15343,8 +15343,8 @@ T RasterizerOrderedTexture2D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -15364,10 +15364,10 @@ T RasterizerOrderedTexture2D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -15412,9 +15412,9 @@ vector<T,4> RasterizerOrderedTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15469,9 +15469,9 @@ vector<T,4> RasterizerOrderedTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15526,9 +15526,9 @@ vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15583,9 +15583,9 @@ vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15640,9 +15640,9 @@ vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15661,10 +15661,10 @@ vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -15709,9 +15709,9 @@ vector<float,4> RasterizerOrderedTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15766,9 +15766,9 @@ vector<float,4> RasterizerOrderedTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15823,9 +15823,9 @@ vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15880,9 +15880,9 @@ vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15937,9 +15937,9 @@ vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -15958,10 +15958,10 @@ vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -16006,9 +16006,9 @@ vector<int,4> RasterizerOrderedTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16063,9 +16063,9 @@ vector<int,4> RasterizerOrderedTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16120,9 +16120,9 @@ vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16177,9 +16177,9 @@ vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16234,9 +16234,9 @@ vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16255,10 +16255,10 @@ vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -16303,9 +16303,9 @@ vector<uint,4> RasterizerOrderedTexture2D.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16360,9 +16360,9 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16417,9 +16417,9 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16474,9 +16474,9 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16531,9 +16531,9 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -16555,10 +16555,10 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -16650,8 +16650,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -16686,10 +16686,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -16781,8 +16781,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -16817,10 +16817,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -16912,8 +16912,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -16949,15 +16949,15 @@ HLSL
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -17069,8 +17069,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -17126,9 +17126,9 @@ T Texture2DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17215,8 +17215,8 @@ float Texture2DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -17289,8 +17289,8 @@ T Texture2DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -17310,10 +17310,10 @@ T Texture2DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -17358,9 +17358,9 @@ vector<T,4> Texture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17415,9 +17415,9 @@ vector<T,4> Texture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17472,9 +17472,9 @@ vector<T,4> Texture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17529,9 +17529,9 @@ vector<T,4> Texture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17586,9 +17586,9 @@ vector<T,4> Texture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17607,10 +17607,10 @@ vector<T,4> Texture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -17655,9 +17655,9 @@ vector<float,4> Texture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17712,9 +17712,9 @@ vector<float,4> Texture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17769,9 +17769,9 @@ vector<float,4> Texture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17826,9 +17826,9 @@ vector<float,4> Texture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17883,9 +17883,9 @@ vector<float,4> Texture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -17904,10 +17904,10 @@ vector<float,4> Texture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -17952,9 +17952,9 @@ vector<int,4> Texture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18009,9 +18009,9 @@ vector<int,4> Texture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18066,9 +18066,9 @@ vector<int,4> Texture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18123,9 +18123,9 @@ vector<int,4> Texture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18180,9 +18180,9 @@ vector<int,4> Texture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18201,10 +18201,10 @@ vector<int,4> Texture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -18249,9 +18249,9 @@ vector<uint,4> Texture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18306,9 +18306,9 @@ vector<uint,4> Texture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18363,9 +18363,9 @@ vector<uint,4> Texture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18420,9 +18420,9 @@ vector<uint,4> Texture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18477,9 +18477,9 @@ vector<uint,4> Texture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18502,15 +18502,15 @@ vector<uint,4> Texture2DArray.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -18623,9 +18623,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18681,9 +18681,9 @@ T RWTexture2DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18770,8 +18770,8 @@ float RWTexture2DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -18844,8 +18844,8 @@ T RWTexture2DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -18865,10 +18865,10 @@ T RWTexture2DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -18913,9 +18913,9 @@ vector<T,4> RWTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -18970,9 +18970,9 @@ vector<T,4> RWTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19027,9 +19027,9 @@ vector<T,4> RWTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19084,9 +19084,9 @@ vector<T,4> RWTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19141,9 +19141,9 @@ vector<T,4> RWTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19162,10 +19162,10 @@ vector<T,4> RWTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -19210,9 +19210,9 @@ vector<float,4> RWTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19267,9 +19267,9 @@ vector<float,4> RWTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19324,9 +19324,9 @@ vector<float,4> RWTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19381,9 +19381,9 @@ vector<float,4> RWTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19438,9 +19438,9 @@ vector<float,4> RWTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19459,10 +19459,10 @@ vector<float,4> RWTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -19507,9 +19507,9 @@ vector<int,4> RWTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19564,9 +19564,9 @@ vector<int,4> RWTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19621,9 +19621,9 @@ vector<int,4> RWTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19678,9 +19678,9 @@ vector<int,4> RWTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19735,9 +19735,9 @@ vector<int,4> RWTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19756,10 +19756,10 @@ vector<int,4> RWTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -19804,9 +19804,9 @@ vector<uint,4> RWTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19861,9 +19861,9 @@ vector<uint,4> RWTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19918,9 +19918,9 @@ vector<uint,4> RWTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -19975,9 +19975,9 @@ vector<uint,4> RWTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20032,9 +20032,9 @@ vector<uint,4> RWTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20057,15 +20057,15 @@ vector<uint,4> RWTexture2DArray.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -20177,8 +20177,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -20234,9 +20234,9 @@ T RasterizerOrderedTexture2DArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20323,8 +20323,8 @@ float RasterizerOrderedTexture2DArray<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -20397,8 +20397,8 @@ T RasterizerOrderedTexture2DArray<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -20418,10 +20418,10 @@ T RasterizerOrderedTexture2DArray<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -20466,9 +20466,9 @@ vector<T,4> RasterizerOrderedTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20523,9 +20523,9 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20580,9 +20580,9 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20637,9 +20637,9 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20694,9 +20694,9 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20715,10 +20715,10 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -20763,9 +20763,9 @@ vector<float,4> RasterizerOrderedTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20820,9 +20820,9 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20877,9 +20877,9 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20934,9 +20934,9 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -20991,9 +20991,9 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21012,10 +21012,10 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -21060,9 +21060,9 @@ vector<int,4> RasterizerOrderedTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21117,9 +21117,9 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21174,9 +21174,9 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21231,9 +21231,9 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21288,9 +21288,9 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21309,10 +21309,10 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -21357,9 +21357,9 @@ vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21414,9 +21414,9 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21471,9 +21471,9 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21528,9 +21528,9 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21585,9 +21585,9 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -21609,10 +21609,10 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -21709,8 +21709,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -21745,10 +21745,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -21845,8 +21845,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -21881,10 +21881,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -21981,8 +21981,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22018,15 +22018,15 @@ HLSL
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -22138,8 +22138,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22195,9 +22195,9 @@ T Texture3D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -22284,8 +22284,8 @@ float Texture3D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22358,8 +22358,8 @@ T Texture3D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -22379,10 +22379,10 @@ T Texture3D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -22426,8 +22426,8 @@ vector<T,4> Texture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22481,8 +22481,8 @@ vector<T,4> Texture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22536,8 +22536,8 @@ vector<T,4> Texture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22591,8 +22591,8 @@ vector<T,4> Texture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22646,8 +22646,8 @@ vector<T,4> Texture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22666,10 +22666,10 @@ vector<T,4> Texture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -22713,8 +22713,8 @@ vector<float,4> Texture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22768,8 +22768,8 @@ vector<float,4> Texture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22823,8 +22823,8 @@ vector<float,4> Texture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22878,8 +22878,8 @@ vector<float,4> Texture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22933,8 +22933,8 @@ vector<float,4> Texture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -22953,10 +22953,10 @@ vector<float,4> Texture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -23000,8 +23000,8 @@ vector<int,4> Texture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23055,8 +23055,8 @@ vector<int,4> Texture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23110,8 +23110,8 @@ vector<int,4> Texture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23165,8 +23165,8 @@ vector<int,4> Texture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23220,8 +23220,8 @@ vector<int,4> Texture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23240,10 +23240,10 @@ vector<int,4> Texture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -23287,8 +23287,8 @@ vector<uint,4> Texture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23342,8 +23342,8 @@ vector<uint,4> Texture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23397,8 +23397,8 @@ vector<uint,4> Texture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23452,8 +23452,8 @@ vector<uint,4> Texture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23507,8 +23507,8 @@ vector<uint,4> Texture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23531,15 +23531,15 @@ vector<uint,4> Texture3D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -23652,9 +23652,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -23710,9 +23710,9 @@ T RWTexture3D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -23799,8 +23799,8 @@ float RWTexture3D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23873,8 +23873,8 @@ T RWTexture3D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -23894,10 +23894,10 @@ T RWTexture3D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -23941,8 +23941,8 @@ vector<T,4> RWTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -23996,8 +23996,8 @@ vector<T,4> RWTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24051,8 +24051,8 @@ vector<T,4> RWTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24106,8 +24106,8 @@ vector<T,4> RWTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24161,8 +24161,8 @@ vector<T,4> RWTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24181,10 +24181,10 @@ vector<T,4> RWTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -24228,8 +24228,8 @@ vector<float,4> RWTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24283,8 +24283,8 @@ vector<float,4> RWTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24338,8 +24338,8 @@ vector<float,4> RWTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24393,8 +24393,8 @@ vector<float,4> RWTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24448,8 +24448,8 @@ vector<float,4> RWTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24468,10 +24468,10 @@ vector<float,4> RWTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -24515,8 +24515,8 @@ vector<int,4> RWTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24570,8 +24570,8 @@ vector<int,4> RWTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24625,8 +24625,8 @@ vector<int,4> RWTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24680,8 +24680,8 @@ vector<int,4> RWTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24735,8 +24735,8 @@ vector<int,4> RWTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24755,10 +24755,10 @@ vector<int,4> RWTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -24802,8 +24802,8 @@ vector<uint,4> RWTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24857,8 +24857,8 @@ vector<uint,4> RWTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24912,8 +24912,8 @@ vector<uint,4> RWTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -24967,8 +24967,8 @@ vector<uint,4> RWTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25022,8 +25022,8 @@ vector<uint,4> RWTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25046,15 +25046,15 @@ vector<uint,4> RWTexture3D.GatherAlpha(
 ## Methods
 
 * _CalculateLevelOfDetail_ 
-* _GetDimensions_ 
-* _subscript_ 
-* _SampleCmp_ 
-* _Load_ 
-* _SampleBias_ 
 * _CalculateLevelOfDetailUnclamped_ 
-* _SampleGrad_ 
+* _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 * _Sample_ 
+* _SampleBias_ 
+* _SampleCmp_ 
 * _SampleCmpLevelZero_ 
+* _SampleGrad_ 
 * _SampleLevel_ 
 
 
@@ -25166,8 +25166,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25223,9 +25223,9 @@ T RasterizerOrderedTexture3D<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
-* _3_ HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
+3. HLSL
 
 ## Parameters
 
@@ -25312,8 +25312,8 @@ float RasterizerOrderedTexture3D<T>.SampleCmpLevelZero(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25386,8 +25386,8 @@ T RasterizerOrderedTexture3D<T>.SampleLevel(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ GLSL, HLSL
+1. CUDA, GLSL, HLSL
+2. GLSL, HLSL
 
 ## Parameters
 
@@ -25407,10 +25407,10 @@ T RasterizerOrderedTexture3D<T>.SampleLevel(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -25454,8 +25454,8 @@ vector<T,4> RasterizerOrderedTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25509,8 +25509,8 @@ vector<T,4> RasterizerOrderedTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25564,8 +25564,8 @@ vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25619,8 +25619,8 @@ vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25674,8 +25674,8 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25694,10 +25694,10 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -25741,8 +25741,8 @@ vector<float,4> RasterizerOrderedTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25796,8 +25796,8 @@ vector<float,4> RasterizerOrderedTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25851,8 +25851,8 @@ vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25906,8 +25906,8 @@ vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25961,8 +25961,8 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -25981,10 +25981,10 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -26028,8 +26028,8 @@ vector<int,4> RasterizerOrderedTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26083,8 +26083,8 @@ vector<int,4> RasterizerOrderedTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26138,8 +26138,8 @@ vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26193,8 +26193,8 @@ vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26248,8 +26248,8 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26268,10 +26268,10 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -26315,8 +26315,8 @@ vector<uint,4> RasterizerOrderedTexture3D.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26370,8 +26370,8 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26425,8 +26425,8 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26480,8 +26480,8 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26535,8 +26535,8 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26558,10 +26558,10 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -26658,8 +26658,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26694,10 +26694,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -26794,8 +26794,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26830,10 +26830,10 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -26930,8 +26930,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -26966,16 +26966,16 @@ HLSL
 
 ## Methods
 
-* _Sample_ 
-* _SampleLevel_ 
-* _SampleCmp_ 
-* _SampleCmpLevelZero_ 
 * _CalculateLevelOfDetail_ 
 * _CalculateLevelOfDetailUnclamped_ 
 * _GetDimensions_ 
 * _Load_ 
-* _SampleGrad_ 
+* _Sample_ 
 * _SampleBias_ 
+* _SampleCmp_ 
+* _SampleCmpLevelZero_ 
+* _SampleGrad_ 
+* _SampleLevel_ 
 
 
 --------------------------------------------------------------------------------
@@ -27081,8 +27081,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27114,8 +27114,8 @@ T TextureCube<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ HLSL
+1. CUDA, GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27247,10 +27247,10 @@ CUDA, GLSL, HLSL
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -27294,8 +27294,8 @@ vector<T,4> TextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27349,8 +27349,8 @@ vector<T,4> TextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27404,8 +27404,8 @@ vector<T,4> TextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27459,8 +27459,8 @@ vector<T,4> TextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27514,8 +27514,8 @@ vector<T,4> TextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27534,10 +27534,10 @@ vector<T,4> TextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -27581,8 +27581,8 @@ vector<float,4> TextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27636,8 +27636,8 @@ vector<float,4> TextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27691,8 +27691,8 @@ vector<float,4> TextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27746,8 +27746,8 @@ vector<float,4> TextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27801,8 +27801,8 @@ vector<float,4> TextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27821,10 +27821,10 @@ vector<float,4> TextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -27868,8 +27868,8 @@ vector<int,4> TextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27923,8 +27923,8 @@ vector<int,4> TextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -27978,8 +27978,8 @@ vector<int,4> TextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28033,8 +28033,8 @@ vector<int,4> TextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28088,8 +28088,8 @@ vector<int,4> TextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28108,10 +28108,10 @@ vector<int,4> TextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -28155,8 +28155,8 @@ vector<uint,4> TextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28210,8 +28210,8 @@ vector<uint,4> TextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28265,8 +28265,8 @@ vector<uint,4> TextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28320,8 +28320,8 @@ vector<uint,4> TextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28375,8 +28375,8 @@ vector<uint,4> TextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28398,16 +28398,16 @@ vector<uint,4> TextureCube.GatherAlpha(
 
 ## Methods
 
-* _Sample_ 
-* _SampleLevel_ 
-* _SampleCmp_ 
-* _SampleCmpLevelZero_ 
 * _CalculateLevelOfDetail_ 
 * _CalculateLevelOfDetailUnclamped_ 
 * _GetDimensions_ 
 * _Load_ 
-* _SampleGrad_ 
+* _Sample_ 
 * _SampleBias_ 
+* _SampleCmp_ 
+* _SampleCmpLevelZero_ 
+* _SampleGrad_ 
+* _SampleLevel_ 
 
 
 --------------------------------------------------------------------------------
@@ -28513,8 +28513,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28546,8 +28546,8 @@ T RasterizerOrderedTextureCube<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ HLSL
+1. CUDA, GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28679,10 +28679,10 @@ CUDA, GLSL, HLSL
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -28726,8 +28726,8 @@ vector<T,4> RasterizerOrderedTextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28781,8 +28781,8 @@ vector<T,4> RasterizerOrderedTextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28836,8 +28836,8 @@ vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28891,8 +28891,8 @@ vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28946,8 +28946,8 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -28966,10 +28966,10 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -29013,8 +29013,8 @@ vector<float,4> RasterizerOrderedTextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29068,8 +29068,8 @@ vector<float,4> RasterizerOrderedTextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29123,8 +29123,8 @@ vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29178,8 +29178,8 @@ vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29233,8 +29233,8 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29253,10 +29253,10 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -29300,8 +29300,8 @@ vector<int,4> RasterizerOrderedTextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29355,8 +29355,8 @@ vector<int,4> RasterizerOrderedTextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29410,8 +29410,8 @@ vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29465,8 +29465,8 @@ vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29520,8 +29520,8 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29540,10 +29540,10 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -29587,8 +29587,8 @@ vector<uint,4> RasterizerOrderedTextureCube.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29642,8 +29642,8 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29697,8 +29697,8 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29752,8 +29752,8 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29807,8 +29807,8 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29830,9 +29830,9 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
 
 ## Methods
 
+* _GetDimensions_ 
 * _GetSamplePosition_ 
 * _Load_ 
-* _GetDimensions_ 
 
 
 --------------------------------------------------------------------------------
@@ -29924,8 +29924,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -29943,9 +29943,9 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Methods
 
+* _GetDimensions_ 
 * _GetSamplePosition_ 
 * _Load_ 
-* _GetDimensions_ 
 
 
 --------------------------------------------------------------------------------
@@ -30037,8 +30037,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30056,13 +30056,13 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Methods
 
-* _Sample_ 
-* _SampleLevel_ 
 * _CalculateLevelOfDetail_ 
 * _CalculateLevelOfDetailUnclamped_ 
 * _GetDimensions_ 
-* _SampleGrad_ 
+* _Sample_ 
 * _SampleBias_ 
+* _SampleGrad_ 
+* _SampleLevel_ 
 
 
 --------------------------------------------------------------------------------
@@ -30173,8 +30173,8 @@ T TextureCubeArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ HLSL
+1. CUDA, GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30262,10 +30262,10 @@ CUDA, GLSL, HLSL
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -30309,8 +30309,8 @@ vector<T,4> TextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30364,8 +30364,8 @@ vector<T,4> TextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30419,8 +30419,8 @@ vector<T,4> TextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30474,8 +30474,8 @@ vector<T,4> TextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30529,8 +30529,8 @@ vector<T,4> TextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30549,10 +30549,10 @@ vector<T,4> TextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -30596,8 +30596,8 @@ vector<float,4> TextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30651,8 +30651,8 @@ vector<float,4> TextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30706,8 +30706,8 @@ vector<float,4> TextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30761,8 +30761,8 @@ vector<float,4> TextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30816,8 +30816,8 @@ vector<float,4> TextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30836,10 +30836,10 @@ vector<float,4> TextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -30883,8 +30883,8 @@ vector<int,4> TextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30938,8 +30938,8 @@ vector<int,4> TextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -30993,8 +30993,8 @@ vector<int,4> TextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31048,8 +31048,8 @@ vector<int,4> TextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31103,8 +31103,8 @@ vector<int,4> TextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31123,10 +31123,10 @@ vector<int,4> TextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -31170,8 +31170,8 @@ vector<uint,4> TextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31225,8 +31225,8 @@ vector<uint,4> TextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31280,8 +31280,8 @@ vector<uint,4> TextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31335,8 +31335,8 @@ vector<uint,4> TextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31390,8 +31390,8 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31413,13 +31413,13 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
 
 ## Methods
 
-* _Sample_ 
-* _SampleLevel_ 
 * _CalculateLevelOfDetail_ 
 * _CalculateLevelOfDetailUnclamped_ 
 * _GetDimensions_ 
-* _SampleGrad_ 
+* _Sample_ 
 * _SampleBias_ 
+* _SampleGrad_ 
+* _SampleLevel_ 
 
 
 --------------------------------------------------------------------------------
@@ -31530,8 +31530,8 @@ T RasterizerOrderedTextureCubeArray<T>.Sample(
 
 ## Target Availability
 
-* _1_ CUDA, GLSL, HLSL
-* _2_ HLSL
+1. CUDA, GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31619,10 +31619,10 @@ CUDA, GLSL, HLSL
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -31666,8 +31666,8 @@ vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31721,8 +31721,8 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31776,8 +31776,8 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31831,8 +31831,8 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31886,8 +31886,8 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -31906,10 +31906,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -31953,8 +31953,8 @@ vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32008,8 +32008,8 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32063,8 +32063,8 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32118,8 +32118,8 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32173,8 +32173,8 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32193,10 +32193,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -32240,8 +32240,8 @@ vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32295,8 +32295,8 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32350,8 +32350,8 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32405,8 +32405,8 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32460,8 +32460,8 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32480,10 +32480,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Methods
 
 * _Gather_ 
-* _GatherAlpha_ 
 * _GatherRed_ 
 * _GatherGreen_ 
 * _GatherBlue_ 
+* _GatherAlpha_ 
 
 
 --------------------------------------------------------------------------------
@@ -32527,8 +32527,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32582,8 +32582,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32637,8 +32637,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32692,8 +32692,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32747,8 +32747,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -32770,8 +32770,8 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 
 ## Methods
 
-* _GetSamplePosition_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
 
 
 --------------------------------------------------------------------------------
@@ -32849,8 +32849,8 @@ HLSL
 
 ## Methods
 
-* _GetSamplePosition_ 
 * _GetDimensions_ 
+* _GetSamplePosition_ 
 
 
 --------------------------------------------------------------------------------
@@ -33059,10 +33059,10 @@ HLSL
 
 ## Methods
 
-* _Load3_ 
-* _Load4_ 
 * _GetDimensions_ 
 * _Load2_ 
+* _Load3_ 
+* _Load4_ 
 
 
 --------------------------------------------------------------------------------
@@ -33098,8 +33098,8 @@ vector<uint,2> ByteAddressBuffer.Load2(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33122,8 +33122,8 @@ vector<uint,3> ByteAddressBuffer.Load3(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33146,8 +33146,8 @@ vector<uint,4> ByteAddressBuffer.Load4(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33181,9 +33181,9 @@ HLSL
 
 ## Methods
 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -33222,8 +33222,8 @@ T StructuredBuffer<T>.Load(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33359,31 +33359,31 @@ HLSL
 
 ## Methods
 
-* _InterlockedXor_ 
-* _Load4_ 
-* _InterlockedAdd_ 
 * _GetDimensions_ 
-* _InterlockedOr_ 
-* _InterlockedAndU64_ 
-* _InterlockedAddF32_ 
-* _InterlockedExchange_ 
-* _InterlockedCompareExchangeU64_ 
-* _InterlockedOrU64_ 
-* _InterlockedMinU64_ 
-* _InterlockedAnd_ 
-* _Store3_ 
-* _InterlockedMin_ 
-* _Store4_ 
-* _Store2_ 
-* _InterlockedMaxU64_ 
-* _InterlockedCompareExchange_ 
-* _InterlockedExchangeU64_ 
 * _Load2_ 
-* _InterlockedMax_ 
-* _InterlockedXorU64_ 
-* _InterlockedAddI64_ 
 * _Load3_ 
+* _Load4_ 
+* _InterlockedAddF32_ 
+* _InterlockedAddI64_ 
+* _InterlockedCompareExchangeU64_ 
+* _InterlockedMaxU64_ 
+* _InterlockedMinU64_ 
+* _InterlockedAndU64_ 
+* _InterlockedOrU64_ 
+* _InterlockedXorU64_ 
+* _InterlockedExchangeU64_ 
+* _InterlockedAdd_ 
+* _InterlockedAnd_ 
+* _InterlockedCompareExchange_ 
 * _InterlockedCompareStore_ 
+* _InterlockedExchange_ 
+* _InterlockedMax_ 
+* _InterlockedMin_ 
+* _InterlockedOr_ 
+* _InterlockedXor_ 
+* _Store2_ 
+* _Store3_ 
+* _Store4_ 
 
 
 --------------------------------------------------------------------------------
@@ -33419,8 +33419,8 @@ vector<uint,2> RWByteAddressBuffer.Load2(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33443,8 +33443,8 @@ vector<uint,3> RWByteAddressBuffer.Load3(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -33467,8 +33467,8 @@ vector<uint,4> RWByteAddressBuffer.Load4(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -34007,20 +34007,20 @@ HLSL
 
 ## Methods
 
+* _GetDimensions_ 
+* _Load2_ 
+* _Load3_ 
 * _Load4_ 
 * _InterlockedAdd_ 
-* _InterlockedOr_ 
-* _GetDimensions_ 
-* _InterlockedMax_ 
 * _InterlockedAnd_ 
-* _InterlockedMin_ 
-* _Store2_ 
-* _InterlockedExchange_ 
-* _Load3_ 
-* _InterlockedCompareStore_ 
-* _InterlockedXor_ 
 * _InterlockedCompareExchange_ 
-* _Load2_ 
+* _InterlockedCompareStore_ 
+* _InterlockedExchange_ 
+* _InterlockedMax_ 
+* _InterlockedMin_ 
+* _InterlockedOr_ 
+* _InterlockedXor_ 
+* _Store2_ 
 * _Store3_ 
 * _Store4_ 
 
@@ -34058,8 +34058,8 @@ vector<uint,2> RasterizerOrderedByteAddressBuffer.Load2(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -34082,8 +34082,8 @@ vector<uint,3> RasterizerOrderedByteAddressBuffer.Load3(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -34106,8 +34106,8 @@ vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -34440,11 +34440,11 @@ HLSL
 
 ## Methods
 
-* _subscript_ 
 * _DecrementCounter_ 
-* _Load_ 
 * _GetDimensions_ 
 * _IncrementCounter_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -34511,8 +34511,8 @@ T RWStructuredBuffer<T>.Load(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -34545,11 +34545,11 @@ HLSL
 
 ## Methods
 
-* _subscript_ 
 * _DecrementCounter_ 
-* _Load_ 
 * _GetDimensions_ 
 * _IncrementCounter_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -34616,8 +34616,8 @@ T RasterizerOrderedStructuredBuffer<T>.Load(
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -43835,9 +43835,9 @@ CUDA, HLSL
 
 ## Methods
 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -43877,8 +43877,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -43911,9 +43911,9 @@ HLSL
 
 ## Methods
 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -43953,8 +43953,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -43987,9 +43987,9 @@ HLSL
 
 ## Methods
 
-* _subscript_ 
-* _Load_ 
 * _GetDimensions_ 
+* _Load_ 
+* _subscript_ 
 
 
 --------------------------------------------------------------------------------
@@ -44029,8 +44029,8 @@ GLSL GL_EXT_samplerless_texture_functions
 
 ## Target Availability
 
-* _1_ GLSL, HLSL
-* _2_ HLSL
+1. GLSL, HLSL
+2. HLSL
 
 ## Parameters
 
@@ -45226,47 +45226,47 @@ uint CANDIDATE_PROCEDURAL_PRIMITIVE
 
 ## Methods
 
-* _CandidateObjectToWorld3x4_ 
-* _CommittedObjectRayDirection_ 
-* _CommittedInstanceContributionToHitGroupIndex_ 
-* _CommittedTriangleFrontFace_ 
-* _CandidateType_ 
-* _CommittedWorldToObject3x4_ 
-* _WorldRayDirection_ 
-* _CandidateGeometryIndex_ 
-* _CandidateInstanceID_ 
-* _CandidateProceduralPrimitiveNonOpaque_ 
-* _CandidateWorldToObject3x4_ 
 * _init_ 
 * _TraceRayInline_ 
-* _CommittedGeometryIndex_ 
-* _CommittedStatus_ 
-* _CommittedRayT_ 
-* _CommittedObjectRayOrigin_ 
-* _CandidateObjectRayDirection_ 
-* _CommittedTriangleBarycentrics_ 
-* _CandidateTriangleRayT_ 
-* _CommittedObjectToWorld4x3_ 
-* _CommittedPrimitiveIndex_ 
-* _CandidatePrimitiveIndex_ 
-* _CandidateWorldToObject4x3_ 
-* _CandidateTriangleFrontFace_ 
-* _CommittedInstanceID_ 
-* _CommitNonOpaqueTriangleHit_ 
-* _RayFlags_ 
-* _CandidateObjectToWorld4x3_ 
-* _RayTMin_ 
-* _CandidateInstanceContributionToHitGroupIndex_ 
 * _Proceed_ 
-* _CandidateInstanceIndex_ 
-* _CandidateTriangleBarycentrics_ 
-* _CommittedObjectToWorld3x4_ 
-* _CommitProceduralPrimitiveHit_ 
 * _Abort_ 
-* _CommittedInstanceIndex_ 
-* _CommittedWorldToObject4x3_ 
+* _CandidateType_ 
+* _CandidateObjectToWorld3x4_ 
+* _CandidateObjectToWorld4x3_ 
+* _CandidateWorldToObject3x4_ 
+* _CandidateWorldToObject4x3_ 
+* _CandidateInstanceIndex_ 
+* _CandidateInstanceID_ 
+* _CandidateGeometryIndex_ 
+* _CandidatePrimitiveIndex_ 
+* _CandidateInstanceContributionToHitGroupIndex_ 
 * _CandidateObjectRayOrigin_ 
+* _CandidateObjectRayDirection_ 
+* _CandidateProceduralPrimitiveNonOpaque_ 
+* _CandidateTriangleFrontFace_ 
+* _CandidateTriangleBarycentrics_ 
+* _CandidateTriangleRayT_ 
+* _CommitNonOpaqueTriangleHit_ 
+* _CommitProceduralPrimitiveHit_ 
+* _CommittedStatus_ 
+* _CommittedObjectToWorld3x4_ 
+* _CommittedObjectToWorld4x3_ 
+* _CommittedWorldToObject3x4_ 
+* _CommittedWorldToObject4x3_ 
+* _CommittedRayT_ 
+* _CommittedInstanceIndex_ 
+* _CommittedInstanceID_ 
+* _CommittedGeometryIndex_ 
+* _CommittedPrimitiveIndex_ 
+* _CommittedInstanceContributionToHitGroupIndex_ 
+* _CommittedObjectRayOrigin_ 
+* _CommittedObjectRayDirection_ 
+* _CommittedTriangleFrontFace_ 
+* _CommittedTriangleBarycentrics_ 
+* _RayFlags_ 
 * _WorldRayOrigin_ 
+* _WorldRayDirection_ 
+* _RayTMin_ 
 
 
 --------------------------------------------------------------------------------

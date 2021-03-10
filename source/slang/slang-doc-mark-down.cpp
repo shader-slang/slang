@@ -829,6 +829,9 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
 
         if (uniqueMethods.getCount())
         {
+            // Put in source definition order
+            uniqueMethods.sort([](Decl* a, Decl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
+
             out << "## Methods\n\n";
             _appendAsBullets(uniqueMethods);
         }
