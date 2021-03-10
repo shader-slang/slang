@@ -428,7 +428,7 @@ void DocMarkDownWriter::_maybeAppendSet(const UnownedStringSlice& title, const S
         {
             for (Index i = 0; i < uniqueCount; ++i)
             {
-                out << toSlice("* _") << (i + 1) << ("_ ");
+                out << (i + 1) << (". ");
                 _appendCommaList(uniqueValues[i]);
                 out << toSlice("\n");
             }
@@ -556,7 +556,6 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
                 }
             }
 
-#if 1
             if (targetSetSet.getUniqueValues().getCount() > 1)
             {
                 const Index targetIndex = targetSetSet.getValueIndex(i);
@@ -573,7 +572,6 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
                     prevTargetIndex = targetIndex;
                 }
             }
-#endif
 
             writeSignature(sig);
         }
