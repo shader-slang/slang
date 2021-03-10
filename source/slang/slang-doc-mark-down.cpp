@@ -820,7 +820,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         SLANG_ASSERT(aggTypeDecl->isMemberDictionaryValid());
 
         List<Decl*> uniqueMethods;
-        for (const auto pair : aggTypeDecl->memberDictionary)
+        for (const auto& pair : aggTypeDecl->memberDictionary)
         {
             CallableDecl* callableDecl = as<CallableDecl>(pair.Value);
             if (callableDecl && isVisible(callableDecl))
