@@ -767,6 +767,7 @@ tool "gfx"
     files {"slang-gfx.h"}
 
     -- Will compile across targets
+    addSourceDir "tools/gfx/cpu"
     addSourceDir "tools/gfx/nvapi"
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
@@ -786,7 +787,6 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
         addSourceDir "tools/gfx/cuda"
-        addSourceDir "tools/gfx/cpu"
 
         if type(cudaPath) == "string" then
             defines { "GFX_ENABLE_CUDA" }
