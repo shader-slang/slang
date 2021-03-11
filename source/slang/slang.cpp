@@ -245,7 +245,7 @@ SlangResult Session::checkPassThroughSupport(SlangPassThrough inPassThrough)
     return checkExternalCompilerSupport(this, PassThroughMode(inPassThrough));
 }
 
-SlangResult Session::compileStdLib()
+SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 {
     if (m_builtinLinkage->mapNameToLoadedModules.Count())
     {
@@ -256,6 +256,43 @@ SlangResult Session::compileStdLib()
     // TODO(JS): Could make this return a SlangResult as opposed to exception
     addBuiltinSource(coreLanguageScope, "core", getCoreLibraryCode());
     addBuiltinSource(hlslLanguageScope, "hlsl", getHLSLLibraryCode());
+
+    if (compileFlags & slang::CompileStdLibFlag::WriteDocumentation)
+    {
+        // Not 100% clear where best to get the ASTBuilder from, but from the linkage shouldn't
+        // cause any problems with scoping
+
+        ASTBuilder* astBuilder = getBuiltinLinkage()->getASTBuilder();
+        SourceManager* sourceManager = getBuiltinSourceManager();
+
+        DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
+
+        List<String> docStrings;
+
+        // For all the modules add their doc output to docStrings
+        for (Module* stdlibModule : stdlibModules)
+        { 
+            RefPtr<DocMarkup> markup(new DocMarkup);
+            DocMarkupExtractor::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
+
+            DocMarkDownWriter writer(markup, astBuilder);
+            writer.writeAll();
+            docStrings.add(writer.getOutput());
+        }
+
+        // Combine all together in stdlib-doc.md output fiel
+        {
+            String fileName("stdlib-doc.md");
+
+            StreamWriter writer(new FileStream(fileName, FileMode::Create));
+
+            for (auto& docString : docStrings)
+            {
+                writer.Write(docString);
+            }
+        }
+    }
+
     return SLANG_OK;
 }
 

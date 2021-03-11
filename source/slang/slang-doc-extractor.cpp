@@ -322,6 +322,7 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
 
         switch (tok.type)
         {
+            case TokenType::LBrace:
             case TokenType::LBracket:
             case TokenType::LParent:
             case TokenType::OpLess:
@@ -396,11 +397,11 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                     {
                         return i + 1;
                     }
-                }
 
-                if (location == Location::Before)
-                {
-                    return -1;
+                    if (location == Location::Before)
+                    {
+                        return -1;
+                    }
                 }
 
                 break;
@@ -636,6 +637,9 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
             return _findMarkup(info, locs, SLANG_COUNT_OF(locs), out);
         }
         case SearchStyle::Before:
+        {
+            return _findMarkup(info, Location::Before, out);
+        }
         case SearchStyle::Function:
         {
             return _findMarkup(info, Location::Before, out);
@@ -652,6 +656,70 @@ SlangResult DocMarkupExtractor::_findMarkup(const FindInfo& info, SearchStyle se
         }
     }
 }
+
+
+static void _calcLineVisibility(SourceView* sourceView, const TokenList& toks, List<MarkupVisibility>& outLineVisibility)
+{
+    SourceFile* sourceFile = sourceView->getSourceFile();
+    const auto& lineOffsets = sourceFile->getLineBreakOffsets();
+
+    outLineVisibility.setCount(lineOffsets.getCount() + 1);
+
+    MarkupVisibility lastVisibility = MarkupVisibility::Public;
+    Index lastLine = 0;
+
+    for (const auto& tok : toks)
+    {
+        if (tok.type == TokenType::LineComment)
+        {
+            UnownedStringSlice contents = tok.getContent();
+
+            MarkupVisibility newVisibility = lastVisibility;
+
+            // Distinct from other markup
+            if (contents.startsWith(toSlice("//@")))
+            {
+                UnownedStringSlice access = contents.tail(3).trim();
+                if (access == "hidden:" || access == "private:")
+                {
+                    newVisibility = MarkupVisibility::Hidden;
+                }
+                else if (access == "internal:")
+                {
+                    newVisibility = MarkupVisibility::Internal;
+                }
+                else if (access == "public:")
+                {
+                    newVisibility = MarkupVisibility::Public;
+                }
+            }
+
+            if (newVisibility != lastVisibility)
+            {
+                // Work up the line it's on
+                const int offset = sourceView->getRange().getOffset(tok.loc);
+                Index line = sourceFile->calcLineIndexFromOffset(offset);
+
+                // Fill in the span
+                for (Index i = lastLine; i < line; ++i)
+                {
+                    outLineVisibility[i] = lastVisibility;
+                }
+
+                // Record the new access and where we are up to
+                lastLine = line;
+                lastVisibility = newVisibility;
+            }
+        }
+    }
+
+    // Fill in the remaining
+    for (Index i = lastLine; i < outLineVisibility.getCount(); ++ i)
+    {
+        outLineVisibility[i] = lastVisibility;
+    }
+}
+
 
 SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inputCount, SourceManager* sourceManager, DiagnosticSink* sink, List<SourceView*>& outViews, List<SearchItemOutput>& out)
 {
@@ -726,8 +794,10 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
     {
         TokenList tokens;
+        List<MarkupVisibility> lineVisibility;
 
-        MemoryArena memoryArena;
+        MemoryArena memoryArena(4096);
+
         RootNamePool rootNamePool;
         NamePool namePool;
         namePool.setRootNamePool(&rootNamePool);
@@ -746,6 +816,7 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
             dst.viewIndex = -1;
             dst.inputIndex = entry.inputIndex;
+            dst.visibilty = MarkupVisibility::Public;
 
             // If there isn't a mechanism to search with, just move on
             if (entry.searchStyle == SearchStyle::None)
@@ -767,6 +838,10 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
                 // Lex everything
                 tokens = lexer.lexAllTokens();
+
+                // Let's work out the access
+
+                _calcLineVisibility(sourceView, tokens, lineVisibility);
             }
 
             dst.viewIndex = viewIndex;
@@ -780,6 +855,8 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
             // Work out the line number
             SourceFile* sourceFile = sourceView->getSourceFile();
             const Index lineIndex = sourceFile->calcLineIndexFromOffset(int(offset));
+
+            dst.visibilty = lineVisibility[lineIndex];
 
             // Okay, lets find the token index with a binary chop
             Index tokenIndex = _findTokenIndex(loc, tokens.m_tokens.getBuffer(), tokens.m_tokens.getCount());
@@ -902,6 +979,7 @@ SlangResult DocMarkupExtractor::extract(ModuleDecl* moduleDecl, SourceManager* s
             // Add to the documentation
             DocMarkup::Entry& docEntry = outDoc->addEntry(decl);
             docEntry.m_markup = outputItem.text;
+            docEntry.m_visibility = outputItem.visibilty;
         }
     }
     

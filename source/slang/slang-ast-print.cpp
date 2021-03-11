@@ -34,29 +34,40 @@ void ASTPrinter::addVal(Val* val)
     val->toText(m_builder);
 }
 
-void ASTPrinter::_addDeclName(Decl* decl)
+/* static */void ASTPrinter::appendDeclName(Decl* decl, StringBuilder& out)
 {
     if (as<ConstructorDecl>(decl))
     {
-        m_builder << "init";
+        out << "init";
     }
     else if (as<SubscriptDecl>(decl))
     {
-        m_builder << "subscript";
+        out << "subscript";
     }
     else
     {
-        m_builder << getText(decl->getName());
+        out << getText(decl->getName());
     }
+}
+
+void ASTPrinter::_addDeclName(Decl* decl)
+{
+    appendDeclName(decl, m_builder);
+}
+
+void ASTPrinter::addOverridableDeclPath(const DeclRef<Decl>& declRef)
+{
+    ScopePart scopePart(this, Part::Type::DeclPath);
+    _addDeclPathRec(declRef, 0);
 }
 
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
 {
     ScopePart scopePart(this, Part::Type::DeclPath);
-    _addDeclPathRec(declRef);
+    _addDeclPathRec(declRef, 1);
 }
 
-void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
+void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 {
     auto& sb = m_builder;
 
@@ -74,8 +85,48 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
     // Depending on what the parent is, we may want to format things specially
     if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
     {
-        _addDeclPathRec(aggTypeDeclRef);
-        sb << ".";
+        _addDeclPathRec(aggTypeDeclRef, depth + 1);
+        sb << toSlice(".");
+    }
+    else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
+    {
+        _addDeclPathRec(namespaceDeclRef, depth + 1);
+        // Hmm, it could be argued that we follow the . as seen in AggType as is followed in some other languages
+        // like Java.
+        // That it is useful to have a distinction between something that is a member/method and something that is
+        // in a scope (such as a namespace), and is something that has returned to later languages probably for that
+        // reason (Slang accepts . or ::). So for now this is follows the :: convention.
+        //
+        // It could be argued them that the previous '.' use should vary depending on that distinction.
+        
+        sb << toSlice("::");
+    }
+    else if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
+    {
+        ExtensionDecl* extensionDecl = as<ExtensionDecl>(parentDeclRef.getDecl());
+        Type* type = extensionDecl->targetType.type;
+        addType(type);
+        sb << toSlice(".");
+    }
+    else if (auto moduleDecl = as<ModuleDecl>(parentDeclRef.getDecl()))
+    {
+        Name* moduleName = moduleDecl->getName();
+        if ((m_optionFlags & OptionFlag::ModuleName) && moduleName)
+        {
+            // Use to say in modules scope
+            sb << moduleName->text << toSlice("::");
+        }
+    }
+
+    // If this decl is the module, we only output it's name if that feature is enabled
+    if (ModuleDecl* moduleDecl = as<ModuleDecl>(declRef.getDecl()))
+    {
+        Name* moduleName = moduleDecl->getName();
+        if ((m_optionFlags & OptionFlag::ModuleName) && moduleName)
+        {
+            sb << moduleName->text; 
+        }
+        return;
     }
 
     _addDeclName(declRef.getDecl());
@@ -85,41 +136,91 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
     if (parentGenericDeclRef)
     {
         auto genSubst = as<GenericSubstitution>(declRef.substitutions.substitutions);
-        SLANG_RELEASE_ASSERT(genSubst);
-        SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
-
-        // If the name we printed previously was an operator
-        // that ends with `<`, then immediately printing the
-        // generic arguments inside `<...>` may cause it to
-        // be hard to parse the operator name visually.
-        //
-        // We thus include a space between the declaration name
-        // and its generic arguments in this case.
-        //
-        if (sb.endsWith("<"))
+        if (genSubst)
         {
-            sb << " ";
-        }
+            SLANG_RELEASE_ASSERT(genSubst);
+            SLANG_RELEASE_ASSERT(genSubst->genericDecl == parentGenericDeclRef.getDecl());
 
-        sb << "<";
-        bool first = true;
-        for (auto arg : genSubst->args)
-        {
-            // When printing the representation of a specialized
-            // generic declaration we don't want to include the
-            // argument values for subtype witnesses since these
-            // do not correspond to parameters of the generic
-            // as the user sees it.
+            // If the name we printed previously was an operator
+            // that ends with `<`, then immediately printing the
+            // generic arguments inside `<...>` may cause it to
+            // be hard to parse the operator name visually.
             //
-            if (as<Witness>(arg))
-                continue;
+            // We thus include a space between the declaration name
+            // and its generic arguments in this case.
+            //
+            if (sb.endsWith("<"))
+            {
+                sb << " ";
+            }
 
-            if (!first) sb << ", ";
-            addVal(arg);
-            first = false;
+            sb << "<";
+            bool first = true;
+            for (auto arg : genSubst->args)
+            {
+                // When printing the representation of a specialized
+                // generic declaration we don't want to include the
+                // argument values for subtype witnesses since these
+                // do not correspond to parameters of the generic
+                // as the user sees it.
+                //
+                if (as<Witness>(arg))
+                    continue;
+
+                if (!first) sb << ", ";
+                addVal(arg);
+                first = false;
+            }
+            sb << ">";
         }
-        sb << ">";
+        else if (depth > 0)
+        {
+            // Write out the generic parameters (only if the depth allows it)
+            addGenericParams(parentGenericDeclRef);
+        }
     }
+}
+
+void ASTPrinter::addGenericParams(const DeclRef<GenericDecl>& genericDeclRef)
+{
+    auto& sb = m_builder;
+
+    sb << "<";
+    bool first = true;
+    for (auto paramDeclRef : getMembers(genericDeclRef))
+    {
+        if (auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamType);
+                sb << getText(genericTypeParam.getName());
+            }
+        }
+        else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
+        {
+            if (!first) sb << ", ";
+            first = false;
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << getText(genericValParam.getName());
+            }
+
+            sb << ":";
+
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValueType);
+                addType(getType(m_astBuilder, genericValParam));
+            }
+        }
+        else
+        {
+        }
+    }
+    sb << ">";
 }
 
 void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
@@ -140,6 +241,29 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
 
             {
                 ScopePart scopePart(this, Part::Type::ParamType);
+
+                // Seems these apply to parameters/VarDeclBase and are not part of the 'type'
+                // but seems more appropriate to put in the Type Part
+
+                if (paramDecl->hasModifier<InOutModifier>())
+                {
+                    sb << toSlice("inout ");
+                }
+                else if (paramDecl->hasModifier<OutModifier>())
+                {
+                    sb << toSlice("out ");
+                }
+                else if (paramDecl->hasModifier<InModifier>())
+                {
+                    sb << toSlice("in ");
+                }
+
+                // And this to params/variables (not the type)
+                if (paramDecl->hasModifier<ConstModifier>())
+                {
+                    sb << toSlice("const ");
+                }
+
                 addType(getType(m_astBuilder, paramDeclRef));
             }
 
@@ -161,42 +285,7 @@ void ASTPrinter::addDeclParams(const DeclRef<Decl>& declRef)
     }
     else if (auto genericDeclRef = declRef.as<GenericDecl>())
     {
-        sb << "<";
-        bool first = true;
-        for (auto paramDeclRef : getMembers(genericDeclRef))
-        {
-            if (auto genericTypeParam = paramDeclRef.as<GenericTypeParamDecl>())
-            {
-                if (!first) sb << ", ";
-                first = false;
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamType);
-                    sb << getText(genericTypeParam.getName());
-                }
-            }
-            else if (auto genericValParam = paramDeclRef.as<GenericValueParamDecl>())
-            {
-                if (!first) sb << ", ";
-                first = false;
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamValue);
-                    sb << getText(genericValParam.getName());
-                }
-
-                sb << ":";
-
-                {
-                    ScopePart scopePart(this, Part::Type::GenericParamValueType);
-                    addType(getType(m_astBuilder, genericValParam));
-                }
-            }
-            else
-            {
-            }
-        }
-        sb << ">";
+        addGenericParams(genericDeclRef);
 
         addDeclParams(DeclRef<Decl>(getInner(genericDeclRef), genericDeclRef.substitutions));
     }
@@ -265,7 +354,7 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     return index >= 0 ? getPart(slice, parts[index]) : UnownedStringSlice();
 }
 
-UnownedStringSlice ASTPrinter::getPart(Part::Type partType) const
+UnownedStringSlice ASTPrinter::getPartSlice(Part::Type partType) const
 {
     return m_parts ? getPart(partType, getSlice(), *m_parts) : UnownedStringSlice();
 }
