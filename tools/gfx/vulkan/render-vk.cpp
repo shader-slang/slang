@@ -30,6 +30,11 @@
 #   endif
 #endif
 
+// Undef xlib macros
+#ifdef Always
+#undef Always
+#endif
+
 namespace gfx {
 using namespace Slang;
 
@@ -1552,7 +1557,7 @@ public:
                 size_t dstOffset,
                 IBufferResource* src,
                 size_t srcOffset,
-                size_t size)
+                size_t size) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(srcOffset);
@@ -1561,7 +1566,7 @@ public:
                 SLANG_UNUSED(size);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data)
+                uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data) override
             {
                 _uploadBufferData(
                     m_commandBuffer->m_commandBuffer,
@@ -1850,9 +1855,7 @@ public:
             ::GetClientRect((HWND)m_windowHandle.handleValues[0], &rc);
             *widthOut = rc.right - rc.left;
             *heightOut = rc.bottom - rc.top;
-#else
-            auto platformDesc = _getPlatformDesc<XPlatformDesc>();
-
+#elif defined(SLANG_ENABLE_XLIB)
             XWindowAttributes winAttr = {};
             XGetWindowAttributes(
                 (Display*)m_windowHandle.handleValues[0],
@@ -1861,6 +1864,9 @@ public:
 
             *widthOut = winAttr.width;
             *heightOut = winAttr.height;
+#else
+            *widthOut = 0;
+            *heightOut = 0;
 #endif
         }
 
@@ -2088,9 +2094,9 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() { return m_desc; }
+        virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
         virtual SLANG_NO_THROW Result
-            SLANG_MCALL getImage(uint32_t index, ITextureResource** outResource)
+            SLANG_MCALL getImage(uint32_t index, ITextureResource** outResource) override
         {
             if (m_images.getCount() <= (Index)index)
                 return SLANG_FAIL;
@@ -2098,14 +2104,14 @@ public:
             m_images[index]->addRef();
             return SLANG_OK;
         }
-        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height)
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
         {
             SLANG_UNUSED(width);
             SLANG_UNUSED(height);
             destroySwapchainAndImages();
             return createSwapchainAndImages();
         }
-        virtual SLANG_NO_THROW Result SLANG_MCALL present()
+        virtual SLANG_NO_THROW Result SLANG_MCALL present() override
         {
             uint32_t swapChainIndices[] = {uint32_t(m_currentImageIndex)};
 
@@ -2123,7 +2129,7 @@ public:
             m_queue->m_pendingWaitSemaphore = VK_NULL_HANDLE;
             return SLANG_OK;
         }
-        virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage()
+        virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override
         {
             if (!m_images.getCount())
                 return -1;
@@ -2283,9 +2289,9 @@ VkBool32 VKDevice::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReport
 
     fprintf(stderr, "%s", buffer);
     fflush(stderr);
-
+#ifdef _WIN32
     OutputDebugStringA(buffer);
-
+#endif
     return VK_FALSE;
 }
 
@@ -2339,8 +2345,9 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     applicationInfo.pApplicationName = "slang-render-test";
     applicationInfo.pEngineName = "slang-render-test";
     applicationInfo.apiVersion = VK_API_VERSION_1_0;
-
-    char const* instanceExtensions[] =
+    applicationInfo.engineVersion = 1;
+    applicationInfo.applicationVersion = 1;
+    const char* instanceExtensions[] =
     {
         VK_KHR_SURFACE_EXTENSION_NAME,
 
@@ -2348,8 +2355,8 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
 #if SLANG_WINDOWS_FAMILY
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-#else
-        VK_KHR_XLIB_SURFACE_EXTENSION_NAME
+#elif defined(SLANG_ENABLE_XLIB)
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
 #endif
 
 #if ENABLE_VALIDATION_LAYER
@@ -2361,7 +2368,6 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instanceCreateInfo.pApplicationInfo = &applicationInfo;
-
     instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
     instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
@@ -2414,9 +2420,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             instanceCreateInfo.ppEnabledLayerNames = layerNames;
         }
     }
-
-    if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS)
-        return SLANG_FAIL;
+    SLANG_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
     if (useValidationLayer)
@@ -2673,6 +2677,13 @@ Result VKDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQue
 Result VKDevice::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
+#if !defined(SLANG_ENABLE_XLIB)
+    if (window.type == WindowHandle::Type::XLibHandle)
+    {
+        return SLANG_FAIL;
+    }
+#endif
+
     RefPtr<SwapchainImpl> sc = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
     *outSwapchain = sc.detach();

@@ -146,7 +146,7 @@ namespace Slang
             if (SLANG_FAILED(locator(m_downstreamCompilerPaths[int(type)], m_sharedLibraryLoader, m_downstreamCompilerSet)))
             {
                 // If the locator reported a failure the first time we invoked
-                // it, then we will invoke it against with a wrapper shared librar
+                // it, then we will invoke it against with a wrapper shared library
                 // loader that reported library load failures to our diagnost `sink`.
                 //
                 // This means that in the case of failure the user will see a listing
