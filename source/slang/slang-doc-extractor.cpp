@@ -679,7 +679,7 @@ static void _calcLineVisibility(SourceView* sourceView, const TokenList& toks, L
             // Distinct from other markup
             if (contents.startsWith(toSlice("//@")))
             {
-                UnownedStringSlice access = contents.tail(4).trim();
+                UnownedStringSlice access = contents.tail(3).trim();
                 if (access == "hidden:" || access == "private:")
                 {
                     newVisibility = MarkupVisibility::Hidden;
