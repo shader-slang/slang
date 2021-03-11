@@ -31,7 +31,7 @@
 #include "slang-serialize-container.h"
 
 #include "slang-doc-extractor.h"
-#include "slang-doc-mark-down.h"
+#include "slang-doc-markdown-writer.h"
 
 #include "slang-check-impl.h"
 
@@ -275,7 +275,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
             RefPtr<DocMarkup> markup(new DocMarkup);
             DocMarkupExtractor::extract(stdlibModule->getModuleDecl(), sourceManager, &sink, markup);
 
-            DocMarkDownWriter writer(markup, astBuilder);
+            DocMarkdownWriter writer(markup, astBuilder);
             writer.writeAll();
             docStrings.add(writer.getOutput());
         }
@@ -1859,7 +1859,7 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
                 String fileName = Path::getFileNameWithoutExt(path);
                 fileName.append(".md");
 
-                DocMarkDownWriter writer(markup, astBuilder);
+                DocMarkdownWriter writer(markup, astBuilder);
                 writer.writeAll();
 
                 File::writeAllText(fileName, writer.getOutput());
