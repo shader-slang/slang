@@ -78,7 +78,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         IResource::Usage initialUsage,
@@ -1057,17 +1057,12 @@ static int _calcResourceAccessFlags(int accessFlags)
     }
 }
 
-Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
+Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
     TextureResource::Desc srcDesc(descIn);
     srcDesc.setDefaults(initialUsage);
 
     const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
-
-    if(initData)
-    {
-        assert(initData->numSubResources == srcDesc.numMipLevels * effectiveArraySize * srcDesc.size.depth);
-    }
 
     const DXGI_FORMAT format = D3DUtil::getMapFormat(srcDesc.format);
     if (format == DXGI_FORMAT_UNKNOWN)
@@ -1092,11 +1087,11 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
                     const int mipHeight = ITextureResource::Size::calcMipSize(srcDesc.size.height, j);
 
                     D3D11_SUBRESOURCE_DATA& data = subRes[subResourceIndex];
+                    auto& srcData = initData[subResourceIndex];
 
-                    data.pSysMem = initData->subResources[subResourceIndex];
-
-                    data.SysMemPitch = UINT(initData->mipRowStrides[j]);
-                    data.SysMemSlicePitch = UINT(initData->mipRowStrides[j] * mipHeight);
+                    data.pSysMem = srcData.data;
+                    data.SysMemPitch = UINT(srcData.strideY);
+                    data.SysMemSlicePitch = UINT(srcData.strideZ);
 
                     subResourceIndex++;
                 }

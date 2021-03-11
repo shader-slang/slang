@@ -1365,7 +1365,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override
     {
         RefPtr<TextureCUDAResource> tex = new TextureCUDAResource(desc);
@@ -1611,7 +1611,7 @@ public:
                 {
                     for (Index j = 0; j < faceCount; j++)
                     {
-                        const auto srcData = initData->subResources[mipLevel + j * desc.numMipLevels];
+                        const auto srcData = initData[mipLevel + j * desc.numMipLevels].data;
                         // Copy over to the workspace to make contiguous
                         ::memcpy(
                             workspace.begin() + faceSizeInBytes * j, srcData,
@@ -1633,7 +1633,7 @@ public:
                     for (Index j = 0; j < 6; j++)
                     {
                         const auto srcData =
-                            initData->subResources[mipLevel + j * desc.numMipLevels];
+                            initData[mipLevel + j * desc.numMipLevels].data;
                         ::memcpy(
                             workspace.getBuffer() + faceSizeInBytes * j, srcData,
                             faceSizeInBytes);
@@ -1643,7 +1643,7 @@ public:
                 }
                 else
                 {
-                    const auto srcData = initData->subResources[mipLevel];
+                    const auto srcData = initData[mipLevel].data;
                     srcDataPtr = srcData;
                 }
             }

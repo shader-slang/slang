@@ -217,14 +217,9 @@ GUI::GUI(
         desc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, width, height, 1);
         desc.setDefaults(IResource::Usage::PixelShaderResource);
 
-
-        ptrdiff_t mipRowStrides[] = { ptrdiff_t(width * 4 * sizeof(unsigned char)) };
-        void* subResourceData[] = { pixels };
-        ITextureResource::Data initData;
-        initData.mipRowStrides = mipRowStrides;
-        initData.numMips = 1;
-        initData.numSubResources = 1;
-        initData.subResources = subResourceData;
+        ITextureResource::SubresourceData initData = {};
+        initData.data = pixels;
+        initData.strideY = width * 4 * sizeof(unsigned char);
 
         auto texture =
             device->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);

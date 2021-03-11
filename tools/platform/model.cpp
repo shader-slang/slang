@@ -128,13 +128,16 @@ ComPtr<ITextureResource> loadTextureImage(
     // results when loading the image with stb_image.
     }
 
-    std::vector<void*> subresourceInitData;
-    std::vector<ptrdiff_t> mipRowStrides;
+    std::vector<ITextureResource::SubresourceData> subresourceInitData;
 
     ptrdiff_t stride = extentX * channelCount * sizeof(stbi_uc);
 
-    subresourceInitData.push_back(data);
-    mipRowStrides.push_back(stride);
+    ITextureResource::SubresourceData baseInitData;
+    baseInitData.data = data;
+    baseInitData.strideY = stride;
+    baseInitData.strideZ = 0;
+
+    subresourceInitData.push_back(baseInitData);
 
     // create down-sampled images for the different mip levels
     bool generateMips = true;
@@ -166,8 +169,13 @@ ComPtr<ITextureResource> loadTextureImage(
                 STBIR_ALPHA_CHANNEL_NONE,
                 STBIR_FLAG_ALPHA_PREMULTIPLIED);
 
-            subresourceInitData.push_back(newData);
-            mipRowStrides.push_back(newStride);
+
+            ITextureResource::SubresourceData mipInitData;
+            mipInitData.data = newData;
+            mipInitData.strideY = newStride;
+            mipInitData.strideZ = 0;
+
+            subresourceInitData.push_back(mipInitData);
 
             prevExtentX = newExtentX;
             prevExtentY = newExtentY;
@@ -176,19 +184,13 @@ ComPtr<ITextureResource> loadTextureImage(
         }
     }
 
-    int mipCount = (int) mipRowStrides.size();
+    int mipCount = (int) subresourceInitData.size();
 
     ITextureResource::Desc desc;
     desc.init2D(IResource::Type::Texture2D, format, extentX, extentY, mipCount);
 
-    ITextureResource::Data initData;
-    initData.numSubResources = mipCount;
-    initData.numMips = mipCount;
-    initData.subResources = &subresourceInitData[0];
-    initData.mipRowStrides = &mipRowStrides[0];
-
     auto texture =
-        device->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
+        device->createTextureResource(IResource::Usage::PixelShaderResource, desc, subresourceInitData.data());
 
     free(data);
 
