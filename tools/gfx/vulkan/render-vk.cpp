@@ -65,7 +65,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         IResource::Usage initialUsage,
@@ -3011,7 +3011,7 @@ size_t calcNumRows(Format format, int height)
     return (size_t)height;
 }
 
-Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
+Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
     TextureResource::Desc desc(descIn);
     desc.setDefaults(initialUsage);
@@ -3113,7 +3113,6 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
         VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
         const int numMipMaps = desc.numMipLevels;
-        assert(initData->numMips == numMipMaps);
 
         // Calculate how large the buffer has to be
         size_t bufferSize = 0;
@@ -3140,35 +3139,49 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
 
         // Copy into upload buffer
         {
-            int subResourceIndex = 0;
+            int subResourceCounter = 0;
 
             uint8_t* dstData;
             m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
 
+            size_t dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)
             {
                 for (Index j = 0; j < mipSizes.getCount(); ++j)
                 {
                     const auto& mipSize = mipSizes[j];
 
-                    const ptrdiff_t srcRowStride = initData->mipRowStrides[j];
+                    int subResourceIndex = subResourceCounter++;
+                    auto initSubresource = initData[subResourceIndex];
+
+                    const ptrdiff_t srcRowStride = initSubresource.strideY;
+                    const ptrdiff_t srcLayerStride = initSubresource.strideZ;
+
                     auto dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
                     auto numRows = calcNumRows(desc.format, mipSize.height);
+                    auto dstLayerSizeInBytes = dstRowSizeInBytes * numRows;
+
+                    const uint8_t* srcLayer = (const uint8_t*) initSubresource.data;
+                    uint8_t* dstLayer = dstData + dstSubresourceOffset;
 
                     for (int k = 0; k < mipSize.depth; k++)
                     {
-                        const uint8_t* srcData = (const uint8_t*)(initData->subResources[subResourceIndex]);
+                        const uint8_t* srcRow = srcLayer;
+                        uint8_t* dstRow = dstLayer;
 
                         for (uint32_t l = 0; l < numRows; l++)
                         {
-                            ::memcpy(dstData, srcData, dstRowSizeInBytes);
+                            ::memcpy(dstRow, srcRow, dstRowSizeInBytes);
 
-                            dstData += dstRowSizeInBytes;
-                            srcData += srcRowStride;
+                            dstRow += dstRowSizeInBytes;
+                            srcRow += srcRowStride;
                         }
 
-                        subResourceIndex++;
+                        dstLayer += dstLayerSizeInBytes;
+                        srcLayer += srcLayerStride;
                     }
+
+                    dstSubresourceOffset += dstLayerSizeInBytes * mipSize.depth;
                 }
             }
 

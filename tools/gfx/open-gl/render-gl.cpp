@@ -106,7 +106,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         IResource::Usage initialUsage,
@@ -1450,7 +1450,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
     IResource::Usage initialUsage,
     const ITextureResource::Desc& descIn,
-    const ITextureResource::Data* initData,
+    const ITextureResource::SubresourceData* initData,
     ITextureResource** outResource)
 {
     TextureResource::Desc srcDesc(descIn);
@@ -1479,6 +1479,10 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
     // Set on texture so will be freed if failure
     texture->m_handle = handle;
 
+    // TODO: The logic below seems to be ignoring the row/layer stride of
+    // the subresources that have been passed in, despite OpenGL having
+    // the ability to set the image unpack stride, etc.
+
     switch (srcDesc.type)
     {
         case IResource::Type::Texture1D:
@@ -1493,6 +1497,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                 {
                     for (int j = 0; j < srcDesc.numMipLevels; j++)
                     {
+                        // TODO: Double-check this logic - we are passing in `i` as the height?
                         glTexImage2D(
                             target,
                             j,
@@ -1502,7 +1507,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[slice++] : nullptr);
+                            initData ? initData[slice++].data : nullptr);
                     }
                 }
             }
@@ -1520,7 +1525,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                         0,
                         format,
                         formatType,
-                        initData ? initData->subResources[i] : nullptr);
+                        initData ? initData[i].data : nullptr);
                 }
             }
             break;
@@ -1556,7 +1561,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[slice++] : nullptr);
+                            initData ? initData[slice++].data : nullptr);
                     }
                 }
             }
@@ -1581,7 +1586,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                                 0,
                                 format,
                                 formatType,
-                                initData ? initData->subResources[slice++] : nullptr);
+                                initData ? initData[slice++].data : nullptr);
                         }
                     }
                 }
@@ -1600,7 +1605,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[i] : nullptr);
+                            initData ? initData[i].data : nullptr);
                     }
                 }
             }
@@ -1622,7 +1627,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                     0,
                     format,
                     formatType,
-                    initData ? initData->subResources[i] : nullptr);
+                    initData ? initData[i].data : nullptr);
             }
             break;
         }

@@ -87,38 +87,30 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
     const int numSubResources = textureResourceDesc.calcNumSubResources();
 
     IResource::Usage initialUsage = IResource::Usage::GenericRead;
-    ITextureResource::Data initData;
 
-    List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.setCount(textureResourceDesc.numMipLevels);
-    List<const void*> subResources;
-    subResources.setCount(numSubResources);
-
-    // Set up the src row strides
-    for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
+    List<ITextureResource::SubresourceData> initSubresources;
+    int subResourceCounter = 0;
+    for( int a = 0; a < effectiveArraySize; ++a )
     {
-        const int mipWidth = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, i);
-        mipRowStrides[i] = mipWidth * sizeof(uint32_t);
-    }
-
-    // Set up pointers the the data
-    {
-        int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.getCount());
-        for (int i = 0; i < numSubResources; i++)
+        for( int m = 0; m < textureResourceDesc.numMipLevels; ++m )
         {
-            subResources[i] = texData.dataBuffer[subResourceIndex].getBuffer();
-            // Wrap around
-            subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
+            int subResourceIndex = subResourceCounter++;
+            const int mipWidth = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, m);
+            const int mipHeight = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, m);
+
+            auto strideY = mipWidth * sizeof(uint32_t);
+            auto strideZ = mipHeight * strideY;
+
+            ITextureResource::SubresourceData subresourceData;
+            subresourceData.data = texData.dataBuffer[subResourceIndex].getBuffer();
+            subresourceData.strideY = strideY;
+            subresourceData.strideZ = strideZ;
+
+            initSubresources.add(subresourceData);
         }
     }
 
-    initData.mipRowStrides = mipRowStrides.getBuffer();
-    initData.numMips = textureResourceDesc.numMipLevels;
-    initData.numSubResources = numSubResources;
-    initData.subResources = subResources.getBuffer();
-
-    textureOut = device->createTextureResource(IResource::Usage::GenericRead, textureResourceDesc, &initData);
+    textureOut = device->createTextureResource(IResource::Usage::GenericRead, textureResourceDesc, initSubresources.getBuffer());
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
