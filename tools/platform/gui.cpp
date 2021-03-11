@@ -34,7 +34,6 @@ LRESULT CALLBACK guiWindowProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 
     return handled;
 }
-void setNativeWindowHook(Window* window, WNDPROC proc);
 #endif
 
 
@@ -51,8 +50,6 @@ GUI::GUI(
 
 #ifdef _WIN32
      ImGui_ImplWin32_Init((HWND)window->getNativeHandle().handleValues[0]);
-
-     setNativeWindowHook(window, &guiWindowProc);
 #endif
 
     // Let's do the initialization work required for our graphics API

@@ -406,7 +406,7 @@ public:
     virtual bool getVisible() override { return visible; }
     virtual WindowHandle getNativeHandle() override
     {
-        return WindowHandle::FromHwnd(handle);
+        return WindowHandle::fromHwnd(handle);
     }
     virtual void setText(Slang::String text) override
     {
