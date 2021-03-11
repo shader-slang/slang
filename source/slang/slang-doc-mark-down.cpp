@@ -560,17 +560,30 @@ void DocMarkDownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
     writePreamble(entry);
 
     {
-        List<ASTPrinter::Part> parts;
-        ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames, &parts);
- 
-        printer.addDeclSignature(DeclRef<Decl>(callableDecl, nullptr));
+        ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames);
+        StringBuilder& builder = printer.getStringBuilder();
 
-        // We just want the name
-        UnownedStringSlice name = printer.getPartSlice(Part::Type::DeclPath);
+        GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
+        if (genericDecl)
+        {
+            if (!as<ModuleDecl>(genericDecl->parentDecl))
+            {
+                // If this is generic *don't* put name with generic parameters, as they may vary by
+                // override. Just put the path followed by the name of this
+                printer.addDeclPath(DeclRef<Decl>(genericDecl->parentDecl, nullptr));
 
-        
+                // Place the name (without generic params) at the end
+                builder << toSlice(".");
+            }
+            ASTPrinter::appendDeclName(callableDecl, builder);
+        }
+        else
+        {
+            printer.addDeclPath(DeclRef<Decl>(callableDecl, nullptr));
+        }
+
         // Extract the name
-        out << toSlice("# `") << name << toSlice("`\n\n");
+        out << toSlice("# `") << builder << toSlice("`\n\n");
     }
 
     writeDescription(entry);

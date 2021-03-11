@@ -50,7 +50,6 @@ void ASTPrinter::addVal(Val* val)
     }
 }
 
-
 void ASTPrinter::_addDeclName(Decl* decl)
 {
     appendDeclName(decl, m_builder);
@@ -103,7 +102,6 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
         addType(type);
         sb << toSlice(".");
     }
-
 
     _addDeclName(declRef.getDecl());
 
