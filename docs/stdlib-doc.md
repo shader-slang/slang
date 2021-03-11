@@ -74,9 +74,17 @@ __BuiltinFloatingPointType.This __BuiltinFloatingPointType.getPi();
 --------------------------------------------------------------------------------
 # `struct SamplerState`
 
+## Description
+
+Sampling state for filtered texture fetches.
+
 
 --------------------------------------------------------------------------------
 # `struct SamplerComparisonState`
+
+## Description
+
+Sampling state for filtered texture fetches that include a comparison operation before filtering.
 
 
 --------------------------------------------------------------------------------
@@ -32712,6 +32720,10 @@ int getStringHash(String string);
 --------------------------------------------------------------------------------
 # `beginInvocationInterlock`
 
+## Description
+
+Mark beginning of "interlocked" operations in a fragment shader.
+
 ## Signature 
 
 ```
@@ -32729,6 +32741,10 @@ void beginInvocationInterlock();
 
 --------------------------------------------------------------------------------
 # `endInvocationInterlock`
+
+## Description
+
+Mark end of "interlocked" operations in a fragment shader.
 
 ## Signature 
 
@@ -37342,6 +37358,22 @@ matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
 --------------------------------------------------------------------------------
 # `GetAttributeAtVertex<T>`
 
+## Description
+
+ Get the value of a vertex attribute at a specific vertex.
+
+ The `GetAttributeAtVertex()` function can be used in a fragment shader
+ to get the value of the given `attribute` at the vertex of the primitive
+ that corresponds to the given `vertexIndex`.
+
+ Note that the `attribute` must have been a declared varying input to
+ the fragment shader with the `nointerpolation` modifier.
+
+ This function can be applied to scalars, vectors, and matrices of
+ built-in scalar types.
+
+ Note: these functions are not curently implemented for Vulkan/SPIR-V output.
+
 ## Signature 
 
 ```
@@ -37366,6 +37398,22 @@ T GetAttributeAtVertex<T>(
 
 --------------------------------------------------------------------------------
 # `GetAttributeAtVertex<T, N:int>`
+
+## Description
+
+ Get the value of a vertex attribute at a specific vertex.
+
+ The `GetAttributeAtVertex()` function can be used in a fragment shader
+ to get the value of the given `attribute` at the vertex of the primitive
+ that corresponds to the given `vertexIndex`.
+
+ Note that the `attribute` must have been a declared varying input to
+ the fragment shader with the `nointerpolation` modifier.
+
+ This function can be applied to scalars, vectors, and matrices of
+ built-in scalar types.
+
+ Note: these functions are not curently implemented for Vulkan/SPIR-V output.
 
 ## Signature 
 
@@ -37392,6 +37440,22 @@ vector<T,N> GetAttributeAtVertex<T, N:int>(
 
 --------------------------------------------------------------------------------
 # `GetAttributeAtVertex<T, N:int, M:int>`
+
+## Description
+
+ Get the value of a vertex attribute at a specific vertex.
+
+ The `GetAttributeAtVertex()` function can be used in a fragment shader
+ to get the value of the given `attribute` at the vertex of the primitive
+ that corresponds to the given `vertexIndex`.
+
+ Note that the `attribute` must have been a declared varying input to
+ the fragment shader with the `nointerpolation` modifier.
+
+ This function can be applied to scalars, vectors, and matrices of
+ built-in scalar types.
+
+ Note: these functions are not curently implemented for Vulkan/SPIR-V output.
 
 ## Signature 
 

@@ -397,11 +397,11 @@ Index DocMarkupExtractor::_findStartIndex(const FindInfo& info, Location locatio
                     {
                         return i + 1;
                     }
-                }
 
-                if (location == Location::Before)
-                {
-                    return -1;
+                    if (location == Location::Before)
+                    {
+                        return -1;
+                    }
                 }
 
                 break;
