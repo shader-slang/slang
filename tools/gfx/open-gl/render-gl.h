@@ -5,6 +5,6 @@
 
 namespace gfx {
 
-SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // gfx

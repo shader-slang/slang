@@ -106,7 +106,7 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline Expr* getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
+    inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);
     }
@@ -121,7 +121,7 @@ namespace Slang
         return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
     }
 
-    inline Expr* getTagExpr(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
+    inline SubstExpr<Expr> getTagExpr(ASTBuilder* astBuilder, DeclRef<EnumCaseDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->tagExpr);
     }
@@ -165,6 +165,37 @@ namespace Slang
         return declRef.getDecl()->inner;
     }
 
+    //
+
+    inline Type* getType(ASTBuilder* astBuilder, SubstExpr<Expr> expr)
+    {
+        return substituteType(expr.getSubsts(), astBuilder, expr.getExpr()->type);
+    }
+
+    inline SubstExpr<Expr> getBaseExpr(SubstExpr<ParenExpr> expr)
+    {
+        return substituteExpr(expr.getSubsts(), expr.getExpr()->base);
+    }
+
+    inline SubstExpr<Expr> getBaseExpr(SubstExpr<InvokeExpr> expr)
+    {
+        return substituteExpr(expr.getSubsts(), expr.getExpr()->functionExpr);
+    }
+
+    inline Index getArgCount(SubstExpr<InvokeExpr> expr)
+    {
+        return expr.getExpr()->arguments.getCount();
+    }
+
+    inline SubstExpr<Expr> getArg(SubstExpr<InvokeExpr> expr, Index index)
+    {
+        return substituteExpr(expr.getSubsts(), expr.getExpr()->arguments[index]);
+    }
+
+    inline DeclRef<Decl> getDeclRef(ASTBuilder* astBuilder, SubstExpr<DeclRefExpr> expr)
+    {
+        return substituteDeclRef(expr.getSubsts(), astBuilder, expr.getExpr()->declRef);
+    }
 
     //
 

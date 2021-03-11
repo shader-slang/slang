@@ -310,7 +310,12 @@ public:
     Win32PlatformWindow(const WindowDesc& desc)
     {
         DWORD windowExtendedStyle = 0;
-        DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+        style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
+        if (desc.style == WindowStyle::Default)
+        {
+            style |= WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_THICKFRAME;
+        }
+
         HINSTANCE instance = (HINSTANCE)GetModuleHandle(0);
 
         RECT windowRect;
@@ -401,7 +406,7 @@ public:
     virtual bool getVisible() override { return visible; }
     virtual WindowHandle getNativeHandle() override
     {
-        return WindowHandle::FromHwnd(handle);
+        return WindowHandle::fromHwnd(handle);
     }
     virtual void setText(Slang::String text) override
     {

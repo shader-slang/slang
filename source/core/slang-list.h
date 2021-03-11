@@ -30,6 +30,8 @@ namespace Slang
         static const Index kInitialCount = 16;
 
     public:
+        typedef List ThisType;
+
         List()
             : m_buffer(nullptr), m_count(0), m_capacity(0)
         {
@@ -184,6 +186,28 @@ namespace Slang
 
         const T* getBuffer() const { return m_buffer; }
         T* getBuffer() { return m_buffer; }
+
+        bool operator==(const ThisType& rhs) const
+        {
+            if (&rhs == this)
+            {
+                return true;
+            }
+            const Index count = getCount();
+            if (count != rhs.getCount())
+            {
+                return false;
+            }
+            for (Index i = 0; i < count; ++i)
+            {
+                if ((*this)[i] != rhs[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
         void insert(Index idx, const T& val) { insertRange(idx, &val, 1); }
 

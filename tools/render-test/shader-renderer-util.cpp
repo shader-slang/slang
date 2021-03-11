@@ -34,19 +34,19 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
 /* static */ Result ShaderRendererUtil::generateTextureResource(
     const InputTextureDesc& inputDesc,
     int bindFlags,
-    IRenderer* renderer,
+    IDevice* device,
     ComPtr<ITextureResource>& textureOut)
 {
     TextureData texData;
     generateTextureData(texData, inputDesc);
-    return createTextureResource(inputDesc, texData, bindFlags, renderer, textureOut);
+    return createTextureResource(inputDesc, texData, bindFlags, device, textureOut);
 }
 
 /* static */ Result ShaderRendererUtil::createTextureResource(
     const InputTextureDesc& inputDesc,
     const TextureData& texData,
     int bindFlags,
-    IRenderer* renderer,
+    IDevice* device,
     ComPtr<ITextureResource>& textureOut)
 {
     ITextureResource::Desc textureResourceDesc;
@@ -87,38 +87,30 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
     const int numSubResources = textureResourceDesc.calcNumSubResources();
 
     IResource::Usage initialUsage = IResource::Usage::GenericRead;
-    ITextureResource::Data initData;
 
-    List<ptrdiff_t> mipRowStrides;
-    mipRowStrides.setCount(textureResourceDesc.numMipLevels);
-    List<const void*> subResources;
-    subResources.setCount(numSubResources);
-
-    // Set up the src row strides
-    for (int i = 0; i < textureResourceDesc.numMipLevels; i++)
+    List<ITextureResource::SubresourceData> initSubresources;
+    int subResourceCounter = 0;
+    for( int a = 0; a < effectiveArraySize; ++a )
     {
-        const int mipWidth = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, i);
-        mipRowStrides[i] = mipWidth * sizeof(uint32_t);
-    }
-
-    // Set up pointers the the data
-    {
-        int subResourceIndex = 0;
-        const int numGen = int(texData.dataBuffer.getCount());
-        for (int i = 0; i < numSubResources; i++)
+        for( int m = 0; m < textureResourceDesc.numMipLevels; ++m )
         {
-            subResources[i] = texData.dataBuffer[subResourceIndex].getBuffer();
-            // Wrap around
-            subResourceIndex = (subResourceIndex + 1 >= numGen) ? 0 : (subResourceIndex + 1);
+            int subResourceIndex = subResourceCounter++;
+            const int mipWidth = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, m);
+            const int mipHeight = ITextureResource::Size::calcMipSize(textureResourceDesc.size.width, m);
+
+            auto strideY = mipWidth * sizeof(uint32_t);
+            auto strideZ = mipHeight * strideY;
+
+            ITextureResource::SubresourceData subresourceData;
+            subresourceData.data = texData.dataBuffer[subResourceIndex].getBuffer();
+            subresourceData.strideY = strideY;
+            subresourceData.strideZ = strideZ;
+
+            initSubresources.add(subresourceData);
         }
     }
 
-    initData.mipRowStrides = mipRowStrides.getBuffer();
-    initData.numMips = textureResourceDesc.numMipLevels;
-    initData.numSubResources = numSubResources;
-    initData.subResources = subResources.getBuffer();
-
-    textureOut = renderer->createTextureResource(IResource::Usage::GenericRead, textureResourceDesc, &initData);
+    textureOut = device->createTextureResource(IResource::Usage::GenericRead, textureResourceDesc, initSubresources.getBuffer());
 
     return textureOut ? SLANG_OK : SLANG_FAIL;
 }
@@ -128,7 +120,7 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
     bool isOutput,
     size_t bufferSize,
     const void* initData,
-    IRenderer* renderer,
+    IDevice* device,
     Slang::ComPtr<IBufferResource>& bufferOut)
 {
     IResource::Usage initialUsage = IResource::Usage::GenericRead;
@@ -158,7 +150,8 @@ void BindingStateImpl::apply(ICommandEncoder* encoder, PipelineType pipelineType
 
     srcDesc.bindFlags = bindFlags;
 
-    ComPtr<IBufferResource> bufferResource = renderer->createBufferResource(initialUsage, srcDesc, initData);
+    ComPtr<IBufferResource> bufferResource =
+        device->createBufferResource(initialUsage, srcDesc, initData);
     if (!bufferResource)
     {
         return SLANG_FAIL;
@@ -179,15 +172,15 @@ static ISamplerState::Desc _calcSamplerDesc(const InputSamplerDesc& srcDesc)
     return dstDesc;
 }
 
-ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
+ComPtr<ISamplerState> _createSamplerState(IDevice* device,
     const InputSamplerDesc& srcDesc)
 {
-    return renderer->createSamplerState(_calcSamplerDesc(srcDesc));
+    return device->createSamplerState(_calcSamplerDesc(srcDesc));
 }
 
 /* static */ Result ShaderRendererUtil::createBindingState(
     const ShaderInputLayout& layout,
-    IRenderer* renderer,
+    IDevice* device,
     IBufferResource* addedConstantBuffer,
     BindingStateImpl** outBindingState)
 {
@@ -284,7 +277,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     descriptorSetLayoutDesc.slotRangeCount = slotRangeDescs.getCount();
     descriptorSetLayoutDesc.slotRanges = slotRangeDescs.getBuffer();
 
-    auto descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
+    auto descriptorSetLayout = device->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
     List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
@@ -295,10 +288,11 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
     pipelineLayoutDesc.descriptorSetCount = pipelineDescriptorSets.getCount();
     pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
 
-    auto pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
+    auto pipelineLayout = device->createPipelineLayout(pipelineLayoutDesc);
     if(!pipelineLayout) return SLANG_FAIL;
 
-    auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
+    auto descriptorSet =
+        device->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
     List<BindingStateImpl::OutputBinding> outputBindings;
@@ -335,7 +329,13 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
                     }
 
                     ComPtr<IBufferResource> bufferResource;
-                    SLANG_RETURN_ON_FAIL(createBufferResource(srcEntry.bufferDesc, srcEntry.isOutput, bufferSize, srcEntry.bufferData.getBuffer(), renderer, bufferResource));
+                    SLANG_RETURN_ON_FAIL(createBufferResource(
+                        srcEntry.bufferDesc,
+                        srcEntry.isOutput,
+                        bufferSize,
+                        srcEntry.bufferData.getBuffer(),
+                        device,
+                        bufferResource));
 
                     switch(srcBuffer.type)
                     {
@@ -348,7 +348,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
                             IResourceView::Desc viewDesc;
                             viewDesc.type = IResourceView::Type::UnorderedAccess;
                             viewDesc.format = srcBuffer.format;
-                            auto bufferView = renderer->createBufferView(
+                            auto bufferView = device->createBufferView(
                                 bufferResource,
                                 viewDesc);
                             descriptorSet->setResource(rangeIndex, 0, bufferView);
@@ -369,13 +369,14 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
             case ShaderInputType::CombinedTextureSampler:
                 {
                     ComPtr<ITextureResource> texture;
-                    SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+                    SLANG_RETURN_ON_FAIL(generateTextureResource(
+                        srcEntry.textureDesc, textureBindFlags, device, texture));
 
-                    auto sampler = _createSamplerState(renderer, srcEntry.samplerDesc);
+                    auto sampler = _createSamplerState(device, srcEntry.samplerDesc);
 
                     IResourceView::Desc viewDesc;
                     viewDesc.type = IResourceView::Type::ShaderResource;
-                    auto textureView = renderer->createTextureView(
+                    auto textureView = device->createTextureView(
                         texture,
                         viewDesc);
 
@@ -394,13 +395,14 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
             case ShaderInputType::Texture:
                 {
                     ComPtr<ITextureResource> texture;
-                    SLANG_RETURN_ON_FAIL(generateTextureResource(srcEntry.textureDesc, textureBindFlags, renderer, texture));
+                    SLANG_RETURN_ON_FAIL(generateTextureResource(
+                        srcEntry.textureDesc, textureBindFlags, device, texture));
 
                     // TODO: support UAV textures...
 
                     IResourceView::Desc viewDesc;
                     viewDesc.type = IResourceView::Type::ShaderResource;
-                    auto textureView = renderer->createTextureView(
+                    auto textureView = device->createTextureView(
                         texture,
                         viewDesc);
 
@@ -423,7 +425,7 @@ ComPtr<ISamplerState> _createSamplerState(IRenderer* renderer,
 
             case ShaderInputType::Sampler:
                 {
-                    auto sampler = _createSamplerState(renderer, srcEntry.samplerDesc);
+                    auto sampler = _createSamplerState(device, srcEntry.samplerDesc);
                     descriptorSet->setSampler(rangeIndex, 0, sampler);
                 }
                 break;

@@ -582,6 +582,107 @@ namespace Slang
         HashCode getHashCode() const;
     };
 
+        /// An expression together with (optional) substutions to apply to it
+        ///
+        /// Under the hood this is a pair of an `Expr*` and a `SubstitutionSet`.
+        /// Conceptually it represents the result of applying the substitutions,
+        /// recursively, to the given expression.
+        ///
+        /// `SubstExprBase` exists primarily to provide a non-templated base type
+        /// for `SubstExpr<T>`. Code should prefer to use `SubstExpr<Expr>` instead
+        /// of `SubstExprBase` as often as possible.
+        ///
+    struct SubstExprBase
+    {
+    public:
+            /// Initialize as a null expression
+        SubstExprBase()
+        {}
+
+            /// Initialize as the given `expr` with no subsitutions applied
+        SubstExprBase(Expr* expr)
+            : m_expr(expr)
+        {}
+
+            /// Initialize as the given `expr` with the given `substs` applied
+        SubstExprBase(Expr* expr, SubstitutionSet const& substs)
+            : m_expr(expr)
+            , m_substs(substs)
+        {}
+
+            /// Get the underlying expression without any substitutions
+        Expr* getExpr() const { return m_expr; }
+
+            /// Get the subsitutions being applied, if any
+        SubstitutionSet const& getSubsts() const { return m_substs; }
+
+    private:
+        Expr*           m_expr = nullptr;
+        SubstitutionSet m_substs;
+
+        typedef void (SubstExprBase::*SafeBool)();
+        void SafeBoolTrue() {}
+
+    public:
+            /// Test whether this is a non-null expression
+        operator SafeBool()
+        {
+            return m_expr ? &SubstExprBase::SafeBoolTrue : nullptr;
+        }
+
+            /// Test whether this is a null expression
+        bool operator!() const { return m_expr == nullptr; }
+
+    };
+
+        /// An expression together with (optional) substutions to apply to it
+        ///
+        /// Under the hood this is a pair of an `T*` (there `T: Expr`) and a `SubstitutionSet`.
+        /// Conceptually it represents the result of applying the substitutions,
+        /// recursively, to the given expression.
+        ///
+    template<typename T>
+    struct SubstExpr : SubstExprBase
+    {
+    private:
+        typedef SubstExprBase Super;
+
+    public:
+            /// Initialize as a null expression
+        SubstExpr()
+        {}
+
+            /// Initialize as the given `expr` with no subsitutions applied
+        SubstExpr(T* expr)
+            : Super(expr)
+        {}
+
+            /// Initialize as the given `expr` with the given `substs` applied
+        SubstExpr(T* expr, SubstitutionSet const& substs)
+            : Super(expr, substs)
+        {}
+
+            /// Initialize as a copy of the given `other` expression
+        template <typename U>
+        SubstExpr(SubstExpr<U> const& other,
+            typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
+            : Super(other.getExpr(), other.getSubsts())
+        {
+        }
+
+            /// Get the underlying expression without any substitutions
+        T* getExpr() const { return (T*) Super::getExpr(); }
+
+            /// Dynamic cast to an expression of type `U`
+            ///
+            /// Returns a null expression if the cast fails, or if this expression was null.
+        template<typename U>
+        SubstExpr<U> as()
+        {
+            return SubstExpr<U>(Slang::as<U>(getExpr()), getSubsts());
+        }
+    };
+
     class ASTBuilder;
 
     template<typename T>
@@ -623,10 +724,10 @@ namespace Slang
         DeclRefBase substitute(ASTBuilder* astBuilder, DeclRefBase declRef) const;
 
         // Apply substitutions to an expression
-        Expr* substitute(ASTBuilder* astBuilder, Expr* expr) const;
+        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const;
 
         // Apply substitutions to this declaration reference
-        DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+        DeclRefBase substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const;
 
         // Returns true if 'as' will return a valid cast
         template <typename T>
@@ -698,7 +799,8 @@ namespace Slang
         {
             return DeclRefBase::substitute(astBuilder, type);
         }
-        Expr* substitute(ASTBuilder* astBuilder, Expr* expr) const
+
+        SubstExpr<Expr> substitute(ASTBuilder* astBuilder, Expr* expr) const
         {
             return DeclRefBase::substitute(astBuilder, expr);
         }
@@ -711,7 +813,7 @@ namespace Slang
         }
 
         // Apply substitutions to this declaration reference
-        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+        DeclRef<T> substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
         {
             return DeclRef<T>::unsafeInit(DeclRefBase::substituteImpl(astBuilder, subst, ioDiff));
         }
@@ -721,6 +823,10 @@ namespace Slang
             return DeclRef<ContainerDecl>::unsafeInit(DeclRefBase::getParent());
         }
     };
+
+    SubstExpr<Expr> substituteExpr(SubstitutionSet const& substs, Expr* expr);
+    DeclRef<Decl> substituteDeclRef(SubstitutionSet const& substs, ASTBuilder* astBuilder, DeclRef<Decl> const& declRef);
+    Type* substituteType(SubstitutionSet const& substs, ASTBuilder* astBuilder, Type* type);
 
     SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase& declRef) { declRef.toText(io); return io; }
 

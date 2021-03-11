@@ -88,7 +88,7 @@ using namespace Slang;
 
 namespace gfx {
 
-class GLRenderer : public ImmediateRendererBase
+class GLDevice : public ImmediateRendererBase
 {
 public:
     // Renderer    implementation
@@ -106,7 +106,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         IResource::Usage initialUsage,
@@ -179,13 +179,14 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
     virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override {}
     virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override {}
-    virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const override
+    virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
-        return RendererType::OpenGl;
+        return m_info;
     }
+
     HGLRC createGLContext(HDC hdc);
-    GLRenderer();
-    ~GLRenderer();
+    GLDevice();
+    ~GLDevice();
 
     protected:
     enum
@@ -227,7 +228,7 @@ public:
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer, GLuint id, GLenum target):
+        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLDevice>* renderer, GLuint id, GLenum target):
             Parent(desc),
 			m_renderer(renderer),
 			m_handle(id),
@@ -243,7 +244,7 @@ public:
 		}
 
         Usage m_initialUsage;
-		RefPtr<WeakSink<GLRenderer> > m_renderer;
+		RefPtr<WeakSink<GLDevice> > m_renderer;
 		GLuint m_handle;
         GLenum m_target;
 	};
@@ -253,7 +254,7 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLRenderer>* renderer):
+        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLDevice>* renderer):
             Parent(desc),
             m_initialUsage(initialUsage),
             m_renderer(renderer)
@@ -271,7 +272,7 @@ public:
          }
 
         Usage m_initialUsage;
-        RefPtr<WeakSink<GLRenderer> > m_renderer;
+        RefPtr<WeakSink<GLDevice> > m_renderer;
         GLenum m_target;
         GLuint m_handle;
     };
@@ -351,14 +352,14 @@ public:
     public:
         GLuint m_framebuffer;
         ShortList<GLenum> m_drawBuffers;
-        WeakSink<GLRenderer>* m_renderer;
+        WeakSink<GLDevice>* m_renderer;
         ShortList<RefPtr<TextureViewImpl>> renderTargetViews;
         RefPtr<TextureViewImpl> depthStencilView;
         ShortList<ColorClearValue> m_colorClearValues;
         bool m_sameClearValues = true;
         DepthStencilClearValue m_depthStencilClearValue;
 
-        FramebufferImpl(WeakSink<GLRenderer>* renderer) :m_renderer(renderer) {}
+        FramebufferImpl(WeakSink<GLDevice>* renderer) :m_renderer(renderer) {}
         ~FramebufferImpl()
         {
             if (auto renderer = m_renderer->get())
@@ -429,73 +430,92 @@ public:
     public:
         ~SwapchainImpl()
         {
-            for (auto image : m_images)
-                image->m_handle = 0;
-            if (auto rendererRef = m_renderer->get())
-            {
-                rendererRef->glDeleteFramebuffers(1, &m_framebuffer);
-                glDeleteTextures(1, &m_backBuffer);
-            }
-            wglMakeCurrent(m_hdc, 0);
+            destroyBackBufferAndFBO();
             wglDeleteContext(m_glrc);
             ::ReleaseDC(m_hwnd, m_hdc);
         }
-        Result init(GLRenderer* renderer, const ISwapchain::Desc& desc, WindowHandle window)
+        void destroyBackBufferAndFBO()
+        {
+            if (m_images.getCount())
+            {
+                wglMakeCurrent(m_rendererHDC, m_rendererRC);
+                if (auto rendererRef = m_renderer->get())
+                {
+                    rendererRef->glDeleteFramebuffers(1, &m_framebuffer);
+                }
+                wglMakeCurrent(m_hdc, m_glrc);
+                glDeleteTextures(1, &m_backBuffer);
+                for (auto image : m_images)
+                    image->m_handle = 0;
+                m_images.clear();
+            }
+        }
+        void createBackBufferAndFBO()
+        {
+            if (m_desc.width > 0 && m_desc.height > 0)
+            {
+                wglMakeCurrent(m_rendererHDC, m_rendererRC);
+
+                glGenTextures(1, &m_backBuffer);
+                glBindTexture(GL_TEXTURE_2D, m_backBuffer);
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA8,
+                    m_desc.width,
+                    m_desc.height,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    nullptr);
+
+                wglMakeCurrent(m_hdc, m_glrc);
+                m_renderer->get()->glGenFramebuffers(1, &m_framebuffer);
+                m_renderer->get()->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);
+                m_renderer->get()->glFramebufferTexture2D(
+                    GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_backBuffer, 0);
+
+                m_images.clear();
+                for (uint32_t i = 0; i < m_desc.imageCount; i++)
+                {
+                    ITextureResource::Desc texDesc = {};
+                    texDesc.init2D(
+                        IResource::Type::Texture2D,
+                        gfx::Format::RGBA_Unorm_UInt8,
+                        m_desc.width,
+                        m_desc.height,
+                        1);
+                    RefPtr<TextureResourceImpl> tex = new TextureResourceImpl(
+                        IResource::Usage::RenderTarget, texDesc, m_renderer);
+                    tex->m_handle = m_backBuffer;
+                    m_images.add(tex);
+                }
+                wglMakeCurrent(m_rendererHDC, m_rendererRC);
+            }
+        }
+        Result init(GLDevice* renderer, const ISwapchain::Desc& desc, WindowHandle window)
         {
             m_renderer = renderer->m_weakRenderer.Ptr();
+            m_rendererHDC = renderer->m_hdc;
+            m_rendererRC = renderer->m_glContext;
 
             m_hwnd = (HWND)window.handleValues[0];
             m_hdc = ::GetDC(m_hwnd);
             m_glrc = renderer->createGLContext(m_hdc);
-            wglMakeCurrent(renderer->m_hdc, renderer->m_glContext);
-
             m_desc = desc;
 
-            glGenTextures(1, &m_backBuffer);
-            glBindTexture(GL_TEXTURE_2D, m_backBuffer);
-            glTexImage2D(
-                GL_TEXTURE_2D,
-                0,
-                GL_RGBA8,
-                desc.width,
-                desc.height,
-                0,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                nullptr);
-
-            wglMakeCurrent(m_hdc, m_glrc);
-            renderer->glGenFramebuffers(1, &m_framebuffer);
-            renderer->glBindFramebuffer(GL_READ_FRAMEBUFFER, m_framebuffer);
-            renderer->glFramebufferTexture2D(
-                GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_backBuffer, 0);
-
-            for (uint32_t i = 0; i < desc.imageCount; i++)
-            {
-                ITextureResource::Desc texDesc = {};
-                texDesc.init2D(
-                    IResource::Type::Texture2D,
-                    gfx::Format::RGBA_Unorm_UInt8,
-                    desc.width,
-                    desc.height,
-                    1);
-                RefPtr<TextureResourceImpl> tex =
-                    new TextureResourceImpl(IResource::Usage::RenderTarget, texDesc, m_renderer);
-                tex->m_handle = m_backBuffer;
-                m_images.add(tex);
-            }
-            wglMakeCurrent(renderer->m_hdc, renderer->m_glContext);
+            createBackBufferAndFBO();
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
-        virtual SLANG_NO_THROW Result
+        virtual SLANG_NO_THROW Result SLANG_MCALL
             getImage(uint32_t index, ITextureResource** outResource) override
         {
             m_images[index]->addRef();
             *outResource = m_images[index].Ptr();
             return SLANG_OK;
         }
-        virtual SLANG_NO_THROW Result present() override
+        virtual SLANG_NO_THROW Result SLANG_MCALL present() override
         {
             glFlush();
             wglMakeCurrent(m_hdc, m_glrc);
@@ -518,18 +538,35 @@ public:
             return SLANG_OK;
         }
 
-        virtual SLANG_NO_THROW uint32_t acquireNextImage() override
+        virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override
         {
-            return 0;
+            if (m_desc.width > 0 && m_desc.height > 0)
+                return 0;
+            return -1;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
+        {
+            if (width > 0 && height > 0 && (width != m_desc.width || height != m_desc.height))
+            {
+                m_desc.width = width;
+                m_desc.height = height;
+                destroyBackBufferAndFBO();
+                createBackBufferAndFBO();
+            }
+            return SLANG_OK;
         }
 
     public:
-        WeakSink<GLRenderer>* m_renderer = nullptr;
+        WeakSink<GLDevice>* m_renderer = nullptr;
         GLuint m_framebuffer;
         GLuint m_backBuffer;
         HGLRC m_glrc;
         HWND m_hwnd;
         HDC m_hdc;
+
+        HDC m_rendererHDC;
+        HGLRC m_rendererRC;
         ISwapchain::Desc m_desc;
         ShortList<RefPtr<TextureResourceImpl>> m_images;
     };
@@ -623,7 +660,7 @@ public:
 	class ShaderProgramImpl : public GraphicsCommonShaderProgram
     {
 	public:
-		ShaderProgramImpl(WeakSink<GLRenderer>* renderer, GLuint id):
+		ShaderProgramImpl(WeakSink<GLDevice>* renderer, GLuint id):
 			m_renderer(renderer),
 			m_id(id)
 		{
@@ -637,7 +674,7 @@ public:
 		}
 
 		GLuint m_id;
-		RefPtr<WeakSink<GLRenderer> > m_renderer;
+		RefPtr<WeakSink<GLDevice> > m_renderer;
 	};
 
     class PipelineStateImpl : public PipelineStateBase
@@ -691,6 +728,11 @@ public:
 
     static void compileTimeAsserts();
 
+    // GLDevice members.
+
+    DeviceInfo m_info;
+    String m_adapterName;
+
     HDC     m_hdc;
     HGLRC   m_glContext = 0;
     uint32_t m_stencilRef = 0;
@@ -698,7 +740,7 @@ public:
     GLuint m_vao;
     RefPtr<PipelineStateImpl> m_currentPipelineState;
     RefPtr<FramebufferImpl> m_currentFramebuffer;
-    RefPtr<WeakSink<GLRenderer> > m_weakRenderer;
+    RefPtr<WeakSink<GLDevice> > m_weakRenderer;
 
     RefPtr<DescriptorSetImpl>   m_boundDescriptorSets[kMaxDescriptorSetCount];
 
@@ -719,7 +761,7 @@ public:
     static const GlPixelFormatInfo s_pixelFormatInfos[];            /// Maps GlPixelFormat to a format info
 };
 
-/* static */GLRenderer::GlPixelFormat GLRenderer::_getGlPixelFormat(Format format)
+/* static */GLDevice::GlPixelFormat GLDevice::_getGlPixelFormat(Format format)
 {
     switch (format)
     {
@@ -731,7 +773,7 @@ public:
     }
 }
 
-/* static */ const GLRenderer::GlPixelFormatInfo GLRenderer::s_pixelFormatInfos[] =
+/* static */ const GLDevice::GlPixelFormatInfo GLDevice::s_pixelFormatInfos[] =
 {
     // internalType, format, formatType
     { 0,                0,          0},                         // GlPixelFormat::Unknown
@@ -741,20 +783,20 @@ public:
 
 };
 
-/* static */void GLRenderer::compileTimeAsserts()
+/* static */void GLDevice::compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-SlangResult SLANG_MCALL createGLRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
+SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
 {
-    RefPtr<GLRenderer> result = new GLRenderer();
+    RefPtr<GLDevice> result = new GLDevice();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
     *outRenderer = result.detach();
     return SLANG_OK;
 }
 
-void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
+void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
 {
     ::OutputDebugStringA("GL: ");
     ::OutputDebugStringA(message);
@@ -769,12 +811,12 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
     }
 }
 
-/* static */void APIENTRY GLRenderer::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+/* static */void APIENTRY GLDevice::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
-    ((GLRenderer*)userParam)->debugCallback(source, type, id, severity, length, message);
+    ((GLDevice*)userParam)->debugCallback(source, type, id, severity, length, message);
 }
 
-/* static */GLRenderer::VertexAttributeFormat GLRenderer::getVertexAttributeFormat(Format format)
+/* static */GLDevice::VertexAttributeFormat GLDevice::getVertexAttributeFormat(Format format)
 {
     switch (format)
     {
@@ -791,7 +833,7 @@ void GLRenderer::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sev
     }
 }
 
-void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
+void GLDevice::bindBufferImpl(int target, UInt startSlot, UInt slotCount, BufferResource*const* buffers, const UInt* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -806,7 +848,7 @@ void GLRenderer::bindBufferImpl(int target, UInt startSlot, UInt slotCount, Buff
     }
 }
 
-void GLRenderer::flushStateForDraw()
+void GLDevice::flushStateForDraw()
 {
     if (m_currentFramebuffer)
     {
@@ -907,7 +949,7 @@ void GLRenderer::flushStateForDraw()
     }
 }
 
-GLuint GLRenderer::loadShader(GLenum stage, const char* source)
+GLuint GLDevice::loadShader(GLenum stage, const char* source)
 {
     // GLSL is monumentally stupid. It officially requires the `#version` directive
     // to be the first thing in the file, which wouldn't be so bad but the API
@@ -1076,9 +1118,9 @@ void destroyWindow(WindowHandle window)
 #endif
 }
 
-GLRenderer::GLRenderer() { m_weakRenderer = new WeakSink<GLRenderer>(this); }
+GLDevice::GLDevice() { m_weakRenderer = new WeakSink<GLDevice>(this); }
 
-GLRenderer::~GLRenderer()
+GLDevice::~GLDevice()
 {
     // We can destroy things whilst in this state
     m_currentPipelineState.setNull();
@@ -1093,7 +1135,7 @@ GLRenderer::~GLRenderer()
     }
     destroyWindow(m_windowHandle);
 
-    // By resetting the weak pointer, other objects accessing through WeakSink<GLRenderer> will no
+    // By resetting the weak pointer, other objects accessing through WeakSink<GLDevice> will no
     // longer be able to access this object which is entering a 'being destroyed' to 'destroyed'
     // state
     if (m_weakRenderer)
@@ -1103,7 +1145,7 @@ GLRenderer::~GLRenderer()
     }
 }
 
-HGLRC GLRenderer::createGLContext(HDC hdc)
+HGLRC GLDevice::createGLContext(HDC hdc)
 {
     PIXELFORMATDESCRIPTOR pixelFormatDesc = {sizeof(PIXELFORMATDESCRIPTOR)};
     pixelFormatDesc.nVersion = 1;
@@ -1128,11 +1170,21 @@ HGLRC GLRenderer::createGLContext(HDC hdc)
     return newGLContext;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 {
     SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "glsl_440"));
 
     SLANG_RETURN_ON_FAIL(GraphicsAPIRenderer::initialize(desc));
+
+    // Initialize DeviceInfo
+    {
+        m_info.deviceType = DeviceType::OpenGl;
+        m_info.bindingStyle = BindingStyle::OpenGl;
+        m_info.projectionStyle = ProjectionStyle::OpenGl;
+        m_info.apiName = "OpenGL";
+        static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
+    }
 
     m_windowHandle = createWindow();
     m_desc = desc;
@@ -1154,6 +1206,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
     wglMakeCurrent(m_hdc, m_glContext);
 
     auto renderer = glGetString(GL_RENDERER);
+    m_info.adapterName = (char*)renderer;
 
     if (renderer && desc.adapter)
     {
@@ -1174,6 +1227,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
             return SLANG_E_NOT_AVAILABLE;
         }
     }
+
 
     auto extensions = glGetString(GL_EXTENSIONS);
 
@@ -1214,11 +1268,12 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::initialize(const Desc& desc)
         glEnable(GL_DEBUG_OUTPUT);
         glDebugMessageCallback(staticDebugCallback, this);
     }
+
     return SLANG_OK;
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
+    GLDevice::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
 {
     uint32_t clearMask = 0;
     if (clearDepth)
@@ -1284,7 +1339,7 @@ SLANG_NO_THROW void SLANG_MCALL
     }
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createSwapchain(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createSwapchain(
     const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain)
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
@@ -1294,7 +1349,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createSwapchain(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createFramebufferLayout(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createFramebufferLayout(
     const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout)
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
@@ -1318,7 +1373,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createFramebufferLayout(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLRenderer::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
+    GLDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer)
 {
     RefPtr<FramebufferImpl> framebuffer = new FramebufferImpl(m_weakRenderer);
     framebuffer->renderTargetViews.setCount(desc.renderTargetCount);
@@ -1333,18 +1388,18 @@ SLANG_NO_THROW Result SLANG_MCALL
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setFramebuffer(IFramebuffer* frameBuffer)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setFramebuffer(IFramebuffer* frameBuffer)
 {
     m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
 }
 
-void GLRenderer::setStencilReference(uint32_t referenceValue)
+void GLDevice::setStencilReference(uint32_t referenceValue)
 {
     m_stencilRef = referenceValue;
     // TODO: actually set the stencil state.
 }
 
-void GLRenderer::copyBuffer(
+void GLDevice::copyBuffer(
     IBufferResource* dst,
     size_t dstOffset,
     IBufferResource* src,
@@ -1358,7 +1413,7 @@ void GLRenderer::copyBuffer(
     glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
     ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize)
 {
     SLANG_UNUSED(state);
@@ -1392,10 +1447,10 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::readTextureResource(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
     IResource::Usage initialUsage,
     const ITextureResource::Desc& descIn,
-    const ITextureResource::Data* initData,
+    const ITextureResource::SubresourceData* initData,
     ITextureResource** outResource)
 {
     TextureResource::Desc srcDesc(descIn);
@@ -1424,6 +1479,10 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
     // Set on texture so will be freed if failure
     texture->m_handle = handle;
 
+    // TODO: The logic below seems to be ignoring the row/layer stride of
+    // the subresources that have been passed in, despite OpenGL having
+    // the ability to set the image unpack stride, etc.
+
     switch (srcDesc.type)
     {
         case IResource::Type::Texture1D:
@@ -1438,6 +1497,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                 {
                     for (int j = 0; j < srcDesc.numMipLevels; j++)
                     {
+                        // TODO: Double-check this logic - we are passing in `i` as the height?
                         glTexImage2D(
                             target,
                             j,
@@ -1447,7 +1507,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[slice++] : nullptr);
+                            initData ? initData[slice++].data : nullptr);
                     }
                 }
             }
@@ -1465,7 +1525,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                         0,
                         format,
                         formatType,
-                        initData ? initData->subResources[i] : nullptr);
+                        initData ? initData[i].data : nullptr);
                 }
             }
             break;
@@ -1501,7 +1561,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[slice++] : nullptr);
+                            initData ? initData[slice++].data : nullptr);
                     }
                 }
             }
@@ -1526,7 +1586,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                                 0,
                                 format,
                                 formatType,
-                                initData ? initData->subResources[slice++] : nullptr);
+                                initData ? initData[slice++].data : nullptr);
                         }
                     }
                 }
@@ -1545,7 +1605,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData->subResources[i] : nullptr);
+                            initData ? initData[i].data : nullptr);
                     }
                 }
             }
@@ -1567,7 +1627,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureResource(
                     0,
                     format,
                     formatType,
-                    initData ? initData->subResources[i] : nullptr);
+                    initData ? initData[i].data : nullptr);
             }
             break;
         }
@@ -1610,7 +1670,7 @@ static GLenum _calcTarget(IResource::Usage usage)
     }
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createBufferResource(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferResource(
     IResource::Usage initialUsage,
     const IBufferResource::Desc& descIn,
     const void* initData,
@@ -1635,7 +1695,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createBufferResource(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLRenderer::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
+    GLDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler)
 {
     GLuint samplerID;
     glCreateSamplers(1, &samplerID);
@@ -1646,7 +1706,7 @@ SLANG_NO_THROW Result SLANG_MCALL
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureView(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureView(
     ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
@@ -1660,7 +1720,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createTextureView(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createBufferView(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
     IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
@@ -1674,7 +1734,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createBufferView(
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createInputLayout(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createInputLayout(
     const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> inputLayout = new InputLayoutImpl;
@@ -1694,7 +1754,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createInputLayout(
     return SLANG_OK;
 }
 
-void* GLRenderer::map(IBufferResource* bufferIn, MapFlavor flavor)
+void* GLDevice::map(IBufferResource* bufferIn, MapFlavor flavor)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
@@ -1717,13 +1777,13 @@ void* GLRenderer::map(IBufferResource* bufferIn, MapFlavor flavor)
     return glMapBuffer(buffer->m_target, access);
 }
 
-void GLRenderer::unmap(IBufferResource* bufferIn)
+void GLDevice::unmap(IBufferResource* bufferIn)
 {
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     glUnmapBuffer(buffer->m_target);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPrimitiveTopology(PrimitiveTopology topology)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
 {
     GLenum glTopology = 0;
     switch (topology)
@@ -1737,7 +1797,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPrimitiveTopology(PrimitiveTopolo
     m_boundPrimitiveTopology = glTopology;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setVertexBuffers(
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setVertexBuffers(
     UInt startSlot,
     UInt slotCount,
     IBufferResource* const* buffers,
@@ -1758,11 +1818,11 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setVertexBuffers(
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
+    GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
 {
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setViewports(UInt count, Viewport const* viewports)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setViewports(UInt count, Viewport const* viewports)
 {
     assert(count == 1);
     auto viewport = viewports[0];
@@ -1774,7 +1834,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setViewports(UInt count, Viewport co
     glDepthRange(viewport.minZ, viewport.maxZ);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setScissorRects(UInt count, ScissorRect const* rects)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setScissorRects(UInt count, ScissorRect const* rects)
 {
     assert(count <= 1);
     if( count )
@@ -1802,7 +1862,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setScissorRects(UInt count, ScissorR
     }
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPipelineState(IPipelineState* state)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setPipelineState(IPipelineState* state)
 {
     auto pipelineStateImpl = static_cast<PipelineStateImpl*>(state);
 
@@ -1813,7 +1873,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setPipelineState(IPipelineState* sta
     glUseProgram(programID);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::draw(UInt vertexCount, UInt startVertex = 0)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::draw(UInt vertexCount, UInt startVertex = 0)
 {
     flushStateForDraw();
 
@@ -1821,17 +1881,17 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::draw(UInt vertexCount, UInt startVer
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+    GLDevice::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
 {
     assert(!"unimplemented");
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::dispatchCompute(int x, int y, int z)
+SLANG_NO_THROW void SLANG_MCALL GLDevice::dispatchCompute(int x, int y, int z)
 {
     glDispatchCompute(x, y, z);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setConstantBuffer(
+SLANG_NO_THROW void SLANG_MCALL GLDevice::DescriptorSetImpl::setConstantBuffer(
     UInt range, UInt index, IBufferResource* buffer)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
@@ -1844,7 +1904,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setConstantBuffer
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
+    GLDevice::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceView* view)
 {
     auto viewImpl = static_cast<ResourceViewImpl*>(view);
 
@@ -1864,12 +1924,12 @@ SLANG_NO_THROW void SLANG_MCALL
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    GLRenderer::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
+    GLDevice::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
 {
     assert(!"unsupported");
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setCombinedTextureSampler(
+SLANG_NO_THROW void SLANG_MCALL GLDevice::DescriptorSetImpl::setCombinedTextureSampler(
     UInt range,
     UInt index,
     IResourceView*   textureView,
@@ -1886,16 +1946,16 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setCombinedTextur
     m_samplers[arrayIndex] = samplerImpl;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::DescriptorSetImpl::setRootConstants(
+SLANG_NO_THROW void SLANG_MCALL GLDevice::DescriptorSetImpl::setRootConstants(
     UInt range,
     UInt offset,
     UInt size,
     void const* data)
 {
-    SLANG_UNEXPECTED("unimplemented: setRootConstants for GlRenderer");
+    SLANG_UNEXPECTED("unimplemented: setRootConstants for GLDevice");
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLRenderer::setDescriptorSet(
+SLANG_NO_THROW void SLANG_MCALL GLDevice::setDescriptorSet(
     PipelineType pipelineType, IPipelineLayout* layout, UInt index, IDescriptorSet* descriptorSet)
 {
     auto descriptorSetImpl = (DescriptorSetImpl*)descriptorSet;
@@ -1905,7 +1965,7 @@ SLANG_NO_THROW void SLANG_MCALL GLRenderer::setDescriptorSet(
     m_boundDescriptorSets[index] = descriptorSetImpl;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createDescriptorSetLayout(
+SLANG_NO_THROW Result SLANG_MCALL GLDevice::createDescriptorSetLayout(
     const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout)
 {
     RefPtr<DescriptorSetLayoutImpl> layoutImpl = new DescriptorSetLayoutImpl();
@@ -1957,7 +2017,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLRenderer::createDescriptorSetLayout(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLRenderer::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout)
+    GLDevice::createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout)
 {
     RefPtr<PipelineLayoutImpl> layoutImpl = new PipelineLayoutImpl();
 
@@ -1986,7 +2046,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    GLRenderer::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet)
+    GLDevice::createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet)
 {
     SLANG_UNUSED(flag);
 
@@ -2022,7 +2082,7 @@ SLANG_NO_THROW Result SLANG_MCALL
     return SLANG_OK;
 }
 
-Result GLRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result GLDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
     {
@@ -2093,7 +2153,7 @@ Result GLRenderer::createProgram(const IShaderProgram::Desc& desc, IShaderProgra
     return SLANG_OK;
 }
 
-Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
+Result GLDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);
@@ -2108,7 +2168,7 @@ Result GLRenderer::createGraphicsPipelineState(const GraphicsPipelineStateDesc& 
     return SLANG_OK;
 }
 
-Result GLRenderer::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
+Result GLDevice::createComputePipelineState(const ComputePipelineStateDesc& inDesc, IPipelineState** outState)
 {
     ComputePipelineStateDesc desc = inDesc;
     preparePipelineDesc(desc);

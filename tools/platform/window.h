@@ -5,6 +5,25 @@
 #include "source/core/slang-basic.h"
 #include "source/core/slang-func-ptr.h"
 
+#if defined(SLANG_PLATFORM_DYNAMIC)
+#    if defined(_MSC_VER)
+#        ifdef SLANG_PLATFORM_DYNAMIC_EXPORT
+#            define SLANG_PLATFORM_API SLANG_DLL_EXPORT
+#        else
+#            define SLANG_PLATFORM_API __declspec(dllimport)
+#        endif
+#    else
+// TODO: need to consider compiler capabilities
+//#     ifdef SLANG_DYNAMIC_EXPORT
+#        define SLANG_PLATFORM_API SLANG_DLL_EXPORT
+//#     endif
+#    endif
+#endif
+
+#ifndef SLANG_PLATFORM_API
+#    define SLANG_PLATFORM_API
+#endif
+
 namespace platform {
 
 enum class KeyCode : uint32_t
@@ -99,20 +118,29 @@ struct WindowHandle
     };
     Type type;
     intptr_t handleValues[2];
-    static WindowHandle FromHwnd(void* hwnd)
+    static WindowHandle fromHwnd(void* hwnd)
     {
         WindowHandle handle = {};
         handle.type = WindowHandle::Type::Win32Handle;
         handle.handleValues[0] = (intptr_t)(hwnd);
         return handle;
     }
-    static WindowHandle FromXWindow(void* xdisplay, uint32_t xwindow)
+    static WindowHandle fromXWindow(void* xdisplay, uint32_t xwindow)
     {
         WindowHandle handle = {};
         handle.type = WindowHandle::Type::XLibHandle;
         handle.handleValues[0] = (intptr_t)(xdisplay);
         handle.handleValues[1] = xwindow;
         return handle;
+    }
+    template<typename T>
+    T convert()
+    {
+        T result;
+        result.type = (decltype(result.type))type;
+        result.handleValues[0] = handleValues[0];
+        result.handleValues[1] = handleValues[1];
+        return result;
     }
 };
 
@@ -146,11 +174,17 @@ struct Rect
     int width, height;
 };
 
+enum class WindowStyle
+{
+    Default, FixedSize,
+};
+
 struct WindowDesc
 {
     char const* title = nullptr;
     int width = 0;
     int height = 0;
+    WindowStyle style = WindowStyle::Default;
 };
 
 class Window : public Slang::RefObject
@@ -168,6 +202,7 @@ public:
         Slang::Action<MouseEventArgs> mouseMove;
         Slang::Action<MouseEventArgs> mouseUp;
         Slang::Action<MouseEventArgs> mouseDown;
+        Slang::Action<MouseEventArgs> mouseWheel;
     };
 
     Events events;
@@ -188,12 +223,12 @@ public:
 class Application
 {
 public:
-    static Window* createWindow(const WindowDesc& desc);
-    static void init();
-    static void run(Window* mainWindow, bool waitForEvents = false);
-    static void quit();
-    static void doEvents();
-    static void dispose();
+    static SLANG_PLATFORM_API Window* createWindow(const WindowDesc& desc);
+    static SLANG_PLATFORM_API void init();
+    static SLANG_PLATFORM_API void run(Window* mainWindow, bool waitForEvents = false);
+    static SLANG_PLATFORM_API void quit();
+    static SLANG_PLATFORM_API void doEvents();
+    static SLANG_PLATFORM_API void dispose();
 };
 
 } // namespace platform
@@ -224,12 +259,13 @@ public:
 
 #else
 
-#    define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
-        int main()                              \
-        {                                       \
-            platform::Application::init();      \
-            auto rs - APPLICATION_ENTRY();      \
-            platform::Application::dispose();   \
-        }
+#define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
+    int main()                              \
+    {                                       \
+        platform::Application::init();      \
+        auto rs = APPLICATION_ENTRY();      \
+        platform::Application::dispose();   \
+        return rs;                          \
+    }
 
 #endif

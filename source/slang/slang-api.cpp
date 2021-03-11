@@ -98,7 +98,7 @@ SLANG_API SlangResult slang_createGlobalSession(
         if (tryLoadStdLibFromCache(globalSession, cacheFilename, dllTimestamp) != SLANG_OK)
         {
             // Compile std lib from embeded source.
-            SLANG_RETURN_ON_FAIL(globalSession->compileStdLib());
+            SLANG_RETURN_ON_FAIL(globalSession->compileStdLib(0));
 
             // Store the compiled stdlib to cache file.
             trySaveStdLibToCache(globalSession, cacheFilename, dllTimestamp);

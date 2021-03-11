@@ -6,6 +6,6 @@
 namespace gfx
 {
 
-SlangResult SLANG_MCALL createD3D12Renderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+SlangResult SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // gfx

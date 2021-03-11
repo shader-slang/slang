@@ -1,5 +1,50 @@
 //DISABLE_TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
 
+void outFunc(out int v)
+{
+    v = 10;
+}
+
+/// Testing out nested generics
+struct ParentStruct<T> ///< Some type
+{
+    /// Testing out a child
+    struct ChildStruct<S> ///< Some other type
+    {
+        /// A useless method hey ho
+        T getValue(S v) { T t; S s; return t; }
+    };
+};
+
+struct GenericStruct<T>
+{
+        /// Let's try a typedef too
+    typedef T Element;
+
+    T getValue() { return value; }
+    
+    T value;
+};
+
+/// A rather silly generic function to test out doc extraction
+T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
+    /// Just testing out a 
+    /// non type based generic
+    let U : int,
+    let V : int>    ///< And another one                       
+    (
+    /// CHECKING!!
+    T z,           ///< The Z parameter
+    T b)            ///< The B parameter
+{
+    return z + b;
+}
+
+namespace Hey
+{
+    void doAnotherThing(int a);
+}
+
     /// Let's test indent
     /// 
     /// ```
@@ -14,9 +59,12 @@ RWStructuredBuffer<int> inputBuffer;
 /// An interface to do things
 interface IDoThing
 {
+        /// An associated type
+    associatedtype V;
+    
         /// Add two integers
-    int add(int a,      ///< First parameter 
-        int b           ///< Second parameter
+    V add(V a,      ///< First parameter 
+        V b           ///< Second parameter
     );
     
         /// Subtract
@@ -40,6 +88,8 @@ extension float : IThing
 
 struct Thing : IThing, IDoThing
 {
+    typedef int V;
+    
     int add(int a, int b) { return a + b; }
     int sub(int a, int b ) { return a - b; }
     float getValue() { return 1.0f; }
@@ -86,19 +136,6 @@ int doThing(int a,  ///< a parameter
     return a;
 }
 
-/// A rather silly generic function to test out doc extraction
-T addInts<T : __BuiltinIntegerType,     ///< The type we are operating on 
-    /// Just testing out a 
-    /// non type based generic
-    let U : int,
-    let V : int>    ///< And another one                       
-    (
-    /// CHECKING!!
-    T z,           ///< The Z parameter
-    T b)            ///< The B parameter
-{
-    return z + b;
-}
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

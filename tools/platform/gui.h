@@ -13,7 +13,7 @@ namespace platform {
 struct GUI : Slang::RefObject
 {
     GUI(Window* window,
-        gfx::IRenderer* renderer,
+        gfx::IDevice* device,
         gfx::ICommandQueue* queue,
         gfx::IFramebufferLayout* framebufferLayout);
     ~GUI();
@@ -22,7 +22,7 @@ struct GUI : Slang::RefObject
     void endFrame(gfx::IFramebuffer* framebuffer);
 
 private:
-    Slang::ComPtr<gfx::IRenderer>    renderer;
+    Slang::ComPtr<gfx::IDevice> device;
     Slang::ComPtr<gfx::ICommandQueue> queue;
     Slang::ComPtr<gfx::IRenderPassLayout> renderPass;
     Slang::ComPtr<gfx::IPipelineState>       pipelineState;

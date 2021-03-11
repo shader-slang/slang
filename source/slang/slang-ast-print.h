@@ -15,7 +15,8 @@ public:
     {
         enum Enum : OptionFlags
         {
-            ParamNames = 0x1,               ///< If set will output parameter names
+            ParamNames = 0x01,                  ///< If set will output parameter names
+            ModuleName = 0x02,                  ///< Writes out module names
         };
     };
 
@@ -112,6 +113,9 @@ public:
         /// Add the path to the declaration including the declaration name
     void addDeclPath(const DeclRef<Decl>& declRef);
 
+        /// Add the path such that it encapsulates all overridable decls (ie is without terminal generic parameters)
+    void addOverridableDeclPath(const DeclRef<Decl>& declRef);
+
         /// Add just the parameters from a declaration.
         /// Will output the generic parameters (if it's a generic) in <> before the parameters ()
     void addDeclParams(const DeclRef<Decl>& declRef);
@@ -126,14 +130,19 @@ public:
         /// Add the signature for the decl
     void addDeclSignature(const DeclRef<Decl>& declRef);
 
+        /// Add generic parameters 
+    void addGenericParams(const DeclRef<GenericDecl>& genericDeclRef);
+
         /// Get the specified part type. Returns empty slice if not found
-    UnownedStringSlice getPart(Part::Type partType) const;
+    UnownedStringSlice getPartSlice(Part::Type partType) const;
         /// Get the slice for a part
     UnownedStringSlice getPartSlice(const Part& part) const { return getPart(getSlice(), part); }
-    
+
         /// Gets the specified part type
     static UnownedStringSlice getPart(const UnownedStringSlice& slice, const Part& part) { return UnownedStringSlice(slice.begin() + part.start, slice.begin() + part.end); }
     static UnownedStringSlice getPart(Part::Type partType, const UnownedStringSlice& slice, const List<Part>& parts);
+
+    static void appendDeclName(Decl* decl, StringBuilder& out);
 
         /// Ctor
     ASTPrinter(ASTBuilder* astBuilder, OptionFlags optionFlags = 0, List<Part>* parts = nullptr):
@@ -148,7 +157,7 @@ public:
 
 protected:
 
-    void _addDeclPathRec(const DeclRef<Decl>& declRef);
+    void _addDeclPathRec(const DeclRef<Decl>& declRef, Index depth);
     void _addDeclName(Decl* decl);
     
     OptionFlags m_optionFlags;              ///< Flags controlling output

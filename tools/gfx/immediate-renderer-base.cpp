@@ -57,8 +57,8 @@ public:
             *outObject = nullptr;
             return SLANG_E_NO_INTERFACE;
         }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     public:
         CommandWriter* m_writer;
@@ -99,13 +99,13 @@ public:
             m_writer->clearFrame(clearMask, clearDepth, clearStencil);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state)
+        virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
         {
             m_writer->setPipelineState(state);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            bindRootShaderObject(IShaderObject* object)
+            bindRootShaderObject(IShaderObject* object) override
         {
             m_writer->bindRootShaderObject(PipelineType::Graphics, object);
         }
@@ -113,22 +113,22 @@ public:
         virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
             IPipelineLayout* layout,
             UInt index,
-            IDescriptorSet* descriptorSet)
+            IDescriptorSet* descriptorSet) override
         {
             m_writer->setDescriptorSet(PipelineType::Graphics, layout, index, descriptorSet);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setViewports(uint32_t count, const Viewport* viewports)
+            setViewports(uint32_t count, const Viewport* viewports) override
         {
             m_writer->setViewports(count, viewports);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setScissorRects(uint32_t count, const ScissorRect* scissors)
+            setScissorRects(uint32_t count, const ScissorRect* scissors) override
         {
             m_writer->setScissorRects(count, scissors);
         }
-        virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology)
+        virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology) override
         {
             m_writer->setPrimitiveTopology(topology);
         }
@@ -137,29 +137,29 @@ public:
             UInt slotCount,
             IBufferResource* const* buffers,
             const UInt* strides,
-            const UInt* offsets)
+            const UInt* offsets) override
         {
             m_writer->setVertexBuffers(startSlot, slotCount, buffers, strides, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
+            setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override
         {
             m_writer->setIndexBuffer(buffer, indexFormat, offset);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex)
+        virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override
         {
             m_writer->draw(vertexCount, startVertex);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+            drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override
         {
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue)
+        virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override
         {
             m_writer->setStencilReference(referenceValue);
         }
@@ -193,8 +193,8 @@ public:
             *outObject = nullptr;
             return SLANG_E_NO_INTERFACE;
         }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     public:
         CommandWriter* m_writer;
@@ -255,8 +255,8 @@ public:
             *outObject = nullptr;
             return SLANG_E_NO_INTERFACE;
         }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     public:
         CommandWriter* m_writer;
@@ -278,7 +278,7 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+            uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
         {
             m_writer->uploadBufferData(dst, offset, size, data);
         }

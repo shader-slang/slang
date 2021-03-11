@@ -830,27 +830,42 @@ namespace Slang
         //
         bool findWitnessForInterfaceRequirement(
             ConformanceCheckingContext* context,
-            Type*                       type,
+            Type*                       subType,
+            Type*                       superInterfaceType,
             InheritanceDecl*            inheritanceDecl,
-            DeclRef<InterfaceDecl>      interfaceDeclRef,
+            DeclRef<InterfaceDecl>      superInterfaceDeclRef,
             DeclRef<Decl>               requiredMemberDeclRef,
-            RefPtr<WitnessTable>        witnessTable);
+            RefPtr<WitnessTable>        witnessTable,
+            SubtypeWitness*             subTypeConformsToSuperInterfaceWitness);
 
         // Check that the type declaration `typeDecl`, which
         // declares conformance to the interface `interfaceDeclRef`,
         // (via the given `inheritanceDecl`) actually provides
         // members to satisfy all the requirements in the interface.
+        bool checkInterfaceConformance(
+            ConformanceCheckingContext* context,
+            Type*                       subType,
+            Type*                       superInterfaceType,
+            InheritanceDecl*            inheritanceDecl,
+            DeclRef<InterfaceDecl>      superInterfaceDeclRef,
+            SubtypeWitness*             subTypeConformsToSuperInterfaceWitness,
+            WitnessTable*               witnessTable);
+
         RefPtr<WitnessTable> checkInterfaceConformance(
             ConformanceCheckingContext* context,
-            Type*                       type,
+            Type*                       subType,
+            Type*                       superInterfaceType,
             InheritanceDecl*            inheritanceDecl,
-            DeclRef<InterfaceDecl>      interfaceDeclRef);
+            DeclRef<InterfaceDecl>      superInterfaceDeclRef,
+            SubtypeWitness*             subTypeConformsToSuperInterfaceWitness);
 
-        RefPtr<WitnessTable> checkConformanceToType(
+        bool checkConformanceToType(
             ConformanceCheckingContext* context,
-            Type*                       type,
+            Type*                       subType,
             InheritanceDecl*            inheritanceDecl,
-            Type*                       baseType);
+            Type*                       superType,
+            SubtypeWitness*             subIsSuperWitness,
+            WitnessTable*               witnessTable);
 
             /// Check that `type` which has declared that it inherits from (and/or implements)
             /// another type via `inheritanceDecl` actually does what it needs to for that
@@ -913,6 +928,11 @@ namespace Slang
 
         IntVal* getIntVal(IntegerLiteralExpr* expr);
 
+        inline IntVal* getIntVal(SubstExpr<IntegerLiteralExpr> expr)
+        {
+            return getIntVal(expr.getExpr());
+        }
+
         Name* getName(String const& text)
         {
             return getNamePool()->getName(text);
@@ -938,12 +958,12 @@ namespace Slang
 
             /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
         IntVal* tryConstantFoldExpr(
-            InvokeExpr*                     invokeExpr,
+            SubstExpr<InvokeExpr>           invokeExpr,
             ConstantFoldingCircularityInfo* circularityInfo);
 
             /// Try to apply front-end constant folding to determine the value of `expr`.
         IntVal* tryConstantFoldExpr(
-            Expr*                           expr,
+            SubstExpr<Expr>                 expr,
             ConstantFoldingCircularityInfo* circularityInfo);
 
         bool _checkForCircularityInConstantFolding(
@@ -960,7 +980,7 @@ namespace Slang
             /// as an integer constant.
             ///
         IntVal* tryFoldIntegerConstantExpression(
-            Expr*                           expr,
+            SubstExpr<Expr>                 expr,
             ConstantFoldingCircularityInfo* circularityInfo);
 
         // Enforce that an expression resolves to an integer constant, and get its value

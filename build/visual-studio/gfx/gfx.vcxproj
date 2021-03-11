@@ -182,6 +182,7 @@
     <ClInclude Include="..\..\..\slang-gfx.h" />
     <ClInclude Include="..\..\..\tools\gfx\command-writer.h" />
     <ClInclude Include="..\..\..\tools\gfx\cuda\render-cuda.h" />
+    <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-swapchain.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\circular-resource-heap-d3d12.h" />
@@ -202,11 +203,11 @@
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-device-queue.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-module.h" />
-    <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx\cuda\render-cuda.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-swapchain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\circular-resource-heap-d3d12.cpp" />
@@ -226,7 +227,6 @@
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-device-queue.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-module.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-swap-chain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\vulkan\vk-util.cpp" />
   </ItemGroup>
   <ItemGroup>

@@ -92,7 +92,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 // The main interesting part of the host application code is where we
 // load, compile, inspect, and compose the Slang shader code.
 //
-Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& outShaderProgram)
+Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outShaderProgram)
 {
     // We need to obatin a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -100,7 +100,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& 
     // Our example application uses the `gfx` graphics API abstraction layer, which already
     // creates a Slang compilation session for us, so we just grab and use it here.
     ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(renderer->getSlangSession(slangSession.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
     
     // Once the session has been obtained, we can start loading code into it.
     //
@@ -322,7 +322,7 @@ Result loadShaderProgram(gfx::IRenderer* renderer, ComPtr<gfx::IShaderProgram>& 
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
 
-    auto shaderProgram = renderer->createProgram(programDesc);
+    auto shaderProgram = device->createProgram(programDesc);
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;
@@ -333,9 +333,10 @@ int gWindowHeight = 768;
 const uint32_t kSwapchainImageCount = 2;
 
 Slang::RefPtr<platform::Window> gWindow;
-Slang::ComPtr<gfx::IRenderer> gRenderer;
+Slang::ComPtr<gfx::IDevice> gDevice;
 ComPtr<gfx::IBufferResource> gConstantBuffer;
 ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+ComPtr<gfx::IFramebufferLayout> gFramebufferLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
 ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
@@ -347,7 +348,8 @@ ComPtr<gfx::ICommandQueue> gQueue;
 Result initialize()
 {
     platform::WindowDesc windowDesc;
-    windowDesc.title = "Slang Shader Toy";
+    const char* title = "Slang Shader Toy";
+    windowDesc.title = title;
     windowDesc.width = gWindowWidth;
     windowDesc.height = gWindowHeight;
     gWindow = platform::Application::createWindow(windowDesc);
@@ -355,15 +357,21 @@ Result initialize()
     gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
     gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
     gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
+    gWindow->events.sizeChanged = Slang::Action<>(this, &ShaderToyApp::windowSizeChanged);
 
-    IRenderer::Desc rendererDesc;
-    rendererDesc.rendererType = RendererType::DirectX11;
-    Result res = gfxCreateRenderer(&rendererDesc, gRenderer.writeRef());
+    IDevice::Desc deviceDesc;
+    deviceDesc.deviceType = DeviceType::Vulkan;
+    Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if(SLANG_FAILED(res)) return res;
+
+    auto deviceInfo = gDevice->getDeviceInfo();
+    Slang::StringBuilder titleSb;
+    titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
+    gWindow->setText(titleSb.getBuffer());
 
     ICommandQueue::Desc queueDesc = {};
     queueDesc.type = ICommandQueue::QueueType::Graphics;
-    gQueue = gRenderer->createCommandQueue(queueDesc);
+    gQueue = gDevice->createCommandQueue(queueDesc);
 
     int constantBufferSize = sizeof(Uniforms);
 
@@ -372,15 +380,14 @@ Result initialize()
     constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
     constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
 
-    gConstantBuffer = gRenderer->createBufferResource(
-        IResource::Usage::ConstantBuffer,
-        constantBufferDesc);
+    gConstantBuffer =
+        gDevice->createBufferResource(IResource::Usage::ConstantBuffer, constantBufferDesc);
     if(!gConstantBuffer) return SLANG_FAIL;
 
     InputElementDesc inputElements[] = {
         { "POSITION", 0, Format::RG_Float32, offsetof(FullScreenTriangle::Vertex, position) },
     };
-    auto inputLayout = gRenderer->createInputLayout(
+    auto inputLayout = gDevice->createInputLayout(
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
     if(!inputLayout) return SLANG_FAIL;
@@ -388,14 +395,14 @@ Result initialize()
     IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.init(FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex));
     vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
-    gVertexBuffer = gRenderer->createBufferResource(
+    gVertexBuffer = gDevice->createBufferResource(
         IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         &FullScreenTriangle::kVertices[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
 
     ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gRenderer, shaderProgram));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, shaderProgram));
 
     IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
     {
@@ -404,7 +411,7 @@ Result initialize()
     IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
     descriptorSetLayoutDesc.slotRangeCount = 1;
     descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
-    auto descriptorSetLayout = gRenderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
+    auto descriptorSetLayout = gDevice->createDescriptorSetLayout(descriptorSetLayoutDesc);
     if(!descriptorSetLayout) return SLANG_FAIL;
 
     IPipelineLayout::DescriptorSetDesc descriptorSets[] =
@@ -415,12 +422,13 @@ Result initialize()
     pipelineLayoutDesc.renderTargetCount = 1;
     pipelineLayoutDesc.descriptorSetCount = 1;
     pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
-    auto pipelineLayout = gRenderer->createPipelineLayout(pipelineLayoutDesc);
+    auto pipelineLayout = gDevice->createPipelineLayout(pipelineLayoutDesc);
     if(!pipelineLayout) return SLANG_FAIL;
 
     gPipelineLayout = pipelineLayout;
 
-    auto descriptorSet = gRenderer->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
+    auto descriptorSet =
+        gDevice->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
     if(!descriptorSet) return SLANG_FAIL;
 
     descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);
@@ -434,9 +442,7 @@ Result initialize()
     swapchainDesc.height = gWindowHeight;
     swapchainDesc.imageCount = kSwapchainImageCount;
     swapchainDesc.queue = gQueue;
-    gfx::WindowHandle windowHandle;
-    memcpy(&windowHandle, &gWindow->getNativeHandle(), sizeof(windowHandle));
-    gSwapchain = gRenderer->createSwapchain(swapchainDesc, windowHandle);
+    gSwapchain = gDevice->createSwapchain(swapchainDesc, gWindow->getNativeHandle().convert<gfx::WindowHandle>());
 
     IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
     IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
@@ -444,58 +450,18 @@ Result initialize()
     framebufferLayoutDesc.renderTargetCount = 1;
     framebufferLayoutDesc.renderTargets = &renderTargetLayout;
     framebufferLayoutDesc.depthStencil = &depthLayout;
-    ComPtr<IFramebufferLayout> framebufferLayout;
     SLANG_RETURN_ON_FAIL(
-        gRenderer->createFramebufferLayout(framebufferLayoutDesc, framebufferLayout.writeRef()));
+        gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
 
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
-    {
-        gfx::ITextureResource::Desc depthBufferDesc;
-        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
-        depthBufferDesc.init2D(
-            gfx::IResource::Type::Texture2D,
-            gfx::Format::D_Float32,
-            gSwapchain->getDesc().width,
-            gSwapchain->getDesc().height,
-            0);
-
-        ComPtr<gfx::ITextureResource> depthBufferResource = gRenderer->createTextureResource(
-            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
-        ComPtr<gfx::ITextureResource> colorBuffer;
-        gSwapchain->getImage(i, colorBuffer.writeRef());
-
-        gfx::IResourceView::Desc colorBufferViewDesc;
-        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-        colorBufferViewDesc.format = gSwapchain->getDesc().format;
-        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-        ComPtr<gfx::IResourceView> rtv =
-            gRenderer->createTextureView(colorBuffer.get(), colorBufferViewDesc);
-
-        gfx::IResourceView::Desc depthBufferViewDesc;
-        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
-        depthBufferViewDesc.format = gfx::Format::D_Float32;
-        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
-        ComPtr<gfx::IResourceView> dsv =
-            gRenderer->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
-
-        gfx::IFramebuffer::Desc framebufferDesc;
-        framebufferDesc.renderTargetCount = 1;
-        framebufferDesc.depthStencilView = dsv.get();
-        framebufferDesc.renderTargetViews = rtv.readRef();
-        framebufferDesc.layout = framebufferLayout;
-        ComPtr<gfx::IFramebuffer> frameBuffer = gRenderer->createFramebuffer(framebufferDesc);
-        gFramebuffers.add(frameBuffer);
-    }
+    createSwapchainFramebuffers();
 
     // Create pipeline.
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
-    desc.framebufferLayout = framebufferLayout;
+    desc.framebufferLayout = gFramebufferLayout;
     desc.pipelineLayout = pipelineLayout;
-    auto pipelineState = gRenderer->createGraphicsPipelineState(desc);
+    auto pipelineState = gDevice->createGraphicsPipelineState(desc);
     if (!pipelineState)
         return SLANG_FAIL;
 
@@ -503,7 +469,7 @@ Result initialize()
 
     // Create render pass.
     gfx::IRenderPassLayout::Desc renderPassDesc = {};
-    renderPassDesc.framebufferLayout = framebufferLayout;
+    renderPassDesc.framebufferLayout = gFramebufferLayout;
     renderPassDesc.renderTargetCount = 1;
     IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
     IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
@@ -517,7 +483,7 @@ Result initialize()
     depthStencilAccess.finalState = ResourceState::DepthWrite;
     renderPassDesc.renderTargetAccess = &renderTargetAccess;
     renderPassDesc.depthStencilAccess = &depthStencilAccess;
-    gRenderPass = gRenderer->createRenderPassLayout(renderPassDesc);
+    gRenderPass = gDevice->createRenderPassLayout(renderPassDesc);
     return SLANG_OK;
 }
 
@@ -534,6 +500,9 @@ platform::TimePoint startTime;
 void renderFrame()
 {
     auto frameIndex = gSwapchain->acquireNextImage();
+    if (frameIndex == -1)
+        return;
+
     auto commandBuffer = gQueue->createCommandBuffer();
     if( firstTime )
     {
@@ -597,6 +566,73 @@ void handleEvent(const platform::MouseEventArgs& event)
     isMouseDown = ((int)event.buttons & (int)platform::ButtonState::Enum::LeftButton) != 0;
     lastMouseX = (float)event.x;
     lastMouseY = (float)event.y;
+}
+
+void createSwapchainFramebuffers()
+{
+    gFramebuffers.clear();
+    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
+    {
+        gfx::ITextureResource::Desc depthBufferDesc;
+        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
+        depthBufferDesc.init2D(
+            gfx::IResource::Type::Texture2D,
+            gfx::Format::D_Float32,
+            gSwapchain->getDesc().width,
+            gSwapchain->getDesc().height,
+            0);
+
+        ComPtr<gfx::ITextureResource> depthBufferResource = gDevice->createTextureResource(
+            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+        ComPtr<gfx::ITextureResource> colorBuffer;
+        gSwapchain->getImage(i, colorBuffer.writeRef());
+
+        gfx::IResourceView::Desc colorBufferViewDesc;
+        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
+        colorBufferViewDesc.format = gSwapchain->getDesc().format;
+        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
+        ComPtr<gfx::IResourceView> rtv =
+            gDevice->createTextureView(colorBuffer.get(), colorBufferViewDesc);
+
+        gfx::IResourceView::Desc depthBufferViewDesc;
+        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
+        depthBufferViewDesc.format = gfx::Format::D_Float32;
+        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
+        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
+        ComPtr<gfx::IResourceView> dsv =
+            gDevice->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
+
+        gfx::IFramebuffer::Desc framebufferDesc;
+        framebufferDesc.renderTargetCount = 1;
+        framebufferDesc.depthStencilView = dsv.get();
+        framebufferDesc.renderTargetViews = rtv.readRef();
+        framebufferDesc.layout = gFramebufferLayout;
+        ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
+        gFramebuffers.add(frameBuffer);
+    }
+}
+
+void windowSizeChanged()
+{
+    // Wait for the GPU to finish.
+    gQueue->wait();
+
+    auto clientRect = gWindow->getClientRect();
+    if (clientRect.width > 0 && clientRect.height > 0)
+    {
+        // Free all framebuffers before resizing swapchain.
+        gFramebuffers = decltype(gFramebuffers)();
+
+        // Resize swapchain.
+        if (gSwapchain->resize(clientRect.width, clientRect.height) == SLANG_OK)
+        {
+            // Recreate framebuffers for each swapchain back buffer image.
+            createSwapchainFramebuffers();
+            gWindowWidth = clientRect.width;
+            gWindowHeight = clientRect.height;
+        }
+    }
 }
 
 };

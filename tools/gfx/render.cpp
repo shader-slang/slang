@@ -34,21 +34,9 @@ static const uint8_t s_formatSize[] = {
     uint8_t(sizeof(uint32_t)), // D_Unorm24_S8,
 };
 
-static const BindingStyle s_rendererTypeToBindingStyle[] = {
-    BindingStyle::Unknown, // Unknown,
-    BindingStyle::DirectX, // DirectX11,
-    BindingStyle::DirectX, // DirectX12,
-    BindingStyle::OpenGl, // OpenGl,
-    BindingStyle::Vulkan, // Vulkan
-    BindingStyle::CPU, // CPU
-    BindingStyle::CUDA, // CUDA
-};
-
 static void _compileTimeAsserts()
 {
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
-    SLANG_COMPILE_TIME_ASSERT(
-        SLANG_COUNT_OF(s_rendererTypeToBindingStyle) == int(RendererType::CountOf));
 }
 
 extern "C"
@@ -58,58 +46,55 @@ extern "C"
         return s_formatSize[int(format)];
     }
 
-    BindingStyle SLANG_MCALL gfxGetBindingStyle(RendererType type)
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice)
     {
-        return s_rendererTypeToBindingStyle[int(type)];
-    }
-
-    const char* SLANG_MCALL gfxGetRendererName(RendererType type)
-    {
-        switch (type)
-        {
-        case RendererType::DirectX11:
-            return "DirectX11";
-        case RendererType::DirectX12:
-            return "DirectX12";
-        case RendererType::OpenGl:
-            return "OpenGL";
-        case RendererType::Vulkan:
-            return "Vulkan";
-        case RendererType::Unknown:
-            return "Unknown";
-        case RendererType::CPU:
-            return "CPU";
-        case RendererType::CUDA:
-            return "CUDA";
-        default:
-            return "?!?";
-        }
-    }
-
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer)
-    {
-        switch (desc->rendererType)
+        switch (desc->deviceType)
         {
 #if SLANG_WINDOWS_FAMILY
-        case RendererType::DirectX11:
+        case DeviceType::DirectX11:
             {
-                return createD3D11Renderer(desc, outRenderer);
+                return createD3D11Device(desc, outDevice);
             }
-        case RendererType::DirectX12:
+        case DeviceType::DirectX12:
             {
-                return createD3D12Renderer(desc, outRenderer);
+                return createD3D12Device(desc, outDevice);
             }
-        case RendererType::OpenGl:
+        case DeviceType::OpenGl:
             {
-                return createGLRenderer(desc, outRenderer);
+                return createGLDevice(desc, outDevice);
             }
-        case RendererType::Vulkan:
+        case DeviceType::Vulkan:
             {
-                return createVKRenderer(desc, outRenderer);
+                return createVKDevice(desc, outDevice);
             }
-        case RendererType::CUDA:
+        case DeviceType::CUDA:
             {
-                return createCUDARenderer(desc, outRenderer);
+                return createCUDADevice(desc, outDevice);
+            }
+        case DeviceType::Default:
+            {
+                IDevice::Desc newDesc = *desc;
+                newDesc.deviceType = DeviceType::DirectX12;
+                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                newDesc.deviceType = DeviceType::Vulkan;
+                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                newDesc.deviceType = DeviceType::DirectX11;
+                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                newDesc.deviceType = DeviceType::OpenGl;
+                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                    return SLANG_OK;
+                return SLANG_FAIL;
+            }
+            break;
+#elif SLANG_LINUX_FAMILY
+            case DeviceType::Default:
+            case DeviceType::Vulkan:
+            {
+                return createVKDevice(desc, outDevice);
             }
 #endif
 
@@ -118,28 +103,31 @@ extern "C"
         }
     }
 
-    ProjectionStyle SLANG_MCALL gfxGetProjectionStyle(RendererType type)
+    const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type)
     {
         switch (type)
         {
-        case RendererType::DirectX11:
-        case RendererType::DirectX12:
-            {
-                return ProjectionStyle::DirectX;
-            }
-        case RendererType::OpenGl:
-            return ProjectionStyle::OpenGl;
-        case RendererType::Vulkan:
-            return ProjectionStyle::Vulkan;
-        case RendererType::Unknown:
-            return ProjectionStyle::Unknown;
+        case gfx::DeviceType::Unknown:
+            return "Unknown";
+        case gfx::DeviceType::Default:
+            return "Default";
+        case gfx::DeviceType::DirectX11:
+            return "DirectX11";
+        case gfx::DeviceType::DirectX12:
+            return "DirectX12";
+        case gfx::DeviceType::OpenGl:
+            return "OpenGL";
+        case gfx::DeviceType::Vulkan:
+            return "Vulkan";
+        case gfx::DeviceType::CPU:
+            return "CPU";
+        case gfx::DeviceType::CUDA:
+            return "CUDA";
         default:
-            {
-                assert(!"Unhandled type");
-                return ProjectionStyle::Unknown;
-            }
+            return "?";
         }
     }
+
 
     void SLANG_MCALL gfxGetIdentityProjection(ProjectionStyle style, float projMatrix[16])
     {

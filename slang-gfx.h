@@ -76,9 +76,10 @@ enum class StageType
     CountOf,
 };
 
-enum class RendererType
+enum class DeviceType
 {
     Unknown,
+    Default,
     DirectX11,
     DirectX12,
     OpenGl,
@@ -518,14 +519,9 @@ public:
             {
             case IResource::Type::Texture1D:
             case IResource::Type::Texture2D:
-                {
-                    return numMipMaps * arrSize;
-                }
             case IResource::Type::Texture3D:
                 {
-                    // can't have arrays of 3d textures
-                    assert(this->arraySize <= 1);
-                    return numMipMaps * this->size.depth;
+                    return numMipMaps * arrSize;
                 }
             case IResource::Type::TextureCube:
                 {
@@ -615,16 +611,49 @@ public:
         Usage initialUsage;
     };
 
-        /// The ordering of the subResources is
-        /// forall (effectiveArraySize)
-        ///     forall (mip levels)
-        ///         forall (depth levels)
-    struct Data
+        /// Data for a single subresource of a texture.
+        ///
+        /// Each subresource is a tensor with `1 <= rank <= 3`,
+        /// where the rank is deterined by the base shape of the
+        /// texture (Buffer, 1D, 2D, 3D, or Cube). For the common
+        /// case of a 2D texture, `rank == 2` and each subresource
+        /// is a 2D image.
+        ///
+        /// Subresource tensors must be stored in a row-major layout,
+        /// so that the X axis strides over texels, the Y axis strides
+        /// over 1D rows of texels, and the Z axis strides over 2D
+        /// "layers" of texels.
+        ///
+        /// For a texture with multiple mip levels or array elements,
+        /// each mip level and array element is stores as a distinct
+        /// subresource. When indexing into an array of subresources,
+        /// the index of a subresoruce for mip level `m` and array
+        /// index `a` is `m + a*mipLevelCount`.
+        ///
+    struct SubresourceData
     {
-        ptrdiff_t* mipRowStrides;           ///< The row stride for a mip map
-        int numMips;                        ///< The number of mip maps
-        const void*const* subResources;     ///< Pointers to each full mip subResource
-        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize
+            /// Pointer to texel data for the subresource tensor.
+        void const* data;
+
+            /// Stride in bytes between rows of the subresource tensor.
+            ///
+            /// This is the number of bytes to add to a pointer to a texel
+            /// at (X,Y,Z) to get to a texel at (X,Y+1,Z).
+            ///
+            /// Devices may not support all possible values for `strideY`.
+            /// In particular, they may only support strictly positive strides.
+            ///
+        int64_t     strideY;
+
+            /// Stride in bytes between layers of the subresource tensor.
+            ///
+            /// This is the number of bytes to add to a pointer to a texel
+            /// at (X,Y,Z) to get to a texel at (X,Y,Z+1).
+            ///
+            /// Devices may not support all possible values for `strideZ`.
+            /// In particular, they may only support strictly positive strides.
+            ///
+        int64_t     strideZ;
     };
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
@@ -1427,16 +1456,47 @@ public:
         bool enableVSync;
     };
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
-    virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) = 0;
-    virtual SLANG_NO_THROW Result present() = 0;
-    virtual SLANG_NO_THROW uint32_t acquireNextImage() = 0;
+
+    /// Returns the back buffer image at `index`.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getImage(uint32_t index, ITextureResource** outResource) = 0;
+
+    /// Present the next image in the swapchain.
+    virtual SLANG_NO_THROW Result SLANG_MCALL present() = 0;
+
+    /// Returns the index of next back buffer image that will be presented in the next
+    /// `present` call. If the swapchain is invalid/out-of-date, this method returns -1.
+    virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() = 0;
+
+    /// Resizes the back buffers of this swapchain. All render target views and framebuffers
+    /// referencing the back buffer images must be freed before calling this method.
+    virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) = 0;
 };
 #define SLANG_UUID_ISwapchain                                                        \
     {                                                                                \
         0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 } \
     }
 
-class IRenderer: public ISlangUnknown
+struct DeviceInfo
+{
+    DeviceType deviceType;
+
+    BindingStyle bindingStyle;
+
+    ProjectionStyle projectionStyle;
+
+    /// An projection matrix that ensures x, y mapping to pixels
+    /// is the same on all targets
+    float identityProjectionMatrix[16];
+
+    /// The name of the graphics API being used by this device.
+    const char* apiName = nullptr;
+
+    /// The name of the graphics adapter.
+    const char* adapterName = nullptr;
+};
+
+class IDevice: public ISlangUnknown
 {
 public:
     struct SlangDesc
@@ -1458,7 +1518,7 @@ public:
 
     struct Desc
     {
-        RendererType rendererType; // The underlying API/Platform of the renderer.
+        DeviceType deviceType = DeviceType::Default;    // The underlying API/Platform of the device.
         const char* adapter = nullptr;                  // Name to identify the adapter to use
         int requiredFeatureCount = 0;                   // Number of required features.
         const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
@@ -1480,18 +1540,31 @@ public:
         getSlangSession(result.writeRef());
         return result;
     }
-        /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
+        /// Create a texture resource.
+        ///
+        /// If `initData` is non-null, then it must point to an array of
+        /// `ITextureResource::SubresourceData` with one element for each
+        /// subresource of the texture being created.
+        ///
+        /// The number of subresources in a texture is:
+        ///
+        ///     effectiveElementCount * mipLevelCount
+        ///
+        /// where the effective element count is computed as:
+        ///
+        ///     effectiveElementCount = (isArray ? arrayElementCount : 1) * (isCube ? 6 : 1);
+        ///
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     inline SLANG_NO_THROW ComPtr<ITextureResource> createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData = nullptr)
+        const ITextureResource::SubresourceData* initData = nullptr)
     {
         ComPtr<ITextureResource> resource;
         SLANG_RETURN_NULL_ON_FAIL(createTextureResource(initialUsage, desc, initData, resource.writeRef()));
@@ -1695,7 +1768,7 @@ public:
         ISlangBlob** outBlob) = 0;
 
         /// Get the type of this renderer
-    virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const = 0;
+    virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const = 0;
 };
 
 #define SLANG_UUID_IRenderer                                                             \
@@ -1710,22 +1783,11 @@ extern "C"
     /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
 
-    /// Gets the binding style from the type
-    SLANG_GFX_API BindingStyle SLANG_MCALL gfxGetBindingStyle(RendererType type);
-
-    /// Given a renderer type, gets a projection style
-    SLANG_GFX_API ProjectionStyle SLANG_MCALL gfxGetProjectionStyle(RendererType type);
-
-    /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels
-    /// is the same on all targets
-    SLANG_GFX_API void SLANG_MCALL
-        gfxGetIdentityProjection(ProjectionStyle style, float projMatrix[16]);
-
-    /// Get the name of the renderer
-    SLANG_GFX_API const char* SLANG_MCALL gfxGetRendererName(RendererType type);
-
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
+    SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }
 
 }// renderer_test

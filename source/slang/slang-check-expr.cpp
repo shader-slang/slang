@@ -694,7 +694,7 @@ namespace Slang
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
-        InvokeExpr*                     invokeExpr,
+        SubstExpr<InvokeExpr>           invokeExpr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // We need all the operands to the expression
@@ -703,10 +703,10 @@ namespace Slang
         //
         // For right now we will look for calls to intrinsic functions, and then inspect
         // their names (this is bad and slow).
-        auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+        auto funcDeclRefExpr = getBaseExpr(invokeExpr).as<DeclRefExpr>();
         if (!funcDeclRefExpr) return nullptr;
 
-        auto funcDeclRef = funcDeclRefExpr->declRef;
+        auto funcDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr);
         auto intrinsicMod = funcDeclRef.getDecl()->findModifier<IntrinsicOpModifier>();
         if (!intrinsicMod)
         {
@@ -722,31 +722,31 @@ namespace Slang
 
         // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
         static const int kMaxArgs = 8;
-        if (invokeExpr->arguments.getCount() > kMaxArgs)
+        auto argCount = getArgCount(invokeExpr);
+        if (argCount > kMaxArgs)
             return nullptr;
 
         // Before checking the operation name, let's look at the arguments
         IntVal* argVals[kMaxArgs];
         IntegerLiteralValue constArgVals[kMaxArgs];
-        int argCount = 0;
         bool allConst = true;
-        for (auto argExpr : invokeExpr->arguments)
+        for(Index a = 0; a < argCount; ++a)
         {
+            auto argExpr = getArg(invokeExpr, a);
             auto argVal = tryFoldIntegerConstantExpression(argExpr, circularityInfo);
             if (!argVal)
                 return nullptr;
 
-            argVals[argCount] = argVal;
+            argVals[a] = argVal;
 
             if (auto constArgVal = as<ConstantIntVal>(argVal))
             {
-                constArgVals[argCount] = constArgVal->value;
+                constArgVals[a] = constArgVal->value;
             }
             else
             {
                 allConst = false;
             }
-            argCount++;
         }
 
         if (!allConst)
@@ -866,25 +866,25 @@ namespace Slang
     }
 
     IntVal* SemanticsVisitor::tryConstantFoldExpr(
-        Expr*                           expr,
+        SubstExpr<Expr>                 expr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // Unwrap any "identity" expressions
-        while (auto parenExpr = as<ParenExpr>(expr))
+        while (auto parenExpr = expr.as<ParenExpr>())
         {
-            expr = parenExpr->base;
+            expr = getBaseExpr(parenExpr);
         }
 
         // TODO(tfoley): more serious constant folding here
-        if (auto intLitExpr = as<IntegerLiteralExpr>(expr))
+        if (auto intLitExpr = expr.as<IntegerLiteralExpr>())
         {
             return getIntVal(intLitExpr);
         }
 
         // it is possible that we are referring to a generic value param
-        if (auto declRefExpr = as<DeclRefExpr>(expr))
+        if (auto declRefExpr = expr.as<DeclRefExpr>())
         {
-            auto declRef = declRefExpr->declRef;
+            auto declRef = getDeclRef(m_astBuilder, declRefExpr);
 
             if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
             {
@@ -913,13 +913,13 @@ namespace Slang
             }
         }
 
-        if(auto castExpr = as<TypeCastExpr>(expr))
+        if(auto castExpr = expr.as<TypeCastExpr>())
         {
-            auto val = tryConstantFoldExpr(castExpr->arguments[0], circularityInfo);
+            auto val = tryConstantFoldExpr(getArg(castExpr, 0), circularityInfo);
             if(val)
                 return val;
         }
-        else if (auto invokeExpr = as<InvokeExpr>(expr))
+        else if (auto invokeExpr = expr.as<InvokeExpr>())
         {
             auto val = tryConstantFoldExpr(invokeExpr, circularityInfo);
             if (val)
@@ -930,12 +930,12 @@ namespace Slang
     }
 
     IntVal* SemanticsVisitor::tryFoldIntegerConstantExpression(
-        Expr*                           expr,
+        SubstExpr<Expr>                 expr,
         ConstantFoldingCircularityInfo* circularityInfo)
     {
         // Check if type is acceptable for an integer constant expression
         //
-        if(!isScalarIntegerType(expr->type))
+        if(!isScalarIntegerType(getType(m_astBuilder, expr)))
             return nullptr;
 
         // Consider operations that we might be able to constant-fold...
@@ -2037,7 +2037,11 @@ namespace Slang
         {
             auto containerDecl = scope->containerDecl;
 
-            if( auto setterDecl = as<SetterDecl>(containerDecl) )
+            if( auto ctorDecl = as<ConstructorDecl>(containerDecl) )
+            {
+                expr->type.isLeftValue = true;
+            }
+            else if( auto setterDecl = as<SetterDecl>(containerDecl) )
             {
                 expr->type.isLeftValue = true;
             }
