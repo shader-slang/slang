@@ -1,6 +1,6 @@
-// slang-doc-markdown.h
-#ifndef SLANG_DOC_MARK_DOWN_H
-#define SLANG_DOC_MARK_DOWN_H
+// slang-doc-markdown-writer.h
+#ifndef SLANG_DOC_MARKDOWN_WRITER_H
+#define SLANG_DOC_MARKDOWN_WRITER_H
 
 #include "slang-doc-extractor.h"
 #include "slang-ast-print.h"
@@ -9,7 +9,7 @@ namespace Slang {
 
 class ASTBuilder;
 
-struct DocMarkDownWriter
+struct DocMarkdownWriter
 {
     typedef ASTPrinter::Part Part;
     typedef ASTPrinter::PartPair PartPair;
@@ -52,7 +52,7 @@ struct DocMarkDownWriter
     const StringBuilder& getOutput() const { return m_builder; }
 
         /// Ctor.
-    DocMarkDownWriter(DocMarkup* markup, ASTBuilder* astBuilder) :
+    DocMarkdownWriter(DocMarkup* markup, ASTBuilder* astBuilder) :
         m_markup(markup),
         m_astBuilder(astBuilder)
     {
