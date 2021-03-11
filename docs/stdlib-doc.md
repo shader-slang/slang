@@ -1228,7 +1228,7 @@ SamplerRasterizerOrderedTextureCubeMSArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
+# `texture`
 
 ## Signature 
 
@@ -32012,7 +32012,7 @@ vector<float,2> RasterizerOrderedTextureCubeMSArray<T>.GetSamplePosition(int s);
 * `s`
 
 --------------------------------------------------------------------------------
-# `bit_cast<T, U>`
+# `bit_cast`
 
 ## Signature 
 
@@ -32251,7 +32251,7 @@ vector<uint,4> ByteAddressBuffer.Load4(
 * `status`
 
 --------------------------------------------------------------------------------
-# `ByteAddressBuffer.Load<T>`
+# `ByteAddressBuffer.Load`
 
 ## Signature 
 
@@ -32571,7 +32571,7 @@ vector<uint,4> RWByteAddressBuffer.Load4(
 * `status`
 
 --------------------------------------------------------------------------------
-# `RWByteAddressBuffer.Load<T>`
+# `RWByteAddressBuffer.Load`
 
 ## Signature 
 
@@ -33085,7 +33085,7 @@ void RWByteAddressBuffer.Store4(
 * `value`
 
 --------------------------------------------------------------------------------
-# `RWByteAddressBuffer.Store<T>`
+# `RWByteAddressBuffer.Store`
 
 ## Signature 
 
@@ -33224,7 +33224,7 @@ vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(
 * `status`
 
 --------------------------------------------------------------------------------
-# `RasterizerOrderedByteAddressBuffer.Load<T>`
+# `RasterizerOrderedByteAddressBuffer.Load`
 
 ## Signature 
 
@@ -33528,7 +33528,7 @@ void RasterizerOrderedByteAddressBuffer.Store4(
 * `value`
 
 --------------------------------------------------------------------------------
-# `RasterizerOrderedByteAddressBuffer.Store<T>`
+# `RasterizerOrderedByteAddressBuffer.Store`
 
 ## Signature 
 
@@ -33902,7 +33902,7 @@ void abort();
 
 
 --------------------------------------------------------------------------------
-# `abs<T, N:int, M:int>`
+# `abs`
 
 ## Signature 
 
@@ -33929,7 +33929,7 @@ matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `acos<T, N:int, M:int>`
+# `acos`
 
 ## Signature 
 
@@ -33956,7 +33956,7 @@ matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `all<T, N:int, M:int>`
+# `all`
 
 ## Signature 
 
@@ -34009,7 +34009,7 @@ void AllMemoryBarrierWithGroupSync();
 
 
 --------------------------------------------------------------------------------
-# `any<T, N:int, M:int>`
+# `any`
 
 ## Signature 
 
@@ -34058,7 +34058,7 @@ double asdouble(
 * `highbits`
 
 --------------------------------------------------------------------------------
-# `asfloat<N:int, M:int>`
+# `asfloat`
 
 ## Signature 
 
@@ -34088,7 +34088,7 @@ matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asin<T, N:int, M:int>`
+# `asin`
 
 ## Signature 
 
@@ -34115,7 +34115,7 @@ matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asint<N:int, M:int>`
+# `asint`
 
 ## Signature 
 
@@ -34145,7 +34145,7 @@ matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asuint<N:int, M:int>`
+# `asuint`
 
 ## Signature 
 
@@ -34186,7 +34186,7 @@ matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asuint16<R:int, C:int>`
+# `asuint16`
 
 ## Signature 
 
@@ -34218,7 +34218,7 @@ matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<half,R,C> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `asint16<R:int, C:int>`
+# `asint16`
 
 ## Signature 
 
@@ -34246,7 +34246,7 @@ matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `asfloat16<R:int, C:int>`
+# `asfloat16`
 
 ## Signature 
 
@@ -34278,7 +34278,7 @@ matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `atan<T, N:int, M:int>`
+# `atan`
 
 ## Signature 
 
@@ -34305,7 +34305,7 @@ matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `atan2<T, N:int, M:int>`
+# `atan2`
 
 ## Signature 
 
@@ -34339,7 +34339,7 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `ceil<T, N:int, M:int>`
+# `ceil`
 
 ## Signature 
 
@@ -34383,7 +34383,7 @@ bool CheckAccessFullyMapped(uint status);
 * `status`
 
 --------------------------------------------------------------------------------
-# `clamp<T, N:int, M:int>`
+# `clamp`
 
 ## Signature 
 
@@ -34419,7 +34419,7 @@ matrix<T,N,M> clamp<T, N:int, M:int>(
 * `maxBound`
 
 --------------------------------------------------------------------------------
-# `clip<T, N:int, M:int>`
+# `clip`
 
 ## Signature 
 
@@ -34441,7 +34441,7 @@ void clip<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `cos<T, N:int, M:int>`
+# `cos`
 
 ## Signature 
 
@@ -34468,7 +34468,7 @@ matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `cosh<T, N:int, M:int>`
+# `cosh`
 
 ## Signature 
 
@@ -34512,7 +34512,7 @@ uint countbits(uint value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `cross<T>`
+# `cross`
 
 ## Signature 
 
@@ -34550,7 +34550,7 @@ vector<int,4> D3DCOLORtoUBYTE4(vector<float,4> color);
 * `color`
 
 --------------------------------------------------------------------------------
-# `ddx<T, N:int, M:int>`
+# `ddx`
 
 ## Signature 
 
@@ -34575,7 +34575,7 @@ matrix<T,N,M> ddx<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ddx_coarse<T, N:int, M:int>`
+# `ddx_coarse`
 
 ## Signature 
 
@@ -34604,7 +34604,7 @@ matrix<T,N,M> ddx_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ddx_fine<T, N:int, M:int>`
+# `ddx_fine`
 
 ## Signature 
 
@@ -34633,7 +34633,7 @@ matrix<T,N,M> ddx_fine<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ddy<T, N:int, M:int>`
+# `ddy`
 
 ## Signature 
 
@@ -34658,7 +34658,7 @@ matrix<T,N,M> ddy<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ddy_coarse<T, N:int, M:int>`
+# `ddy_coarse`
 
 ## Signature 
 
@@ -34687,7 +34687,7 @@ matrix<T,N,M> ddy_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ddy_fine<T, N:int, M:int>`
+# `ddy_fine`
 
 ## Signature 
 
@@ -34716,7 +34716,7 @@ matrix<T,N,M> ddy_fine<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `degrees<T, N:int, M:int>`
+# `degrees`
 
 ## Signature 
 
@@ -34741,7 +34741,7 @@ matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `determinant<T, N:int>`
+# `determinant`
 
 ## Signature 
 
@@ -34788,7 +34788,7 @@ void DeviceMemoryBarrierWithGroupSync();
 
 
 --------------------------------------------------------------------------------
-# `distance<T, N:int>`
+# `distance`
 
 ## Signature 
 
@@ -34810,7 +34810,7 @@ T distance<T, N:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `dot<T, N:int>`
+# `dot`
 
 ## Signature 
 
@@ -34832,7 +34832,7 @@ T dot<T, N:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `dst<T>`
+# `dst`
 
 ## Signature 
 
@@ -34853,7 +34853,7 @@ vector<T,4> dst<T>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeAtCentroid<T, N:int, M:int>`
+# `EvaluateAttributeAtCentroid`
 
 ## Signature 
 
@@ -34875,7 +34875,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeAtSample<T, N:int, M:int>`
+# `EvaluateAttributeAtSample`
 
 ## Signature 
 
@@ -34904,7 +34904,7 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 * `sampleindex`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeSnapped<T, N:int, M:int>`
+# `EvaluateAttributeSnapped`
 
 ## Signature 
 
@@ -34933,7 +34933,7 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
 * `offset`
 
 --------------------------------------------------------------------------------
-# `exp<T, N:int, M:int>`
+# `exp`
 
 ## Signature 
 
@@ -34960,7 +34960,7 @@ matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `exp2<T, N:int, M:int>`
+# `exp2`
 
 ## Signature 
 
@@ -34987,7 +34987,7 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `f16tof32<N:int>`
+# `f16tof32`
 
 ## Signature 
 
@@ -35013,7 +35013,7 @@ vector<float,N> f16tof32<N:int>(vector<uint,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `f32tof16<N:int>`
+# `f32tof16`
 
 ## Signature 
 
@@ -35039,7 +35039,7 @@ vector<uint,N> f32tof16<N:int>(vector<float,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `faceforward<T, N:int>`
+# `faceforward`
 
 ## Signature 
 
@@ -35063,7 +35063,7 @@ vector<T,N> faceforward<T, N:int>(
 * `ng`
 
 --------------------------------------------------------------------------------
-# `firstbithigh<N:int>`
+# `firstbithigh`
 
 ## Signature 
 
@@ -35089,7 +35089,7 @@ vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `firstbitlow<N:int>`
+# `firstbitlow`
 
 ## Signature 
 
@@ -35115,7 +35115,7 @@ vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `floor<T, N:int, M:int>`
+# `floor`
 
 ## Signature 
 
@@ -35142,7 +35142,7 @@ matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `fma<N:int, M:int>`
+# `fma`
 
 ## Signature 
 
@@ -35179,7 +35179,7 @@ matrix<double,N,M> fma<N:int, M:int>(
 * `c`
 
 --------------------------------------------------------------------------------
-# `fmod<T, N:int, M:int>`
+# `fmod`
 
 ## Signature 
 
@@ -35211,7 +35211,7 @@ matrix<T,N,M> fmod<T, N:int, M:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `frac<T, N:int, M:int>`
+# `frac`
 
 ## Signature 
 
@@ -35238,7 +35238,7 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `frexp<T, N:int, M:int>`
+# `frexp`
 
 ## Signature 
 
@@ -35270,7 +35270,7 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 * `exp`
 
 --------------------------------------------------------------------------------
-# `fwidth<T, N:int, M:int>`
+# `fwidth`
 
 ## Signature 
 
@@ -35296,7 +35296,7 @@ matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `GetAttributeAtVertex<T, N:int, M:int>`
+# `GetAttributeAtVertex`
 
 ## Description
 
@@ -35677,7 +35677,7 @@ void InterlockedXor(
 * `original_value`
 
 --------------------------------------------------------------------------------
-# `isfinite<T, N:int, M:int>`
+# `isfinite`
 
 ## Signature 
 
@@ -35702,7 +35702,7 @@ matrix<bool,N,M> isfinite<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `isinf<T, N:int, M:int>`
+# `isinf`
 
 ## Signature 
 
@@ -35729,7 +35729,7 @@ matrix<bool,N,M> isinf<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `isnan<T, N:int, M:int>`
+# `isnan`
 
 ## Signature 
 
@@ -35756,7 +35756,7 @@ matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ldexp<T, N:int, M:int>`
+# `ldexp`
 
 ## Signature 
 
@@ -35785,7 +35785,7 @@ matrix<T,N,M> ldexp<T, N:int, M:int>(
 * `exp`
 
 --------------------------------------------------------------------------------
-# `length<T, N:int>`
+# `length`
 
 ## Signature 
 
@@ -35804,7 +35804,7 @@ T length<T, N:int>(vector<T,N> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `lerp<T, N:int, M:int>`
+# `lerp`
 
 ## Signature 
 
@@ -35862,7 +35862,7 @@ vector<float,4> lit(
 * `m`
 
 --------------------------------------------------------------------------------
-# `log<T, N:int, M:int>`
+# `log`
 
 ## Signature 
 
@@ -35889,7 +35889,7 @@ matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `log10<T, N:int, M:int>`
+# `log10`
 
 ## Signature 
 
@@ -35916,7 +35916,7 @@ matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `log2<T, N:int, M:int>`
+# `log2`
 
 ## Signature 
 
@@ -35943,7 +35943,7 @@ matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `mad<T, N:int, M:int>`
+# `mad`
 
 ## Signature 
 
@@ -35981,7 +35981,7 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 * `bvalue`
 
 --------------------------------------------------------------------------------
-# `max<T, N:int, M:int>`
+# `max`
 
 ## Signature 
 
@@ -36015,7 +36015,7 @@ matrix<T,N,M> max<T, N:int, M:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `min<T, N:int, M:int>`
+# `min`
 
 ## Signature 
 
@@ -36049,7 +36049,7 @@ matrix<T,N,M> min<T, N:int, M:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `modf<T, N:int, M:int>`
+# `modf`
 
 ## Signature 
 
@@ -36104,7 +36104,7 @@ vector<uint,4> msad4(
 * `accum`
 
 --------------------------------------------------------------------------------
-# `mul<T, R:int, N:int, C:int>`
+# `mul`
 
 ## Signature 
 
@@ -36158,7 +36158,7 @@ matrix<T,R,C> mul<T, R:int, N:int, C:int>(
 * `right`
 
 --------------------------------------------------------------------------------
-# `noise<N:int>`
+# `noise`
 
 ## Signature 
 
@@ -36199,7 +36199,7 @@ int NonUniformResourceIndex(int index);
 * `index`
 
 --------------------------------------------------------------------------------
-# `normalize<T, N:int>`
+# `normalize`
 
 ## Signature 
 
@@ -36218,7 +36218,7 @@ vector<T,N> normalize<T, N:int>(vector<T,N> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `pow<T, N:int, M:int>`
+# `pow`
 
 ## Signature 
 
@@ -36510,7 +36510,7 @@ void ProcessTriTessFactorsMin(
 * `UnroundedInsideTessFactors`
 
 --------------------------------------------------------------------------------
-# `radians<T, N:int, M:int>`
+# `radians`
 
 ## Signature 
 
@@ -36535,7 +36535,7 @@ matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `rcp<T, N:int, M:int>`
+# `rcp`
 
 ## Signature 
 
@@ -36557,7 +36557,7 @@ matrix<T,N,M> rcp<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `reflect<T, N:int>`
+# `reflect`
 
 ## Signature 
 
@@ -36579,7 +36579,7 @@ vector<T,N> reflect<T, N:int>(
 * `n`
 
 --------------------------------------------------------------------------------
-# `refract<T, N:int>`
+# `refract`
 
 ## Signature 
 
@@ -36603,7 +36603,7 @@ vector<T,N> refract<T, N:int>(
 * `eta`
 
 --------------------------------------------------------------------------------
-# `reversebits<N:int>`
+# `reversebits`
 
 ## Signature 
 
@@ -36625,7 +36625,7 @@ vector<uint,N> reversebits<N:int>(vector<uint,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `round<T, N:int, M:int>`
+# `round`
 
 ## Signature 
 
@@ -36652,7 +36652,7 @@ matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `rsqrt<T, N:int, M:int>`
+# `rsqrt`
 
 ## Signature 
 
@@ -36679,7 +36679,7 @@ matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `saturate<T, N:int, M:int>`
+# `saturate`
 
 ## Signature 
 
@@ -36701,7 +36701,7 @@ matrix<T,N,M> saturate<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `sign<T, N:int, M:int>`
+# `sign`
 
 ## Signature 
 
@@ -36728,7 +36728,7 @@ matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `sin<T, N:int, M:int>`
+# `sin`
 
 ## Signature 
 
@@ -36755,7 +36755,7 @@ matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `sincos<T, N:int, M:int>`
+# `sincos`
 
 ## Signature 
 
@@ -36791,7 +36791,7 @@ void sincos<T, N:int, M:int>(
 * `c`
 
 --------------------------------------------------------------------------------
-# `sinh<T, N:int, M:int>`
+# `sinh`
 
 ## Signature 
 
@@ -36818,7 +36818,7 @@ matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `smoothstep<T, N:int, M:int>`
+# `smoothstep`
 
 ## Signature 
 
@@ -36854,7 +36854,7 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `sqrt<T, N:int, M:int>`
+# `sqrt`
 
 ## Signature 
 
@@ -36881,7 +36881,7 @@ matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `step<T, N:int, M:int>`
+# `step`
 
 ## Signature 
 
@@ -36913,7 +36913,7 @@ matrix<T,N,M> step<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `tan<T, N:int, M:int>`
+# `tan`
 
 ## Signature 
 
@@ -36940,7 +36940,7 @@ matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `tanh<T, N:int, M:int>`
+# `tanh`
 
 ## Signature 
 
@@ -36967,7 +36967,7 @@ matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `transpose<T, N:int, M:int>`
+# `transpose`
 
 ## Signature 
 
@@ -36987,7 +36987,7 @@ matrix<T,M,N> transpose<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `trunc<T, N:int, M:int>`
+# `trunc`
 
 ## Signature 
 
@@ -37245,7 +37245,7 @@ void GroupMemoryBarrierWithWaveSync();
 
 
 --------------------------------------------------------------------------------
-# `WaveMaskBroadcastLaneAt<T, N:int, M:int>`
+# `WaveMaskBroadcastLaneAt`
 
 ## Signature 
 
@@ -37285,7 +37285,7 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveMaskReadLaneAt<T, N:int, M:int>`
+# `WaveMaskReadLaneAt`
 
 ## Signature 
 
@@ -37325,7 +37325,7 @@ matrix<T,N,M> WaveMaskReadLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveMaskShuffle<T, N:int, M:int>`
+# `WaveMaskShuffle`
 
 ## Signature 
 
@@ -37389,7 +37389,7 @@ uint WaveMaskPrefixCountBits(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskBitAnd<T, N:int, M:int>`
+# `WaveMaskBitAnd`
 
 ## Signature 
 
@@ -37425,7 +37425,7 @@ matrix<T,N,M> WaveMaskBitAnd<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskBitOr<T, N:int, M:int>`
+# `WaveMaskBitOr`
 
 ## Signature 
 
@@ -37461,7 +37461,7 @@ matrix<T,N,M> WaveMaskBitOr<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskBitXor<T, N:int, M:int>`
+# `WaveMaskBitXor`
 
 ## Signature 
 
@@ -37497,7 +37497,7 @@ matrix<T,N,M> WaveMaskBitXor<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskMax<T, N:int, M:int>`
+# `WaveMaskMax`
 
 ## Signature 
 
@@ -37533,7 +37533,7 @@ matrix<T,N,M> WaveMaskMax<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskMin<T, N:int, M:int>`
+# `WaveMaskMin`
 
 ## Signature 
 
@@ -37569,7 +37569,7 @@ matrix<T,N,M> WaveMaskMin<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskProduct<T, N:int, M:int>`
+# `WaveMaskProduct`
 
 ## Signature 
 
@@ -37605,7 +37605,7 @@ matrix<T,N,M> WaveMaskProduct<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskSum<T, N:int, M:int>`
+# `WaveMaskSum`
 
 ## Signature 
 
@@ -37641,7 +37641,7 @@ matrix<T,N,M> WaveMaskSum<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskAllEqual<T, N:int, M:int>`
+# `WaveMaskAllEqual`
 
 ## Signature 
 
@@ -37680,7 +37680,7 @@ bool WaveMaskAllEqual<T, N:int, M:int>(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixProduct<T, N:int, M:int>`
+# `WaveMaskPrefixProduct`
 
 ## Signature 
 
@@ -37716,7 +37716,7 @@ matrix<T,N,M> WaveMaskPrefixProduct<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixSum<T, N:int, M:int>`
+# `WaveMaskPrefixSum`
 
 ## Signature 
 
@@ -37752,7 +37752,7 @@ matrix<T,N,M> WaveMaskPrefixSum<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskReadLaneFirst<T, N:int, M:int>`
+# `WaveMaskReadLaneFirst`
 
 ## Signature 
 
@@ -37788,7 +37788,7 @@ matrix<T,N,M> WaveMaskReadLaneFirst<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskMatch<T, N:int, M:int>`
+# `WaveMaskMatch`
 
 ## Signature 
 
@@ -37821,7 +37821,7 @@ uint WaveMaskMatch<T, N:int, M:int>(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixBitAnd<T, N:int, M:int>`
+# `WaveMaskPrefixBitAnd`
 
 ## Signature 
 
@@ -37858,7 +37858,7 @@ matrix<T,N,M> WaveMaskPrefixBitAnd<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixBitOr<T, N:int, M:int>`
+# `WaveMaskPrefixBitOr`
 
 ## Signature 
 
@@ -37891,7 +37891,7 @@ matrix<T,N,M> WaveMaskPrefixBitOr<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixBitXor<T, N:int, M:int>`
+# `WaveMaskPrefixBitXor`
 
 ## Signature 
 
@@ -37927,7 +37927,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `QuadReadLaneAt<T, N:int, M:int>`
+# `QuadReadLaneAt`
 
 ## Signature 
 
@@ -37956,7 +37956,7 @@ matrix<T,N,M> QuadReadLaneAt<T, N:int, M:int>(
 * `quadLaneID`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossX<T, N:int, M:int>`
+# `QuadReadAcrossX`
 
 ## Signature 
 
@@ -37978,7 +37978,7 @@ matrix<T,N,M> QuadReadAcrossX<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossY<T, N:int, M:int>`
+# `QuadReadAcrossY`
 
 ## Signature 
 
@@ -38000,7 +38000,7 @@ matrix<T,N,M> QuadReadAcrossY<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossDiagonal<T, N:int, M:int>`
+# `QuadReadAcrossDiagonal`
 
 ## Signature 
 
@@ -38022,7 +38022,7 @@ matrix<T,N,M> QuadReadAcrossDiagonal<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `WaveActiveBitAnd<T, N:int, M:int>`
+# `WaveActiveBitAnd`
 
 ## Signature 
 
@@ -38051,7 +38051,7 @@ matrix<T,N,M> WaveActiveBitAnd<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveBitOr<T, N:int, M:int>`
+# `WaveActiveBitOr`
 
 ## Signature 
 
@@ -38080,7 +38080,7 @@ matrix<T,N,M> WaveActiveBitOr<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveBitXor<T, N:int, M:int>`
+# `WaveActiveBitXor`
 
 ## Signature 
 
@@ -38109,7 +38109,7 @@ matrix<T,N,M> WaveActiveBitXor<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveMax<T, N:int, M:int>`
+# `WaveActiveMax`
 
 ## Signature 
 
@@ -38138,7 +38138,7 @@ matrix<T,N,M> WaveActiveMax<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveMin<T, N:int, M:int>`
+# `WaveActiveMin`
 
 ## Signature 
 
@@ -38167,7 +38167,7 @@ matrix<T,N,M> WaveActiveMin<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveProduct<T, N:int, M:int>`
+# `WaveActiveProduct`
 
 ## Signature 
 
@@ -38196,7 +38196,7 @@ matrix<T,N,M> WaveActiveProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveSum<T, N:int, M:int>`
+# `WaveActiveSum`
 
 ## Signature 
 
@@ -38225,7 +38225,7 @@ matrix<T,N,M> WaveActiveSum<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveAllEqual<T, N:int, M:int>`
+# `WaveActiveAllEqual`
 
 ## Signature 
 
@@ -38405,7 +38405,7 @@ uint _WaveCountBits(vector<uint,4> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `WavePrefixProduct<T, N:int, M:int>`
+# `WavePrefixProduct`
 
 ## Signature 
 
@@ -38434,7 +38434,7 @@ matrix<T,N,M> WavePrefixProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WavePrefixSum<T, N:int, M:int>`
+# `WavePrefixSum`
 
 ## Signature 
 
@@ -38463,7 +38463,7 @@ matrix<T,N,M> WavePrefixSum<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveReadLaneFirst<T, N:int, M:int>`
+# `WaveReadLaneFirst`
 
 ## Signature 
 
@@ -38492,7 +38492,7 @@ matrix<T,N,M> WaveReadLaneFirst<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveBroadcastLaneAt<T, N:int, M:int>`
+# `WaveBroadcastLaneAt`
 
 ## Signature 
 
@@ -38528,7 +38528,7 @@ matrix<T,N,M> WaveBroadcastLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveReadLaneAt<T, N:int, M:int>`
+# `WaveReadLaneAt`
 
 ## Signature 
 
@@ -38564,7 +38564,7 @@ matrix<T,N,M> WaveReadLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveShuffle<T, N:int, M:int>`
+# `WaveShuffle`
 
 ## Signature 
 
@@ -38657,7 +38657,7 @@ vector<uint,4> WaveGetActiveMulti();
 
 
 --------------------------------------------------------------------------------
-# `WaveMatch<T, N:int, M:int>`
+# `WaveMatch`
 
 ## Signature 
 
@@ -38699,7 +38699,7 @@ uint WaveMultiPrefixCountBits(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixBitAnd<T, N:int, M:int>`
+# `WaveMultiPrefixBitAnd`
 
 ## Signature 
 
@@ -38735,7 +38735,7 @@ matrix<T,N,M> WaveMultiPrefixBitAnd<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixBitOr<T, N:int, M:int>`
+# `WaveMultiPrefixBitOr`
 
 ## Signature 
 
@@ -38768,7 +38768,7 @@ matrix<T,N,M> WaveMultiPrefixBitOr<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixBitXor<T, N:int, M:int>`
+# `WaveMultiPrefixBitXor`
 
 ## Signature 
 
@@ -38804,7 +38804,7 @@ matrix<T,N,M> WaveMultiPrefixBitXor<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixProduct<T, N:int, M:int>`
+# `WaveMultiPrefixProduct`
 
 ## Signature 
 
@@ -38833,7 +38833,7 @@ matrix<T,N,M> WaveMultiPrefixProduct<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixSum<T, N:int, M:int>`
+# `WaveMultiPrefixSum`
 
 ## Signature 
 
@@ -39193,7 +39193,7 @@ uint RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES
 * `barycentrics`
 
 --------------------------------------------------------------------------------
-# `CallShader<Payload>`
+# `CallShader`
 
 ## Signature 
 
@@ -39214,7 +39214,7 @@ void CallShader<Payload>(
 * `payload`
 
 --------------------------------------------------------------------------------
-# `TraceRay<payload_t>`
+# `TraceRay`
 
 ## Signature 
 
@@ -39247,7 +39247,7 @@ void TraceRay<payload_t>(
 * `Payload`
 
 --------------------------------------------------------------------------------
-# `ReportHit<A>`
+# `ReportHit`
 
 ## Signature 
 
@@ -39666,7 +39666,7 @@ void SetMeshOutputCounts(
 * `primitiveCount`
 
 --------------------------------------------------------------------------------
-# `DispatchMesh<P>`
+# `DispatchMesh`
 
 ## Signature 
 
@@ -39748,7 +39748,7 @@ void FeedbackTexture2D<T>.GetDimensions(
 * `numberOfLevels`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedbackLevel<S>`
+# `FeedbackTexture2D<T>.WriteSamplerFeedbackLevel`
 
 ## Signature 
 
@@ -39773,7 +39773,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackLevel<S>(
 * `lod`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedback<S>`
+# `FeedbackTexture2D<T>.WriteSamplerFeedback`
 
 ## Signature 
 
@@ -39802,7 +39802,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
 * `clamp`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>`
+# `FeedbackTexture2D<T>.WriteSamplerFeedbackBias`
 
 ## Signature 
 
@@ -39834,7 +39834,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
 * `clamp`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>`
+# `FeedbackTexture2D<T>.WriteSamplerFeedbackGrad`
 
 ## Signature 
 
@@ -39919,7 +39919,7 @@ void FeedbackTexture2DArray<T>.GetDimensions(
 * `numberOfLevels`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel<S>`
+# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel`
 
 ## Signature 
 
@@ -39944,7 +39944,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel<S>(
 * `lod`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>`
+# `FeedbackTexture2DArray<T>.WriteSamplerFeedback`
 
 ## Signature 
 
@@ -39973,7 +39973,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
 * `clamp`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>`
+# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias`
 
 ## Signature 
 
@@ -40005,7 +40005,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
 * `clamp`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>`
+# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad`
 
 ## Signature 
 
