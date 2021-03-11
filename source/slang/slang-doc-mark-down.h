@@ -31,8 +31,8 @@ struct DocMarkDownWriter
         /// Write out all documentation to the output buffer
     void writeAll();
 
-        /// NOTE! This will write information about *all* of the overridden versions of a function/method
-    void writeOverridableCallable(const DocMarkup::Entry& entry, CallableDecl* callable);
+        /// This will write information about *all* of the overridden versions of a function/method
+    void writeCallableOverridable(const DocMarkup::Entry& entry, CallableDecl* callable);
 
     void writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl);
     void writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl);

@@ -118,27 +118,6 @@ SamplerTexture1D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture1D     t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRWTexture1D<T>`
 
 ## Generic Parameters
@@ -167,27 +146,6 @@ SamplerRWTexture1D<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture1D   t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture1D<T>`
@@ -220,27 +178,6 @@ SamplerRasterizerOrderedTexture1D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture1D t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTexture1DMS<T>`
 
 ## Generic Parameters
@@ -269,27 +206,6 @@ SamplerTexture1DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture1DMS   t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRWTexture1DMS<T>`
@@ -322,27 +238,6 @@ SamplerRWTexture1DMS<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture1DMS t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture1DMS<T>`
 
 ## Generic Parameters
@@ -371,27 +266,6 @@ SamplerRasterizerOrderedTexture1DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DMS t,
-    vector<float,1>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTexture1DArray<T>`
@@ -424,27 +298,6 @@ SamplerTexture1DArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture1DArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRWTexture1DArray<T>`
 
 ## Generic Parameters
@@ -473,27 +326,6 @@ SamplerRWTexture1DArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture1DArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture1DArray<T>`
@@ -526,27 +358,6 @@ SamplerRasterizerOrderedTexture1DArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTexture1DMSArray<T>`
 
 ## Generic Parameters
@@ -575,27 +386,6 @@ SamplerTexture1DMSArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture1DMSArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRWTexture1DMSArray<T>`
@@ -628,27 +418,6 @@ SamplerRWTexture1DMSArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture1DMSArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture1DMSArray<T>`
 
 ## Generic Parameters
@@ -677,27 +446,6 @@ SamplerRasterizerOrderedTexture1DMSArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DMSArray t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTexture2D<T>`
@@ -730,27 +478,6 @@ SamplerTexture2D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture2D     t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRWTexture2D<T>`
 
 ## Generic Parameters
@@ -779,27 +506,6 @@ SamplerRWTexture2D<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture2D   t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture2D<T>`
@@ -832,27 +538,6 @@ SamplerRasterizerOrderedTexture2D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture2D t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTexture2DMS<T>`
 
 ## Generic Parameters
@@ -881,27 +566,6 @@ SamplerTexture2DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture2DMS   t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRWTexture2DMS<T>`
@@ -934,27 +598,6 @@ SamplerRWTexture2DMS<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture2DMS t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture2DMS<T>`
 
 ## Generic Parameters
@@ -983,27 +626,6 @@ SamplerRasterizerOrderedTexture2DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DMS t,
-    vector<float,2>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTexture2DArray<T>`
@@ -1036,27 +658,6 @@ SamplerTexture2DArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture2DArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRWTexture2DArray<T>`
 
 ## Generic Parameters
@@ -1085,27 +686,6 @@ SamplerRWTexture2DArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture2DArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture2DArray<T>`
@@ -1138,27 +718,6 @@ SamplerRasterizerOrderedTexture2DArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTexture2DMSArray<T>`
 
 ## Generic Parameters
@@ -1187,27 +746,6 @@ SamplerTexture2DMSArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture2DMSArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRWTexture2DMSArray<T>`
@@ -1240,27 +778,6 @@ SamplerRWTexture2DMSArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture2DMSArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture2DMSArray<T>`
 
 ## Generic Parameters
@@ -1289,27 +806,6 @@ SamplerRasterizerOrderedTexture2DMSArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DMSArray t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTexture3D<T>`
@@ -1342,27 +838,6 @@ SamplerTexture3D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture3D     t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRWTexture3D<T>`
 
 ## Generic Parameters
@@ -1391,27 +866,6 @@ SamplerRWTexture3D<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture3D   t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture3D<T>`
@@ -1444,27 +898,6 @@ SamplerRasterizerOrderedTexture3D<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture3D t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTexture3DMS<T>`
 
 ## Generic Parameters
@@ -1493,27 +926,6 @@ SamplerTexture3DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture3DMS   t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRWTexture3DMS<T>`
@@ -1546,27 +958,6 @@ SamplerRWTexture3DMS<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRWTexture3DMS t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTexture3DMS<T>`
 
 ## Generic Parameters
@@ -1595,27 +986,6 @@ SamplerRasterizerOrderedTexture3DMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTexture3DMS t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTextureCube<T>`
@@ -1648,27 +1018,6 @@ SamplerTextureCube<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTextureCube   t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTextureCube<T>`
 
 ## Generic Parameters
@@ -1697,27 +1046,6 @@ SamplerRasterizerOrderedTextureCube<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTextureCube t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTextureCubeMS<T>`
@@ -1750,27 +1078,6 @@ SamplerTextureCubeMS<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTextureCubeMS t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTextureCubeMS<T>`
 
 ## Generic Parameters
@@ -1799,27 +1106,6 @@ SamplerRasterizerOrderedTextureCubeMS<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTextureCubeMS t,
-    vector<float,3>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerTextureCubeArray<T>`
@@ -1852,27 +1138,6 @@ SamplerTextureCubeArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTextureCubeArray t,
-    vector<float,4>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTextureCubeArray<T>`
 
 ## Generic Parameters
@@ -1903,27 +1168,6 @@ SamplerRasterizerOrderedTextureCubeArray<T>.init(
 * `s`
 
 --------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerRasterizerOrderedTextureCubeArray t,
-    vector<float,4>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
---------------------------------------------------------------------------------
 # `struct SamplerTextureCubeMSArray<T>`
 
 ## Generic Parameters
@@ -1952,27 +1196,6 @@ SamplerTextureCubeMSArray<T>.init(
 
 * `t`
 * `s`
-
---------------------------------------------------------------------------------
-# `texture<T>`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTextureCubeMSArray t,
-    vector<float,4>      location);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
 
 --------------------------------------------------------------------------------
 # `struct SamplerRasterizerOrderedTextureCubeMSArray<T>`
@@ -2010,6 +1233,117 @@ SamplerRasterizerOrderedTextureCubeMSArray<T>.init(
 ## Signature 
 
 ```
+T texture<T>(
+    SamplerTexture1D     t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerRWTexture1D   t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture1D t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerTexture1DMS   t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerRWTexture1DMS t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture1DMS t,
+    vector<float,1>      location);
+T texture<T>(
+    SamplerTexture1DArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRWTexture1DArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture1DArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerTexture1DMSArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRWTexture1DMSArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture1DMSArray t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerTexture2D     t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRWTexture2D   t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture2D t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerTexture2DMS   t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRWTexture2DMS t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture2DMS t,
+    vector<float,2>      location);
+T texture<T>(
+    SamplerTexture2DArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRWTexture2DArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture2DArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTexture2DMSArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRWTexture2DMSArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture2DMSArray t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTexture3D     t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRWTexture3D   t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture3D t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTexture3DMS   t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRWTexture3DMS t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTexture3DMS t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTextureCube   t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTextureCube t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTextureCubeMS t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTextureCubeMS t,
+    vector<float,3>      location);
+T texture<T>(
+    SamplerTextureCubeArray t,
+    vector<float,4>      location);
+T texture<T>(
+    SamplerRasterizerOrderedTextureCubeArray t,
+    vector<float,4>      location);
+T texture<T>(
+    SamplerTextureCubeMSArray t,
+    vector<float,4>      location);
 T texture<T>(
     SamplerRasterizerOrderedTextureCubeMSArray t,
     vector<float,4>      location);
@@ -32922,17 +32256,25 @@ vector<uint,4> ByteAddressBuffer.Load4(
 ## Signature 
 
 ```
+/// See Target Availability 1
+uint ByteAddressBuffer.Load(int location);
+/// See Target Availability 2
+uint ByteAddressBuffer.Load(
+    int                  location,
+    out uint             status);
 T ByteAddressBuffer.Load<T>(int location);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `location`
+* `status`
 
 --------------------------------------------------------------------------------
 # `struct StructuredBuffer<T>`
@@ -33234,17 +32576,25 @@ vector<uint,4> RWByteAddressBuffer.Load4(
 ## Signature 
 
 ```
+/// See Target Availability 1
+uint RWByteAddressBuffer.Load(int location);
+/// See Target Availability 2
+uint RWByteAddressBuffer.Load(
+    int                  location,
+    out uint             status);
 T RWByteAddressBuffer.Load<T>(int location);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `location`
+* `status`
 
 --------------------------------------------------------------------------------
 # `RWByteAddressBuffer.InterlockedAddF32`
@@ -33740,6 +33090,11 @@ void RWByteAddressBuffer.Store4(
 ## Signature 
 
 ```
+/// See Target Availability 1
+void RWByteAddressBuffer.Store(
+    uint                 address,
+    uint                 value);
+/// See Target Availability 2
 void RWByteAddressBuffer.Store<T>(
     int                  offset,
     T                    value);
@@ -33747,13 +33102,15 @@ void RWByteAddressBuffer.Store<T>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
-* `offset`
+* `address`
 * `value`
+* `offset`
 
 --------------------------------------------------------------------------------
 # `struct RasterizerOrderedByteAddressBuffer`
@@ -33872,17 +33229,25 @@ vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(
 ## Signature 
 
 ```
+/// See Target Availability 1
+uint RasterizerOrderedByteAddressBuffer.Load(int location);
+/// See Target Availability 2
+uint RasterizerOrderedByteAddressBuffer.Load(
+    int                  location,
+    out uint             status);
 T RasterizerOrderedByteAddressBuffer.Load<T>(int location);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `location`
+* `status`
 
 --------------------------------------------------------------------------------
 # `RasterizerOrderedByteAddressBuffer.InterlockedAdd`
@@ -34168,6 +33533,11 @@ void RasterizerOrderedByteAddressBuffer.Store4(
 ## Signature 
 
 ```
+/// See Target Availability 1
+void RasterizerOrderedByteAddressBuffer.Store(
+    uint                 address,
+    uint                 value);
+/// See Target Availability 2
 void RasterizerOrderedByteAddressBuffer.Store<T>(
     int                  offset,
     T                    value);
@@ -34175,13 +33545,15 @@ void RasterizerOrderedByteAddressBuffer.Store<T>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
-* `offset`
+* `address`
 * `value`
+* `offset`
 
 --------------------------------------------------------------------------------
 # `struct RWStructuredBuffer<T>`
@@ -34530,97 +33902,30 @@ void abort();
 
 
 --------------------------------------------------------------------------------
-# `abs<T>`
-
-## Signature 
-
-```
-T abs<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `abs<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> abs<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `abs<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T abs<T>(T x);
+/// See Target Availability 2
+vector<T,N> abs<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `acos<T>`
-
-## Signature 
-
-```
-T acos<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `acos<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> acos<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -34629,12 +33934,19 @@ vector<T,N> acos<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T acos<T>(T x);
+/// See Target Availability 2
+vector<T,N> acos<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -34644,54 +33956,22 @@ matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `all<T>`
-
-## Signature 
-
-```
-bool all<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `all<T, N:int>`
-
-## Signature 
-
-```
-bool all<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `all<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool all<T>(T x);
+bool all<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 bool all<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -34729,54 +34009,22 @@ void AllMemoryBarrierWithGroupSync();
 
 
 --------------------------------------------------------------------------------
-# `any<T>`
-
-## Signature 
-
-```
-bool any<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `any<T, N:int>`
-
-## Signature 
-
-```
-bool any<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `any<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool any<T>(T x);
+bool any<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 bool any<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -34810,151 +34058,33 @@ double asdouble(
 * `highbits`
 
 --------------------------------------------------------------------------------
-# `asfloat<N:int>`
+# `asfloat<N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+float asfloat(int x);
+float asfloat(uint x);
 vector<float,N> asfloat<N:int>(vector<int,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asfloat<N:int>`
-
-## Signature 
-
-```
 vector<float,N> asfloat<N:int>(vector<uint,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asfloat<N:int, M:int>`
-
-## Signature 
-
-```
+/// See Target Availability 2
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<int,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asfloat<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<uint,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asfloat<N:int>`
-
-## Signature 
-
-```
+float asfloat(float x);
 vector<float,N> asfloat<N:int>(vector<float,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asfloat<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asin<T>`
-
-## Signature 
-
-```
-T asin<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `asin<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> asin<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -34963,12 +34093,19 @@ vector<T,N> asin<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T asin<T>(T x);
+/// See Target Availability 2
+vector<T,N> asin<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -34978,109 +34115,28 @@ matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asint<N:int>`
+# `asint<N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+int asint(float x);
+int asint(uint x);
 vector<int,N> asint<N:int>(vector<float,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asint<N:int>`
-
-## Signature 
-
-```
 vector<int,N> asint<N:int>(vector<uint,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asint<N:int, M:int>`
-
-## Signature 
-
-```
+/// See Target Availability 2
 matrix<int,N,M> asint<N:int, M:int>(matrix<float,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asint<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<int,N,M> asint<N:int, M:int>(matrix<uint,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asint<N:int>`
-
-## Signature 
-
-```
+int asint(int x);
 vector<int,N> asint<N:int>(vector<int,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asint<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -35089,391 +34145,76 @@ matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `asuint<N:int>`
+# `asuint<N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+void asuint(
+    double               value,
+    out uint             lowbits,
+    out uint             highbits);
+uint asuint(float x);
+uint asuint(int x);
 vector<uint,N> asuint<N:int>(vector<float,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asuint<N:int>`
-
-## Signature 
-
-```
 vector<uint,N> asuint<N:int>(vector<int,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asuint<N:int, M:int>`
-
-## Signature 
-
-```
+/// See Target Availability 2
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<float,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asuint<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<int,N,M> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `asuint<N:int>`
-
-## Signature 
-
-```
+uint asuint(uint x);
 vector<uint,N> asuint<N:int>(vector<uint,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
-# `asuint<N:int, M:int>`
-
-## Signature 
-
-```
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 ```
 
+## Requirements
+
+`GLSL GL_ARB_gpu_shader5`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `N`
 * `M`
+* `value`
+* `lowbits`
+* `highbits`
 * `x`
 
 --------------------------------------------------------------------------------
-# `asfloat16<N:int>`
+# `asuint16<R:int, C:int>`
 
 ## Signature 
 
 ```
-vector<half,N> asfloat16<N:int>(vector<half,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asfloat16<R:int, C:int>`
-
-## Signature 
-
-```
-matrix<half,R,C> asfloat16<R:int, C:int>(matrix<half,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asint16<N:int>`
-
-## Signature 
-
-```
-vector<int16_t,N> asint16<N:int>(vector<int16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asint16<R:int, C:int>`
-
-## Signature 
-
-```
-matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<int16_t,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<N:int>`
-
-## Signature 
-
-```
+/// See Target Availability 1
+uint16_t asuint16(uint16_t value);
 vector<uint16_t,N> asuint16<N:int>(vector<uint16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<R:int, C:int>`
-
-## Signature 
-
-```
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<uint16_t,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asint16<N:int>`
-
-## Signature 
-
-```
-vector<int16_t,N> asint16<N:int>(vector<uint16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asint16<R:int, C:int>`
-
-## Signature 
-
-```
-matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<uint16_t,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<N:int>`
-
-## Signature 
-
-```
+uint16_t asuint16(int16_t value);
 vector<uint16_t,N> asuint16<N:int>(vector<int16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<R:int, C:int>`
-
-## Signature 
-
-```
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<int16_t,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<N:int>`
-
-## Signature 
-
-```
+/// See Target Availability 2
+uint16_t asuint16(half value);
+/// See Target Availability 1
 vector<uint16_t,N> asuint16<N:int>(vector<half,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asuint16<R:int, C:int>`
-
-## Signature 
-
-```
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<half,R,C> value);
 ```
 
 ## Target Availability
 
-`HLSL`
-
-## Parameters
-
-* `R`
-* `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asfloat16<N:int>`
-
-## Signature 
-
-```
-vector<half,N> asfloat16<N:int>(vector<uint16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
+1. `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
 * `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `asfloat16<R:int, C:int>`
-
-## Signature 
-
-```
-matrix<half,R,C> asfloat16<R:int, C:int>(matrix<uint16_t,R,C> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
 * `R`
 * `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asint16<N:int>`
-
-## Signature 
-
-```
-vector<int16_t,N> asint16<N:int>(vector<half,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
 * `value`
 
 --------------------------------------------------------------------------------
@@ -35482,6 +34223,14 @@ vector<int16_t,N> asint16<N:int>(vector<half,N> value);
 ## Signature 
 
 ```
+int16_t asint16(int16_t value);
+vector<int16_t,N> asint16<N:int>(vector<int16_t,N> value);
+matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<int16_t,R,C> value);
+int16_t asint16(uint16_t value);
+vector<int16_t,N> asint16<N:int>(vector<uint16_t,N> value);
+matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<uint16_t,R,C> value);
+int16_t asint16(half value);
+vector<int16_t,N> asint16<N:int>(vector<half,N> value);
 matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 ```
 
@@ -35491,26 +34240,9 @@ matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 
 ## Parameters
 
+* `N`
 * `R`
 * `C`
-* `value`
-
---------------------------------------------------------------------------------
-# `asfloat16<N:int>`
-
-## Signature 
-
-```
-vector<half,N> asfloat16<N:int>(vector<int16_t,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `N`
 * `value`
 
 --------------------------------------------------------------------------------
@@ -35519,55 +34251,31 @@ vector<half,N> asfloat16<N:int>(vector<int16_t,N> value);
 ## Signature 
 
 ```
+/// See Target Availability 1
+half asfloat16(half value);
+vector<half,N> asfloat16<N:int>(vector<half,N> value);
+matrix<half,R,C> asfloat16<R:int, C:int>(matrix<half,R,C> value);
+/// See Target Availability 2
+half asfloat16(uint16_t value);
+/// See Target Availability 1
+vector<half,N> asfloat16<N:int>(vector<uint16_t,N> value);
+matrix<half,R,C> asfloat16<R:int, C:int>(matrix<uint16_t,R,C> value);
+half asfloat16(int16_t value);
+vector<half,N> asfloat16<N:int>(vector<int16_t,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
+* `N`
 * `R`
 * `C`
 * `value`
-
---------------------------------------------------------------------------------
-# `atan<T>`
-
-## Signature 
-
-```
-T atan<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `atan<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> atan<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
 
 --------------------------------------------------------------------------------
 # `atan<T, N:int, M:int>`
@@ -35575,61 +34283,25 @@ vector<T,N> atan<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T atan<T>(T x);
+/// See Target Availability 2
+vector<T,N> atan<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `atan2<T>`
-
-## Signature 
-
-```
-T atan2<T>(
-    T                    y,
-    T                    x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `y`
-* `x`
-
---------------------------------------------------------------------------------
-# `atan2<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> atan2<T, N:int>(
-    vector<T,N>          y,
-    vector<T,N>          x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `y`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -35638,6 +34310,15 @@ vector<T,N> atan2<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T atan2<T>(
+    T                    y,
+    T                    x);
+/// See Target Availability 2
+vector<T,N> atan2<T, N:int>(
+    vector<T,N>          y,
+    vector<T,N>          x);
+/// See Target Availability 3
 matrix<T,N,M> atan2<T, N:int, M:int>(
     matrix<T,N,M>        y,
     matrix<T,N,M>        x);
@@ -35645,7 +34326,9 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -35656,54 +34339,24 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `ceil<T>`
-
-## Signature 
-
-```
-T ceil<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ceil<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ceil<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `ceil<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ceil<T>(T x);
+/// See Target Availability 2
+vector<T,N> ceil<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> ceil<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -35730,58 +34383,21 @@ bool CheckAccessFullyMapped(uint status);
 * `status`
 
 --------------------------------------------------------------------------------
-# `clamp<T>`
-
-## Signature 
-
-```
-T clamp<T>(
-    T                    x,
-    T                    minBound,
-    T                    maxBound);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `minBound`
-* `maxBound`
-
---------------------------------------------------------------------------------
-# `clamp<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> clamp<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          minBound,
-    vector<T,N>          maxBound);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `minBound`
-* `maxBound`
-
---------------------------------------------------------------------------------
 # `clamp<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T clamp<T>(
+    T                    x,
+    T                    minBound,
+    T                    maxBound);
+vector<T,N> clamp<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          minBound,
+    vector<T,N>          maxBound);
+/// See Target Availability 2
 matrix<T,N,M> clamp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        minBound,
@@ -35790,7 +34406,8 @@ matrix<T,N,M> clamp<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -35802,48 +34419,13 @@ matrix<T,N,M> clamp<T, N:int, M:int>(
 * `maxBound`
 
 --------------------------------------------------------------------------------
-# `clip<T>`
-
-## Signature 
-
-```
-void clip<T>(T x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `clip<T, N:int>`
-
-## Signature 
-
-```
-void clip<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `clip<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+void clip<T>(T x);
+void clip<T, N:int>(vector<T,N> x);
 void clip<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
@@ -35859,54 +34441,24 @@ void clip<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `cos<T>`
-
-## Signature 
-
-```
-T cos<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `cos<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> cos<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `cos<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T cos<T>(T x);
+/// See Target Availability 2
+vector<T,N> cos<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -35916,54 +34468,24 @@ matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `cosh<T>`
-
-## Signature 
-
-```
-T cosh<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `cosh<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> cosh<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `cosh<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T cosh<T>(T x);
+/// See Target Availability 2
+vector<T,N> cosh<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> cosh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -36028,105 +34550,28 @@ vector<int,4> D3DCOLORtoUBYTE4(vector<float,4> color);
 * `color`
 
 --------------------------------------------------------------------------------
-# `ddx<T>`
-
-## Signature 
-
-```
-T ddx<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddx<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddx<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `ddx<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddx<T>(T x);
+vector<T,N> ddx<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddx<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddx_coarse<T>`
-
-## Signature 
-
-```
-T ddx_coarse<T>(T x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddx_coarse<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddx_coarse<T, N:int>(vector<T,N> x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -36135,63 +34580,27 @@ vector<T,N> ddx_coarse<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddx_coarse<T>(T x);
+vector<T,N> ddx_coarse<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddx_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
+## Requirements
+
+`GLSL GL_ARB_derivative_control`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddx_fine<T>`
-
-## Signature 
-
-```
-T ddx_fine<T>(T x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddx_fine<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddx_fine<T, N:int>(vector<T,N> x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -36200,55 +34609,27 @@ vector<T,N> ddx_fine<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddx_fine<T>(T x);
+vector<T,N> ddx_fine<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddx_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
+## Requirements
+
+`GLSL GL_ARB_derivative_control`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy<T>`
-
-## Signature 
-
-```
-T ddy<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddy<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -36257,63 +34638,23 @@ vector<T,N> ddy<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddy<T>(T x);
+vector<T,N> ddy<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddy<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy_coarse<T>`
-
-## Signature 
-
-```
-T ddy_coarse<T>(T x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy_coarse<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddy_coarse<T, N:int>(vector<T,N> x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -36322,63 +34663,27 @@ vector<T,N> ddy_coarse<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddy_coarse<T>(T x);
+vector<T,N> ddy_coarse<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddy_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
+## Requirements
+
+`GLSL GL_ARB_derivative_control`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy_fine<T>`
-
-## Signature 
-
-```
-T ddy_fine<T>(T x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `ddy_fine<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> ddy_fine<T, N:int>(vector<T,N> x);
-```
-
-## Requirements
-
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -36387,12 +34692,21 @@ vector<T,N> ddy_fine<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T ddy_fine<T>(T x);
+vector<T,N> ddy_fine<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> ddy_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
+## Requirements
+
+`GLSL GL_ARB_derivative_control`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -36402,54 +34716,22 @@ matrix<T,N,M> ddy_fine<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `degrees<T>`
-
-## Signature 
-
-```
-T degrees<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `degrees<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> degrees<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `degrees<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T degrees<T>(T x);
+vector<T,N> degrees<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -36571,48 +34853,13 @@ vector<T,4> dst<T>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeAtCentroid<T>`
-
-## Signature 
-
-```
-T EvaluateAttributeAtCentroid<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `EvaluateAttributeAtCentroid<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> EvaluateAttributeAtCentroid<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `EvaluateAttributeAtCentroid<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T EvaluateAttributeAtCentroid<T>(T x);
+vector<T,N> EvaluateAttributeAtCentroid<T, N:int>(vector<T,N> x);
 matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
@@ -36628,7 +34875,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeAtSample<T>`
+# `EvaluateAttributeAtSample<T, N:int, M:int>`
 
 ## Signature 
 
@@ -36636,46 +34883,9 @@ matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 T EvaluateAttributeAtSample<T>(
     T                    x,
     uint                 sampleindex);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `sampleindex`
-
---------------------------------------------------------------------------------
-# `EvaluateAttributeAtSample<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> EvaluateAttributeAtSample<T, N:int>(
     vector<T,N>          x,
     uint                 sampleindex);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `sampleindex`
-
---------------------------------------------------------------------------------
-# `EvaluateAttributeAtSample<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
     matrix<T,N,M>        x,
     uint                 sampleindex);
@@ -36694,7 +34904,7 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 * `sampleindex`
 
 --------------------------------------------------------------------------------
-# `EvaluateAttributeSnapped<T>`
+# `EvaluateAttributeSnapped<T, N:int, M:int>`
 
 ## Signature 
 
@@ -36702,46 +34912,9 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 T EvaluateAttributeSnapped<T>(
     T                    x,
     vector<int,2>        offset);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `offset`
-
---------------------------------------------------------------------------------
-# `EvaluateAttributeSnapped<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> EvaluateAttributeSnapped<T, N:int>(
     vector<T,N>          x,
     vector<int,2>        offset);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `offset`
-
---------------------------------------------------------------------------------
-# `EvaluateAttributeSnapped<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
     matrix<T,N,M>        x,
     vector<int,2>        offset);
@@ -36760,54 +34933,24 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
 * `offset`
 
 --------------------------------------------------------------------------------
-# `exp<T>`
-
-## Signature 
-
-```
-T exp<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `exp<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> exp<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `exp<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T exp<T>(T x);
+/// See Target Availability 2
+vector<T,N> exp<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -36817,54 +34960,24 @@ matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `exp2<T>`
-
-## Signature 
-
-```
-T exp2<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `exp2<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> exp2<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `exp2<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T exp2<T>(T x);
+/// See Target Availability 2
+vector<T,N> exp2<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -36879,12 +34992,20 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+float f16tof32(uint value);
+/// See Target Availability 2
 vector<float,N> f16tof32<N:int>(vector<uint,N> value);
 ```
 
+## Requirements
+
+`GLSL420`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -36897,12 +35018,20 @@ vector<float,N> f16tof32<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
+/// See Target Availability 1
+uint f32tof16(float value);
+/// See Target Availability 2
 vector<uint,N> f32tof16<N:int>(vector<float,N> value);
 ```
 
+## Requirements
+
+`GLSL420`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -36939,30 +35068,20 @@ vector<T,N> faceforward<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+int firstbithigh(int value);
+/// See Target Availability 2
 vector<int,N> firstbithigh<N:int>(vector<int,N> value);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `firstbithigh<N:int>`
-
-## Signature 
-
-```
+/// See Target Availability 1
+uint firstbithigh(uint value);
+/// See Target Availability 2
 vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 ```
 
 ## Target Availability
 
-`GLSL`, `HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
@@ -36975,72 +35094,25 @@ vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
+/// See Target Availability 1
+int firstbitlow(int value);
+/// See Target Availability 2
 vector<int,N> firstbitlow<N:int>(vector<int,N> value);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
-# `firstbitlow<N:int>`
-
-## Signature 
-
-```
+/// See Target Availability 1
+uint firstbitlow(uint value);
+/// See Target Availability 2
 vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 ```
 
 ## Target Availability
 
-`GLSL`, `HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
 * `N`
 * `value`
-
---------------------------------------------------------------------------------
-# `floor<T>`
-
-## Signature 
-
-```
-T floor<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `floor<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> floor<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
 
 --------------------------------------------------------------------------------
 # `floor<T, N:int, M:int>`
@@ -37048,12 +35120,19 @@ vector<T,N> floor<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T floor<T>(T x);
+/// See Target Availability 2
+vector<T,N> floor<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -37063,34 +35142,22 @@ matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `fma<N:int>`
-
-## Signature 
-
-```
-vector<double,N> fma<N:int>(
-    vector<double,N>     a,
-    vector<double,N>     b,
-    vector<double,N>     c);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `N`
-* `a`
-* `b`
-* `c`
-
---------------------------------------------------------------------------------
 # `fma<N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+double fma(
+    double               a,
+    double               b,
+    double               c);
+/// See Target Availability 2
+vector<double,N> fma<N:int>(
+    vector<double,N>     a,
+    vector<double,N>     b,
+    vector<double,N>     c);
+/// See Target Availability 3
 matrix<double,N,M> fma<N:int, M:int>(
     matrix<double,N,M>   a,
     matrix<double,N,M>   b,
@@ -37099,7 +35166,9 @@ matrix<double,N,M> fma<N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -37110,54 +35179,19 @@ matrix<double,N,M> fma<N:int, M:int>(
 * `c`
 
 --------------------------------------------------------------------------------
-# `fmod<T>`
-
-## Signature 
-
-```
-T fmod<T>(
-    T                    x,
-    T                    y);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `fmod<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> fmod<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
 # `fmod<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T fmod<T>(
+    T                    x,
+    T                    y);
+/// See Target Availability 2
+vector<T,N> fmod<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y);
 matrix<T,N,M> fmod<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
@@ -37165,7 +35199,8 @@ matrix<T,N,M> fmod<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -37176,54 +35211,24 @@ matrix<T,N,M> fmod<T, N:int, M:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `frac<T>`
-
-## Signature 
-
-```
-T frac<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `frac<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> frac<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `frac<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T frac<T>(T x);
+/// See Target Availability 2
+vector<T,N> frac<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -37231,49 +35236,6 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 * `N`
 * `M`
 * `x`
-
---------------------------------------------------------------------------------
-# `frexp<T>`
-
-## Signature 
-
-```
-T frexp<T>(
-    T                    x,
-    out T                exp);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `exp`
-
---------------------------------------------------------------------------------
-# `frexp<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> frexp<T, N:int>(
-    vector<T,N>          x,
-    out vector<T,N>      exp);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `exp`
 
 --------------------------------------------------------------------------------
 # `frexp<T, N:int, M:int>`
@@ -37281,6 +35243,14 @@ vector<T,N> frexp<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T frexp<T>(
+    T                    x,
+    out T                exp);
+vector<T,N> frexp<T, N:int>(
+    vector<T,N>          x,
+    out vector<T,N>      exp);
+/// See Target Availability 2
 matrix<T,N,M> frexp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     out matrix<T,N,M>    exp);
@@ -37288,7 +35258,8 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -37299,54 +35270,23 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 * `exp`
 
 --------------------------------------------------------------------------------
-# `fwidth<T>`
-
-## Signature 
-
-```
-T fwidth<T>(T x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `fwidth<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> fwidth<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `fwidth<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T fwidth<T>(T x);
+/// See Target Availability 2
+vector<T,N> fwidth<T, N:int>(vector<T,N> x);
+/// See Target Availability 1
 matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
@@ -37354,89 +35294,6 @@ matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
 * `N`
 * `M`
 * `x`
-
---------------------------------------------------------------------------------
-# `GetAttributeAtVertex<T>`
-
-## Description
-
- Get the value of a vertex attribute at a specific vertex.
-
- The `GetAttributeAtVertex()` function can be used in a fragment shader
- to get the value of the given `attribute` at the vertex of the primitive
- that corresponds to the given `vertexIndex`.
-
- Note that the `attribute` must have been a declared varying input to
- the fragment shader with the `nointerpolation` modifier.
-
- This function can be applied to scalars, vectors, and matrices of
- built-in scalar types.
-
- Note: these functions are not curently implemented for Vulkan/SPIR-V output.
-
-## Signature 
-
-```
-T GetAttributeAtVertex<T>(
-    T                    attribute,
-    uint                 vertexIndex);
-```
-
-## Requirements
-
-`GLSL GL_NV_fragment_shader_barycentric`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `attribute`
-* `vertexIndex`
-
---------------------------------------------------------------------------------
-# `GetAttributeAtVertex<T, N:int>`
-
-## Description
-
- Get the value of a vertex attribute at a specific vertex.
-
- The `GetAttributeAtVertex()` function can be used in a fragment shader
- to get the value of the given `attribute` at the vertex of the primitive
- that corresponds to the given `vertexIndex`.
-
- Note that the `attribute` must have been a declared varying input to
- the fragment shader with the `nointerpolation` modifier.
-
- This function can be applied to scalars, vectors, and matrices of
- built-in scalar types.
-
- Note: these functions are not curently implemented for Vulkan/SPIR-V output.
-
-## Signature 
-
-```
-vector<T,N> GetAttributeAtVertex<T, N:int>(
-    vector<T,N>          attribute,
-    uint                 vertexIndex);
-```
-
-## Requirements
-
-`GLSL GL_NV_fragment_shader_barycentric`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `attribute`
-* `vertexIndex`
 
 --------------------------------------------------------------------------------
 # `GetAttributeAtVertex<T, N:int, M:int>`
@@ -37460,6 +35317,12 @@ vector<T,N> GetAttributeAtVertex<T, N:int>(
 ## Signature 
 
 ```
+T GetAttributeAtVertex<T>(
+    T                    attribute,
+    uint                 vertexIndex);
+vector<T,N> GetAttributeAtVertex<T, N:int>(
+    vector<T,N>          attribute,
+    uint                 vertexIndex);
 matrix<T,N,M> GetAttributeAtVertex<T, N:int, M:int>(
     matrix<T,N,M>        attribute,
     uint                 vertexIndex);
@@ -37814,97 +35677,28 @@ void InterlockedXor(
 * `original_value`
 
 --------------------------------------------------------------------------------
-# `isfinite<T>`
-
-## Signature 
-
-```
-bool isfinite<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `isfinite<T, N:int>`
-
-## Signature 
-
-```
-vector<bool,N> isfinite<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `isfinite<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool isfinite<T>(T x);
+/// See Target Availability 2
+vector<bool,N> isfinite<T, N:int>(vector<T,N> x);
 matrix<bool,N,M> isfinite<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `isinf<T>`
-
-## Signature 
-
-```
-bool isinf<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `isinf<T, N:int>`
-
-## Signature 
-
-```
-vector<bool,N> isinf<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -37913,55 +35707,25 @@ vector<bool,N> isinf<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool isinf<T>(T x);
+/// See Target Availability 2
+vector<bool,N> isinf<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<bool,N,M> isinf<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `isnan<T>`
-
-## Signature 
-
-```
-bool isnan<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `isnan<T, N:int>`
-
-## Signature 
-
-```
-vector<bool,N> isnan<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -37970,12 +35734,19 @@ vector<bool,N> isnan<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool isnan<T>(T x);
+/// See Target Availability 2
+vector<bool,N> isnan<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -37985,7 +35756,7 @@ matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `ldexp<T>`
+# `ldexp<T, N:int, M:int>`
 
 ## Signature 
 
@@ -37993,46 +35764,9 @@ matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 T ldexp<T>(
     T                    x,
     T                    exp);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `exp`
-
---------------------------------------------------------------------------------
-# `ldexp<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> ldexp<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          exp);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `exp`
-
---------------------------------------------------------------------------------
-# `ldexp<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> ldexp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        exp);
@@ -38070,58 +35804,21 @@ T length<T, N:int>(vector<T,N> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `lerp<T>`
-
-## Signature 
-
-```
-T lerp<T>(
-    T                    x,
-    T                    y,
-    T                    s);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-* `s`
-
---------------------------------------------------------------------------------
-# `lerp<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> lerp<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y,
-    vector<T,N>          s);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-* `s`
-
---------------------------------------------------------------------------------
 # `lerp<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T lerp<T>(
+    T                    x,
+    T                    y,
+    T                    s);
+vector<T,N> lerp<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y,
+    vector<T,N>          s);
+/// See Target Availability 2
 matrix<T,N,M> lerp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y,
@@ -38130,7 +35827,8 @@ matrix<T,N,M> lerp<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -38164,97 +35862,30 @@ vector<float,4> lit(
 * `m`
 
 --------------------------------------------------------------------------------
-# `log<T>`
-
-## Signature 
-
-```
-T log<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `log<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> log<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `log<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T log<T>(T x);
+/// See Target Availability 2
+vector<T,N> log<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `log10<T>`
-
-## Signature 
-
-```
-T log10<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `log10<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> log10<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -38263,55 +35894,25 @@ vector<T,N> log10<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T log10<T>(T x);
+/// See Target Availability 2
+vector<T,N> log10<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `log2<T>`
-
-## Signature 
-
-```
-T log2<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `log2<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> log2<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -38320,12 +35921,19 @@ vector<T,N> log2<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T log2<T>(T x);
+/// See Target Availability 2
+vector<T,N> log2<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -38335,58 +35943,22 @@ matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `mad<T>`
-
-## Signature 
-
-```
-T mad<T>(
-    T                    mvalue,
-    T                    avalue,
-    T                    bvalue);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mvalue`
-* `avalue`
-* `bvalue`
-
---------------------------------------------------------------------------------
-# `mad<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> mad<T, N:int>(
-    vector<T,N>          mvalue,
-    vector<T,N>          avalue,
-    vector<T,N>          bvalue);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mvalue`
-* `avalue`
-* `bvalue`
-
---------------------------------------------------------------------------------
 # `mad<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T mad<T>(
+    T                    mvalue,
+    T                    avalue,
+    T                    bvalue);
+/// See Target Availability 2
+vector<T,N> mad<T, N:int>(
+    vector<T,N>          mvalue,
+    vector<T,N>          avalue,
+    vector<T,N>          bvalue);
+/// See Target Availability 3
 matrix<T,N,M> mad<T, N:int, M:int>(
     matrix<T,N,M>        mvalue,
     matrix<T,N,M>        avalue,
@@ -38395,7 +35967,9 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -38407,54 +35981,20 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 * `bvalue`
 
 --------------------------------------------------------------------------------
-# `max<T>`
-
-## Signature 
-
-```
-T max<T>(
-    T                    x,
-    T                    y);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `max<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> max<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
 # `max<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T max<T>(
+    T                    x,
+    T                    y);
+/// See Target Availability 2
+vector<T,N> max<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y);
+/// See Target Availability 3
 matrix<T,N,M> max<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
@@ -38462,56 +36002,15 @@ matrix<T,N,M> max<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `min<T>`
-
-## Signature 
-
-```
-T min<T>(
-    T                    x,
-    T                    y);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `min<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> min<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 * `y`
 
@@ -38521,6 +36020,15 @@ vector<T,N> min<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T min<T>(
+    T                    x,
+    T                    y);
+/// See Target Availability 2
+vector<T,N> min<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y);
+/// See Target Availability 3
 matrix<T,N,M> min<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
@@ -38528,7 +36036,9 @@ matrix<T,N,M> min<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -38539,54 +36049,20 @@ matrix<T,N,M> min<T, N:int, M:int>(
 * `y`
 
 --------------------------------------------------------------------------------
-# `modf<T>`
-
-## Signature 
-
-```
-T modf<T>(
-    T                    x,
-    out T                ip);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `ip`
-
---------------------------------------------------------------------------------
-# `modf<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> modf<T, N:int>(
-    vector<T,N>          x,
-    out vector<T,N>      ip);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `ip`
-
---------------------------------------------------------------------------------
 # `modf<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T modf<T>(
+    T                    x,
+    out T                ip);
+/// See Target Availability 2
+vector<T,N> modf<T, N:int>(
+    vector<T,N>          x,
+    out vector<T,N>      ip);
+/// See Target Availability 1
 matrix<T,N,M> modf<T, N:int, M:int>(
     matrix<T,N,M>        x,
     out matrix<T,N,M>    ip);
@@ -38594,7 +36070,8 @@ matrix<T,N,M> modf<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
@@ -38627,190 +36104,37 @@ vector<uint,4> msad4(
 * `accum`
 
 --------------------------------------------------------------------------------
-# `mul<T>`
-
-## Signature 
-
-```
-T mul<T>(
-    T                    x,
-    T                    y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> mul<T, N:int>(
-    vector<T,N>          x,
-    T                    y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> mul<T, N:int>(
-    T                    x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int, M:int>`
-
-## Signature 
-
-```
-matrix<T,N,M> mul<T, N:int, M:int>(
-    matrix<T,N,M>        x,
-    T                    y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `M`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int, M:int>`
-
-## Signature 
-
-```
-matrix<T,N,M> mul<T, N:int, M:int>(
-    T                    x,
-    matrix<T,N,M>        y);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `M`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int>`
-
-## Signature 
-
-```
-T mul<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int, M:int>`
-
-## Signature 
-
-```
-vector<T,M> mul<T, N:int, M:int>(
-    vector<T,N>          left,
-    matrix<T,N,M>        right);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `M`
-* `left`
-* `right`
-
---------------------------------------------------------------------------------
-# `mul<T, N:int, M:int>`
-
-## Signature 
-
-```
-vector<T,N> mul<T, N:int, M:int>(
-    matrix<T,N,M>        left,
-    vector<T,M>          right);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `M`
-* `left`
-* `right`
-
---------------------------------------------------------------------------------
 # `mul<T, R:int, N:int, C:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T mul<T>(
+    T                    x,
+    T                    y);
+vector<T,N> mul<T, N:int>(
+    vector<T,N>          x,
+    T                    y);
+vector<T,N> mul<T, N:int>(
+    T                    x,
+    vector<T,N>          y);
+matrix<T,N,M> mul<T, N:int, M:int>(
+    matrix<T,N,M>        x,
+    T                    y);
+matrix<T,N,M> mul<T, N:int, M:int>(
+    T                    x,
+    matrix<T,N,M>        y);
+/// See Target Availability 2
+T mul<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y);
+vector<T,M> mul<T, N:int, M:int>(
+    vector<T,N>          left,
+    matrix<T,N,M>        right);
+vector<T,N> mul<T, N:int, M:int>(
+    matrix<T,N,M>        left,
+    vector<T,M>          right);
 matrix<T,R,C> mul<T, R:int, N:int, C:int>(
     matrix<T,R,N>        right,
     matrix<T,N,C>        left);
@@ -38818,16 +36142,20 @@ matrix<T,R,C> mul<T, R:int, N:int, C:int>(
 
 ## Target Availability
 
-`GLSL`, `HLSL`
+1. `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
 * `T`
-* `R`
 * `N`
+* `M`
+* `R`
 * `C`
-* `right`
+* `x`
+* `y`
 * `left`
+* `right`
 
 --------------------------------------------------------------------------------
 # `noise<N:int>`
@@ -38835,6 +36163,7 @@ matrix<T,R,C> mul<T, R:int, N:int, C:int>(
 ## Signature 
 
 ```
+float noise(float x);
 float noise<N:int>(vector<float,N> x);
 ```
 
@@ -38889,54 +36218,20 @@ vector<T,N> normalize<T, N:int>(vector<T,N> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `pow<T>`
-
-## Signature 
-
-```
-T pow<T>(
-    T                    x,
-    T                    y);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
-# `pow<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> pow<T, N:int>(
-    vector<T,N>          x,
-    vector<T,N>          y);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `y`
-
---------------------------------------------------------------------------------
 # `pow<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T pow<T>(
+    T                    x,
+    T                    y);
+/// See Target Availability 2
+vector<T,N> pow<T, N:int>(
+    vector<T,N>          x,
+    vector<T,N>          y);
+/// See Target Availability 3
 matrix<T,N,M> pow<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
@@ -38944,7 +36239,9 @@ matrix<T,N,M> pow<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -39213,54 +36510,22 @@ void ProcessTriTessFactorsMin(
 * `UnroundedInsideTessFactors`
 
 --------------------------------------------------------------------------------
-# `radians<T>`
-
-## Signature 
-
-```
-T radians<T>(T x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `radians<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> radians<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `radians<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T radians<T>(T x);
+vector<T,N> radians<T, N:int>(vector<T,N> x);
+/// See Target Availability 2
 matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -39270,48 +36535,13 @@ matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `rcp<T>`
-
-## Signature 
-
-```
-T rcp<T>(T x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `rcp<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> rcp<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `rcp<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T rcp<T>(T x);
+vector<T,N> rcp<T, N:int>(vector<T,N> x);
 matrix<T,N,M> rcp<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
@@ -39378,12 +36608,16 @@ vector<T,N> refract<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+uint reversebits(uint value);
+/// See Target Availability 2
 vector<uint,N> reversebits<N:int>(vector<uint,N> value);
 ```
 
 ## Target Availability
 
-`GLSL`, `HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
 
 ## Parameters
 
@@ -39391,97 +36625,30 @@ vector<uint,N> reversebits<N:int>(vector<uint,N> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `round<T>`
-
-## Signature 
-
-```
-T round<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `round<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> round<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `round<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T round<T>(T x);
+/// See Target Availability 2
+vector<T,N> round<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `rsqrt<T>`
-
-## Signature 
-
-```
-T rsqrt<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `rsqrt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> rsqrt<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -39490,12 +36657,19 @@ vector<T,N> rsqrt<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T rsqrt<T>(T x);
+/// See Target Availability 2
+vector<T,N> rsqrt<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -39505,48 +36679,13 @@ matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `saturate<T>`
-
-## Signature 
-
-```
-T saturate<T>(T x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `saturate<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> saturate<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `saturate<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T saturate<T>(T x);
+vector<T,N> saturate<T, N:int>(vector<T,N> x);
 matrix<T,N,M> saturate<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
@@ -39562,97 +36701,30 @@ matrix<T,N,M> saturate<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `sign<T>`
-
-## Signature 
-
-```
-int sign<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `sign<T, N:int>`
-
-## Signature 
-
-```
-vector<int,N> sign<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `sign<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+int sign<T>(T x);
+/// See Target Availability 2
+vector<int,N> sign<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `sin<T>`
-
-## Signature 
-
-```
-T sin<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `sin<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> sin<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -39661,12 +36733,19 @@ vector<T,N> sin<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T sin<T>(T x);
+/// See Target Availability 2
+vector<T,N> sin<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -39676,58 +36755,21 @@ matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `sincos<T>`
-
-## Signature 
-
-```
-void sincos<T>(
-    T                    x,
-    out T                s,
-    out T                c);
-```
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-* `s`
-* `c`
-
---------------------------------------------------------------------------------
-# `sincos<T, N:int>`
-
-## Signature 
-
-```
-void sincos<T, N:int>(
-    vector<T,N>          x,
-    out vector<T,N>      s,
-    out vector<T,N>      c);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-* `s`
-* `c`
-
---------------------------------------------------------------------------------
 # `sincos<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+void sincos<T>(
+    T                    x,
+    out T                s,
+    out T                c);
+/// See Target Availability 2
+void sincos<T, N:int>(
+    vector<T,N>          x,
+    out vector<T,N>      s,
+    out vector<T,N>      c);
 void sincos<T, N:int, M:int>(
     matrix<T,N,M>        x,
     out matrix<T,N,M>    s,
@@ -39736,7 +36778,8 @@ void sincos<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `CUDA`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -39748,107 +36791,30 @@ void sincos<T, N:int, M:int>(
 * `c`
 
 --------------------------------------------------------------------------------
-# `sinh<T>`
-
-## Signature 
-
-```
-T sinh<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `sinh<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> sinh<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `sinh<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T sinh<T>(T x);
+/// See Target Availability 2
+vector<T,N> sinh<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `smoothstep<T>`
-
-## Signature 
-
-```
-T smoothstep<T>(
-    T                    min,
-    T                    max,
-    T                    x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `min`
-* `max`
-* `x`
-
---------------------------------------------------------------------------------
-# `smoothstep<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> smoothstep<T, N:int>(
-    vector<T,N>          min,
-    vector<T,N>          max,
-    vector<T,N>          x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `min`
-* `max`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -39857,6 +36823,16 @@ vector<T,N> smoothstep<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T smoothstep<T>(
+    T                    min,
+    T                    max,
+    T                    x);
+vector<T,N> smoothstep<T, N:int>(
+    vector<T,N>          min,
+    vector<T,N>          max,
+    vector<T,N>          x);
+/// See Target Availability 2
 matrix<T,N,M> smoothstep<T, N:int, M:int>(
     matrix<T,N,M>        min,
     matrix<T,N,M>        max,
@@ -39865,7 +36841,8 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -39877,103 +36854,30 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `sqrt<T>`
-
-## Signature 
-
-```
-T sqrt<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `sqrt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> sqrt<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `sqrt<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T sqrt<T>(T x);
+/// See Target Availability 2
+vector<T,N> sqrt<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `x`
-
---------------------------------------------------------------------------------
-# `step<T>`
-
-## Signature 
-
-```
-T step<T>(
-    T                    y,
-    T                    x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `y`
-* `x`
-
---------------------------------------------------------------------------------
-# `step<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> step<T, N:int>(
-    vector<T,N>          y,
-    vector<T,N>          x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `y`
 * `x`
 
 --------------------------------------------------------------------------------
@@ -39982,6 +36886,14 @@ vector<T,N> step<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T step<T>(
+    T                    y,
+    T                    x);
+vector<T,N> step<T, N:int>(
+    vector<T,N>          y,
+    vector<T,N>          x);
+/// See Target Availability 2
 matrix<T,N,M> step<T, N:int, M:int>(
     matrix<T,N,M>        y,
     matrix<T,N,M>        x);
@@ -39989,7 +36901,8 @@ matrix<T,N,M> step<T, N:int, M:int>(
 
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -40000,54 +36913,24 @@ matrix<T,N,M> step<T, N:int, M:int>(
 * `x`
 
 --------------------------------------------------------------------------------
-# `tan<T>`
-
-## Signature 
-
-```
-T tan<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `tan<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> tan<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `tan<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T tan<T>(T x);
+/// See Target Availability 2
+vector<T,N> tan<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -40057,54 +36940,24 @@ matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `tanh<T>`
-
-## Signature 
-
-```
-T tanh<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `tanh<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> tanh<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `tanh<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T tanh<T>(T x);
+/// See Target Availability 2
+vector<T,N> tanh<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -40134,54 +36987,24 @@ matrix<T,M,N> transpose<T, N:int, M:int>(matrix<T,N,M> x);
 * `x`
 
 --------------------------------------------------------------------------------
-# `trunc<T>`
-
-## Signature 
-
-```
-T trunc<T>(T x);
-```
-
-## Target Availability
-
-`CPP`, `CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `x`
-
---------------------------------------------------------------------------------
-# `trunc<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> trunc<T, N:int>(vector<T,N> x);
-```
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `x`
-
---------------------------------------------------------------------------------
 # `trunc<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T trunc<T>(T x);
+/// See Target Availability 2
+vector<T,N> trunc<T, N:int>(vector<T,N> x);
+/// See Target Availability 3
 matrix<T,N,M> trunc<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Target Availability
 
-`HLSL`
+1. `CPP`, `CUDA`, `GLSL`, `HLSL`
+2. `GLSL`, `HLSL`
+3. `HLSL`
 
 ## Parameters
 
@@ -40422,136 +37245,41 @@ void GroupMemoryBarrierWithWaveSync();
 
 
 --------------------------------------------------------------------------------
-# `WaveMaskBroadcastLaneAt<T>`
-
-## Signature 
-
-```
-T WaveMaskBroadcastLaneAt<T>(
-    uint                 mask,
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveMaskBroadcastLaneAt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskBroadcastLaneAt<T, N:int>(
-    uint                 mask,
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
 # `WaveMaskBroadcastLaneAt<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskBroadcastLaneAt<T>(
+    uint                 mask,
+    T                    value,
+    int                  lane);
+vector<T,N> WaveMaskBroadcastLaneAt<T, N:int>(
+    uint                 mask,
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskBroadcastLaneAt<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveMaskReadLaneAt<T>`
-
-## Signature 
-
-```
-T WaveMaskReadLaneAt<T>(
-    uint                 mask,
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveMaskReadLaneAt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskReadLaneAt<T, N:int>(
-    uint                 mask,
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `value`
 * `lane`
@@ -40562,15 +37290,30 @@ vector<T,N> WaveMaskReadLaneAt<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskReadLaneAt<T>(
+    uint                 mask,
+    T                    value,
+    int                  lane);
+vector<T,N> WaveMaskReadLaneAt<T, N:int>(
+    uint                 mask,
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskReadLaneAt<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -40582,75 +37325,35 @@ matrix<T,N,M> WaveMaskReadLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveMaskShuffle<T>`
-
-## Signature 
-
-```
-T WaveMaskShuffle<T>(
-    uint                 mask,
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveMaskShuffle<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskShuffle<T, N:int>(
-    uint                 mask,
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
 # `WaveMaskShuffle<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskShuffle<T>(
+    uint                 mask,
+    T                    value,
+    int                  lane);
+vector<T,N> WaveMaskShuffle<T, N:int>(
+    uint                 mask,
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskShuffle<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -40686,127 +37389,38 @@ uint WaveMaskPrefixCountBits(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskBitAnd<T>`
-
-## Signature 
-
-```
-T WaveMaskBitAnd<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskBitAnd<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskBitAnd<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
 # `WaveMaskBitAnd<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskBitAnd<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskBitAnd<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskBitAnd<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskBitOr<T>`
-
-## Signature 
-
-```
-T WaveMaskBitOr<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskBitOr<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskBitOr<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -40816,71 +37430,33 @@ vector<T,N> WaveMaskBitOr<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskBitOr<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskBitOr<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskBitOr<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskBitXor<T>`
-
-## Signature 
-
-```
-T WaveMaskBitXor<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskBitXor<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskBitXor<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -40890,71 +37466,33 @@ vector<T,N> WaveMaskBitXor<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskBitXor<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskBitXor<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskBitXor<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskMax<T>`
-
-## Signature 
-
-```
-T WaveMaskMax<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskMax<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskMax<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -40964,71 +37502,33 @@ vector<T,N> WaveMaskMax<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskMax<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskMax<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskMax<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskMin<T>`
-
-## Signature 
-
-```
-T WaveMaskMin<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskMin<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskMin<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41038,71 +37538,33 @@ vector<T,N> WaveMaskMin<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskMin<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskMin<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskMin<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskProduct<T>`
-
-## Signature 
-
-```
-T WaveMaskProduct<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskProduct<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskProduct<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41112,71 +37574,33 @@ vector<T,N> WaveMaskProduct<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskProduct<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskProduct<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskProduct<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskSum<T>`
-
-## Signature 
-
-```
-T WaveMaskSum<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskSum<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskSum<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41186,14 +37610,27 @@ vector<T,N> WaveMaskSum<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskSum<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskSum<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskSum<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -41202,57 +37639,6 @@ matrix<T,N,M> WaveMaskSum<T, N:int, M:int>(
 * `M`
 * `mask`
 * `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskAllEqual<T>`
-
-## Signature 
-
-```
-bool WaveMaskAllEqual<T>(
-    uint                 mask,
-    T                    value);
-```
-
-## Requirements
-
-`CUDA SM 7.0`, `GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `value`
-
---------------------------------------------------------------------------------
-# `WaveMaskAllEqual<T, N:int>`
-
-## Signature 
-
-```
-bool WaveMaskAllEqual<T, N:int>(
-    uint                 mask,
-    vector<T,N>          value);
-```
-
-## Requirements
-
-`CUDA SM 7.0`, `GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `value`
 
 --------------------------------------------------------------------------------
 # `WaveMaskAllEqual<T, N:int, M:int>`
@@ -41260,6 +37646,16 @@ bool WaveMaskAllEqual<T, N:int>(
 ## Signature 
 
 ```
+/// See Requirement 1
+/// See Target Availability 1
+bool WaveMaskAllEqual<T>(
+    uint                 mask,
+    T                    value);
+bool WaveMaskAllEqual<T, N:int>(
+    uint                 mask,
+    vector<T,N>          value);
+/// See Requirement 2
+/// See Target Availability 2
 bool WaveMaskAllEqual<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value);
@@ -41267,11 +37663,13 @@ bool WaveMaskAllEqual<T, N:int, M:int>(
 
 ## Requirements
 
-`CUDA SM 7.0`
+1. `CUDA SM 7.0`, `GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
+2. `CUDA SM 7.0`
 
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -41282,127 +37680,38 @@ bool WaveMaskAllEqual<T, N:int, M:int>(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixProduct<T>`
-
-## Signature 
-
-```
-T WaveMaskPrefixProduct<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixProduct<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskPrefixProduct<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
 # `WaveMaskPrefixProduct<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskPrefixProduct<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskPrefixProduct<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskPrefixProduct<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixSum<T>`
-
-## Signature 
-
-```
-T WaveMaskPrefixSum<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixSum<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskPrefixSum<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41412,71 +37721,33 @@ vector<T,N> WaveMaskPrefixSum<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskPrefixSum<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskPrefixSum<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskPrefixSum<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskReadLaneFirst<T>`
-
-## Signature 
-
-```
-T WaveMaskReadLaneFirst<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskReadLaneFirst<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskReadLaneFirst<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41486,14 +37757,27 @@ vector<T,N> WaveMaskReadLaneFirst<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskReadLaneFirst<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskReadLaneFirst<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskReadLaneFirst<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -41504,7 +37788,7 @@ matrix<T,N,M> WaveMaskReadLaneFirst<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveMaskMatch<T>`
+# `WaveMaskMatch<T, N:int, M:int>`
 
 ## Signature 
 
@@ -41512,54 +37796,9 @@ matrix<T,N,M> WaveMaskReadLaneFirst<T, N:int, M:int>(
 uint WaveMaskMatch<T>(
     uint                 mask,
     T                    value);
-```
-
-## Requirements
-
-`CUDA SM 7.0`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `value`
-
---------------------------------------------------------------------------------
-# `WaveMaskMatch<T, N:int>`
-
-## Signature 
-
-```
 uint WaveMaskMatch<T, N:int>(
     uint                 mask,
     vector<T,N>          value);
-```
-
-## Requirements
-
-`CUDA SM 7.0`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `value`
-
---------------------------------------------------------------------------------
-# `WaveMaskMatch<T, N:int, M:int>`
-
-## Signature 
-
-```
 uint WaveMaskMatch<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value);
@@ -41582,127 +37821,39 @@ uint WaveMaskMatch<T, N:int, M:int>(
 * `value`
 
 --------------------------------------------------------------------------------
-# `WaveMaskPrefixBitAnd<T>`
-
-## Signature 
-
-```
-T WaveMaskPrefixBitAnd<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixBitAnd<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskPrefixBitAnd<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
 # `WaveMaskPrefixBitAnd<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskPrefixBitAnd<T>(
+    uint                 mask,
+    T                    expr);
+/// See Target Availability 2
+vector<T,N> WaveMaskPrefixBitAnd<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 1
 matrix<T,N,M> WaveMaskPrefixBitAnd<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `HLSL`
+2. `CUDA`, `GLSL`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixBitOr<T>`
-
-## Signature 
-
-```
-T WaveMaskPrefixBitOr<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixBitOr<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskPrefixBitOr<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41712,10 +37863,20 @@ vector<T,N> WaveMaskPrefixBitOr<T, N:int>(
 ## Signature 
 
 ```
+T WaveMaskPrefixBitOr<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskPrefixBitOr<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
 matrix<T,N,M> WaveMaskPrefixBitOr<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
+
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
 
 ## Target Availability
 
@@ -41726,57 +37887,6 @@ matrix<T,N,M> WaveMaskPrefixBitOr<T, N:int, M:int>(
 * `T`
 * `N`
 * `M`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixBitXor<T>`
-
-## Signature 
-
-```
-T WaveMaskPrefixBitXor<T>(
-    uint                 mask,
-    T                    expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `mask`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveMaskPrefixBitXor<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMaskPrefixBitXor<T, N:int>(
-    uint                 mask,
-    vector<T,N>          expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `mask`
 * `expr`
 
@@ -41786,14 +37896,27 @@ vector<T,N> WaveMaskPrefixBitXor<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMaskPrefixBitXor<T>(
+    uint                 mask,
+    T                    expr);
+vector<T,N> WaveMaskPrefixBitXor<T, N:int>(
+    uint                 mask,
+    vector<T,N>          expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveMaskPrefixBitXor<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -41804,7 +37927,7 @@ matrix<T,N,M> WaveMaskPrefixBitXor<T, N:int, M:int>(
 * `expr`
 
 --------------------------------------------------------------------------------
-# `QuadReadLaneAt<T>`
+# `QuadReadLaneAt<T, N:int, M:int>`
 
 ## Signature 
 
@@ -41812,46 +37935,9 @@ matrix<T,N,M> WaveMaskPrefixBitXor<T, N:int, M:int>(
 T QuadReadLaneAt<T>(
     T                    sourceValue,
     uint                 quadLaneID);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `sourceValue`
-* `quadLaneID`
-
---------------------------------------------------------------------------------
-# `QuadReadLaneAt<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> QuadReadLaneAt<T, N:int>(
     vector<T,N>          sourceValue,
     uint                 quadLaneID);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `sourceValue`
-* `quadLaneID`
-
---------------------------------------------------------------------------------
-# `QuadReadLaneAt<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> QuadReadLaneAt<T, N:int, M:int>(
     matrix<T,N,M>        sourceValue,
     uint                 quadLaneID);
@@ -41870,48 +37956,13 @@ matrix<T,N,M> QuadReadLaneAt<T, N:int, M:int>(
 * `quadLaneID`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossX<T>`
-
-## Signature 
-
-```
-T QuadReadAcrossX<T>(T localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `localValue`
-
---------------------------------------------------------------------------------
-# `QuadReadAcrossX<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> QuadReadAcrossX<T, N:int>(vector<T,N> localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `localValue`
-
---------------------------------------------------------------------------------
 # `QuadReadAcrossX<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T QuadReadAcrossX<T>(T localValue);
+vector<T,N> QuadReadAcrossX<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossX<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
 
@@ -41927,48 +37978,13 @@ matrix<T,N,M> QuadReadAcrossX<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossY<T>`
-
-## Signature 
-
-```
-T QuadReadAcrossY<T>(T localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `localValue`
-
---------------------------------------------------------------------------------
-# `QuadReadAcrossY<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> QuadReadAcrossY<T, N:int>(vector<T,N> localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `localValue`
-
---------------------------------------------------------------------------------
 # `QuadReadAcrossY<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T QuadReadAcrossY<T>(T localValue);
+vector<T,N> QuadReadAcrossY<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossY<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
 
@@ -41984,48 +38000,13 @@ matrix<T,N,M> QuadReadAcrossY<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `QuadReadAcrossDiagonal<T>`
-
-## Signature 
-
-```
-T QuadReadAcrossDiagonal<T>(T localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `localValue`
-
---------------------------------------------------------------------------------
-# `QuadReadAcrossDiagonal<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> QuadReadAcrossDiagonal<T, N:int>(vector<T,N> localValue);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `localValue`
-
---------------------------------------------------------------------------------
 # `QuadReadAcrossDiagonal<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+T QuadReadAcrossDiagonal<T>(T localValue);
+vector<T,N> QuadReadAcrossDiagonal<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossDiagonal<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
 
@@ -42041,113 +38022,32 @@ matrix<T,N,M> QuadReadAcrossDiagonal<T, N:int, M:int>(matrix<T,N,M> localValue);
 * `localValue`
 
 --------------------------------------------------------------------------------
-# `WaveActiveBitAnd<T>`
-
-## Signature 
-
-```
-T WaveActiveBitAnd<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveBitAnd<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveBitAnd<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `expr`
-
---------------------------------------------------------------------------------
 # `WaveActiveBitAnd<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveBitAnd<T>(T expr);
+vector<T,N> WaveActiveBitAnd<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveBitAnd<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveBitOr<T>`
-
-## Signature 
-
-```
-T WaveActiveBitOr<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveBitOr<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveBitOr<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42156,63 +38056,27 @@ vector<T,N> WaveActiveBitOr<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveBitOr<T>(T expr);
+vector<T,N> WaveActiveBitOr<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveBitOr<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveBitXor<T>`
-
-## Signature 
-
-```
-T WaveActiveBitXor<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveBitXor<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveBitXor<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42221,63 +38085,27 @@ vector<T,N> WaveActiveBitXor<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveBitXor<T>(T expr);
+vector<T,N> WaveActiveBitXor<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveBitXor<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveMax<T>`
-
-## Signature 
-
-```
-T WaveActiveMax<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveMax<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveMax<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42286,63 +38114,27 @@ vector<T,N> WaveActiveMax<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveMax<T>(T expr);
+vector<T,N> WaveActiveMax<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveMax<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveMin<T>`
-
-## Signature 
-
-```
-T WaveActiveMin<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveMin<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveMin<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42351,63 +38143,27 @@ vector<T,N> WaveActiveMin<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveMin<T>(T expr);
+vector<T,N> WaveActiveMin<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveMin<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveProduct<T>`
-
-## Signature 
-
-```
-T WaveActiveProduct<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveProduct<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveProduct<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42416,63 +38172,27 @@ vector<T,N> WaveActiveProduct<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveProduct<T>(T expr);
+vector<T,N> WaveActiveProduct<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveSum<T>`
-
-## Signature 
-
-```
-T WaveActiveSum<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveActiveSum<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveActiveSum<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42481,12 +38201,21 @@ vector<T,N> WaveActiveSum<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveActiveSum<T>(T expr);
+vector<T,N> WaveActiveSum<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveActiveSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -42496,62 +38225,26 @@ matrix<T,N,M> WaveActiveSum<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveActiveAllEqual<T>`
-
-## Signature 
-
-```
-bool WaveActiveAllEqual<T>(T value);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-
---------------------------------------------------------------------------------
-# `WaveActiveAllEqual<T, N:int>`
-
-## Signature 
-
-```
-bool WaveActiveAllEqual<T, N:int>(vector<T,N> value);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
 # `WaveActiveAllEqual<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+bool WaveActiveAllEqual<T>(T value);
+bool WaveActiveAllEqual<T, N:int>(vector<T,N> value);
+/// See Target Availability 2
 bool WaveActiveAllEqual<T, N:int, M:int>(matrix<T,N,M> value);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -42712,113 +38405,32 @@ uint _WaveCountBits(vector<uint,4> value);
 * `value`
 
 --------------------------------------------------------------------------------
-# `WavePrefixProduct<T>`
-
-## Signature 
-
-```
-T WavePrefixProduct<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WavePrefixProduct<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WavePrefixProduct<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `expr`
-
---------------------------------------------------------------------------------
 # `WavePrefixProduct<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WavePrefixProduct<T>(T expr);
+vector<T,N> WavePrefixProduct<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WavePrefixProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WavePrefixSum<T>`
-
-## Signature 
-
-```
-T WavePrefixSum<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WavePrefixSum<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WavePrefixSum<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42827,63 +38439,27 @@ vector<T,N> WavePrefixSum<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WavePrefixSum<T>(T expr);
+vector<T,N> WavePrefixSum<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WavePrefixSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveReadLaneFirst<T>`
-
-## Signature 
-
-```
-T WaveReadLaneFirst<T>(T expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-
---------------------------------------------------------------------------------
-# `WaveReadLaneFirst<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveReadLaneFirst<T, N:int>(vector<T,N> expr);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 
 --------------------------------------------------------------------------------
@@ -42892,12 +38468,21 @@ vector<T,N> WaveReadLaneFirst<T, N:int>(vector<T,N> expr);
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveReadLaneFirst<T>(T expr);
+vector<T,N> WaveReadLaneFirst<T, N:int>(vector<T,N> expr);
+/// See Target Availability 2
 matrix<T,N,M> WaveReadLaneFirst<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -42907,127 +38492,38 @@ matrix<T,N,M> WaveReadLaneFirst<T, N:int, M:int>(matrix<T,N,M> expr);
 * `expr`
 
 --------------------------------------------------------------------------------
-# `WaveBroadcastLaneAt<T>`
-
-## Signature 
-
-```
-T WaveBroadcastLaneAt<T>(
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveBroadcastLaneAt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveBroadcastLaneAt<T, N:int>(
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
 # `WaveBroadcastLaneAt<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveBroadcastLaneAt<T>(
+    T                    value,
+    int                  lane);
+vector<T,N> WaveBroadcastLaneAt<T, N:int>(
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveBroadcastLaneAt<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveReadLaneAt<T>`
-
-## Signature 
-
-```
-T WaveReadLaneAt<T>(
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveReadLaneAt<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveReadLaneAt<T, N:int>(
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `value`
 * `lane`
 
@@ -43037,14 +38533,27 @@ vector<T,N> WaveReadLaneAt<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveReadLaneAt<T>(
+    T                    value,
+    int                  lane);
+vector<T,N> WaveReadLaneAt<T, N:int>(
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveReadLaneAt<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -43055,70 +38564,32 @@ matrix<T,N,M> WaveReadLaneAt<T, N:int, M:int>(
 * `lane`
 
 --------------------------------------------------------------------------------
-# `WaveShuffle<T>`
-
-## Signature 
-
-```
-T WaveShuffle<T>(
-    T                    value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
-# `WaveShuffle<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveShuffle<T, N:int>(
-    vector<T,N>          value,
-    int                  lane);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-* `lane`
-
---------------------------------------------------------------------------------
 # `WaveShuffle<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveShuffle<T>(
+    T                    value,
+    int                  lane);
+vector<T,N> WaveShuffle<T, N:int>(
+    vector<T,N>          value,
+    int                  lane);
+/// See Target Availability 2
 matrix<T,N,M> WaveShuffle<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`HLSL`
+1. `GLSL`, `HLSL`
+2. `HLSL`
 
 ## Parameters
 
@@ -43186,48 +38657,13 @@ vector<uint,4> WaveGetActiveMulti();
 
 
 --------------------------------------------------------------------------------
-# `WaveMatch<T>`
-
-## Signature 
-
-```
-vector<uint,4> WaveMatch<T>(T value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-
---------------------------------------------------------------------------------
-# `WaveMatch<T, N:int>`
-
-## Signature 
-
-```
-vector<uint,4> WaveMatch<T, N:int>(vector<T,N> value);
-```
-
-## Target Availability
-
-`HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-
---------------------------------------------------------------------------------
 # `WaveMatch<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+vector<uint,4> WaveMatch<T>(T value);
+vector<uint,4> WaveMatch<T, N:int>(vector<T,N> value);
 vector<uint,4> WaveMatch<T, N:int, M:int>(matrix<T,N,M> value);
 ```
 
@@ -43263,127 +38699,38 @@ uint WaveMultiPrefixCountBits(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixBitAnd<T>`
-
-## Signature 
-
-```
-T WaveMultiPrefixBitAnd<T>(
-    T                    expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixBitAnd<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMultiPrefixBitAnd<T, N:int>(
-    vector<T,N>          expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
 # `WaveMultiPrefixBitAnd<T, N:int, M:int>`
 
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMultiPrefixBitAnd<T>(
+    T                    expr,
+    vector<uint,4>       mask);
+vector<T,N> WaveMultiPrefixBitAnd<T, N:int>(
+    vector<T,N>          expr,
+    vector<uint,4>       mask);
+/// See Target Availability 2
 matrix<T,N,M> WaveMultiPrefixBitAnd<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
 * `T`
 * `N`
 * `M`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixBitOr<T>`
-
-## Signature 
-
-```
-T WaveMultiPrefixBitOr<T>(
-    T                    expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixBitOr<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMultiPrefixBitOr<T, N:int>(
-    vector<T,N>          expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 * `mask`
 
@@ -43393,10 +38740,20 @@ vector<T,N> WaveMultiPrefixBitOr<T, N:int>(
 ## Signature 
 
 ```
+T WaveMultiPrefixBitOr<T>(
+    T                    expr,
+    vector<uint,4>       mask);
+vector<T,N> WaveMultiPrefixBitOr<T, N:int>(
+    vector<T,N>          expr,
+    vector<uint,4>       mask);
 matrix<T,N,M> WaveMultiPrefixBitOr<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
+
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
 
 ## Target Availability
 
@@ -43407,57 +38764,6 @@ matrix<T,N,M> WaveMultiPrefixBitOr<T, N:int, M:int>(
 * `T`
 * `N`
 * `M`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixBitXor<T>`
-
-## Signature 
-
-```
-T WaveMultiPrefixBitXor<T>(
-    T                    expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `expr`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixBitXor<T, N:int>`
-
-## Signature 
-
-```
-vector<T,N> WaveMultiPrefixBitXor<T, N:int>(
-    vector<T,N>          expr,
-    vector<uint,4>       mask);
-```
-
-## Requirements
-
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
 * `expr`
 * `mask`
 
@@ -43467,14 +38773,27 @@ vector<T,N> WaveMultiPrefixBitXor<T, N:int>(
 ## Signature 
 
 ```
+/// See Target Availability 1
+T WaveMultiPrefixBitXor<T>(
+    T                    expr,
+    vector<uint,4>       mask);
+vector<T,N> WaveMultiPrefixBitXor<T, N:int>(
+    vector<T,N>          expr,
+    vector<uint,4>       mask);
+/// See Target Availability 2
 matrix<T,N,M> WaveMultiPrefixBitXor<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
 
+## Requirements
+
+`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
+
 ## Target Availability
 
-`CUDA`, `HLSL`
+1. `CUDA`, `GLSL`, `HLSL`
+2. `CUDA`, `HLSL`
 
 ## Parameters
 
@@ -43485,7 +38804,7 @@ matrix<T,N,M> WaveMultiPrefixBitXor<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixProduct<T>`
+# `WaveMultiPrefixProduct<T, N:int, M:int>`
 
 ## Signature 
 
@@ -43493,46 +38812,9 @@ matrix<T,N,M> WaveMultiPrefixBitXor<T, N:int, M:int>(
 T WaveMultiPrefixProduct<T>(
     T                    value,
     vector<uint,4>       mask);
-```
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixProduct<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> WaveMultiPrefixProduct<T, N:int>(
     vector<T,N>          value,
     vector<uint,4>       mask);
-```
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixProduct<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> WaveMultiPrefixProduct<T, N:int, M:int>(
     matrix<T,N,M>        value,
     vector<uint,4>       mask);
@@ -43551,7 +38833,7 @@ matrix<T,N,M> WaveMultiPrefixProduct<T, N:int, M:int>(
 * `mask`
 
 --------------------------------------------------------------------------------
-# `WaveMultiPrefixSum<T>`
+# `WaveMultiPrefixSum<T, N:int, M:int>`
 
 ## Signature 
 
@@ -43559,46 +38841,9 @@ matrix<T,N,M> WaveMultiPrefixProduct<T, N:int, M:int>(
 T WaveMultiPrefixSum<T>(
     T                    value,
     vector<uint,4>       mask);
-```
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `value`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixSum<T, N:int>`
-
-## Signature 
-
-```
 vector<T,N> WaveMultiPrefixSum<T, N:int>(
     vector<T,N>          value,
     vector<uint,4>       mask);
-```
-
-## Target Availability
-
-`CUDA`, `HLSL`
-
-## Parameters
-
-* `T`
-* `N`
-* `value`
-* `mask`
-
---------------------------------------------------------------------------------
-# `WaveMultiPrefixSum<T, N:int, M:int>`
-
-## Signature 
-
-```
 matrix<T,N,M> WaveMultiPrefixSum<T, N:int, M:int>(
     matrix<T,N,M>        value,
     vector<uint,4>       mask);
@@ -43969,15 +39214,6 @@ void CallShader<Payload>(
 * `payload`
 
 --------------------------------------------------------------------------------
-# `CallShader<Payload>`
-
-## Signature 
-
-```
-```
-
-
---------------------------------------------------------------------------------
 # `TraceRay<payload_t>`
 
 ## Signature 
@@ -44011,15 +39247,6 @@ void TraceRay<payload_t>(
 * `Payload`
 
 --------------------------------------------------------------------------------
-# `TraceRay<payload_t>`
-
-## Signature 
-
-```
-```
-
-
---------------------------------------------------------------------------------
 # `ReportHit<A>`
 
 ## Signature 
@@ -44041,15 +39268,6 @@ bool ReportHit<A>(
 * `tHit`
 * `hitKind`
 * `attributes`
-
---------------------------------------------------------------------------------
-# `ReportHit<A>`
-
-## Signature 
-
-```
-```
-
 
 --------------------------------------------------------------------------------
 # `IgnoreHit`
@@ -44530,87 +39748,6 @@ void FeedbackTexture2D<T>.GetDimensions(
 * `numberOfLevels`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedback<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
-    Texture2D            tex,
-    SamplerState         samp,
-    vector<float,2>      location,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `tex`
-* `samp`
-* `location`
-* `clamp`
-
---------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
-    Texture2D            tex,
-    SamplerState         samp,
-    vector<float,2>      location,
-    float                bias,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `tex`
-* `samp`
-* `location`
-* `bias`
-* `clamp`
-
---------------------------------------------------------------------------------
-# `FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
-    Texture2D            tex,
-    SamplerState         samp,
-    vector<float,2>      location,
-    vector<float,2>      ddx,
-    vector<float,2>      ddy,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `tex`
-* `samp`
-* `location`
-* `ddx`
-* `ddy`
-* `clamp`
-
---------------------------------------------------------------------------------
 # `FeedbackTexture2D<T>.WriteSamplerFeedbackLevel<S>`
 
 ## Signature 
@@ -44644,6 +39781,11 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackLevel<S>(
 void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
     Texture2D            tex,
     SamplerState         samp,
+    vector<float,2>      location,
+    float                clamp);
+void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
+    Texture2D            tex,
+    SamplerState         samp,
     vector<float,2>      location);
 ```
 
@@ -44657,6 +39799,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
 * `tex`
 * `samp`
 * `location`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>`
@@ -44664,6 +39807,12 @@ void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
 ## Signature 
 
 ```
+void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
+    Texture2D            tex,
+    SamplerState         samp,
+    vector<float,2>      location,
+    float                bias,
+    float                clamp);
 void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
     Texture2D            tex,
     SamplerState         samp,
@@ -44682,6 +39831,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
 * `samp`
 * `location`
 * `bias`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>`
@@ -44689,6 +39839,13 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
 ## Signature 
 
 ```
+void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
+    Texture2D            tex,
+    SamplerState         samp,
+    vector<float,2>      location,
+    vector<float,2>      ddx,
+    vector<float,2>      ddy,
+    float                clamp);
 void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
     Texture2D            tex,
     SamplerState         samp,
@@ -44709,6 +39866,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
 * `location`
 * `ddx`
 * `ddy`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `struct FeedbackTexture2DArray<T>`
@@ -44761,87 +39919,6 @@ void FeedbackTexture2DArray<T>.GetDimensions(
 * `numberOfLevels`
 
 --------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
-    Texture2DArray       texArray,
-    SamplerState         samp,
-    vector<float,3>      location,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `texArray`
-* `samp`
-* `location`
-* `clamp`
-
---------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
-    Texture2DArray       texArray,
-    SamplerState         samp,
-    vector<float,3>      location,
-    float                bias,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `texArray`
-* `samp`
-* `location`
-* `bias`
-* `clamp`
-
---------------------------------------------------------------------------------
-# `FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>`
-
-## Signature 
-
-```
-void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
-    Texture2DArray       texArray,
-    SamplerState         samp,
-    vector<float,3>      location,
-    vector<float,3>      ddx,
-    vector<float,3>      ddy,
-    float                clamp);
-```
-
-## Target Availability
-
-`CPP`, `HLSL`
-
-## Parameters
-
-* `S`
-* `texArray`
-* `samp`
-* `location`
-* `ddx`
-* `ddy`
-* `clamp`
-
---------------------------------------------------------------------------------
 # `FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel<S>`
 
 ## Signature 
@@ -44875,6 +39952,11 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel<S>(
 void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
     Texture2DArray       texArray,
     SamplerState         samp,
+    vector<float,3>      location,
+    float                clamp);
+void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
+    Texture2DArray       texArray,
+    SamplerState         samp,
     vector<float,3>      location);
 ```
 
@@ -44888,6 +39970,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
 * `texArray`
 * `samp`
 * `location`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>`
@@ -44895,6 +39978,12 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
 ## Signature 
 
 ```
+void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
+    Texture2DArray       texArray,
+    SamplerState         samp,
+    vector<float,3>      location,
+    float                bias,
+    float                clamp);
 void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
     Texture2DArray       texArray,
     SamplerState         samp,
@@ -44913,6 +40002,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
 * `samp`
 * `location`
 * `bias`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>`
@@ -44920,6 +40010,13 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
 ## Signature 
 
 ```
+void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
+    Texture2DArray       texArray,
+    SamplerState         samp,
+    vector<float,3>      location,
+    vector<float,3>      ddx,
+    vector<float,3>      ddy,
+    float                clamp);
 void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
     Texture2DArray       texArray,
     SamplerState         samp,
@@ -44940,6 +40037,7 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
 * `location`
 * `ddx`
 * `ddy`
+* `clamp`
 
 --------------------------------------------------------------------------------
 # `GeometryIndex`

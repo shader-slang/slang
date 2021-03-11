@@ -504,7 +504,56 @@ void DocMarkDownWriter::_maybeAppendSet(const UnownedStringSlice& title, const S
     }
 }
 
-void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
+static Decl* _getSameNameDecl(Decl* decl)
+{
+    auto parentDecl = decl->parentDecl;
+
+    // Sanity check: there should always be a parent declaration.
+    //
+    SLANG_ASSERT(parentDecl);
+    if (!parentDecl) return nullptr;
+
+    // If the declaration is the "inner" declaration of a generic,
+    // then we actually want to look one level up, because the
+    // peers/siblings of the declaration will belong to the same
+    // parent as the generic, not to the generic.
+    //
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+    {
+        // Note: we need to check here to be sure `newDecl`
+        // is the "inner" declaration and not one of the
+        // generic parameters, or else we will end up
+        // checking them at the wrong scope.
+        //
+        if (decl == genericParentDecl->inner)
+        {
+            decl = parentDecl;
+        }
+    }
+
+    return decl;
+}
+
+static bool _isFirstOverridden(Decl* decl)
+{
+    decl = _getSameNameDecl(decl);
+
+    ContainerDecl* parentDecl = decl->parentDecl;
+
+    // Make sure we have the member dictionary.
+    buildMemberDictionary(parentDecl);
+
+    Name* declName = decl->getName();
+    if (declName)
+    {
+        Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(declName);
+        return (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
+    }
+
+    return false;
+}
+
+void DocMarkDownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
 {
     auto& out = m_builder;
 
@@ -519,22 +568,34 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
         // We just want the name
         UnownedStringSlice name = printer.getPartSlice(Part::Type::DeclPath);
 
+        
         // Extract the name
         out << toSlice("# `") << name << toSlice("`\n\n");
-
     }
 
     writeDescription(entry);
 
     List<CallableDecl*> sigs;
     {
-        for (Decl* curDecl = callableDecl; curDecl; curDecl = curDecl->nextInContainerWithSameName)
+        Decl* sameNameDecl = _getSameNameDecl(callableDecl);
+
+        for (Decl* curDecl = sameNameDecl; curDecl; curDecl = curDecl->nextInContainerWithSameName)
         {
-            CallableDecl* sig = as<CallableDecl>(curDecl);
+            CallableDecl* sig = nullptr;
+            if (GenericDecl* genericDecl = as<GenericDecl>(curDecl))
+            {
+                sig = as<CallableDecl>(genericDecl->inner);
+            }
+            else
+            {
+                sig = as<CallableDecl>(curDecl);
+            }
+            
             if (!sig)
             {
                 continue;
             }
+
             // Want to add only the primary sig
             if (sig->primaryDecl == nullptr || sig->primaryDecl == sig)
             {
@@ -987,24 +1048,9 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
 
     if (CallableDecl* callableDecl = as<CallableDecl>(decl))
     {
-        ContainerDecl* parentDecl = decl->parentDecl;
-
-        // Make sure we have the member dictionary.
-        buildMemberDictionary(decl->parentDecl);
-
-        // We only write out for the primary/first
-        bool isFirst = false;
-        
-        Name* declName = callableDecl->getName();
-        if (declName)
+        if (_isFirstOverridden(callableDecl))
         {
-            Decl** firstDeclPtr = parentDecl->memberDictionary.TryGetValue(declName);
-            isFirst = (firstDeclPtr && *firstDeclPtr == decl) || (firstDeclPtr == nullptr);
-        }
-
-        if (isFirst)
-        {
-            writeOverridableCallable(entry, callableDecl);
+             writeCallableOverridable(entry, callableDecl);
         }
     }
     else if (EnumDecl* enumDecl = as<EnumDecl>(decl))
