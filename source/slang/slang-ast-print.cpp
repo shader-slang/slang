@@ -55,13 +55,19 @@ void ASTPrinter::_addDeclName(Decl* decl)
     appendDeclName(decl, m_builder);
 }
 
+void ASTPrinter::addOverridableDeclPath(const DeclRef<Decl>& declRef)
+{
+    ScopePart scopePart(this, Part::Type::DeclPath);
+    _addDeclPathRec(declRef, 0);
+}
+
 void ASTPrinter::addDeclPath(const DeclRef<Decl>& declRef)
 {
     ScopePart scopePart(this, Part::Type::DeclPath);
-    _addDeclPathRec(declRef);
+    _addDeclPathRec(declRef, 1);
 }
 
-void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
+void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 {
     auto& sb = m_builder;
 
@@ -79,12 +85,12 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
     // Depending on what the parent is, we may want to format things specially
     if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
     {
-        _addDeclPathRec(aggTypeDeclRef);
+        _addDeclPathRec(aggTypeDeclRef, depth + 1);
         sb << toSlice(".");
     }
     else if (auto namespaceDeclRef = parentDeclRef.as<NamespaceDecl>())
     {
-        _addDeclPathRec(namespaceDeclRef);
+        _addDeclPathRec(namespaceDeclRef, depth + 1);
         // Hmm, it could be argued that we follow the . as seen in AggType as is followed in some other languages
         // like Java.
         // That it is useful to have a distinction between something that is a member/method and something that is
@@ -101,6 +107,26 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
         Type* type = extensionDecl->targetType.type;
         addType(type);
         sb << toSlice(".");
+    }
+    else if (auto moduleDecl = as<ModuleDecl>(parentDeclRef.getDecl()))
+    {
+        Name* moduleName = moduleDecl->getName();
+        if ((m_optionFlags & OptionFlag::ModuleName) && moduleName)
+        {
+            // Use to say in modules scope
+            sb << moduleName->text << toSlice("::");
+        }
+    }
+
+    // If this decl is the module, we only output it's name if that feature is enabled
+    if (ModuleDecl* moduleDecl = as<ModuleDecl>(declRef.getDecl()))
+    {
+        Name* moduleName = moduleDecl->getName();
+        if ((m_optionFlags & OptionFlag::ModuleName) && moduleName)
+        {
+            sb << moduleName->text; 
+        }
+        return;
     }
 
     _addDeclName(declRef.getDecl());
@@ -147,9 +173,9 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef)
             }
             sb << ">";
         }
-        else
+        else if (depth > 0)
         {
-            // Write out the generic parameters
+            // Write out the generic parameters (only if the depth allows it)
             addGenericParams(parentGenericDeclRef);
         }
     }

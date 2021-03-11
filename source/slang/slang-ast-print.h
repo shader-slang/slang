@@ -15,7 +15,8 @@ public:
     {
         enum Enum : OptionFlags
         {
-            ParamNames = 0x1,               ///< If set will output parameter names
+            ParamNames = 0x01,                  ///< If set will output parameter names
+            ModuleName = 0x02,                  ///< Writes out module names
         };
     };
 
@@ -112,6 +113,9 @@ public:
         /// Add the path to the declaration including the declaration name
     void addDeclPath(const DeclRef<Decl>& declRef);
 
+        /// Add the path such that it encapsulates all overridable decls (ie is without terminal generic parameters)
+    void addOverridableDeclPath(const DeclRef<Decl>& declRef);
+
         /// Add just the parameters from a declaration.
         /// Will output the generic parameters (if it's a generic) in <> before the parameters ()
     void addDeclParams(const DeclRef<Decl>& declRef);
@@ -153,7 +157,7 @@ public:
 
 protected:
 
-    void _addDeclPathRec(const DeclRef<Decl>& declRef);
+    void _addDeclPathRec(const DeclRef<Decl>& declRef, Index depth);
     void _addDeclName(Decl* decl);
     
     OptionFlags m_optionFlags;              ///< Flags controlling output

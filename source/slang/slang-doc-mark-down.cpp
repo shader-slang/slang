@@ -560,30 +560,11 @@ void DocMarkDownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
     writePreamble(entry);
 
     {
-        ASTPrinter printer(m_astBuilder, ASTPrinter::OptionFlag::ParamNames);
-        StringBuilder& builder = printer.getStringBuilder();
-
-        GenericDecl* genericDecl = as<GenericDecl>(callableDecl->parentDecl);
-        if (genericDecl)
-        {
-            if (!as<ModuleDecl>(genericDecl->parentDecl))
-            {
-                // If this is generic *don't* put name with generic parameters, as they may vary by
-                // override. Just put the path followed by the name of this
-                printer.addDeclPath(DeclRef<Decl>(genericDecl->parentDecl, nullptr));
-
-                // Place the name (without generic params) at the end
-                builder << toSlice(".");
-            }
-            ASTPrinter::appendDeclName(callableDecl, builder);
-        }
-        else
-        {
-            printer.addDeclPath(DeclRef<Decl>(callableDecl, nullptr));
-        }
-
+        // Output the overridable path (ie without terminal generic parameters)
+        ASTPrinter printer(m_astBuilder);
+        printer.addOverridableDeclPath(DeclRef<Decl>(callableDecl, nullptr));
         // Extract the name
-        out << toSlice("# `") << builder << toSlice("`\n\n");
+        out << toSlice("# `") << printer.getStringBuilder() << toSlice("`\n\n");
     }
 
     writeDescription(entry);
