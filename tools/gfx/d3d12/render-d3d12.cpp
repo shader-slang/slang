@@ -81,7 +81,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         IResource::Usage initialUsage,
@@ -2402,7 +2402,7 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
     }
 }
 
-Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::Data* initData, ITextureResource** outResource)
+Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
     // Description of uploading on Dx12
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
@@ -2550,6 +2550,8 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
 
             for (int j = 0; j < numMipMaps; ++j)
             {
+                auto srcSubresource = initData[j];
+
                 const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
                 const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
@@ -2557,25 +2559,34 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
 
                 assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
 
-                const ptrdiff_t dstMipRowPitch = ptrdiff_t(layouts[j].Footprint.RowPitch);
-                const ptrdiff_t srcMipRowPitch = ptrdiff_t(initData->mipRowStrides[j]);
+                auto mipRowSize = mipRowSizeInBytes[j];
 
-                assert(dstMipRowPitch >= srcMipRowPitch);
+                const ptrdiff_t dstMipRowPitch = ptrdiff_t(footprint.RowPitch);
+                const ptrdiff_t srcMipRowPitch = ptrdiff_t(srcSubresource.strideY);
 
-                const uint8_t* srcRow = (const uint8_t*)initData->subResources[subResourceIndex];
-                uint8_t* dstRow = p + layouts[j].Offset;
+                const ptrdiff_t dstMipLayerPitch = ptrdiff_t(footprint.RowPitch*footprint.Height);
+                const ptrdiff_t srcMipLayerPitch = ptrdiff_t(srcSubresource.strideZ);
 
-                // Copy the depth each mip
+                // Our outer loop will copy the depth layers one at a time.
+                //
+                const uint8_t* srcLayer = (const uint8_t*) srcSubresource.data;
+                uint8_t* dstLayer = p + layouts[j].Offset;
                 for (int l = 0; l < mipSize.depth; l++)
                 {
-                    // Copy rows
+                    // Our inner loop will copy the rows one at a time.
+                    //
+                    const uint8_t* srcRow = srcLayer;
+                    uint8_t* dstRow = dstLayer;
                     for (int k = 0; k < mipSize.height; ++k)
                     {
-                        ::memcpy(dstRow, srcRow, srcMipRowPitch);
+                        ::memcpy(dstRow, srcRow, mipRowSize);
 
                         srcRow += srcMipRowPitch;
                         dstRow += dstMipRowPitch;
                     }
+
+                    srcLayer += srcMipLayerPitch;
+                    dstLayer += dstMipLayerPitch;
                 }
 
                 //assert(srcRow == (const uint8_t*)(srcMip.getBuffer() + srcMip.getCount()));

@@ -519,14 +519,9 @@ public:
             {
             case IResource::Type::Texture1D:
             case IResource::Type::Texture2D:
-                {
-                    return numMipMaps * arrSize;
-                }
             case IResource::Type::Texture3D:
                 {
-                    // can't have arrays of 3d textures
-                    assert(this->arraySize <= 1);
-                    return numMipMaps * this->size.depth;
+                    return numMipMaps * arrSize;
                 }
             case IResource::Type::TextureCube:
                 {
@@ -616,16 +611,49 @@ public:
         Usage initialUsage;
     };
 
-        /// The ordering of the subResources is
-        /// forall (effectiveArraySize)
-        ///     forall (mip levels)
-        ///         forall (depth levels)
-    struct Data
+        /// Data for a single subresource of a texture.
+        ///
+        /// Each subresource is a tensor with `1 <= rank <= 3`,
+        /// where the rank is deterined by the base shape of the
+        /// texture (Buffer, 1D, 2D, 3D, or Cube). For the common
+        /// case of a 2D texture, `rank == 2` and each subresource
+        /// is a 2D image.
+        ///
+        /// Subresource tensors must be stored in a row-major layout,
+        /// so that the X axis strides over texels, the Y axis strides
+        /// over 1D rows of texels, and the Z axis strides over 2D
+        /// "layers" of texels.
+        ///
+        /// For a texture with multiple mip levels or array elements,
+        /// each mip level and array element is stores as a distinct
+        /// subresource. When indexing into an array of subresources,
+        /// the index of a subresoruce for mip level `m` and array
+        /// index `a` is `m + a*mipLevelCount`.
+        ///
+    struct SubresourceData
     {
-        ptrdiff_t* mipRowStrides;           ///< The row stride for a mip map
-        int numMips;                        ///< The number of mip maps
-        const void*const* subResources;     ///< Pointers to each full mip subResource
-        int numSubResources;                ///< The total amount of subResources. Typically = numMips * depth * arraySize
+            /// Pointer to texel data for the subresource tensor.
+        void const* data;
+
+            /// Stride in bytes between rows of the subresource tensor.
+            ///
+            /// This is the number of bytes to add to a pointer to a texel
+            /// at (X,Y,Z) to get to a texel at (X,Y+1,Z).
+            ///
+            /// Devices may not support all possible values for `strideY`.
+            /// In particular, they may only support strictly positive strides.
+            ///
+        int64_t     strideY;
+
+            /// Stride in bytes between layers of the subresource tensor.
+            ///
+            /// This is the number of bytes to add to a pointer to a texel
+            /// at (X,Y,Z) to get to a texel at (X,Y,Z+1).
+            ///
+            /// Devices may not support all possible values for `strideZ`.
+            /// In particular, they may only support strictly positive strides.
+            ///
+        int64_t     strideZ;
     };
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
@@ -1512,18 +1540,31 @@ public:
         getSlangSession(result.writeRef());
         return result;
     }
-        /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
+        /// Create a texture resource.
+        ///
+        /// If `initData` is non-null, then it must point to an array of
+        /// `ITextureResource::SubresourceData` with one element for each
+        /// subresource of the texture being created.
+        ///
+        /// The number of subresources in a texture is:
+        ///
+        ///     effectiveElementCount * mipLevelCount
+        ///
+        /// where the effective element count is computed as:
+        ///
+        ///     effectiveElementCount = (isArray ? arrayElementCount : 1) * (isCube ? 6 : 1);
+        ///
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData,
+        const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     inline SLANG_NO_THROW ComPtr<ITextureResource> createTextureResource(
         IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
-        const ITextureResource::Data* initData = nullptr)
+        const ITextureResource::SubresourceData* initData = nullptr)
     {
         ComPtr<ITextureResource> resource;
         SLANG_RETURN_NULL_ON_FAIL(createTextureResource(initialUsage, desc, initData, resource.writeRef()));
