@@ -91,74 +91,123 @@ static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out
     StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
 }
 
-void DocMarkDownWriter::_appendAsBullets(const List<NameAndMarkup>& values)
+void DocMarkDownWriter::_appendAsBullets(const List<NameAndText>& values, char wrapChar)
 {
     auto& out = m_builder;
     for (const auto& value : values)
     {
         out << "* ";
 
-        Name* name = value.name;
-        if (name)
+        const String& name = value.name;
+        if (name.getLength())
         {
-            out << toSlice("_") << name->text << toSlice("_ ");
+            if (wrapChar)
+            {
+                out.appendChar(wrapChar);
+                out << name;
+                out.appendChar(wrapChar);   
+            }
+            else
+            {
+                out << name;
+            }
         }
 
-        if (value.markup.getLength())
+        if (value.text.getLength())
         {
+            out.appendChar(' ');
+
             // Hmm, we'll want to make something multiline into a single line
-            _appendAsSingleLine(value.markup.getUnownedSlice(), out);
+            _appendAsSingleLine(value.text.getUnownedSlice(), out);
         }
 
         out << "\n";
     }
 }
 
-
-void DocMarkDownWriter::_appendAsBullets(const List<Decl*>& in)
+void DocMarkDownWriter::_appendAsBullets(const List<String>& values, char wrapChar)
 {
     auto& out = m_builder;
-    for (auto decl : in)
+    for (const auto& value : values)
     {
-        DocMarkup::Entry* paramEntry = m_markup->getEntry(decl);
+        out << "* ";
 
-        out << toSlice("* _");
-        ASTPrinter::appendDeclName(decl, out);
-        out << toSlice("_ ");
-
-        if (paramEntry)
+        if (value.getLength())
         {
-            // Hmm, we'll want to make something multiline into a single line
-            _appendAsSingleLine(paramEntry->m_markup.getUnownedSlice(), out);
-        }
+            if (wrapChar)
+            {
+                out.appendChar(wrapChar);
+                out << value;
+                out.appendChar(wrapChar);
 
+            }
+            else
+            {
+                out << value;
+            }
+        }
         out << "\n";
     }
-
-    out << toSlice("\n");
 }
 
-template <typename T>
-void DocMarkDownWriter::_appendAsBullets(FilteredMemberList<T>& list)
+String DocMarkDownWriter::_getName(Decl* decl)
 {
-    List<Decl*> decls;
-    _toList(list, decls);
-    _appendAsBullets(decls);
+    StringBuilder buf;
+    ASTPrinter::appendDeclName(decl, buf);
+    return buf.ProduceString();
 }
 
-void DocMarkDownWriter::_appendCommaList(const List<InheritanceDecl*>& inheritanceDecls)
+String DocMarkDownWriter::_getName(InheritanceDecl* decl)
 {
-    for (Index i = 0; i < inheritanceDecls.getCount(); ++i)
+    StringBuilder buf;
+    buf.Clear();
+    buf << decl->base;
+    return buf.ProduceString();
+}
+
+DocMarkDownWriter::NameAndText DocMarkDownWriter::_getNameAndText(DocMarkup::Entry* entry, Decl* decl)
+{
+    NameAndText nameAndText;
+
+    nameAndText.name = _getName(decl);
+ 
+    // We could extract different text here, but for now just do all markup
+    if (entry)
     {
-        if (i > 0)
-        {
-            m_builder << toSlice(", ");
-        }
-        m_builder << inheritanceDecls[i]->base;
+        // For now we'll just use all markup, but really we need something more sophisticated here
+        nameAndText.text = entry->m_markup;
     }
+
+    return nameAndText;
 }
 
-void DocMarkDownWriter::_appendCommaList(const List<String>& strings)
+DocMarkDownWriter::NameAndText DocMarkDownWriter::_getNameAndText(Decl* decl)
+{
+    DocMarkup::Entry* entry = m_markup->getEntry(decl);
+    return _getNameAndText(entry, decl);
+}
+
+List<DocMarkDownWriter::NameAndText> DocMarkDownWriter::_getAsNameAndTextList(const List<Decl*>& in)
+{
+    List<NameAndText> out;
+    for (auto decl : in)
+    {
+        out.add(_getNameAndText(decl));
+    }
+    return out;
+}
+
+List<String> DocMarkDownWriter::_getAsStringList(const List<Decl*>& in)
+{
+    List<String> strings;
+    for (auto decl : in)
+    {
+        strings.add(_getName(decl));
+    }
+    return strings;
+}
+
+void DocMarkDownWriter::_appendCommaList(const List<String>& strings, char wrapChar)
 {
     for (Index i = 0; i < strings.getCount(); ++i)
     {
@@ -166,7 +215,16 @@ void DocMarkDownWriter::_appendCommaList(const List<String>& strings)
         {
             m_builder << toSlice(", ");
         }
-        m_builder << strings[i];
+        if (wrapChar)
+        {
+            m_builder.appendChar(wrapChar);
+            m_builder << strings[i];
+            m_builder.appendChar(wrapChar);
+        }
+        else
+        {
+            m_builder << strings[i];
+        }
     }
 }
 
@@ -341,8 +399,10 @@ void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
     }
 }
 
-void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndMarkup>& out)
+List<DocMarkDownWriter::NameAndText> DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls)
 {
+    List<NameAndText> out;
+
     Dictionary<Name*, Index> nameDict;
 
     for (auto decl : decls)
@@ -357,11 +417,11 @@ void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndM
 
         if (index >= out.getCount())
         {
-            out.add(NameAndMarkup{ name, String() });
+            out.add(NameAndText{ getText(name), String() });
         }
 
-        NameAndMarkup& nameAndMarkup = out[index];
-        if (nameAndMarkup.markup.getLength() > 0)
+        NameAndText& nameAndMarkup = out[index];
+        if (nameAndMarkup.text.getLength() > 0)
         {
             continue;
         }
@@ -369,9 +429,11 @@ void DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls, List<NameAndM
         auto entry = m_markup->getEntry(decl);
         if (entry && entry->m_markup.getLength())
         {
-            nameAndMarkup.markup = entry->m_markup;
+            nameAndMarkup.text = entry->m_markup;
         }
     }
+
+    return out;
 }
 
 static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
@@ -429,13 +491,13 @@ void DocMarkDownWriter::_maybeAppendSet(const UnownedStringSlice& title, const S
             for (Index i = 0; i < uniqueCount; ++i)
             {
                 out << (i + 1) << (". ");
-                _appendCommaList(uniqueValues[i]);
+                _appendCommaList(uniqueValues[i], '`');
                 out << toSlice("\n");
             }
         }
         else
         {
-            _appendCommaList(uniqueValues[0]);
+            _appendCommaList(uniqueValues[0], '`');
             out << toSlice("\n");
         }
         out << toSlice("\n");
@@ -458,7 +520,7 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
         UnownedStringSlice name = printer.getPartSlice(Part::Type::DeclPath);
 
         // Extract the name
-        out << toSlice("# ") << name << toSlice("\n\n");
+        out << toSlice("# `") << name << toSlice("`\n\n");
 
     }
 
@@ -636,13 +698,9 @@ void DocMarkDownWriter::writeOverridableCallable(const DocMarkup::Entry& entry, 
                 out << "## Parameters\n\n";
 
                 // Get the unique generics
-                List<NameAndMarkup> params;
-                _getUniqueParams(genericDecls, params);
-                _appendAsBullets(params);
-
-                params.clear();
-                _getUniqueParams(paramDecls, params);
-                _appendAsBullets(params);
+                _appendAsBullets(_getUniqueParams(genericDecls), '`');
+                // And parameters
+                _appendAsBullets(_getUniqueParams(paramDecls), '`');
             }
         }
     }
@@ -664,11 +722,54 @@ void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumD
 
     out << toSlice("## Values \n\n");
 
-    auto cases = enumDecl->getMembersOfType<EnumCaseDecl>();
-    _appendAsBullets(cases);
-
+    _appendAsBullets(_getAsNameAndTextList(enumDecl->getMembersOfType<EnumCaseDecl>()), '_');
+    
     writeDescription(entry);
 }
+
+void DocMarkDownWriter::_appendEscaped(const UnownedStringSlice& text)
+{
+    auto& out = m_builder;
+
+    const char* start = text.begin();
+    const char* cur = start;
+    const char*const end = text.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+
+        switch (c)
+        {
+            case '<':
+            case '>':
+            case '&':
+            case '"':
+            case '_':
+            {
+                // Flush if any before
+                if (cur > start)
+                {
+                    out.append(start, cur);
+                }
+                // Prefix with the 
+                out.appendChar('\\');
+
+                // Start will still include the char, for later flushing
+                start = cur;
+                break;
+            }
+            default: break;
+        }
+    }
+
+    // Flush any remaining
+    if (cur > start)
+    {
+        out.append(start, cur);
+    }
+}
+
 
 void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl)
 {
@@ -693,20 +794,15 @@ void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, Agg
     }
 }
 
-void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
+void DocMarkDownWriter::_appendAggTypeName(AggTypeDeclBase* aggTypeDecl)
 {
-    writePreamble(entry);
-
     auto& out = m_builder;
 
-    // We can write out he name using the printer
+    // This could be lots of different things - struct/class/extension/interface/..
 
     ASTPrinter printer(m_astBuilder);
     printer.addDeclPath(DeclRef<Decl>(aggTypeDecl, nullptr));
 
-    // This could be lots of different things - struct/class/extension/interface/..
-
-    out << toSlice("# ");
     if (as<StructDecl>(aggTypeDecl))
     {
         out << toSlice("struct ") << printer.getStringBuilder();
@@ -722,14 +818,28 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
     else if (ExtensionDecl* extensionDecl = as<ExtensionDecl>(aggTypeDecl))
     {
         out << toSlice("extension ") << extensionDecl->targetType;
-        _appendDerivedFrom(toSlice(" : "), extensionDecl);   
+        _appendDerivedFrom(toSlice(" : "), extensionDecl);
     }
     else
     {
         out << toSlice("?");
     }
+}
 
-    out << toSlice("\n\n");
+void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
+{
+    writePreamble(entry);
+
+    auto& out = m_builder;
+
+    // We can write out he name using the printer
+
+    ASTPrinter printer(m_astBuilder);
+    printer.addDeclPath(DeclRef<Decl>(aggTypeDecl, nullptr));
+
+    out << toSlice("# `");
+    _appendAggTypeName(aggTypeDecl);
+    out << toSlice("`\n\n");
 
     {
         List<InheritanceDecl*> inheritanceDecls;
@@ -738,7 +848,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         if (inheritanceDecls.getCount())
         {
             out << "*Implements:* ";
-            _appendCommaList(inheritanceDecls);
+            _appendCommaList(_getAsStringList(inheritanceDecls), '`');
             out << toSlice("\n\n");
         }
     }
@@ -765,14 +875,13 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
                 }
                 out << toSlice("\n");
 
-                
                 List<InheritanceDecl*> inheritanceDecls;
                 _getDecls<InheritanceDecl>(assocTypeDecl, inheritanceDecls);
 
                 if (inheritanceDecls.getCount())
                 {
                     out << "  ";
-                    _appendCommaList(inheritanceDecls);
+                    _appendCommaList(_getAsStringList(inheritanceDecls), '`');
                     out << toSlice("\n");
                 }
             }
@@ -797,8 +906,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         if (params.getCount())
         {
             out << "## Generic Parameters\n\n";
-            // We have generic params and regular parameters, in this list
-            _appendAsBullets(params);
+            _appendAsBullets(_getAsNameAndTextList(params), '`');
         }
     }
 
@@ -808,7 +916,8 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         if (fields.getCount())
         {
             out << "## Fields\n\n";
-            _appendAsBullets(fields);
+
+            _appendAsBullets(_getAsNameAndTextList(fields), '`');
         }
     }
 
@@ -833,7 +942,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
             uniqueMethods.sort([](Decl* a, Decl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
 
             out << "## Methods\n\n";
-            _appendAsBullets(uniqueMethods);
+            _appendAsBullets(_getAsStringList(uniqueMethods), '`');
         }
     }
 }

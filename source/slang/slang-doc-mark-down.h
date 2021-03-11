@@ -63,26 +63,56 @@ struct DocMarkDownWriter
         /// Given a list of ASTPrinter::Parts, works out the different parts of the sig
     static void getSignature(const List<Part>& parts, Signature& outSig);
 
-    struct NameAndMarkup
+    struct NameAndText
     {
-        Name* name;
-        String markup;
+        String name;
+        String text;
     };
-    void _getUniqueParams(const List<Decl*>& decls, List<NameAndMarkup>& out);
+
+    List<NameAndText> _getUniqueParams(const List<Decl*>& decls);
+
+    String _getName(Decl* decl);
+    String _getName(InheritanceDecl* decl);
+
+    NameAndText _getNameAndText(DocMarkup::Entry* entry, Decl* decl);
+    NameAndText _getNameAndText(Decl* decl);
 
     template <typename T>
-    void _appendAsBullets(FilteredMemberList<T>& in);
-    void _appendAsBullets(const List<Decl*>& in);
+    List<NameAndText> _getAsNameAndTextList(const FilteredMemberList<T>& in)
+    {
+        List<NameAndText> out;
+        for (auto decl : const_cast<FilteredMemberList<T>&>(in))
+        {
+            out.add(_getNameAndText(decl));
+        }
+        return out;
+    }
+    template <typename T>
+    List<String> _getAsStringList(const List<T*>& in)
+    {
+        List<String> strings;
+        for (auto decl : in)
+        {
+            strings.add(_getName(decl));
+        }
+        return strings;
+    }
 
-    void _appendAsBullets(const List<NameAndMarkup>& values);
+    List<NameAndText> _getAsNameAndTextList(const List<Decl*>& in);
+    List<String> _getAsStringList(const List<Decl*>& in);
 
-    void _appendCommaList(const List<InheritanceDecl*>& inheritanceDecls);
-    void _appendCommaList(const List<String>& strings);
+    void _appendAsBullets(const List<NameAndText>& values, char wrapChar);
+    void _appendAsBullets(const List<String>& values, char wrapChar);
+
+    void _appendCommaList(const List<String>& strings, char wrapChar);
 
     void _maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set);
 
         /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
+    void _appendEscaped(const UnownedStringSlice& text);
+
+    void _appendAggTypeName(AggTypeDeclBase* aggTypeDecl);
 
     DocMarkup* m_markup;
     ASTBuilder* m_astBuilder;
