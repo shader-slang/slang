@@ -40,10 +40,10 @@ void setNativeWindowHook(Window* window, WNDPROC proc);
 
 GUI::GUI(
     Window* window,
-    IRenderer* inRenderer,
+    IDevice* inDevice,
     ICommandQueue* inQueue,
     IFramebufferLayout* framebufferLayout)
-    : renderer(inRenderer)
+    : device(inDevice)
     , queue(inQueue)
 {
      ImGui::CreateContext();
@@ -151,7 +151,7 @@ GUI::GUI(
     programDesc.kernels = &kernelDescs[0];
     programDesc.kernelCount = 2;
 
-    auto program = renderer->createProgram(programDesc);
+    auto program = device->createProgram(programDesc);
 
     vertexShaderBlob->release();
     fragmentShaderBlob->release();
@@ -161,7 +161,7 @@ GUI::GUI(
         {"U", 1, Format::RG_Float32,        offsetof(ImDrawVert, uv) },
         {"U", 2, Format::RGBA_Unorm_UInt8,  offsetof(ImDrawVert, col) },
     };
-    auto inputLayout = renderer->createInputLayout(
+    auto inputLayout = device->createInputLayout(
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
 
@@ -176,7 +176,7 @@ GUI::GUI(
     descriptorSetLayoutDesc.slotRangeCount = descriptorSetRanges.getCount();
     descriptorSetLayoutDesc.slotRanges = descriptorSetRanges.getBuffer();
 
-    descriptorSetLayout = renderer->createDescriptorSetLayout(descriptorSetLayoutDesc);
+    descriptorSetLayout = device->createDescriptorSetLayout(descriptorSetLayoutDesc);
 
     Slang::List<IPipelineLayout::DescriptorSetDesc> pipelineDescriptorSets;
     pipelineDescriptorSets.add(IPipelineLayout::DescriptorSetDesc(descriptorSetLayout));
@@ -186,7 +186,7 @@ GUI::GUI(
     pipelineLayoutDesc.descriptorSets = pipelineDescriptorSets.getBuffer();
     pipelineLayoutDesc.renderTargetCount = 1;
 
-    pipelineLayout = renderer->createPipelineLayout(pipelineLayoutDesc);
+    pipelineLayout = device->createPipelineLayout(pipelineLayoutDesc);
 
     TargetBlendDesc targetBlendDesc;
     targetBlendDesc.color.srcFactor = BlendFactor::SrcAlpha;
@@ -208,7 +208,7 @@ GUI::GUI(
 
     // TODO: need to set up blending state...
 
-    pipelineState = renderer->createGraphicsPipelineState(pipelineDesc);
+    pipelineState = device->createGraphicsPipelineState(pipelineDesc);
 
     // Initialize the texture atlas
     unsigned char* pixels;
@@ -229,19 +229,20 @@ GUI::GUI(
         initData.numSubResources = 1;
         initData.subResources = subResourceData;
 
-        auto texture = renderer->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
+        auto texture =
+            device->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
 
         gfx::IResourceView::Desc viewDesc;
         viewDesc.format = desc.format;
         viewDesc.type = IResourceView::Type::ShaderResource;
-        auto textureView = renderer->createTextureView(texture, viewDesc);
+        auto textureView = device->createTextureView(texture, viewDesc);
 
         io.Fonts->TexID = (void*) textureView.detach();
     }
 
     {
         ISamplerState::Desc desc;
-        samplerState = renderer->createSamplerState(desc);
+        samplerState = device->createSamplerState(desc);
     }
 
     {
@@ -255,7 +256,7 @@ GUI::GUI(
         colorAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
         desc.renderTargetAccess = &colorAccess;
         desc.renderTargetCount = 1;
-        renderPass = renderer->createRenderPassLayout(desc);
+        renderPass = device->createRenderPassLayout(desc);
     }
 }
 
@@ -288,15 +289,14 @@ void GUI::endFrame(IFramebuffer* framebuffer)
     vertexBufferDesc.init(vertexCount * sizeof(ImDrawVert));
     vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
     vertexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto vertexBuffer = renderer->createBufferResource(
-        IResource::Usage::VertexBuffer,
-        vertexBufferDesc);
+    auto vertexBuffer =
+        device->createBufferResource(IResource::Usage::VertexBuffer, vertexBufferDesc);
 
     gfx::IBufferResource::Desc indexBufferDesc;
     indexBufferDesc.init(indexCount * sizeof(ImDrawIdx));
     indexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
     indexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto indexBuffer = renderer->createBufferResource(
+    auto indexBuffer = device->createBufferResource(
         IResource::Usage::IndexBuffer,
         indexBufferDesc);
     auto cmdBuf = queue->createCommandBuffer();
@@ -323,9 +323,8 @@ void GUI::endFrame(IFramebuffer* framebuffer)
     constantBufferDesc.init(sizeof(glm::mat4x4));
     constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
     constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto constantBuffer = renderer->createBufferResource(
-        IResource::Usage::ConstantBuffer,
-        constantBufferDesc);
+    auto constantBuffer =
+        device->createBufferResource(IResource::Usage::ConstantBuffer, constantBufferDesc);
 
     {
         float L = draw_data->DisplayPos.x;
@@ -389,7 +388,7 @@ void GUI::endFrame(IFramebuffer* framebuffer)
                 renderEncoder->setScissorRects(1, &rect);
 
                 // TODO: This should be a dynamic/transient descriptor set...
-                auto descriptorSet = renderer->createDescriptorSet(descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
+                auto descriptorSet = device->createDescriptorSet(descriptorSetLayout, gfx::IDescriptorSet::Flag::Transient);
                 descriptorSet->setConstantBuffer(0, 0, constantBuffer);
                 descriptorSet->setResource(1, 0,
                     (gfx::IResourceView*) command->TextureId);

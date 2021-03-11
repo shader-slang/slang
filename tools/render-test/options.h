@@ -50,9 +50,9 @@ struct Options
 	ShaderProgramType shaderType = ShaderProgramType::Graphics;
 
         /// The renderer type inferred from the target language type. Used if a rendererType is not explicitly set.
-    RendererType targetLanguageRendererType = RendererType::Unknown;
+    DeviceType targetLanguageDeviceType = DeviceType::Unknown;
         /// The set render type
-    RendererType rendererType = RendererType::Unknown;
+    DeviceType deviceType = DeviceType::Unknown;
     InputLanguageID inputLanguageID = InputLanguageID::Slang;
     SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 

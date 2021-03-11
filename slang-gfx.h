@@ -76,9 +76,10 @@ enum class StageType
     CountOf,
 };
 
-enum class RendererType
+enum class DeviceType
 {
     Unknown,
+    Default,
     DirectX11,
     DirectX12,
     OpenGl,
@@ -1427,16 +1428,47 @@ public:
         bool enableVSync;
     };
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
-    virtual SLANG_NO_THROW Result getImage(uint32_t index, ITextureResource** outResource) = 0;
-    virtual SLANG_NO_THROW Result present() = 0;
-    virtual SLANG_NO_THROW uint32_t acquireNextImage() = 0;
+
+    /// Returns the back buffer image at `index`.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getImage(uint32_t index, ITextureResource** outResource) = 0;
+
+    /// Present the next image in the swapchain.
+    virtual SLANG_NO_THROW Result SLANG_MCALL present() = 0;
+
+    /// Returns the index of next back buffer image that will be presented in the next
+    /// `present` call. If the swapchain is invalid/out-of-date, this method returns -1.
+    virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() = 0;
+
+    /// Resizes the back buffers of this swapchain. All render target views and framebuffers
+    /// referencing the back buffer images must be freed before calling this method.
+    virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) = 0;
 };
 #define SLANG_UUID_ISwapchain                                                        \
     {                                                                                \
         0xbe91ba6c, 0x784, 0x4308, { 0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 } \
     }
 
-class IRenderer: public ISlangUnknown
+struct DeviceInfo
+{
+    DeviceType deviceType;
+
+    BindingStyle bindingStyle;
+
+    ProjectionStyle projectionStyle;
+
+    /// An projection matrix that ensures x, y mapping to pixels
+    /// is the same on all targets
+    float identityProjectionMatrix[16];
+
+    /// The name of the graphics API being used by this device.
+    const char* apiName = nullptr;
+
+    /// The name of the graphics adapter.
+    const char* adapterName = nullptr;
+};
+
+class IDevice: public ISlangUnknown
 {
 public:
     struct SlangDesc
@@ -1458,7 +1490,7 @@ public:
 
     struct Desc
     {
-        RendererType rendererType; // The underlying API/Platform of the renderer.
+        DeviceType deviceType = DeviceType::Default;    // The underlying API/Platform of the device.
         const char* adapter = nullptr;                  // Name to identify the adapter to use
         int requiredFeatureCount = 0;                   // Number of required features.
         const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
@@ -1695,7 +1727,7 @@ public:
         ISlangBlob** outBlob) = 0;
 
         /// Get the type of this renderer
-    virtual SLANG_NO_THROW RendererType SLANG_MCALL getRendererType() const = 0;
+    virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const = 0;
 };
 
 #define SLANG_UUID_IRenderer                                                             \
@@ -1710,22 +1742,11 @@ extern "C"
     /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
 
-    /// Gets the binding style from the type
-    SLANG_GFX_API BindingStyle SLANG_MCALL gfxGetBindingStyle(RendererType type);
-
-    /// Given a renderer type, gets a projection style
-    SLANG_GFX_API ProjectionStyle SLANG_MCALL gfxGetProjectionStyle(RendererType type);
-
-    /// Given the projection style returns an 'identity' matrix, which ensures x,y mapping to pixels
-    /// is the same on all targets
-    SLANG_GFX_API void SLANG_MCALL
-        gfxGetIdentityProjection(ProjectionStyle style, float projMatrix[16]);
-
-    /// Get the name of the renderer
-    SLANG_GFX_API const char* SLANG_MCALL gfxGetRendererName(RendererType type);
-
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
-    SLANG_GFX_API SlangResult SLANG_MCALL gfxCreateRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
+    SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }
 
 }// renderer_test

@@ -113,7 +113,7 @@ gfx::StageType mapStage(SlangStage stage)
     }
 }
 
-Result createProgramFromSlang(IRenderer* renderer, IShaderProgram::Desc const& originalDesc, IShaderProgram** outProgram)
+Result createProgramFromSlang(IDevice* device, IShaderProgram::Desc const& originalDesc, IShaderProgram** outProgram)
 {
     SlangInt targetIndex = 0;
     auto slangProgram = originalDesc.slangProgram;
@@ -153,7 +153,7 @@ Result createProgramFromSlang(IRenderer* renderer, IShaderProgram::Desc const& o
     programDesc.kernelCount = kernelDescs.getCount();
     programDesc.kernels = kernelDescs.getBuffer();
 
-    return renderer->createProgram(programDesc, outProgram);
+    return device->createProgram(programDesc, outProgram);
 }
 
 IShaderObject* gfx::ShaderObjectBase::getInterface(const Guid& guid)
@@ -258,11 +258,11 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     }
 }
 
-IRenderer* gfx::RendererBase::getInterface(const Guid& guid)
+IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 {
     return (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IRenderer)
-        ? static_cast<IRenderer*>(this)
-        : nullptr;
+               ? static_cast<IDevice*>(this)
+               : nullptr;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)

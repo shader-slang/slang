@@ -6,6 +6,6 @@
 
 namespace gfx {
 
-SlangResult SLANG_MCALL createVKRenderer(const IRenderer::Desc* desc, IRenderer** outRenderer);
+SlangResult SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
 } // gfx

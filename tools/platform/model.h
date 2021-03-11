@@ -66,7 +66,7 @@ struct ModelLoader
     };
 
     ICallbacks*              callbacks = nullptr;
-    Slang::ComPtr<IRenderer> renderer;
+    Slang::ComPtr<IDevice> device;
     LoadFlags                loadFlags = 0;
     float                    scale = 1.0f;
 

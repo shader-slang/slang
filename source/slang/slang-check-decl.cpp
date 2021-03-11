@@ -1374,8 +1374,33 @@ namespace Slang
             return false;
         }
 
-        // TODO: actually implement matching here. For now we'll
-        // just pretend that things are satisfied in order to make progress..
+        // A signature matches the required one if it has the right number of parameters,
+        // and those parameters have the right types, and also the result/return type
+        // is the required one.
+        //
+        auto requiredParams = getParameters(requiredMemberDeclRef).toArray();
+        auto satisfyingParams = getParameters(satisfyingMemberDeclRef).toArray();
+        auto paramCount = requiredParams.getCount();
+        if(satisfyingParams.getCount() != paramCount)
+            return false;
+
+        for(Index paramIndex = 0; paramIndex < paramCount; ++paramIndex)
+        {
+            auto requiredParam = requiredParams[paramIndex];
+            auto satisfyingParam = satisfyingParams[paramIndex];
+
+            auto requiredParamType = getType(m_astBuilder, requiredParam);
+            auto satisfyingParamType = getType(m_astBuilder, satisfyingParam);
+
+            if(!requiredParamType->equals(satisfyingParamType))
+                return false;
+        }
+
+        auto requiredResultType = getResultType(m_astBuilder, requiredMemberDeclRef);
+        auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
+        if(!requiredResultType->equals(satisfyingResultType))
+            return false;
+
         witnessTable->add(
             requiredMemberDeclRef.getDecl(),
             RequirementWitness(satisfyingMemberDeclRef));
@@ -1491,58 +1516,234 @@ namespace Slang
 
 
     bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
-        DeclRef<GenericDecl>        genDecl,
-        DeclRef<GenericDecl>        requirementGenDecl,
+        DeclRef<GenericDecl>        satisfyingGenericDeclRef,
+        DeclRef<GenericDecl>        requiredGenericDeclRef,
         RefPtr<WitnessTable>        witnessTable)
     {
-        if (genDecl.getDecl()->members.getCount() != requirementGenDecl.getDecl()->members.getCount())
+        // The signature of a generic is defiend by its members, and we need the
+        // satisfying value to have the same number of members for it to be an
+        // exact match.
+        //
+        auto memberCount = requiredGenericDeclRef.getDecl()->members.getCount();
+        if(satisfyingGenericDeclRef.getDecl()->members.getCount() != memberCount)
             return false;
-        for (Index i = 0; i < genDecl.getDecl()->members.getCount(); i++)
+
+        // We then want to check that pairwise members match, in order.
+        //
+        auto requiredMemberDeclRefs = getMembers(requiredGenericDeclRef);
+        auto satisfyingMemberDeclRefs = getMembers(satisfyingGenericDeclRef);
+        //
+        // We start by performing a superficial "structural" match of the parameters
+        // to ensure that the two generics have an equivalent mix of type, value,
+        // and constraint parameters in the same order.
+        //
+        // Note that in this step we do *not* make any checks on the actual types
+        // involved in constraints, or on the types of value parameters. The reason
+        // for this is that the types on those parameters could be dependent on
+        // type parameters in the generic parameter list, and thus there could be
+        // a mismatch at this point. For example, if we have:
+        //
+        //      interface IBase         { void doThing<T, U : IThing<T>>(); }
+        //      struct Derived : IBase  { void doThing<X, Y : IThing<X>>(); }
+        //
+        // We clearly have a signature match here, but the constraint parameters for
+        // `U : IThing<T>` and `Y : IThing<X>` have the problem that both the sub-type
+        // and super-type they reference are not equivalent without substititions.
+        //
+        // We will deal with this issue after the structural matching is checked, at
+        // which point we can actually verify things like types.
+        //
+        for (Index i = 0; i < memberCount; i++)
         {
-            auto genMbr = genDecl.getDecl()->members[i];
-            auto requiredGenMbr = genDecl.getDecl()->members[i];
-            if (auto genTypeMbr = as<GenericTypeParamDecl>(genMbr))
+            auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
+            auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+
+            if (as<GenericTypeParamDecl>(requiredMemberDeclRef))
             {
-                if (auto requiredGenTypeMbr = as<GenericTypeParamDecl>(requiredGenMbr))
+                if (as<GenericTypeParamDecl>(satisfyingMemberDeclRef))
                 {
                 }
                 else
                     return false;
             }
-            else if (auto genValMbr = as<GenericValueParamDecl>(genMbr))
+            else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
             {
-                if (auto requiredGenValMbr = as<GenericValueParamDecl>(requiredGenMbr))
+                if (auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>())
                 {
-                    if (!genValMbr->type->equals(requiredGenValMbr->type))
-                        return false;
                 }
                 else
                     return false;
             }
-            else if (auto genTypeConstraintMbr = as<GenericTypeConstraintDecl>(genMbr))
+            else if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
             {
-                if (auto requiredTypeConstraintMbr = as<GenericTypeConstraintDecl>(requiredGenMbr))
+                if (auto satisfyingConstraintDeclRef = satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>())
                 {
-                    if (!genTypeConstraintMbr->sup->equals(requiredTypeConstraintMbr->sup))
-                    {
-                        return false;
-                    }
                 }
                 else
                     return false;
             }
         }
 
-        // TODO: this isn't right, because we need to specialize the
-        // declarations of the generics to a common set of substitutions,
-        // so that their types are comparable (e.g., foo<T> and foo<U>
-        // need to have substitutions applies so that they are both foo<X>,
-        // after which uses of the type X in their parameter lists can
-        // be compared).
+        // In order to compare the inner declarations of the two generics, we need to
+        // align them so that they are expressed in terms of consistent type parameters.
+        //
+        // For example, we might have:
+        //
+        //      interface IBase           { void doThing<T>(T val); }
+        //      struct    Derived : IBase { void doThing<U>(U val); }
+        //
+        // If we directly compare the signatures of the inner `doThing` function declarations,
+        // we'd find a mismatch between the `T` and `U` types of the `val` parameter.
+        //
+        // We can get around this mismatch by constructing a specialized reference and
+        // then doing the comparison. For example `IBase::doThing<X>` and `Derived::doThing<X>`
+        // should both have the signature `X -> void`.
+        //
+        // The one big detail that we need to be careful about here is that when we
+        // recursively call `doesMemberSatisfyRequirement`, that will eventually store
+        // the satisfying `DeclRef` as the value for the given requirement key, and we don't
+        // want to store a specialized reference like `Derived::doThing<X>` - we need to
+        // somehow store the original declaration.
+        //
+        // The solution here is to specialize the *required* declaration to the parameters
+        // of the satisfying declaration. In the example above that means we are going to
+        // compare `Derived::doThing` against `IBase::doThing<U>` where the `U` there is
+        // the parameter of `Dervived::doThing`.
+        //
+        GenericSubstitution* requiredSubst = m_astBuilder->create<GenericSubstitution>();
+        requiredSubst->genericDecl = requiredGenericDeclRef.getDecl();
+        requiredSubst->outer = requiredGenericDeclRef.substitutions;
 
+        for (Index i = 0; i < memberCount; i++)
+        {
+            auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
+            auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+
+            if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
+            {
+                auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                SLANG_ASSERT(satisfyingTypeParamDeclRef);
+                auto satisfyingType = DeclRefType::create(m_astBuilder, satisfyingTypeParamDeclRef);
+
+                requiredSubst->args.add(satisfyingType);
+            }
+            else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
+            {
+                auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
+                SLANG_ASSERT(satisfyingValueParamDeclRef);
+
+                auto satisfyingVal = m_astBuilder->create<GenericParamIntVal>();
+                satisfyingVal->declRef = satisfyingValueParamDeclRef;
+
+                requiredSubst->args.add(satisfyingVal);
+            }
+        }
+        for (Index i = 0; i < memberCount; i++)
+        {
+            auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
+            auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+
+            if(auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            {
+                auto satisfyingConstraintDeclRef = satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
+                SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+                auto satisfyingWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
+                satisfyingWitness->sub = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+                satisfyingWitness->sup = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+                satisfyingWitness->declRef = satisfyingConstraintDeclRef;
+
+                requiredSubst->args.add(satisfyingWitness);
+            }
+        }
+
+        // Now that we have computed a set of specialization arguments that will
+        // specialize the generic requirement at the type parameters of the satisfying
+        // generic, we can construct a reference to that declaration and re-run some
+        // of the earlier checking logic with more type information usable.
+        //
+        auto specializedRequiredGenericDeclRef = DeclRef<GenericDecl>(requiredGenericDeclRef.getDecl(), requiredSubst);
+        auto specializedRequiredMemberDeclRefs = getMembers(specializedRequiredGenericDeclRef);
+        for (Index i = 0; i < memberCount; i++)
+        {
+            auto requiredMemberDeclRef = specializedRequiredMemberDeclRefs[i];
+            auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+
+            if(auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
+            {
+                auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                SLANG_ASSERT(satisfyingTypeParamDeclRef);
+
+                // There are no additional checks we need to make on plain old
+                // type parameters at this point.
+                //
+                // TODO: If we ever support having type parameters of higher kinds,
+                // then this is possibly where we'd want to check that the kinds of
+                // the two parameters match.
+                //
+                SLANG_UNUSED(satisfyingGenericDeclRef);
+            }
+            else if (auto requiredValueParamDeclRef = requiredMemberDeclRef.as<GenericValueParamDecl>())
+            {
+                auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
+                SLANG_ASSERT(satisfyingValueParamDeclRef);
+
+                // For a generic value parameter, we need to check that the required
+                // and satisfying declaration both agree on the type of the parameter.
+                //
+                auto requiredParamType = getType(m_astBuilder, requiredValueParamDeclRef);
+                auto satisfyingParamType = getType(m_astBuilder, satisfyingValueParamDeclRef);
+                if (!satisfyingParamType->equals(requiredParamType))
+                    return false;
+            }
+            else if(auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            {
+                auto satisfyingConstraintDeclRef = satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
+                SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+                // For a generic constraint parameter, we need to check that the sub-type
+                // and super-type in the constraint both match.
+                //
+                // In current code the sub type will always be one of the generic type parameters,
+                // and the super-type will always be an interface, but there should be no
+                // need to make use of those additional details here.
+
+                auto requiredSubType = getSub(m_astBuilder, requiredConstraintDeclRef);
+                auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+                if (!satisfyingSubType->equals(requiredSubType))
+                    return false;
+
+                auto requiredSuperType = getSup(m_astBuilder, requiredConstraintDeclRef);
+                auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+                if (!satisfyingSuperType->equals(requiredSuperType))
+                    return false;
+            }
+        }
+
+        // Note: the above logic really only applies to the case of an exact match on signature,
+        // even down to the way that constraints were declared. We could potentially be more
+        // relaxed by taking advantage of the way that various different generic signatures will
+        // actually lower to the same IR generic signature.
+        //
+        // In theory, all we really care about when it comes to constraints is that the constraints
+        // on the required and satisfying declaration are *equivalent*.
+        //
+        // More generally, a satisfying generic could actually provide *looser* constraints and
+        // still work; all that matters is that it can be instantiated at any argument values/types
+        // that are valid for the requirement.
+        //
+        // We leave both of those issues up to the synthesis path: if we do not find a member that
+        // provides an exact match, then the compiler should try to synthesize one that is an exact
+        // match and makes use of existing declarations that might have require defaulting of arguments
+        // or type conversations to fit.
+
+        // Once we've validated that the generic signatures are in an exact match, and devised type
+        // arguments for the requirement to make the two align, we can recursively check the inner
+        // declaration (whatever it is) for an exact match.
+        //
         return doesMemberSatisfyRequirement(
-            DeclRef<Decl>(genDecl.getDecl()->inner, genDecl.substitutions),
-            DeclRef<Decl>(requirementGenDecl.getDecl()->inner, requirementGenDecl.substitutions),
+            DeclRef<Decl>(satisfyingGenericDeclRef.getDecl()->inner, satisfyingGenericDeclRef.substitutions),
+            DeclRef<Decl>(requiredGenericDeclRef.getDecl()->inner, requiredSubst),
             witnessTable);
     }
 
@@ -2375,13 +2576,15 @@ namespace Slang
 
     bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         ConformanceCheckingContext* context,
-        Type*                       type,
+        Type*                       subType,
+        Type*                       superInterfaceType,
         InheritanceDecl*            inheritanceDecl,
-        DeclRef<InterfaceDecl>      interfaceDeclRef,
+        DeclRef<InterfaceDecl>      superInterfaceDeclRef,
         DeclRef<Decl>               requiredMemberDeclRef,
-        RefPtr<WitnessTable>        witnessTable)
+        RefPtr<WitnessTable>        witnessTable,
+        SubtypeWitness*             subTypeConformsToSuperInterfaceWitness)
     {
-        SLANG_UNUSED(interfaceDeclRef)
+        SLANG_UNUSED(superInterfaceDeclRef)
 
         // The goal of this function is to find a suitable
         // value to satisfy the requirement.
@@ -2415,18 +2618,40 @@ namespace Slang
             //
             // TODO: we *really* need a linearization step here!!!!
 
-            RefPtr<WitnessTable> satisfyingWitnessTable = checkConformanceToType(
-                context,
-                type,
-                requiredInheritanceDeclRef.getDecl(),
-                getBaseType(m_astBuilder, requiredInheritanceDeclRef));
+            auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
 
-            if(!satisfyingWitnessTable)
-                return false;
+            DeclaredSubtypeWitness* interfaceIsReqWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
+            interfaceIsReqWitness->sub = superInterfaceType;
+            interfaceIsReqWitness->sup = reqType;
+            interfaceIsReqWitness->declRef = requiredInheritanceDeclRef;
+            // ...
+
+            TransitiveSubtypeWitness* subIsReqWitness = m_astBuilder->create<TransitiveSubtypeWitness>();
+            subIsReqWitness->sub = subType;
+            subIsReqWitness->sup = reqType;
+            subIsReqWitness->subToMid = subTypeConformsToSuperInterfaceWitness;
+            subIsReqWitness->midToSup = interfaceIsReqWitness;
+            // ...
+
+            RefPtr<WitnessTable> satisfyingWitnessTable = new WitnessTable();
+            satisfyingWitnessTable->witnessedType = subType;
+            satisfyingWitnessTable->baseType = reqType;
 
             witnessTable->add(
                 requiredInheritanceDeclRef.getDecl(),
                 RequirementWitness(satisfyingWitnessTable));
+
+            if( !checkConformanceToType(
+                context,
+                subType,
+                requiredInheritanceDeclRef.getDecl(),
+                reqType,
+                subIsReqWitness,
+                satisfyingWitnessTable) )
+            {
+                return false;
+            }
+
             return true;
         }
 
@@ -2465,7 +2690,7 @@ namespace Slang
         // requests will be handled further down. For now we include
         // lookup results that might be usable, but not as-is.
         //
-        auto lookupResult = lookUpMember(m_astBuilder, this, name, type, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
+        auto lookupResult = lookUpMember(m_astBuilder, this, name, subType, LookupMask::Default, LookupOptions::IgnoreBaseInterfaces);
 
         if(!lookupResult.isValid())
         {
@@ -2478,7 +2703,8 @@ namespace Slang
             // signatures of methods, as is done for Swift), we'd
             // need to revisit this step.
             //
-            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, type, requiredMemberDeclRef);
+            getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+            getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
             return false;
         }
 
@@ -2521,26 +2747,29 @@ namespace Slang
         // and if nothing is found we print the candidates that made it
         // furthest in checking.
         //
-        getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, type, requiredMemberDeclRef);
+        getSink()->diagnose(inheritanceDecl, Diagnostics::typeDoesntImplementInterfaceRequirement, subType, requiredMemberDeclRef);
+        getSink()->diagnose(requiredMemberDeclRef, Diagnostics::seeDeclarationOf, requiredMemberDeclRef);
         return false;
     }
 
     RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
         ConformanceCheckingContext* context,
-        Type*                       type,
+        Type*                       subType,
+        Type*                       superInterfaceType,
         InheritanceDecl*            inheritanceDecl,
-        DeclRef<InterfaceDecl>      interfaceDeclRef)
+        DeclRef<InterfaceDecl>      superInterfaceDeclRef,
+        SubtypeWitness*             subTypeConformsToSuperInterfaceWitnes)
     {
         // Has somebody already checked this conformance,
         // and/or is in the middle of checking it?
         RefPtr<WitnessTable> witnessTable;
-        if(context->mapInterfaceToWitnessTable.TryGetValue(interfaceDeclRef, witnessTable))
+        if(context->mapInterfaceToWitnessTable.TryGetValue(superInterfaceDeclRef, witnessTable))
             return witnessTable;
 
         // We need to check the declaration of the interface
         // before we can check that we conform to it.
         //
-        ensureDecl(interfaceDeclRef, DeclCheckState::CanReadInterfaceRequirements);
+        ensureDecl(superInterfaceDeclRef, DeclCheckState::CanReadInterfaceRequirements);
 
         // We will construct the witness table, and register it
         // *before* we go about checking fine-grained requirements,
@@ -2554,10 +2783,53 @@ namespace Slang
         if(!witnessTable)
         {
             witnessTable = new WitnessTable();
-            witnessTable->baseType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
-            witnessTable->witnessedType = type;
+            witnessTable->baseType = DeclRefType::create(m_astBuilder, superInterfaceDeclRef);
+            witnessTable->witnessedType = subType;
         }
-        context->mapInterfaceToWitnessTable.Add(interfaceDeclRef, witnessTable);
+        context->mapInterfaceToWitnessTable.Add(superInterfaceDeclRef, witnessTable);
+
+        if(!checkInterfaceConformance(context, subType, superInterfaceType, inheritanceDecl, superInterfaceDeclRef, subTypeConformsToSuperInterfaceWitnes, witnessTable))
+            return nullptr;
+
+        return witnessTable;
+    }
+
+    static bool isAssociatedTypeDecl(Decl* decl)
+    {
+        auto d = decl;
+        while(auto genericDecl = as<GenericDecl>(d))
+            d = genericDecl->inner;
+        if(as<AssocTypeDecl>(d))
+            return true;
+        return false;
+    }
+
+    bool SemanticsVisitor::checkInterfaceConformance(
+        ConformanceCheckingContext* context,
+        Type*                       subType,
+        Type*                       superInterfaceType,
+        InheritanceDecl*            inheritanceDecl,
+        DeclRef<InterfaceDecl>      superInterfaceDeclRef,
+        SubtypeWitness*             subTypeConformsToSuperInterfaceWitness,
+        WitnessTable*               witnessTable)
+    {
+        // We need to check the declaration of the interface
+        // before we can check that we conform to it.
+        //
+        ensureDecl(superInterfaceDeclRef, DeclCheckState::CanReadInterfaceRequirements);
+
+        // When comparing things like signatures, we need to do so in the context
+        // of a this-type substitution that aligns the signatures in the interface
+        // with those in the concrete type. For example, we need to treat any uses
+        // of `This` in the interface as equivalent to the concrete type for the
+        // purpose of signature matching (and similarly for associated types).
+        //
+        ThisTypeSubstitution* thisTypeSubst = m_astBuilder->create<ThisTypeSubstitution>();
+        thisTypeSubst->interfaceDecl = superInterfaceDeclRef.getDecl();
+        thisTypeSubst->witness = subTypeConformsToSuperInterfaceWitness;
+        thisTypeSubst->outer = superInterfaceDeclRef.substitutions.substitutions;
+
+        auto specializedSuperInterfaceDeclRef = DeclRef<InterfaceDecl>(superInterfaceDeclRef.getDecl(), thisTypeSubst);
 
         bool result = true;
 
@@ -2567,15 +2839,59 @@ namespace Slang
         // its (non-interface) base types already conforms to
         // that interface, so that all of the requirements are
         // already satisfied with inherited implementations...
-        for(auto requiredMemberDeclRef : getMembers(interfaceDeclRef))
+
+        // Note: we break this logic into two loops, where we first
+        // check conformance for all associated-type requirements
+        // and *then* check conformance for all other requirements.
+        //
+        // Checking associated-type requirements first ensures that
+        // we can make use of the identity of the associated types
+        // when checking other members.
+        //
+        // TODO: There could in theory be subtle cases involving
+        // circular or recursive dependency chains that make such
+        // a simple ordering impractical (e.g., associated type `A`
+        // is constrained to `IThing<This>` where `IThing<T>` requires
+        // that `T : IOtherThing where T.B == int` for another associated
+        // type `B`).
+        //
+        // The only robust solution long-term is probably to treat this
+        // as a type-inference problem by creating type variables to
+        // stand in for the associated-type requirements and then to discover
+        // constraints and solve for those type variables as part of the
+        // conformance-checking process.
+        //
+        for(auto requiredMemberDeclRef : getMembers(specializedSuperInterfaceDeclRef))
         {
+            if(!isAssociatedTypeDecl(requiredMemberDeclRef))
+                continue;
+
             auto requirementSatisfied = findWitnessForInterfaceRequirement(
                 context,
-                type,
+                subType,
+                superInterfaceType,
                 inheritanceDecl,
-                interfaceDeclRef,
+                specializedSuperInterfaceDeclRef,
                 requiredMemberDeclRef,
-                witnessTable);
+                witnessTable,
+                subTypeConformsToSuperInterfaceWitness);
+
+            result = result && requirementSatisfied;
+        }
+        for(auto requiredMemberDeclRef : getMembers(specializedSuperInterfaceDeclRef))
+        {
+            if(isAssociatedTypeDecl(requiredMemberDeclRef))
+                continue;
+
+            auto requirementSatisfied = findWitnessForInterfaceRequirement(
+                context,
+                subType,
+                superInterfaceType,
+                inheritanceDecl,
+                specializedSuperInterfaceDeclRef,
+                requiredMemberDeclRef,
+                witnessTable,
+                subTypeConformsToSuperInterfaceWitness);
 
             result = result && requirementSatisfied;
         }
@@ -2604,14 +2920,12 @@ namespace Slang
         // the time we are compiling and handle those, and punt on the larger issue
         // for a bit longer.
         //
-        for(auto candidateExt : getCandidateExtensions(interfaceDeclRef, this))
+        for(auto candidateExt : getCandidateExtensions(specializedSuperInterfaceDeclRef, this))
         {
             // We need to apply the extension to the interface type that our
             // concrete type is inheriting from.
             //
-            // TODO: need to decide if a this-type substitution is needed here.
-            // It probably it.
-            Type* targetType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
+            Type* targetType = DeclRefType::create(m_astBuilder, specializedSuperInterfaceDeclRef);
             auto extDeclRef = ApplyExtensionToType(candidateExt, targetType);
             if(!extDeclRef)
                 continue;
@@ -2621,65 +2935,66 @@ namespace Slang
             {
                 auto requirementSatisfied = findWitnessForInterfaceRequirement(
                     context,
-                    type,
+                    subType,
+                    superInterfaceType,
                     inheritanceDecl,
-                    interfaceDeclRef,
+                    specializedSuperInterfaceDeclRef,
                     requiredInheritanceDeclRef,
-                    witnessTable);
+                    witnessTable,
+                    subTypeConformsToSuperInterfaceWitness);
 
                 result = result && requirementSatisfied;
             }
         }
 
-        // If we failed to satisfy any requirements along the way,
-        // then we don't actually want to keep the witness table
-        // we've been constructing, because the whole thing was a failure.
-        if(!result)
-        {
-            return nullptr;
-        }
-
-        return witnessTable;
+        // The conformance was satisfied if all the requirements were satisfied.
+        //
+        return result;
     }
 
-    RefPtr<WitnessTable> SemanticsVisitor::checkConformanceToType(
+    bool SemanticsVisitor::checkConformanceToType(
         ConformanceCheckingContext* context,
-        Type*                       type,
+        Type*                       subType,
         InheritanceDecl*            inheritanceDecl,
-        Type*                       baseType)
+        Type*                       superType,
+        SubtypeWitness*             subIsSuperWitness,
+        WitnessTable*               witnessTable)
     {
-        if (auto baseDeclRefType = as<DeclRefType>(baseType))
+        if (auto supereclRefType = as<DeclRefType>(superType))
         {
-            auto baseTypeDeclRef = baseDeclRefType->declRef;
-            if (auto baseInterfaceDeclRef = baseTypeDeclRef.as<InterfaceDecl>())
+            auto superTypeDeclRef = supereclRefType->declRef;
+            if (auto superInterfaceDeclRef = superTypeDeclRef.as<InterfaceDecl>())
             {
                 // The type is stating that it conforms to an interface.
                 // We need to check that it provides all of the members
                 // required by that interface.
                 return checkInterfaceConformance(
                     context,
-                    type,
+                    subType,
+                    superType,
                     inheritanceDecl,
-                    baseInterfaceDeclRef);
+                    superInterfaceDeclRef,
+                    subIsSuperWitness,
+                    witnessTable);
             }
-            else if( auto structDeclRef = baseTypeDeclRef.as<StructDecl>() )
+            else if( auto superStructDeclRef = superTypeDeclRef.as<StructDecl>() )
             {
                 // The type is saying it inherits from a `struct`,
                 // which doesn't require any checking at present
-                return nullptr;
+                return true;
             }
         }
 
         getSink()->diagnose(inheritanceDecl, Diagnostics::unimplemented, "type not supported for inheritance");
-        return nullptr;
+        return false;
     }
 
     bool SemanticsVisitor::checkConformance(
-        Type*                       type,
+        Type*                       subType,
         InheritanceDecl*            inheritanceDecl,
         ContainerDecl*              parentDecl)
     {
-        if( auto declRefType = as<DeclRefType>(type) )
+        if( auto declRefType = as<DeclRefType>(subType) )
         {
             auto declRef = declRefType->declRef;
 
@@ -2709,16 +3024,32 @@ namespace Slang
 
         // Look at the type being inherited from, and validate
         // appropriately.
-        auto baseType = inheritanceDecl->base.type;
+        auto superType = inheritanceDecl->base.type;
+
+        DeclaredSubtypeWitness* subIsSuperWitness = m_astBuilder->create<DeclaredSubtypeWitness>();
+        subIsSuperWitness->declRef = makeDeclRef(inheritanceDecl);
+        subIsSuperWitness->sub = subType;
+        subIsSuperWitness->sup = superType;
 
         ConformanceCheckingContext context;
-        context.conformingType = type;
+        context.conformingType = subType;
         context.parentDecl = parentDecl;
-        RefPtr<WitnessTable> witnessTable = checkConformanceToType(&context, type, inheritanceDecl, baseType);
-        if(!witnessTable)
-            return false;
 
-        inheritanceDecl->witnessTable = witnessTable;
+
+        RefPtr<WitnessTable> witnessTable = inheritanceDecl->witnessTable;
+        if(!witnessTable)
+        {
+            witnessTable = new WitnessTable();
+            witnessTable->baseType = superType;
+            witnessTable->witnessedType = subType;
+            inheritanceDecl->witnessTable = witnessTable;
+        }
+
+        if( !checkConformanceToType(&context, subType, inheritanceDecl, superType, subIsSuperWitness, witnessTable) )
+        {
+            return false;
+        }
+
         return true;
     }
 

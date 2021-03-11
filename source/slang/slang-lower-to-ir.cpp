@@ -633,7 +633,7 @@ LoweredValInfo emitCallToDeclRef(
 
     if( auto ctorDeclRef = funcDeclRef.as<ConstructorDecl>() )
     {
-        if(!ctorDeclRef.getDecl()->body)
+        if(!ctorDeclRef.getDecl()->body && isFromStdLib(ctorDeclRef.decl))
         {
             // HACK: For legacy reasons, all of the built-in initializers
             // in the standard library are declared without proper
@@ -1114,7 +1114,6 @@ void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTy
     }
 }
 
-SubstitutionSet lowerSubstitutions(IRGenContext* context, SubstitutionSet subst);
 //
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
@@ -3141,6 +3140,45 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    void _lowerSubstitutionArg(IRGenContext* subContext, GenericSubstitution* subst, Decl* paramDecl, Index argIndex)
+    {
+        SLANG_ASSERT(argIndex < subst->args.getCount());
+        auto argVal = lowerVal(subContext, subst->args[argIndex]);
+        setValue(subContext, paramDecl, argVal);
+    }
+
+    void _lowerSubstitutionEnv(IRGenContext* subContext, Substitutions* subst)
+    {
+        if(!subst) return;
+        _lowerSubstitutionEnv(subContext, subst->outer);
+
+        if (auto genSubst = as<GenericSubstitution>(subst))
+        {
+            auto genDecl = genSubst->genericDecl;
+
+            Index argCounter = 0;
+            for( auto memberDecl: genDecl->members )
+            {
+                if(auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl) )
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, typeParamDecl, argCounter++);
+                }
+                else if( auto valParamDecl = as<GenericValueParamDecl>(memberDecl) )
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
+                }
+            }
+            for( auto memberDecl: genDecl->members )
+            {
+                if(auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl) )
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
+                }
+            }
+        }
+        // TODO: also need to handle this-type substitution here?
+    }
+
     void addDirectCallArgs(
         InvokeExpr*             expr,
         DeclRef<CallableDecl>   funcDeclRef,
@@ -3156,10 +3194,10 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             auto paramDirection = getParameterDirection(paramDecl);
 
             UInt argIndex = argCounter++;
-            Expr* argExpr = nullptr;
             if(argIndex < argCount)
             {
-                argExpr = expr->arguments[argIndex];
+                auto argExpr = expr->arguments[argIndex];
+                addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
             }
             else
             {
@@ -3167,10 +3205,30 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 // but there are still parameters remaining. This must mean
                 // that these parameters have default argument expressions
                 // associated with them.
-                argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
-
-                // Assert that such an expression must have been present.
+                //
+                // Currently we simply extract the initial-value expression
+                // from the parameter declaration and then lower it in
+                // the context of the caller.
+                //
+                // Note that the expression could involve subsitutions because
+                // in the general case it could depend on the generic parameters
+                // used the specialize the callee. For now we do not handle that
+                // case, and simply ignore generic arguments.
+                //
+                SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
                 SLANG_ASSERT(argExpr);
+
+                IRGenEnv subEnvStorage;
+                IRGenEnv* subEnv = &subEnvStorage;
+                subEnv->outer = context->env;
+
+                IRGenContext subContextStorage = *context;
+                IRGenContext* subContext = &subContextStorage;
+                subContext->env = subEnv;
+
+                _lowerSubstitutionEnv(subContext, argExpr.getSubsts());
+
+                addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
 
                 // TODO: The approach we are taking here to default arguments
                 // is simplistic, and has consequences for the front-end as
@@ -3186,9 +3244,9 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
                 //
                 // Each of these options involves trade-offs, and we need to
                 // make a conscious decision at some point.
-            }
 
-            addCallArgsForParam(context, paramType, paramDirection, argExpr, ioArgs, ioFixups);
+                // Assert that such an expression must have been present.
+            }
         }
     }
 
@@ -7345,35 +7403,6 @@ LoweredValInfo ensureDecl(
     setGlobalValue(shared, decl, result);
 
     return result;
-}
-
-IRInst* lowerSubstitutionArg(
-    IRGenContext*   context,
-    Val*            val)
-{
-    if (auto type = dynamicCast<Type>(val))
-    {
-        return lowerType(context, type);
-    }
-    else if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(val))
-    {
-        // We need to look up the IR-level representation of the witness (which will be a witness table).
-        auto supType = lowerType(
-            context,
-            DeclRefType::create(context->astBuilder, declaredSubtypeWitness->declRef));
-        auto irWitnessTable = getSimpleVal(
-            context,
-            emitDeclRef(
-                context,
-                declaredSubtypeWitness->declRef,
-                context->irBuilder->getWitnessTableType(supType)));
-        return irWitnessTable;
-    }
-    else
-    {
-        SLANG_UNIMPLEMENTED_X("value cases");
-        UNREACHABLE_RETURN(nullptr);
-    }
 }
 
 // Can the IR lowered version of this declaration ever be an `IRGeneric`?

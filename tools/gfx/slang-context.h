@@ -9,7 +9,7 @@ namespace gfx
     public:
         Slang::ComPtr<slang::IGlobalSession> globalSession;
         Slang::ComPtr<slang::ISession> session;
-        Result initialize(const gfx::IRenderer::SlangDesc& desc, SlangCompileTarget compileTarget, const char* defaultProfileName)
+        Result initialize(const gfx::IDevice::SlangDesc& desc, SlangCompileTarget compileTarget, const char* defaultProfileName)
         {
             if (desc.slangGlobalSession)
             {

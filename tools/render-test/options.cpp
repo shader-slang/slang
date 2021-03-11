@@ -18,29 +18,30 @@
 namespace renderer_test {
 using namespace Slang;
 
-static gfx::RendererType _toRenderType(Slang::RenderApiType apiType)
+static gfx::DeviceType _toRenderType(Slang::RenderApiType apiType)
 {
     using namespace Slang;
     switch (apiType)
     {
-    case RenderApiType::D3D11:  return gfx::RendererType::DirectX11;
-    case RenderApiType::D3D12:  return gfx::RendererType::DirectX12;
-    case RenderApiType::OpenGl: return gfx::RendererType::OpenGl;
-    case RenderApiType::Vulkan: return gfx::RendererType::Vulkan;
-    case RenderApiType::CPU:    return gfx::RendererType::CPU;
-    case RenderApiType::CUDA:   return gfx::RendererType::CUDA;
-    default: return gfx::RendererType::Unknown;
+    case RenderApiType::D3D11:  return gfx::DeviceType::DirectX11;
+    case RenderApiType::D3D12:  return gfx::DeviceType::DirectX12;
+    case RenderApiType::OpenGl: return gfx::DeviceType::OpenGl;
+    case RenderApiType::Vulkan: return gfx::DeviceType::Vulkan;
+    case RenderApiType::CPU:    return gfx::DeviceType::CPU;
+    case RenderApiType::CUDA:   return gfx::DeviceType::CUDA;
+    default:
+        return gfx::DeviceType::Unknown;
     }
 }
 
-static SlangResult _setRendererType(RendererType type, const char* arg, Slang::WriterHelper stdError, Options& ioOptions)
+static SlangResult _setRendererType(DeviceType type, const char* arg, Slang::WriterHelper stdError, Options& ioOptions)
 {
-    if (ioOptions.rendererType != RendererType::Unknown)
+    if (ioOptions.deviceType != DeviceType::Unknown)
     {
         stdError.print("Already has renderer option set. Found '%s'\n", arg);
         return SLANG_FAIL;
     }
-    ioOptions.rendererType = type;
+    ioOptions.deviceType = type;
     return SLANG_OK;
 }
 
@@ -262,19 +263,20 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = UnownedStringSlice(argSlice.begin() + 1, argSlice.end());
-                RendererType rendererType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
+                DeviceType deviceType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
 
-                if (rendererType != RendererType::Unknown)
+                if (deviceType != DeviceType::Unknown)
                 {
-                    outOptions.rendererType = rendererType;
+                    outOptions.deviceType = deviceType;
                     continue;
                 }
 
                 // Lookup the target language type
-                RendererType languageRenderType = _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
-                if (languageRenderType != RendererType::Unknown)
+                DeviceType languageRenderType =
+                    _toRenderType(RenderApiUtil::findImplicitLanguageRenderApiType(argName));
+                if (languageRenderType != DeviceType::Unknown)
                 {
-                    outOptions.targetLanguageRendererType = languageRenderType;
+                    outOptions.targetLanguageDeviceType = languageRenderType;
                     outOptions.inputLanguageID = (argName == "hlsl" || argName == "glsl" || argName == "cpp" || argName == "cxx" || argName == "c") ?  InputLanguageID::Native : InputLanguageID::Slang;
                     continue;
                 }
@@ -286,7 +288,9 @@ static SlangResult _setRendererType(RendererType type, const char* arg, Slang::W
     }
 
     // If a render option isn't set use defaultRenderType 
-    outOptions.rendererType = (outOptions.rendererType == RendererType::Unknown) ? outOptions.targetLanguageRendererType : outOptions.rendererType;
+    outOptions.deviceType = (outOptions.deviceType == DeviceType::Unknown)
+                                ? outOptions.targetLanguageDeviceType
+                                : outOptions.deviceType;
 
     // first positional argument is source shader path
     if(positionalArgs.getCount())

@@ -30,7 +30,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 // Loads the shader code defined in `shader-object.slang` for use by the `gfx` layer.
 //
 Result loadShaderProgram(
-    gfx::IRenderer* renderer,
+    gfx::IDevice* device,
     ComPtr<gfx::IShaderProgram>& outShaderProgram,
     slang::ProgramLayout*& slangReflection)
 {
@@ -40,7 +40,7 @@ Result loadShaderProgram(
     // Our example application uses the `gfx` graphics API abstraction layer, which already
     // creates a Slang compilation session for us, so we just grab and use it here.
     ComPtr<slang::ISession> slangSession;
-    SLANG_RETURN_ON_FAIL(renderer->getSlangSession(slangSession.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
     
     // Once the session has been obtained, we can start loading code into it.
     //
@@ -123,7 +123,7 @@ Result loadShaderProgram(
     programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.slangProgram = composedProgram.get();
 
-    auto shaderProgram = renderer->createProgram(programDesc);
+    auto shaderProgram = device->createProgram(programDesc);
 
     outShaderProgram = shaderProgram;
     return SLANG_OK;
@@ -134,24 +134,23 @@ int main()
 {
     // Creates a `gfx` renderer, which provides the main interface for
     // interacting with the graphics API.
-    Slang::ComPtr<gfx::IRenderer> renderer;
-    IRenderer::Desc rendererDesc = {};
-    rendererDesc.rendererType = RendererType::DirectX11;
-    SLANG_RETURN_ON_FAIL(gfxCreateRenderer(&rendererDesc, renderer.writeRef()));
+    Slang::ComPtr<gfx::IDevice> device;
+    IDevice::Desc deviceDesc = {};
+    SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, device.writeRef()));
 
     // Now we can load the shader code.
     // A `gfx::IShaderProgram` object for use in the `gfx` layer.
     ComPtr<gfx::IShaderProgram> shaderProgram;
     // A composed `IComponentType` that gives us reflection info on the shader code.
     slang::ProgramLayout* slangReflection;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(renderer, shaderProgram, slangReflection));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram, slangReflection));
 
     // Create a pipeline state with the loaded shader.
     gfx::ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<gfx::IPipelineState> pipelineState;
     SLANG_RETURN_ON_FAIL(
-        renderer->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
+        device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
     // Create and initiate our input/output buffer.
     const int numberCount = 4;
@@ -165,7 +164,7 @@ int main()
     bufferDesc.cpuAccessFlags = IResource::AccessFlag::Write | IResource::AccessFlag::Read;
 
     ComPtr<gfx::IBufferResource> numbersBuffer;
-    SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
+    SLANG_RETURN_ON_FAIL(device->createBufferResource(
         gfx::IResource::Usage::UnorderedAccess,
         bufferDesc,
         (void*)initialData,
@@ -176,7 +175,7 @@ int main()
     gfx::IResourceView::Desc viewDesc = {};
     viewDesc.type = gfx::IResourceView::Type::UnorderedAccess;
     viewDesc.format = gfx::Format::Unknown;
-    SLANG_RETURN_ON_FAIL(renderer->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
 
     // Now comes the interesting part: binding the shader parameter for the
     // compute kernel that we about to launch. We would like to construct
@@ -185,7 +184,7 @@ int main()
     // To start, we create a root shader object that represents the root level
     // scope of the shader parameters.
     ComPtr<gfx::IShaderObject> rootObject;
-    SLANG_RETURN_ON_FAIL(renderer->createRootShaderObject(shaderProgram, rootObject.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->createRootShaderObject(shaderProgram, rootObject.writeRef()));
     // We can set parameters directly with `rootObject`, but that requires us to use
     // the Slang reflection API to obtain the proper offsets into the root object for each parameter.
     // We implemented these logic in the `ShaderCursor` helper class, which simplifies the user
@@ -200,8 +199,7 @@ int main()
 
     // Now we can use this type to create a shader object that can be bound to the root object.
     ComPtr<gfx::IShaderObject> transformer;
-    SLANG_RETURN_ON_FAIL(
-        renderer->createShaderObject(addTransformerType, transformer.writeRef()));
+    SLANG_RETURN_ON_FAIL(device->createShaderObject(addTransformerType, transformer.writeRef()));
     // Set the `c` field of the `AddTransformer`.
     float c = 1.0f;
     gfx::ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
@@ -213,7 +211,7 @@ int main()
     // to bind the pipeline and root object and launch the kernel.
     {
         ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
-        auto queue = renderer->createCommandQueue(queueDesc);
+        auto queue = device->createCommandQueue(queueDesc);
         auto commandBuffer = queue->createCommandBuffer();
         auto encoder = commandBuffer->encodeComputeCommands();
         encoder->setPipelineState(pipelineState);
@@ -226,7 +224,7 @@ int main()
     }
     // Read back the results.
     ComPtr<ISlangBlob> resultBlob;
-    SLANG_RETURN_ON_FAIL(renderer->readBufferResource(
+    SLANG_RETURN_ON_FAIL(device->readBufferResource(
         numbersBuffer, 0, numberCount * sizeof(float), resultBlob.writeRef()));
     auto result = reinterpret_cast<const float*>(resultBlob->getBufferPointer());
     for (int i = 0; i < numberCount; i++)
