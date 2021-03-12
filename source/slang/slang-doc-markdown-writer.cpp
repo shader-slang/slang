@@ -1,5 +1,5 @@
-// slang-doc-mark-down.cpp
-#include "slang-doc-mark-down.h"
+// slang-doc-markdown-writer.cpp
+#include "slang-doc-markdown-writer.h"
 
 #include "../core/slang-string-util.h"
 
@@ -8,8 +8,7 @@
 
 namespace Slang {
 
-
-struct DocMarkDownWriter::StringListSet
+struct DocMarkdownWriter::StringListSet
 {
     Index add(const HashSet<String>& set)
     {
@@ -91,7 +90,7 @@ static void _appendAsSingleLine(const UnownedStringSlice& in, StringBuilder& out
     StringUtil::join(lines.getBuffer(), lines.getCount(), ' ', out);
 }
 
-void DocMarkDownWriter::_appendAsBullets(const List<NameAndText>& values, char wrapChar)
+void DocMarkdownWriter::_appendAsBullets(const List<NameAndText>& values, char wrapChar)
 {
     auto& out = m_builder;
     for (const auto& value : values)
@@ -125,7 +124,7 @@ void DocMarkDownWriter::_appendAsBullets(const List<NameAndText>& values, char w
     }
 }
 
-void DocMarkDownWriter::_appendAsBullets(const List<String>& values, char wrapChar)
+void DocMarkdownWriter::_appendAsBullets(const List<String>& values, char wrapChar)
 {
     auto& out = m_builder;
     for (const auto& value : values)
@@ -150,14 +149,14 @@ void DocMarkDownWriter::_appendAsBullets(const List<String>& values, char wrapCh
     }
 }
 
-String DocMarkDownWriter::_getName(Decl* decl)
+String DocMarkdownWriter::_getName(Decl* decl)
 {
     StringBuilder buf;
     ASTPrinter::appendDeclName(decl, buf);
     return buf.ProduceString();
 }
 
-String DocMarkDownWriter::_getName(InheritanceDecl* decl)
+String DocMarkdownWriter::_getName(InheritanceDecl* decl)
 {
     StringBuilder buf;
     buf.Clear();
@@ -165,7 +164,7 @@ String DocMarkDownWriter::_getName(InheritanceDecl* decl)
     return buf.ProduceString();
 }
 
-DocMarkDownWriter::NameAndText DocMarkDownWriter::_getNameAndText(DocMarkup::Entry* entry, Decl* decl)
+DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(DocMarkup::Entry* entry, Decl* decl)
 {
     NameAndText nameAndText;
 
@@ -181,13 +180,13 @@ DocMarkDownWriter::NameAndText DocMarkDownWriter::_getNameAndText(DocMarkup::Ent
     return nameAndText;
 }
 
-DocMarkDownWriter::NameAndText DocMarkDownWriter::_getNameAndText(Decl* decl)
+DocMarkdownWriter::NameAndText DocMarkdownWriter::_getNameAndText(Decl* decl)
 {
     DocMarkup::Entry* entry = m_markup->getEntry(decl);
     return _getNameAndText(entry, decl);
 }
 
-List<DocMarkDownWriter::NameAndText> DocMarkDownWriter::_getAsNameAndTextList(const List<Decl*>& in)
+List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getAsNameAndTextList(const List<Decl*>& in)
 {
     List<NameAndText> out;
     for (auto decl : in)
@@ -197,7 +196,7 @@ List<DocMarkDownWriter::NameAndText> DocMarkDownWriter::_getAsNameAndTextList(co
     return out;
 }
 
-List<String> DocMarkDownWriter::_getAsStringList(const List<Decl*>& in)
+List<String> DocMarkdownWriter::_getAsStringList(const List<Decl*>& in)
 {
     List<String> strings;
     for (auto decl : in)
@@ -207,7 +206,7 @@ List<String> DocMarkDownWriter::_getAsStringList(const List<Decl*>& in)
     return strings;
 }
 
-void DocMarkDownWriter::_appendCommaList(const List<String>& strings, char wrapChar)
+void DocMarkdownWriter::_appendCommaList(const List<String>& strings, char wrapChar)
 {
     for (Index i = 0; i < strings.getCount(); ++i)
     {
@@ -228,7 +227,7 @@ void DocMarkDownWriter::_appendCommaList(const List<String>& strings, char wrapC
     }
 }
 
-/* static */void DocMarkDownWriter::getSignature(const List<Part>& parts, Signature& outSig)
+/* static */void DocMarkdownWriter::getSignature(const List<Part>& parts, Signature& outSig)
 {
     const Index count = parts.getCount();
     for (Index i = 0; i < count; ++i)
@@ -279,7 +278,7 @@ void DocMarkDownWriter::_appendCommaList(const List<String>& strings, char wrapC
     }
 }
 
-void DocMarkDownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl)
+void DocMarkdownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl)
 {
     writePreamble(entry);
     auto& out = m_builder;
@@ -296,7 +295,7 @@ void DocMarkDownWriter::writeVar(const DocMarkup::Entry& entry, VarDecl* varDecl
     writeDescription(entry);
 }
 
-void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
+void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
 {
     auto& out = m_builder;
 
@@ -399,7 +398,7 @@ void DocMarkDownWriter::writeSignature(CallableDecl* callableDecl)
     }
 }
 
-List<DocMarkDownWriter::NameAndText> DocMarkDownWriter::_getUniqueParams(const List<Decl*>& decls)
+List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const List<Decl*>& decls)
 {
     List<NameAndText> out;
 
@@ -476,7 +475,7 @@ static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
     }
 }
 
-void DocMarkDownWriter::_maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set)
+void DocMarkdownWriter::_maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set)
 {
      auto& out = m_builder;
 
@@ -553,7 +552,7 @@ static bool _isFirstOverridden(Decl* decl)
     return false;
 }
 
-void DocMarkDownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
+void DocMarkdownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, CallableDecl* callableDecl)
 {
     auto& out = m_builder;
 
@@ -761,7 +760,7 @@ void DocMarkDownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
     }
 }
 
-void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl)
+void DocMarkdownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumDecl)
 {
     writePreamble(entry);
 
@@ -782,7 +781,7 @@ void DocMarkDownWriter::writeEnum(const DocMarkup::Entry& entry, EnumDecl* enumD
     writeDescription(entry);
 }
 
-void DocMarkDownWriter::_appendEscaped(const UnownedStringSlice& text)
+void DocMarkdownWriter::_appendEscaped(const UnownedStringSlice& text)
 {
     auto& out = m_builder;
 
@@ -826,7 +825,7 @@ void DocMarkDownWriter::_appendEscaped(const UnownedStringSlice& text)
 }
 
 
-void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl)
+void DocMarkdownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl)
 {
     auto& out = m_builder;
 
@@ -849,7 +848,7 @@ void DocMarkDownWriter::_appendDerivedFrom(const UnownedStringSlice& prefix, Agg
     }
 }
 
-void DocMarkDownWriter::_appendAggTypeName(AggTypeDeclBase* aggTypeDecl)
+void DocMarkdownWriter::_appendAggTypeName(AggTypeDeclBase* aggTypeDecl)
 {
     auto& out = m_builder;
 
@@ -881,7 +880,7 @@ void DocMarkDownWriter::_appendAggTypeName(AggTypeDeclBase* aggTypeDecl)
     }
 }
 
-void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
+void DocMarkdownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclBase* aggTypeDecl)
 {
     writePreamble(entry);
 
@@ -1002,7 +1001,7 @@ void DocMarkDownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
     }
 }
 
-void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
+void DocMarkdownWriter::writePreamble(const DocMarkup::Entry& entry)
 {
     SLANG_UNUSED(entry);
     auto& out = m_builder;
@@ -1012,7 +1011,7 @@ void DocMarkDownWriter::writePreamble(const DocMarkup::Entry& entry)
     out << toSlice("\n");
 }
 
-void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
+void DocMarkdownWriter::writeDescription(const DocMarkup::Entry& entry)
 {
     auto& out = m_builder;
 
@@ -1032,7 +1031,7 @@ void DocMarkDownWriter::writeDescription(const DocMarkup::Entry& entry)
     }
 }
 
-void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
+void DocMarkdownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
 {
     // Skip these they will be output as part of their respective 'containers'
     if (as<ParamDecl>(decl) || as<EnumCaseDecl>(decl) || as<AssocTypeDecl>(decl) || as<InheritanceDecl>(decl))
@@ -1071,12 +1070,12 @@ void DocMarkDownWriter::writeDecl(const DocMarkup::Entry& entry, Decl* decl)
     }
 }
 
-bool DocMarkDownWriter::isVisible(const Name* name)
+bool DocMarkdownWriter::isVisible(const Name* name)
 {
     return name == nullptr || !name->text.startsWith(toSlice("__"));
 }
 
-bool DocMarkDownWriter::isVisible(const DocMarkup::Entry& entry)
+bool DocMarkdownWriter::isVisible(const DocMarkup::Entry& entry)
 {
     // For now if it's not public it's not visible
     if (entry.m_visibility != MarkupVisibility::Public)
@@ -1088,7 +1087,7 @@ bool DocMarkDownWriter::isVisible(const DocMarkup::Entry& entry)
     return decl == nullptr || isVisible(decl->getName());
 }
 
-bool DocMarkDownWriter::isVisible(Decl* decl)
+bool DocMarkdownWriter::isVisible(Decl* decl)
 {
     if (!isVisible(decl->getName()))
     {
@@ -1099,7 +1098,7 @@ bool DocMarkDownWriter::isVisible(Decl* decl)
     return entry == nullptr || entry->m_visibility == MarkupVisibility::Public;
 }
 
-void DocMarkDownWriter::writeAll()
+void DocMarkdownWriter::writeAll()
 {
     for (const auto& entry : m_markup->getEntries())
     {
