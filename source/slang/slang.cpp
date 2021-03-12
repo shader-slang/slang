@@ -2733,6 +2733,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
+    int                     entryPointIndex,
+    int                     targetIndex,
+    ISlangSharedLibrary**   outSharedLibrary,
+    slang::IBlob**          outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if(entryPointResult.format == ResultFormat::None )
+        return SLANG_FAIL;
+
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    SLANG_RETURN_ON_FAIL(entryPointResult.getSharedLibrary(sharedLibrary));
+
+    *outSharedLibrary = sharedLibrary.detach();
+    return SLANG_OK;
+}
+
 RefPtr<ComponentType> ComponentType::specialize(
     SpecializationArg const*    inSpecializationArgs,
     SlangInt                    specializationArgCount,
@@ -4385,7 +4412,10 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 
     auto targetReq = linkage->targets[targetIndex];
     auto targetProgram = program->getTargetProgram(targetReq);
-    auto programLayout = targetProgram->getExistingLayout();
+
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    auto programLayout = targetProgram->getOrCreateLayout(&sink);
 
     return (SlangReflection*)programLayout;
 }
