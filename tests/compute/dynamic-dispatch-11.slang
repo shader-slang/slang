@@ -1,8 +1,12 @@
 // Test using interface typed shader parameters with dynamic dispatch.
 
+// TODO: This test has been disabled because it relies on
+// `ConstantBuffer<IInterface>` which we expect to change
+// implementation approaches for soon.
+
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda -xslang -disable-specialization -shaderobj
 
 [anyValueSize(8)]
