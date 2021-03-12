@@ -742,15 +742,21 @@ void DocMarkdownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
         // So assume here it's available
         _addRequirement(Requirement{ CodeGenTarget::HLSL, String() }, requirements);
 
+        // We want to make the requirements set unique, so we can look it up easily in the uniqueRequirements, so we sort it
+        // This also has the benefit of keeping the ordering consistent
         requirements.sort();
 
-        Index index = uniqueRequirements.indexOf(requirements);
-        if (index < 0)
+        // See if we already have this combination of requirements
+        Index uniqueRequirementIndex = uniqueRequirements.indexOf(requirements);
+        if (uniqueRequirementIndex < 0)
         {
-            index = uniqueRequirements.getCount();
+            // If not add it
+            uniqueRequirementIndex = uniqueRequirements.getCount();
             uniqueRequirements.add(requirements);
         }
-        requirementsMap.add(index);
+
+        // Add the uniqueRequirement index for this sig index
+        requirementsMap.add(uniqueRequirementIndex);
     }
 
     // Output the signature
