@@ -7,10 +7,6 @@
 __BuiltinArithmeticType.init(int value);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `value`
@@ -23,10 +19,6 @@ __BuiltinArithmeticType.init(int value);
 ```
 __BuiltinFloatingPointType.init(float value);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -44,10 +36,6 @@ Get the value of the mathematical constant pi in this type.
 ```
 __BuiltinFloatingPointType.This __BuiltinFloatingPointType.getPi();
 ```
-
-## Target Availability
-
-`HLSL`
 
 
 --------------------------------------------------------------------------------
@@ -108,9 +96,9 @@ SamplerTexture1D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -138,9 +126,9 @@ SamplerRWTexture1D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -168,9 +156,9 @@ SamplerRasterizerOrderedTexture1D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -198,9 +186,9 @@ SamplerTexture1DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -228,9 +216,9 @@ SamplerRWTexture1DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -258,9 +246,9 @@ SamplerRasterizerOrderedTexture1DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -288,9 +276,9 @@ SamplerTexture1DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -318,9 +306,9 @@ SamplerRWTexture1DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -348,9 +336,9 @@ SamplerRasterizerOrderedTexture1DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -378,9 +366,9 @@ SamplerTexture1DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -408,9 +396,9 @@ SamplerRWTexture1DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -438,9 +426,9 @@ SamplerRasterizerOrderedTexture1DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -468,9 +456,9 @@ SamplerTexture2D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -498,9 +486,9 @@ SamplerRWTexture2D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -528,9 +516,9 @@ SamplerRasterizerOrderedTexture2D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -558,9 +546,9 @@ SamplerTexture2DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -588,9 +576,9 @@ SamplerRWTexture2DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -618,9 +606,9 @@ SamplerRasterizerOrderedTexture2DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -648,9 +636,9 @@ SamplerTexture2DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -678,9 +666,9 @@ SamplerRWTexture2DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -708,9 +696,9 @@ SamplerRasterizerOrderedTexture2DArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -738,9 +726,9 @@ SamplerTexture2DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -768,9 +756,9 @@ SamplerRWTexture2DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -798,9 +786,9 @@ SamplerRasterizerOrderedTexture2DMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -828,9 +816,9 @@ SamplerTexture3D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -858,9 +846,9 @@ SamplerRWTexture3D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -888,9 +876,9 @@ SamplerRasterizerOrderedTexture3D<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -918,9 +906,9 @@ SamplerTexture3DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -948,9 +936,9 @@ SamplerRWTexture3DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -978,9 +966,9 @@ SamplerRasterizerOrderedTexture3DMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1008,9 +996,9 @@ SamplerTextureCube<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1038,9 +1026,9 @@ SamplerRasterizerOrderedTextureCube<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1068,9 +1056,9 @@ SamplerTextureCubeMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1098,9 +1086,9 @@ SamplerRasterizerOrderedTextureCubeMS<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1128,9 +1116,9 @@ SamplerTextureCubeArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1158,9 +1146,9 @@ SamplerRasterizerOrderedTextureCubeArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1188,9 +1176,9 @@ SamplerTextureCubeMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1218,9 +1206,9 @@ SamplerRasterizerOrderedTextureCubeMSArray<T>.init(
     SamplerState         s);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1349,9 +1337,9 @@ T texture<T>(
     vector<float,4>      location);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1390,10 +1378,6 @@ float Texture1D<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -1409,10 +1393,6 @@ float Texture1D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -1437,13 +1417,9 @@ void Texture1D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -1457,28 +1433,24 @@ void Texture1D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1D<T>.Load(vector<int,2> location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1D<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture1D<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -1495,10 +1467,6 @@ T Texture1D<T>.Load(
 T Texture1D<T>.subscript(uint location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -1509,16 +1477,16 @@ T Texture1D<T>.subscript(uint location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
@@ -1532,11 +1500,11 @@ T Texture1D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -1563,9 +1531,9 @@ T Texture1D<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1591,9 +1559,9 @@ float Texture1D<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1608,12 +1576,12 @@ float Texture1D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float Texture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float Texture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
@@ -1621,10 +1589,10 @@ float Texture1D<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -1639,6 +1607,7 @@ float Texture1D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T Texture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -1650,6 +1619,7 @@ T Texture1D<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T Texture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -1659,13 +1629,10 @@ T Texture1D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -1682,12 +1649,12 @@ T Texture1D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
@@ -1695,10 +1662,10 @@ T Texture1D<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -1728,7 +1695,7 @@ T Texture1D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -1736,13 +1703,13 @@ vector<T,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -1750,7 +1717,7 @@ vector<T,4> Texture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -1761,10 +1728,10 @@ vector<T,4> Texture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -1783,7 +1750,7 @@ vector<T,4> Texture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -1791,13 +1758,13 @@ vector<T,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -1805,7 +1772,7 @@ vector<T,4> Texture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -1816,10 +1783,10 @@ vector<T,4> Texture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -1838,7 +1805,7 @@ vector<T,4> Texture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -1846,13 +1813,13 @@ vector<T,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -1860,7 +1827,7 @@ vector<T,4> Texture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -1871,10 +1838,10 @@ vector<T,4> Texture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -1893,7 +1860,7 @@ vector<T,4> Texture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -1901,13 +1868,13 @@ vector<T,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -1915,7 +1882,7 @@ vector<T,4> Texture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -1926,10 +1893,10 @@ vector<T,4> Texture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -1948,7 +1915,7 @@ vector<T,4> Texture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -1956,13 +1923,13 @@ vector<T,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -1970,7 +1937,7 @@ vector<T,4> Texture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -1981,10 +1948,10 @@ vector<T,4> Texture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2014,7 +1981,7 @@ vector<T,4> Texture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -2022,13 +1989,13 @@ vector<float,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2036,7 +2003,7 @@ vector<float,4> Texture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2047,10 +2014,10 @@ vector<float,4> Texture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2069,7 +2036,7 @@ vector<float,4> Texture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -2077,13 +2044,13 @@ vector<float,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2091,7 +2058,7 @@ vector<float,4> Texture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2102,10 +2069,10 @@ vector<float,4> Texture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2124,7 +2091,7 @@ vector<float,4> Texture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -2132,13 +2099,13 @@ vector<float,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2146,7 +2113,7 @@ vector<float,4> Texture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2157,10 +2124,10 @@ vector<float,4> Texture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2179,7 +2146,7 @@ vector<float,4> Texture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -2187,13 +2154,13 @@ vector<float,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2201,7 +2168,7 @@ vector<float,4> Texture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2212,10 +2179,10 @@ vector<float,4> Texture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2234,7 +2201,7 @@ vector<float,4> Texture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -2242,13 +2209,13 @@ vector<float,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2256,7 +2223,7 @@ vector<float,4> Texture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2267,10 +2234,10 @@ vector<float,4> Texture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2300,7 +2267,7 @@ vector<float,4> Texture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -2308,13 +2275,13 @@ vector<int,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2322,7 +2289,7 @@ vector<int,4> Texture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2333,10 +2300,10 @@ vector<int,4> Texture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2355,7 +2322,7 @@ vector<int,4> Texture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -2363,13 +2330,13 @@ vector<int,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2377,7 +2344,7 @@ vector<int,4> Texture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2388,10 +2355,10 @@ vector<int,4> Texture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2410,7 +2377,7 @@ vector<int,4> Texture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -2418,13 +2385,13 @@ vector<int,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2432,7 +2399,7 @@ vector<int,4> Texture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2443,10 +2410,10 @@ vector<int,4> Texture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2465,7 +2432,7 @@ vector<int,4> Texture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -2473,13 +2440,13 @@ vector<int,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2487,7 +2454,7 @@ vector<int,4> Texture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2498,10 +2465,10 @@ vector<int,4> Texture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2520,7 +2487,7 @@ vector<int,4> Texture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -2528,13 +2495,13 @@ vector<int,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2542,7 +2509,7 @@ vector<int,4> Texture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2553,10 +2520,10 @@ vector<int,4> Texture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2586,7 +2553,7 @@ vector<int,4> Texture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -2594,13 +2561,13 @@ vector<uint,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2608,7 +2575,7 @@ vector<uint,4> Texture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -2619,10 +2586,10 @@ vector<uint,4> Texture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2641,7 +2608,7 @@ vector<uint,4> Texture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -2649,13 +2616,13 @@ vector<uint,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2663,7 +2630,7 @@ vector<uint,4> Texture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -2674,10 +2641,10 @@ vector<uint,4> Texture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2696,7 +2663,7 @@ vector<uint,4> Texture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -2704,13 +2671,13 @@ vector<uint,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2718,7 +2685,7 @@ vector<uint,4> Texture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -2729,10 +2696,10 @@ vector<uint,4> Texture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2751,7 +2718,7 @@ vector<uint,4> Texture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -2759,13 +2726,13 @@ vector<uint,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2773,7 +2740,7 @@ vector<uint,4> Texture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -2784,10 +2751,10 @@ vector<uint,4> Texture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2806,7 +2773,7 @@ vector<uint,4> Texture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -2814,13 +2781,13 @@ vector<uint,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2828,7 +2795,7 @@ vector<uint,4> Texture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -2839,10 +2806,10 @@ vector<uint,4> Texture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -2886,10 +2853,6 @@ float RWTexture1D<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -2905,10 +2868,6 @@ float RWTexture1D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -2933,13 +2892,9 @@ void RWTexture1D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -2953,28 +2908,24 @@ void RWTexture1D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1D<T>.Load(vector<int,1> location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1D<T>.Load(
     vector<int,1>        location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture1D<T>.Load(
     vector<int,1>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -2991,10 +2942,6 @@ T RWTexture1D<T>.Load(
 T RWTexture1D<T>.subscript(uint location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -3005,16 +2952,16 @@ T RWTexture1D<T>.subscript(uint location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
@@ -3028,11 +2975,11 @@ T RWTexture1D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -3059,9 +3006,9 @@ T RWTexture1D<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -3087,9 +3034,9 @@ float RWTexture1D<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -3104,12 +3051,12 @@ float RWTexture1D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RWTexture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RWTexture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
@@ -3117,10 +3064,10 @@ float RWTexture1D<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3135,6 +3082,7 @@ float RWTexture1D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RWTexture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -3146,6 +3094,7 @@ T RWTexture1D<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T RWTexture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -3155,13 +3104,10 @@ T RWTexture1D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -3178,12 +3124,12 @@ T RWTexture1D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
@@ -3191,10 +3137,10 @@ T RWTexture1D<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -3224,7 +3170,7 @@ T RWTexture1D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -3232,13 +3178,13 @@ vector<T,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3246,7 +3192,7 @@ vector<T,4> RWTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3257,10 +3203,10 @@ vector<T,4> RWTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3279,7 +3225,7 @@ vector<T,4> RWTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -3287,13 +3233,13 @@ vector<T,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3301,7 +3247,7 @@ vector<T,4> RWTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3312,10 +3258,10 @@ vector<T,4> RWTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3334,7 +3280,7 @@ vector<T,4> RWTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -3342,13 +3288,13 @@ vector<T,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3356,7 +3302,7 @@ vector<T,4> RWTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3367,10 +3313,10 @@ vector<T,4> RWTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3389,7 +3335,7 @@ vector<T,4> RWTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -3397,13 +3343,13 @@ vector<T,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3411,7 +3357,7 @@ vector<T,4> RWTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3422,10 +3368,10 @@ vector<T,4> RWTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3444,7 +3390,7 @@ vector<T,4> RWTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -3452,13 +3398,13 @@ vector<T,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -3466,7 +3412,7 @@ vector<T,4> RWTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -3477,10 +3423,10 @@ vector<T,4> RWTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3510,7 +3456,7 @@ vector<T,4> RWTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -3518,13 +3464,13 @@ vector<float,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3532,7 +3478,7 @@ vector<float,4> RWTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3543,10 +3489,10 @@ vector<float,4> RWTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3565,7 +3511,7 @@ vector<float,4> RWTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -3573,13 +3519,13 @@ vector<float,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3587,7 +3533,7 @@ vector<float,4> RWTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3598,10 +3544,10 @@ vector<float,4> RWTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3620,7 +3566,7 @@ vector<float,4> RWTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -3628,13 +3574,13 @@ vector<float,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3642,7 +3588,7 @@ vector<float,4> RWTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3653,10 +3599,10 @@ vector<float,4> RWTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3675,7 +3621,7 @@ vector<float,4> RWTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -3683,13 +3629,13 @@ vector<float,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3697,7 +3643,7 @@ vector<float,4> RWTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3708,10 +3654,10 @@ vector<float,4> RWTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3730,7 +3676,7 @@ vector<float,4> RWTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -3738,13 +3684,13 @@ vector<float,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -3752,7 +3698,7 @@ vector<float,4> RWTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -3763,10 +3709,10 @@ vector<float,4> RWTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3796,7 +3742,7 @@ vector<float,4> RWTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -3804,13 +3750,13 @@ vector<int,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3818,7 +3764,7 @@ vector<int,4> RWTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -3829,10 +3775,10 @@ vector<int,4> RWTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3851,7 +3797,7 @@ vector<int,4> RWTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -3859,13 +3805,13 @@ vector<int,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3873,7 +3819,7 @@ vector<int,4> RWTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -3884,10 +3830,10 @@ vector<int,4> RWTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3906,7 +3852,7 @@ vector<int,4> RWTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -3914,13 +3860,13 @@ vector<int,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3928,7 +3874,7 @@ vector<int,4> RWTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -3939,10 +3885,10 @@ vector<int,4> RWTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -3961,7 +3907,7 @@ vector<int,4> RWTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -3969,13 +3915,13 @@ vector<int,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3983,7 +3929,7 @@ vector<int,4> RWTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -3994,10 +3940,10 @@ vector<int,4> RWTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4016,7 +3962,7 @@ vector<int,4> RWTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -4024,13 +3970,13 @@ vector<int,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4038,7 +3984,7 @@ vector<int,4> RWTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4049,10 +3995,10 @@ vector<int,4> RWTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4082,7 +4028,7 @@ vector<int,4> RWTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -4090,13 +4036,13 @@ vector<uint,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -4104,7 +4050,7 @@ vector<uint,4> RWTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -4115,10 +4061,10 @@ vector<uint,4> RWTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4137,7 +4083,7 @@ vector<uint,4> RWTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -4145,13 +4091,13 @@ vector<uint,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -4159,7 +4105,7 @@ vector<uint,4> RWTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -4170,10 +4116,10 @@ vector<uint,4> RWTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4192,7 +4138,7 @@ vector<uint,4> RWTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -4200,13 +4146,13 @@ vector<uint,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -4214,7 +4160,7 @@ vector<uint,4> RWTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -4225,10 +4171,10 @@ vector<uint,4> RWTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4247,7 +4193,7 @@ vector<uint,4> RWTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -4255,13 +4201,13 @@ vector<uint,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -4269,7 +4215,7 @@ vector<uint,4> RWTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -4280,10 +4226,10 @@ vector<uint,4> RWTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4302,7 +4248,7 @@ vector<uint,4> RWTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -4310,13 +4256,13 @@ vector<uint,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4324,7 +4270,7 @@ vector<uint,4> RWTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4335,10 +4281,10 @@ vector<uint,4> RWTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4382,10 +4328,6 @@ float RasterizerOrderedTexture1D<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -4401,10 +4343,6 @@ float RasterizerOrderedTexture1D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -4429,13 +4367,9 @@ void RasterizerOrderedTexture1D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -4449,26 +4383,22 @@ void RasterizerOrderedTexture1D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1D<T>.Load(vector<int,1> location);
 T RasterizerOrderedTexture1D<T>.Load(
     vector<int,1>        location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1D<T>.Load(
     vector<int,1>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4485,10 +4415,6 @@ T RasterizerOrderedTexture1D<T>.Load(
 T RasterizerOrderedTexture1D<T>.subscript(uint location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -4499,16 +4425,16 @@ T RasterizerOrderedTexture1D<T>.subscript(uint location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RasterizerOrderedTexture1D<T>.Sample(
     SamplerState         s,
     vector<float,1>      location,
@@ -4522,11 +4448,11 @@ T RasterizerOrderedTexture1D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -4553,9 +4479,9 @@ T RasterizerOrderedTexture1D<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -4581,9 +4507,9 @@ float RasterizerOrderedTexture1D<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -4598,12 +4524,12 @@ float RasterizerOrderedTexture1D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RasterizerOrderedTexture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RasterizerOrderedTexture1D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,1>      location,
@@ -4611,10 +4537,10 @@ float RasterizerOrderedTexture1D<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4629,6 +4555,7 @@ float RasterizerOrderedTexture1D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RasterizerOrderedTexture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -4640,6 +4567,7 @@ T RasterizerOrderedTexture1D<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T RasterizerOrderedTexture1D<T>.SampleGrad(
     SamplerState         s,
     vector<float,1>      location,
@@ -4649,13 +4577,10 @@ T RasterizerOrderedTexture1D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -4672,12 +4597,12 @@ T RasterizerOrderedTexture1D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1D<T>.SampleLevel(
     SamplerState         s,
     vector<float,1>      location,
@@ -4685,10 +4610,10 @@ T RasterizerOrderedTexture1D<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -4718,7 +4643,7 @@ T RasterizerOrderedTexture1D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -4726,13 +4651,13 @@ vector<T,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -4740,7 +4665,7 @@ vector<T,4> RasterizerOrderedTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -4751,10 +4676,10 @@ vector<T,4> RasterizerOrderedTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4773,7 +4698,7 @@ vector<T,4> RasterizerOrderedTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -4781,13 +4706,13 @@ vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -4795,7 +4720,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -4806,10 +4731,10 @@ vector<T,4> RasterizerOrderedTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4828,7 +4753,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -4836,13 +4761,13 @@ vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -4850,7 +4775,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -4861,10 +4786,10 @@ vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4883,7 +4808,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -4891,13 +4816,13 @@ vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -4905,7 +4830,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -4916,10 +4841,10 @@ vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -4938,7 +4863,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -4946,13 +4871,13 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4960,7 +4885,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -4971,10 +4896,10 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5004,7 +4929,7 @@ vector<T,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -5012,13 +4937,13 @@ vector<float,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5026,7 +4951,7 @@ vector<float,4> RasterizerOrderedTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5037,10 +4962,10 @@ vector<float,4> RasterizerOrderedTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5059,7 +4984,7 @@ vector<float,4> RasterizerOrderedTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -5067,13 +4992,13 @@ vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5081,7 +5006,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5092,10 +5017,10 @@ vector<float,4> RasterizerOrderedTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5114,7 +5039,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -5122,13 +5047,13 @@ vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5136,7 +5061,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5147,10 +5072,10 @@ vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5169,7 +5094,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -5177,13 +5102,13 @@ vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5191,7 +5116,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5202,10 +5127,10 @@ vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5224,7 +5149,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -5232,13 +5157,13 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5246,7 +5171,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5257,10 +5182,10 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5290,7 +5215,7 @@ vector<float,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -5298,13 +5223,13 @@ vector<int,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5312,7 +5237,7 @@ vector<int,4> RasterizerOrderedTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5323,10 +5248,10 @@ vector<int,4> RasterizerOrderedTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5345,7 +5270,7 @@ vector<int,4> RasterizerOrderedTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -5353,13 +5278,13 @@ vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5367,7 +5292,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5378,10 +5303,10 @@ vector<int,4> RasterizerOrderedTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5400,7 +5325,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -5408,13 +5333,13 @@ vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5422,7 +5347,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5433,10 +5358,10 @@ vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5455,7 +5380,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -5463,13 +5388,13 @@ vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5477,7 +5402,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5488,10 +5413,10 @@ vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5510,7 +5435,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -5518,13 +5443,13 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5532,7 +5457,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5543,10 +5468,10 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5576,7 +5501,7 @@ vector<int,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location);
@@ -5584,13 +5509,13 @@ vector<uint,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5598,7 +5523,7 @@ vector<uint,4> RasterizerOrderedTexture1D.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.Gather(
     SamplerState         s,
     vector<float,1>      location,
@@ -5609,10 +5534,10 @@ vector<uint,4> RasterizerOrderedTexture1D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5631,7 +5556,7 @@ vector<uint,4> RasterizerOrderedTexture1D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location);
@@ -5639,13 +5564,13 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5653,7 +5578,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     SamplerState         s,
     vector<float,1>      location,
@@ -5664,10 +5589,10 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5686,7 +5611,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location);
@@ -5694,13 +5619,13 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5708,7 +5633,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     SamplerState         s,
     vector<float,1>      location,
@@ -5719,10 +5644,10 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5741,7 +5666,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location);
@@ -5749,13 +5674,13 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5763,7 +5688,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     SamplerState         s,
     vector<float,1>      location,
@@ -5774,10 +5699,10 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5796,7 +5721,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location);
@@ -5804,13 +5729,13 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5818,7 +5743,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     SamplerState         s,
     vector<float,1>      location,
@@ -5829,10 +5754,10 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5882,13 +5807,9 @@ void Texture1DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -5906,10 +5827,6 @@ void Texture1DMS<T>.GetDimensions(
 vector<float,2> Texture1DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -5920,7 +5837,7 @@ vector<float,2> Texture1DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex);
@@ -5928,7 +5845,7 @@ T Texture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
@@ -5936,14 +5853,10 @@ T Texture1DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -5960,10 +5873,6 @@ T Texture1DMS<T>.Load(
 ```
 T Texture1DMS<T>.subscript(uint location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -6006,13 +5915,9 @@ void RWTexture1DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -6030,10 +5935,6 @@ void RWTexture1DMS<T>.GetDimensions(
 vector<float,2> RWTexture1DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -6044,7 +5945,7 @@ vector<float,2> RWTexture1DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex);
@@ -6052,7 +5953,7 @@ T RWTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
@@ -6060,14 +5961,10 @@ T RWTexture1DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6084,10 +5981,6 @@ T RWTexture1DMS<T>.Load(
 ```
 T RWTexture1DMS<T>.subscript(uint location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -6130,13 +6023,9 @@ void RasterizerOrderedTexture1DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -6154,10 +6043,6 @@ void RasterizerOrderedTexture1DMS<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTexture1DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -6168,7 +6053,7 @@ vector<float,2> RasterizerOrderedTexture1DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex);
@@ -6176,7 +6061,7 @@ T RasterizerOrderedTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1DMS<T>.Load(
     vector<int,1>        location,
     int                  sampleIndex,
@@ -6184,14 +6069,10 @@ T RasterizerOrderedTexture1DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6208,10 +6089,6 @@ T RasterizerOrderedTexture1DMS<T>.Load(
 ```
 T RasterizerOrderedTexture1DMS<T>.subscript(uint location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -6248,10 +6125,6 @@ float Texture1DArray<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -6267,10 +6140,6 @@ float Texture1DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -6301,13 +6170,9 @@ void Texture1DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -6322,26 +6187,22 @@ void Texture1DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1DArray<T>.Load(vector<int,3> location);
 T Texture1DArray<T>.Load(
     vector<int,3>        location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1DArray<T>.Load(
     vector<int,3>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6358,10 +6219,6 @@ T Texture1DArray<T>.Load(
 T Texture1DArray<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -6372,16 +6229,16 @@ T Texture1DArray<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -6395,11 +6252,11 @@ T Texture1DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -6426,9 +6283,9 @@ T Texture1DArray<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -6454,9 +6311,9 @@ float Texture1DArray<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -6471,12 +6328,12 @@ float Texture1DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float Texture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float Texture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -6484,10 +6341,10 @@ float Texture1DArray<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6502,6 +6359,7 @@ float Texture1DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T Texture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -6513,6 +6371,7 @@ T Texture1DArray<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T Texture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -6522,13 +6381,10 @@ T Texture1DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -6545,12 +6401,12 @@ T Texture1DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -6558,10 +6414,10 @@ T Texture1DArray<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -6591,7 +6447,7 @@ T Texture1DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -6599,13 +6455,13 @@ vector<T,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -6613,7 +6469,7 @@ vector<T,4> Texture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -6624,10 +6480,10 @@ vector<T,4> Texture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6646,7 +6502,7 @@ vector<T,4> Texture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -6654,13 +6510,13 @@ vector<T,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -6668,7 +6524,7 @@ vector<T,4> Texture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -6679,10 +6535,10 @@ vector<T,4> Texture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6701,7 +6557,7 @@ vector<T,4> Texture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -6709,13 +6565,13 @@ vector<T,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -6723,7 +6579,7 @@ vector<T,4> Texture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -6734,10 +6590,10 @@ vector<T,4> Texture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6756,7 +6612,7 @@ vector<T,4> Texture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -6764,13 +6620,13 @@ vector<T,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -6778,7 +6634,7 @@ vector<T,4> Texture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -6789,10 +6645,10 @@ vector<T,4> Texture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6811,7 +6667,7 @@ vector<T,4> Texture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -6819,13 +6675,13 @@ vector<T,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -6833,7 +6689,7 @@ vector<T,4> Texture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -6844,10 +6700,10 @@ vector<T,4> Texture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6877,7 +6733,7 @@ vector<T,4> Texture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -6885,13 +6741,13 @@ vector<float,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -6899,7 +6755,7 @@ vector<float,4> Texture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -6910,10 +6766,10 @@ vector<float,4> Texture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6932,7 +6788,7 @@ vector<float,4> Texture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -6940,13 +6796,13 @@ vector<float,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -6954,7 +6810,7 @@ vector<float,4> Texture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -6965,10 +6821,10 @@ vector<float,4> Texture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -6987,7 +6843,7 @@ vector<float,4> Texture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -6995,13 +6851,13 @@ vector<float,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7009,7 +6865,7 @@ vector<float,4> Texture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7020,10 +6876,10 @@ vector<float,4> Texture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7042,7 +6898,7 @@ vector<float,4> Texture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -7050,13 +6906,13 @@ vector<float,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7064,7 +6920,7 @@ vector<float,4> Texture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7075,10 +6931,10 @@ vector<float,4> Texture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7097,7 +6953,7 @@ vector<float,4> Texture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -7105,13 +6961,13 @@ vector<float,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7119,7 +6975,7 @@ vector<float,4> Texture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7130,10 +6986,10 @@ vector<float,4> Texture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7163,7 +7019,7 @@ vector<float,4> Texture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -7171,13 +7027,13 @@ vector<int,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -7185,7 +7041,7 @@ vector<int,4> Texture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -7196,10 +7052,10 @@ vector<int,4> Texture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7218,7 +7074,7 @@ vector<int,4> Texture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -7226,13 +7082,13 @@ vector<int,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -7240,7 +7096,7 @@ vector<int,4> Texture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -7251,10 +7107,10 @@ vector<int,4> Texture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7273,7 +7129,7 @@ vector<int,4> Texture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -7281,13 +7137,13 @@ vector<int,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7295,7 +7151,7 @@ vector<int,4> Texture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7306,10 +7162,10 @@ vector<int,4> Texture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7328,7 +7184,7 @@ vector<int,4> Texture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -7336,13 +7192,13 @@ vector<int,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7350,7 +7206,7 @@ vector<int,4> Texture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7361,10 +7217,10 @@ vector<int,4> Texture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7383,7 +7239,7 @@ vector<int,4> Texture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -7391,13 +7247,13 @@ vector<int,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7405,7 +7261,7 @@ vector<int,4> Texture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7416,10 +7272,10 @@ vector<int,4> Texture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7449,7 +7305,7 @@ vector<int,4> Texture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -7457,13 +7313,13 @@ vector<uint,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -7471,7 +7327,7 @@ vector<uint,4> Texture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -7482,10 +7338,10 @@ vector<uint,4> Texture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7504,7 +7360,7 @@ vector<uint,4> Texture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -7512,13 +7368,13 @@ vector<uint,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -7526,7 +7382,7 @@ vector<uint,4> Texture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -7537,10 +7393,10 @@ vector<uint,4> Texture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7559,7 +7415,7 @@ vector<uint,4> Texture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -7567,13 +7423,13 @@ vector<uint,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7581,7 +7437,7 @@ vector<uint,4> Texture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -7592,10 +7448,10 @@ vector<uint,4> Texture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7614,7 +7470,7 @@ vector<uint,4> Texture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -7622,13 +7478,13 @@ vector<uint,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7636,7 +7492,7 @@ vector<uint,4> Texture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -7647,10 +7503,10 @@ vector<uint,4> Texture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7669,7 +7525,7 @@ vector<uint,4> Texture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -7677,13 +7533,13 @@ vector<uint,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7691,7 +7547,7 @@ vector<uint,4> Texture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -7702,10 +7558,10 @@ vector<uint,4> Texture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -7749,10 +7605,6 @@ float RWTexture1DArray<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -7768,10 +7620,6 @@ float RWTexture1DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -7802,13 +7650,9 @@ void RWTexture1DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -7823,28 +7667,24 @@ void RWTexture1DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1DArray<T>.Load(vector<int,2> location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1DArray<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture1DArray<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -7861,10 +7701,6 @@ T RWTexture1DArray<T>.Load(
 T RWTexture1DArray<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -7875,16 +7711,16 @@ T RWTexture1DArray<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -7898,11 +7734,11 @@ T RWTexture1DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -7929,9 +7765,9 @@ T RWTexture1DArray<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -7957,9 +7793,9 @@ float RWTexture1DArray<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -7974,12 +7810,12 @@ float RWTexture1DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RWTexture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RWTexture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -7987,10 +7823,10 @@ float RWTexture1DArray<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8005,6 +7841,7 @@ float RWTexture1DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RWTexture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -8016,6 +7853,7 @@ T RWTexture1DArray<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T RWTexture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -8025,13 +7863,10 @@ T RWTexture1DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -8048,12 +7883,12 @@ T RWTexture1DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -8061,10 +7896,10 @@ T RWTexture1DArray<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -8094,7 +7929,7 @@ T RWTexture1DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -8102,13 +7937,13 @@ vector<T,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8116,7 +7951,7 @@ vector<T,4> RWTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8127,10 +7962,10 @@ vector<T,4> RWTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8149,7 +7984,7 @@ vector<T,4> RWTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -8157,13 +7992,13 @@ vector<T,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8171,7 +8006,7 @@ vector<T,4> RWTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8182,10 +8017,10 @@ vector<T,4> RWTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8204,7 +8039,7 @@ vector<T,4> RWTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -8212,13 +8047,13 @@ vector<T,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8226,7 +8061,7 @@ vector<T,4> RWTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8237,10 +8072,10 @@ vector<T,4> RWTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8259,7 +8094,7 @@ vector<T,4> RWTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -8267,13 +8102,13 @@ vector<T,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8281,7 +8116,7 @@ vector<T,4> RWTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8292,10 +8127,10 @@ vector<T,4> RWTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8314,7 +8149,7 @@ vector<T,4> RWTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -8322,13 +8157,13 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8336,7 +8171,7 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8347,10 +8182,10 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8380,7 +8215,7 @@ vector<T,4> RWTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -8388,13 +8223,13 @@ vector<float,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8402,7 +8237,7 @@ vector<float,4> RWTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8413,10 +8248,10 @@ vector<float,4> RWTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8435,7 +8270,7 @@ vector<float,4> RWTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -8443,13 +8278,13 @@ vector<float,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8457,7 +8292,7 @@ vector<float,4> RWTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8468,10 +8303,10 @@ vector<float,4> RWTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8490,7 +8325,7 @@ vector<float,4> RWTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -8498,13 +8333,13 @@ vector<float,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8512,7 +8347,7 @@ vector<float,4> RWTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8523,10 +8358,10 @@ vector<float,4> RWTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8545,7 +8380,7 @@ vector<float,4> RWTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -8553,13 +8388,13 @@ vector<float,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8567,7 +8402,7 @@ vector<float,4> RWTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8578,10 +8413,10 @@ vector<float,4> RWTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8600,7 +8435,7 @@ vector<float,4> RWTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -8608,13 +8443,13 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8622,7 +8457,7 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8633,10 +8468,10 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8666,7 +8501,7 @@ vector<float,4> RWTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -8674,13 +8509,13 @@ vector<int,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8688,7 +8523,7 @@ vector<int,4> RWTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8699,10 +8534,10 @@ vector<int,4> RWTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8721,7 +8556,7 @@ vector<int,4> RWTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -8729,13 +8564,13 @@ vector<int,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8743,7 +8578,7 @@ vector<int,4> RWTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -8754,10 +8589,10 @@ vector<int,4> RWTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8776,7 +8611,7 @@ vector<int,4> RWTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -8784,13 +8619,13 @@ vector<int,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8798,7 +8633,7 @@ vector<int,4> RWTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -8809,10 +8644,10 @@ vector<int,4> RWTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8831,7 +8666,7 @@ vector<int,4> RWTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -8839,13 +8674,13 @@ vector<int,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8853,7 +8688,7 @@ vector<int,4> RWTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -8864,10 +8699,10 @@ vector<int,4> RWTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8886,7 +8721,7 @@ vector<int,4> RWTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -8894,13 +8729,13 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8908,7 +8743,7 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -8919,10 +8754,10 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -8952,7 +8787,7 @@ vector<int,4> RWTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -8960,13 +8795,13 @@ vector<uint,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8974,7 +8809,7 @@ vector<uint,4> RWTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -8985,10 +8820,10 @@ vector<uint,4> RWTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9007,7 +8842,7 @@ vector<uint,4> RWTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -9015,13 +8850,13 @@ vector<uint,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9029,7 +8864,7 @@ vector<uint,4> RWTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9040,10 +8875,10 @@ vector<uint,4> RWTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9062,7 +8897,7 @@ vector<uint,4> RWTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -9070,13 +8905,13 @@ vector<uint,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -9084,7 +8919,7 @@ vector<uint,4> RWTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -9095,10 +8930,10 @@ vector<uint,4> RWTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9117,7 +8952,7 @@ vector<uint,4> RWTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -9125,13 +8960,13 @@ vector<uint,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -9139,7 +8974,7 @@ vector<uint,4> RWTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -9150,10 +8985,10 @@ vector<uint,4> RWTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9172,7 +9007,7 @@ vector<uint,4> RWTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -9180,13 +9015,13 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -9194,7 +9029,7 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -9205,10 +9040,10 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9252,10 +9087,6 @@ float RasterizerOrderedTexture1DArray<T>.CalculateLevelOfDetail(
     vector<float,1>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -9271,10 +9102,6 @@ float RasterizerOrderedTexture1DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,1>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -9305,13 +9132,9 @@ void RasterizerOrderedTexture1DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -9326,26 +9149,22 @@ void RasterizerOrderedTexture1DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1DArray<T>.Load(vector<int,2> location);
 T RasterizerOrderedTexture1DArray<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1DArray<T>.Load(
     vector<int,2>        location,
     vector<int,1>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9362,10 +9181,6 @@ T RasterizerOrderedTexture1DArray<T>.Load(
 T RasterizerOrderedTexture1DArray<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -9376,16 +9191,16 @@ T RasterizerOrderedTexture1DArray<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RasterizerOrderedTexture1DArray<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -9399,11 +9214,11 @@ T RasterizerOrderedTexture1DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -9430,9 +9245,9 @@ T RasterizerOrderedTexture1DArray<T>.SampleBias(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -9458,9 +9273,9 @@ float RasterizerOrderedTexture1DArray<T>.SampleCmp(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -9475,12 +9290,12 @@ float RasterizerOrderedTexture1DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RasterizerOrderedTexture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RasterizerOrderedTexture1DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -9488,10 +9303,10 @@ float RasterizerOrderedTexture1DArray<T>.SampleCmpLevelZero(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9506,6 +9321,7 @@ float RasterizerOrderedTexture1DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RasterizerOrderedTexture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -9517,6 +9333,7 @@ T RasterizerOrderedTexture1DArray<T>.SampleGrad(
     vector<float,1>      gradX,
     vector<float,1>      gradY,
     vector<int,1>        offset);
+/// See Availability 2
 T RasterizerOrderedTexture1DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -9526,13 +9343,10 @@ T RasterizerOrderedTexture1DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -9549,12 +9363,12 @@ T RasterizerOrderedTexture1DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -9562,10 +9376,10 @@ T RasterizerOrderedTexture1DArray<T>.SampleLevel(
     vector<int,1>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -9595,7 +9409,7 @@ T RasterizerOrderedTexture1DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -9603,13 +9417,13 @@ vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -9617,7 +9431,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -9628,10 +9442,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9650,7 +9464,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -9658,13 +9472,13 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9672,7 +9486,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9683,10 +9497,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9705,7 +9519,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -9713,13 +9527,13 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -9727,7 +9541,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -9738,10 +9552,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9760,7 +9574,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -9768,13 +9582,13 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -9782,7 +9596,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -9793,10 +9607,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9815,7 +9629,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -9823,13 +9637,13 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -9837,7 +9651,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -9848,10 +9662,10 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9881,7 +9695,7 @@ vector<T,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -9889,13 +9703,13 @@ vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -9903,7 +9717,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -9914,10 +9728,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9936,7 +9750,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -9944,13 +9758,13 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9958,7 +9772,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -9969,10 +9783,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -9991,7 +9805,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -9999,13 +9813,13 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10013,7 +9827,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10024,10 +9838,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10046,7 +9860,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -10054,13 +9868,13 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10068,7 +9882,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10079,10 +9893,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10101,7 +9915,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -10109,13 +9923,13 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10123,7 +9937,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10134,10 +9948,10 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10167,7 +9981,7 @@ vector<float,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -10175,13 +9989,13 @@ vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -10189,7 +10003,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -10200,10 +10014,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10222,7 +10036,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -10230,13 +10044,13 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -10244,7 +10058,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -10255,10 +10069,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10277,7 +10091,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -10285,13 +10099,13 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10299,7 +10113,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10310,10 +10124,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10332,7 +10146,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -10340,13 +10154,13 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10354,7 +10168,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10365,10 +10179,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10387,7 +10201,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -10395,13 +10209,13 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10409,7 +10223,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10420,10 +10234,10 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10453,7 +10267,7 @@ vector<int,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location);
@@ -10461,13 +10275,13 @@ vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -10475,7 +10289,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -10486,10 +10300,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10508,7 +10322,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
@@ -10516,13 +10330,13 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -10530,7 +10344,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -10541,10 +10355,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10563,7 +10377,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
@@ -10571,13 +10385,13 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10585,7 +10399,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -10596,10 +10410,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10618,7 +10432,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
@@ -10626,13 +10440,13 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10640,7 +10454,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -10651,10 +10465,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10673,7 +10487,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
@@ -10681,13 +10495,13 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,1>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10695,7 +10509,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     vector<int,1>        offset2,
     vector<int,1>        offset3,
     vector<int,1>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -10706,10 +10520,10 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10763,13 +10577,9 @@ void Texture1DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -10788,10 +10598,6 @@ void Texture1DMSArray<T>.GetDimensions(
 vector<float,2> Texture1DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -10802,7 +10608,7 @@ vector<float,2> Texture1DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -10810,7 +10616,7 @@ T Texture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -10818,14 +10624,10 @@ T Texture1DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10842,10 +10644,6 @@ T Texture1DMSArray<T>.Load(
 ```
 T Texture1DMSArray<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -10892,13 +10690,9 @@ void RWTexture1DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -10917,10 +10711,6 @@ void RWTexture1DMSArray<T>.GetDimensions(
 vector<float,2> RWTexture1DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -10931,7 +10721,7 @@ vector<float,2> RWTexture1DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -10939,7 +10729,7 @@ T RWTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -10947,14 +10737,10 @@ T RWTexture1DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -10971,10 +10757,6 @@ T RWTexture1DMSArray<T>.Load(
 ```
 T RWTexture1DMSArray<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -11021,13 +10803,9 @@ void RasterizerOrderedTexture1DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -11046,10 +10824,6 @@ void RasterizerOrderedTexture1DMSArray<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTexture1DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -11060,7 +10834,7 @@ vector<float,2> RasterizerOrderedTexture1DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -11068,7 +10842,7 @@ T RasterizerOrderedTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,1>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture1DMSArray<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -11076,14 +10850,10 @@ T RasterizerOrderedTexture1DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -11100,10 +10870,6 @@ T RasterizerOrderedTexture1DMSArray<T>.Load(
 ```
 T RasterizerOrderedTexture1DMSArray<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -11140,10 +10906,6 @@ float Texture2D<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -11159,10 +10921,6 @@ float Texture2D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -11193,13 +10951,9 @@ void Texture2D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -11214,26 +10968,22 @@ void Texture2D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2D<T>.Load(vector<int,3> location);
 T Texture2D<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2D<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -11250,10 +11000,6 @@ T Texture2D<T>.Load(
 T Texture2D<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -11264,16 +11010,16 @@ T Texture2D<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -11287,11 +11033,11 @@ T Texture2D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11318,9 +11064,9 @@ T Texture2D<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -11346,9 +11092,9 @@ float Texture2D<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -11363,12 +11109,12 @@ float Texture2D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float Texture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float Texture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -11376,10 +11122,10 @@ float Texture2D<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -11394,6 +11140,7 @@ float Texture2D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T Texture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -11405,6 +11152,7 @@ T Texture2D<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T Texture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -11414,13 +11162,10 @@ T Texture2D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -11437,12 +11182,12 @@ T Texture2D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -11450,10 +11195,10 @@ T Texture2D<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -11483,22 +11228,22 @@ T Texture2D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -11506,7 +11251,7 @@ vector<T,4> Texture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -11517,11 +11262,11 @@ vector<T,4> Texture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11540,22 +11285,22 @@ vector<T,4> Texture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -11563,7 +11308,7 @@ vector<T,4> Texture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -11574,11 +11319,11 @@ vector<T,4> Texture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11597,22 +11342,22 @@ vector<T,4> Texture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -11620,7 +11365,7 @@ vector<T,4> Texture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -11631,11 +11376,11 @@ vector<T,4> Texture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11654,22 +11399,22 @@ vector<T,4> Texture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -11677,7 +11422,7 @@ vector<T,4> Texture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -11688,11 +11433,11 @@ vector<T,4> Texture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11711,22 +11456,22 @@ vector<T,4> Texture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -11734,7 +11479,7 @@ vector<T,4> Texture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -11745,11 +11490,11 @@ vector<T,4> Texture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11779,22 +11524,22 @@ vector<T,4> Texture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -11802,7 +11547,7 @@ vector<float,4> Texture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -11813,11 +11558,11 @@ vector<float,4> Texture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11836,22 +11581,22 @@ vector<float,4> Texture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -11859,7 +11604,7 @@ vector<float,4> Texture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -11870,11 +11615,11 @@ vector<float,4> Texture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11893,22 +11638,22 @@ vector<float,4> Texture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -11916,7 +11661,7 @@ vector<float,4> Texture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -11927,11 +11672,11 @@ vector<float,4> Texture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -11950,22 +11695,22 @@ vector<float,4> Texture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -11973,7 +11718,7 @@ vector<float,4> Texture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -11984,11 +11729,11 @@ vector<float,4> Texture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12007,22 +11752,22 @@ vector<float,4> Texture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12030,7 +11775,7 @@ vector<float,4> Texture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12041,11 +11786,11 @@ vector<float,4> Texture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12075,22 +11820,22 @@ vector<float,4> Texture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -12098,7 +11843,7 @@ vector<int,4> Texture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -12109,11 +11854,11 @@ vector<int,4> Texture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12132,22 +11877,22 @@ vector<int,4> Texture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -12155,7 +11900,7 @@ vector<int,4> Texture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -12166,11 +11911,11 @@ vector<int,4> Texture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12189,22 +11934,22 @@ vector<int,4> Texture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -12212,7 +11957,7 @@ vector<int,4> Texture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -12223,11 +11968,11 @@ vector<int,4> Texture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12246,22 +11991,22 @@ vector<int,4> Texture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -12269,7 +12014,7 @@ vector<int,4> Texture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -12280,11 +12025,11 @@ vector<int,4> Texture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12303,22 +12048,22 @@ vector<int,4> Texture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12326,7 +12071,7 @@ vector<int,4> Texture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12337,11 +12082,11 @@ vector<int,4> Texture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12371,22 +12116,22 @@ vector<int,4> Texture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -12394,7 +12139,7 @@ vector<uint,4> Texture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -12405,11 +12150,11 @@ vector<uint,4> Texture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12428,22 +12173,22 @@ vector<uint,4> Texture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -12451,7 +12196,7 @@ vector<uint,4> Texture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -12462,11 +12207,11 @@ vector<uint,4> Texture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12485,22 +12230,22 @@ vector<uint,4> Texture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -12508,7 +12253,7 @@ vector<uint,4> Texture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -12519,11 +12264,11 @@ vector<uint,4> Texture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12542,22 +12287,22 @@ vector<uint,4> Texture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -12565,7 +12310,7 @@ vector<uint,4> Texture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -12576,11 +12321,11 @@ vector<uint,4> Texture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12599,22 +12344,22 @@ vector<uint,4> Texture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12622,7 +12367,7 @@ vector<uint,4> Texture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -12633,11 +12378,11 @@ vector<uint,4> Texture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12681,10 +12426,6 @@ float RWTexture2D<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -12700,10 +12441,6 @@ float RWTexture2D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -12734,13 +12471,9 @@ void RWTexture2D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -12755,28 +12488,24 @@ void RWTexture2D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2D<T>.Load(vector<int,2> location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2D<T>.Load(
     vector<int,2>        location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture2D<T>.Load(
     vector<int,2>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12793,10 +12522,6 @@ T RWTexture2D<T>.Load(
 T RWTexture2D<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -12807,16 +12532,16 @@ T RWTexture2D<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -12830,11 +12555,11 @@ T RWTexture2D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -12861,9 +12586,9 @@ T RWTexture2D<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -12889,9 +12614,9 @@ float RWTexture2D<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -12906,12 +12631,12 @@ float RWTexture2D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RWTexture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RWTexture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -12919,10 +12644,10 @@ float RWTexture2D<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -12937,6 +12662,7 @@ float RWTexture2D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RWTexture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -12948,6 +12674,7 @@ T RWTexture2D<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T RWTexture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -12957,13 +12684,10 @@ T RWTexture2D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -12980,12 +12704,12 @@ T RWTexture2D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -12993,10 +12717,10 @@ T RWTexture2D<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -13026,22 +12750,22 @@ T RWTexture2D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13049,7 +12773,7 @@ vector<T,4> RWTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13060,11 +12784,11 @@ vector<T,4> RWTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13083,22 +12807,22 @@ vector<T,4> RWTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13106,7 +12830,7 @@ vector<T,4> RWTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13117,11 +12841,11 @@ vector<T,4> RWTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13140,22 +12864,22 @@ vector<T,4> RWTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13163,7 +12887,7 @@ vector<T,4> RWTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13174,11 +12898,11 @@ vector<T,4> RWTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13197,22 +12921,22 @@ vector<T,4> RWTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13220,7 +12944,7 @@ vector<T,4> RWTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13231,11 +12955,11 @@ vector<T,4> RWTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13254,22 +12978,22 @@ vector<T,4> RWTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13277,7 +13001,7 @@ vector<T,4> RWTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13288,11 +13012,11 @@ vector<T,4> RWTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13322,22 +13046,22 @@ vector<T,4> RWTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13345,7 +13069,7 @@ vector<float,4> RWTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13356,11 +13080,11 @@ vector<float,4> RWTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13379,22 +13103,22 @@ vector<float,4> RWTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13402,7 +13126,7 @@ vector<float,4> RWTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13413,11 +13137,11 @@ vector<float,4> RWTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13436,22 +13160,22 @@ vector<float,4> RWTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13459,7 +13183,7 @@ vector<float,4> RWTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13470,11 +13194,11 @@ vector<float,4> RWTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13493,22 +13217,22 @@ vector<float,4> RWTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13516,7 +13240,7 @@ vector<float,4> RWTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13527,11 +13251,11 @@ vector<float,4> RWTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13550,22 +13274,22 @@ vector<float,4> RWTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13573,7 +13297,7 @@ vector<float,4> RWTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13584,11 +13308,11 @@ vector<float,4> RWTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13618,22 +13342,22 @@ vector<float,4> RWTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13641,7 +13365,7 @@ vector<int,4> RWTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13652,11 +13376,11 @@ vector<int,4> RWTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13675,22 +13399,22 @@ vector<int,4> RWTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13698,7 +13422,7 @@ vector<int,4> RWTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13709,11 +13433,11 @@ vector<int,4> RWTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13732,22 +13456,22 @@ vector<int,4> RWTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13755,7 +13479,7 @@ vector<int,4> RWTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -13766,11 +13490,11 @@ vector<int,4> RWTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13789,22 +13513,22 @@ vector<int,4> RWTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13812,7 +13536,7 @@ vector<int,4> RWTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -13823,11 +13547,11 @@ vector<int,4> RWTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13846,22 +13570,22 @@ vector<int,4> RWTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13869,7 +13593,7 @@ vector<int,4> RWTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -13880,11 +13604,11 @@ vector<int,4> RWTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13914,22 +13638,22 @@ vector<int,4> RWTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13937,7 +13661,7 @@ vector<uint,4> RWTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -13948,11 +13672,11 @@ vector<uint,4> RWTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -13971,22 +13695,22 @@ vector<uint,4> RWTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -13994,7 +13718,7 @@ vector<uint,4> RWTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -14005,11 +13729,11 @@ vector<uint,4> RWTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14028,22 +13752,22 @@ vector<uint,4> RWTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -14051,7 +13775,7 @@ vector<uint,4> RWTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -14062,11 +13786,11 @@ vector<uint,4> RWTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14085,22 +13809,22 @@ vector<uint,4> RWTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -14108,7 +13832,7 @@ vector<uint,4> RWTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -14119,11 +13843,11 @@ vector<uint,4> RWTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14142,22 +13866,22 @@ vector<uint,4> RWTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -14165,7 +13889,7 @@ vector<uint,4> RWTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -14176,11 +13900,11 @@ vector<uint,4> RWTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14224,10 +13948,6 @@ float RasterizerOrderedTexture2D<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -14243,10 +13963,6 @@ float RasterizerOrderedTexture2D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -14277,13 +13993,9 @@ void RasterizerOrderedTexture2D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -14298,26 +14010,22 @@ void RasterizerOrderedTexture2D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2D<T>.Load(vector<int,2> location);
 T RasterizerOrderedTexture2D<T>.Load(
     vector<int,2>        location,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2D<T>.Load(
     vector<int,2>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -14334,10 +14042,6 @@ T RasterizerOrderedTexture2D<T>.Load(
 T RasterizerOrderedTexture2D<T>.subscript(vector<uint,2> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -14348,16 +14052,16 @@ T RasterizerOrderedTexture2D<T>.subscript(vector<uint,2> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RasterizerOrderedTexture2D<T>.Sample(
     SamplerState         s,
     vector<float,2>      location,
@@ -14371,11 +14075,11 @@ T RasterizerOrderedTexture2D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14402,9 +14106,9 @@ T RasterizerOrderedTexture2D<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -14430,9 +14134,9 @@ float RasterizerOrderedTexture2D<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -14447,12 +14151,12 @@ float RasterizerOrderedTexture2D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RasterizerOrderedTexture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RasterizerOrderedTexture2D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,2>      location,
@@ -14460,10 +14164,10 @@ float RasterizerOrderedTexture2D<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -14478,6 +14182,7 @@ float RasterizerOrderedTexture2D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RasterizerOrderedTexture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -14489,6 +14194,7 @@ T RasterizerOrderedTexture2D<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T RasterizerOrderedTexture2D<T>.SampleGrad(
     SamplerState         s,
     vector<float,2>      location,
@@ -14498,13 +14204,10 @@ T RasterizerOrderedTexture2D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -14521,12 +14224,12 @@ T RasterizerOrderedTexture2D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2D<T>.SampleLevel(
     SamplerState         s,
     vector<float,2>      location,
@@ -14534,10 +14237,10 @@ T RasterizerOrderedTexture2D<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -14567,22 +14270,22 @@ T RasterizerOrderedTexture2D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -14590,7 +14293,7 @@ vector<T,4> RasterizerOrderedTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -14601,11 +14304,11 @@ vector<T,4> RasterizerOrderedTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14624,22 +14327,22 @@ vector<T,4> RasterizerOrderedTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -14647,7 +14350,7 @@ vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -14658,11 +14361,11 @@ vector<T,4> RasterizerOrderedTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14681,22 +14384,22 @@ vector<T,4> RasterizerOrderedTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -14704,7 +14407,7 @@ vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -14715,11 +14418,11 @@ vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14738,22 +14441,22 @@ vector<T,4> RasterizerOrderedTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -14761,7 +14464,7 @@ vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -14772,11 +14475,11 @@ vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14795,22 +14498,22 @@ vector<T,4> RasterizerOrderedTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -14818,7 +14521,7 @@ vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -14829,11 +14532,11 @@ vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14863,22 +14566,22 @@ vector<T,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -14886,7 +14589,7 @@ vector<float,4> RasterizerOrderedTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -14897,11 +14600,11 @@ vector<float,4> RasterizerOrderedTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14920,22 +14623,22 @@ vector<float,4> RasterizerOrderedTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -14943,7 +14646,7 @@ vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -14954,11 +14657,11 @@ vector<float,4> RasterizerOrderedTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -14977,22 +14680,22 @@ vector<float,4> RasterizerOrderedTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15000,7 +14703,7 @@ vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15011,11 +14714,11 @@ vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15034,22 +14737,22 @@ vector<float,4> RasterizerOrderedTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15057,7 +14760,7 @@ vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15068,11 +14771,11 @@ vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15091,22 +14794,22 @@ vector<float,4> RasterizerOrderedTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15114,7 +14817,7 @@ vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15125,11 +14828,11 @@ vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15159,22 +14862,22 @@ vector<float,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -15182,7 +14885,7 @@ vector<int,4> RasterizerOrderedTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -15193,11 +14896,11 @@ vector<int,4> RasterizerOrderedTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15216,22 +14919,22 @@ vector<int,4> RasterizerOrderedTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -15239,7 +14942,7 @@ vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -15250,11 +14953,11 @@ vector<int,4> RasterizerOrderedTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15273,22 +14976,22 @@ vector<int,4> RasterizerOrderedTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15296,7 +14999,7 @@ vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15307,11 +15010,11 @@ vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15330,22 +15033,22 @@ vector<int,4> RasterizerOrderedTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15353,7 +15056,7 @@ vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15364,11 +15067,11 @@ vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15387,22 +15090,22 @@ vector<int,4> RasterizerOrderedTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15410,7 +15113,7 @@ vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15421,11 +15124,11 @@ vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15455,22 +15158,22 @@ vector<int,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -15478,7 +15181,7 @@ vector<uint,4> RasterizerOrderedTexture2D.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.Gather(
     SamplerState         s,
     vector<float,2>      location,
@@ -15489,11 +15192,11 @@ vector<uint,4> RasterizerOrderedTexture2D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15512,22 +15215,22 @@ vector<uint,4> RasterizerOrderedTexture2D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -15535,7 +15238,7 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     SamplerState         s,
     vector<float,2>      location,
@@ -15546,11 +15249,11 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15569,22 +15272,22 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15592,7 +15295,7 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     SamplerState         s,
     vector<float,2>      location,
@@ -15603,11 +15306,11 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15626,22 +15329,22 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15649,7 +15352,7 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     SamplerState         s,
     vector<float,2>      location,
@@ -15660,11 +15363,11 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15683,22 +15386,22 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15706,7 +15409,7 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     SamplerState         s,
     vector<float,2>      location,
@@ -15717,11 +15420,11 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -15775,13 +15478,9 @@ void Texture2DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -15800,10 +15499,6 @@ void Texture2DMS<T>.GetDimensions(
 vector<float,2> Texture2DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -15814,7 +15509,7 @@ vector<float,2> Texture2DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -15822,7 +15517,7 @@ T Texture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -15830,14 +15525,10 @@ T Texture2DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -15854,10 +15545,6 @@ T Texture2DMS<T>.Load(
 ```
 T Texture2DMS<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -15904,13 +15591,9 @@ void RWTexture2DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -15929,10 +15612,6 @@ void RWTexture2DMS<T>.GetDimensions(
 vector<float,2> RWTexture2DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -15943,7 +15622,7 @@ vector<float,2> RWTexture2DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -15951,7 +15630,7 @@ T RWTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -15959,14 +15638,10 @@ T RWTexture2DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -15983,10 +15658,6 @@ T RWTexture2DMS<T>.Load(
 ```
 T RWTexture2DMS<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -16033,13 +15704,9 @@ void RasterizerOrderedTexture2DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -16058,10 +15725,6 @@ void RasterizerOrderedTexture2DMS<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTexture2DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -16072,7 +15735,7 @@ vector<float,2> RasterizerOrderedTexture2DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex);
@@ -16080,7 +15743,7 @@ T RasterizerOrderedTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2DMS<T>.Load(
     vector<int,2>        location,
     int                  sampleIndex,
@@ -16088,14 +15751,10 @@ T RasterizerOrderedTexture2DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -16112,10 +15771,6 @@ T RasterizerOrderedTexture2DMS<T>.Load(
 ```
 T RasterizerOrderedTexture2DMS<T>.subscript(vector<uint,2> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -16152,10 +15807,6 @@ float Texture2DArray<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -16171,10 +15822,6 @@ float Texture2DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -16209,13 +15856,9 @@ void Texture2DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -16231,26 +15874,22 @@ void Texture2DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2DArray<T>.Load(vector<int,4> location);
 T Texture2DArray<T>.Load(
     vector<int,4>        location,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2DArray<T>.Load(
     vector<int,4>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -16267,10 +15906,6 @@ T Texture2DArray<T>.Load(
 T Texture2DArray<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -16281,16 +15916,16 @@ T Texture2DArray<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -16304,11 +15939,11 @@ T Texture2DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16335,9 +15970,9 @@ T Texture2DArray<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -16363,9 +15998,9 @@ float Texture2DArray<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -16380,12 +16015,12 @@ float Texture2DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float Texture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float Texture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -16393,10 +16028,10 @@ float Texture2DArray<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -16411,6 +16046,7 @@ float Texture2DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T Texture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -16422,6 +16058,7 @@ T Texture2DArray<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T Texture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -16431,13 +16068,10 @@ T Texture2DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -16454,12 +16088,12 @@ T Texture2DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -16467,10 +16101,10 @@ T Texture2DArray<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -16500,22 +16134,22 @@ T Texture2DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -16523,7 +16157,7 @@ vector<T,4> Texture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -16534,11 +16168,11 @@ vector<T,4> Texture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16557,22 +16191,22 @@ vector<T,4> Texture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -16580,7 +16214,7 @@ vector<T,4> Texture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -16591,11 +16225,11 @@ vector<T,4> Texture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16614,22 +16248,22 @@ vector<T,4> Texture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -16637,7 +16271,7 @@ vector<T,4> Texture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -16648,11 +16282,11 @@ vector<T,4> Texture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16671,22 +16305,22 @@ vector<T,4> Texture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -16694,7 +16328,7 @@ vector<T,4> Texture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -16705,11 +16339,11 @@ vector<T,4> Texture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16728,22 +16362,22 @@ vector<T,4> Texture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -16751,7 +16385,7 @@ vector<T,4> Texture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -16762,11 +16396,11 @@ vector<T,4> Texture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16796,22 +16430,22 @@ vector<T,4> Texture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -16819,7 +16453,7 @@ vector<float,4> Texture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -16830,11 +16464,11 @@ vector<float,4> Texture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16853,22 +16487,22 @@ vector<float,4> Texture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -16876,7 +16510,7 @@ vector<float,4> Texture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -16887,11 +16521,11 @@ vector<float,4> Texture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16910,22 +16544,22 @@ vector<float,4> Texture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -16933,7 +16567,7 @@ vector<float,4> Texture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -16944,11 +16578,11 @@ vector<float,4> Texture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -16967,22 +16601,22 @@ vector<float,4> Texture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -16990,7 +16624,7 @@ vector<float,4> Texture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -17001,11 +16635,11 @@ vector<float,4> Texture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17024,22 +16658,22 @@ vector<float,4> Texture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17047,7 +16681,7 @@ vector<float,4> Texture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17058,11 +16692,11 @@ vector<float,4> Texture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17092,22 +16726,22 @@ vector<float,4> Texture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -17115,7 +16749,7 @@ vector<int,4> Texture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -17126,11 +16760,11 @@ vector<int,4> Texture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17149,22 +16783,22 @@ vector<int,4> Texture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -17172,7 +16806,7 @@ vector<int,4> Texture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -17183,11 +16817,11 @@ vector<int,4> Texture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17206,22 +16840,22 @@ vector<int,4> Texture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -17229,7 +16863,7 @@ vector<int,4> Texture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -17240,11 +16874,11 @@ vector<int,4> Texture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17263,22 +16897,22 @@ vector<int,4> Texture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -17286,7 +16920,7 @@ vector<int,4> Texture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -17297,11 +16931,11 @@ vector<int,4> Texture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17320,22 +16954,22 @@ vector<int,4> Texture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17343,7 +16977,7 @@ vector<int,4> Texture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17354,11 +16988,11 @@ vector<int,4> Texture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17388,22 +17022,22 @@ vector<int,4> Texture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -17411,7 +17045,7 @@ vector<uint,4> Texture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -17422,11 +17056,11 @@ vector<uint,4> Texture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17445,22 +17079,22 @@ vector<uint,4> Texture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -17468,7 +17102,7 @@ vector<uint,4> Texture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -17479,11 +17113,11 @@ vector<uint,4> Texture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17502,22 +17136,22 @@ vector<uint,4> Texture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -17525,7 +17159,7 @@ vector<uint,4> Texture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -17536,11 +17170,11 @@ vector<uint,4> Texture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17559,22 +17193,22 @@ vector<uint,4> Texture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -17582,7 +17216,7 @@ vector<uint,4> Texture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -17593,11 +17227,11 @@ vector<uint,4> Texture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17616,22 +17250,22 @@ vector<uint,4> Texture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17639,7 +17273,7 @@ vector<uint,4> Texture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> Texture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -17650,11 +17284,11 @@ vector<uint,4> Texture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17698,10 +17332,6 @@ float RWTexture2DArray<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -17717,10 +17347,6 @@ float RWTexture2DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -17755,13 +17381,9 @@ void RWTexture2DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -17777,28 +17399,24 @@ void RWTexture2DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2DArray<T>.Load(vector<int,3> location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2DArray<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture2DArray<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17815,10 +17433,6 @@ T RWTexture2DArray<T>.Load(
 T RWTexture2DArray<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -17829,16 +17443,16 @@ T RWTexture2DArray<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -17852,11 +17466,11 @@ T RWTexture2DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -17883,9 +17497,9 @@ T RWTexture2DArray<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -17911,9 +17525,9 @@ float RWTexture2DArray<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -17928,12 +17542,12 @@ float RWTexture2DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RWTexture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RWTexture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -17941,10 +17555,10 @@ float RWTexture2DArray<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -17959,6 +17573,7 @@ float RWTexture2DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RWTexture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -17970,6 +17585,7 @@ T RWTexture2DArray<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T RWTexture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -17979,13 +17595,10 @@ T RWTexture2DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -18002,12 +17615,12 @@ T RWTexture2DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -18015,10 +17628,10 @@ T RWTexture2DArray<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -18048,22 +17661,22 @@ T RWTexture2DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18071,7 +17684,7 @@ vector<T,4> RWTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18082,11 +17695,11 @@ vector<T,4> RWTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18105,22 +17718,22 @@ vector<T,4> RWTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18128,7 +17741,7 @@ vector<T,4> RWTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18139,11 +17752,11 @@ vector<T,4> RWTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18162,22 +17775,22 @@ vector<T,4> RWTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18185,7 +17798,7 @@ vector<T,4> RWTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18196,11 +17809,11 @@ vector<T,4> RWTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18219,22 +17832,22 @@ vector<T,4> RWTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18242,7 +17855,7 @@ vector<T,4> RWTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18253,11 +17866,11 @@ vector<T,4> RWTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18276,22 +17889,22 @@ vector<T,4> RWTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18299,7 +17912,7 @@ vector<T,4> RWTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18310,11 +17923,11 @@ vector<T,4> RWTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18344,22 +17957,22 @@ vector<T,4> RWTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18367,7 +17980,7 @@ vector<float,4> RWTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18378,11 +17991,11 @@ vector<float,4> RWTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18401,22 +18014,22 @@ vector<float,4> RWTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18424,7 +18037,7 @@ vector<float,4> RWTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18435,11 +18048,11 @@ vector<float,4> RWTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18458,22 +18071,22 @@ vector<float,4> RWTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18481,7 +18094,7 @@ vector<float,4> RWTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18492,11 +18105,11 @@ vector<float,4> RWTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18515,22 +18128,22 @@ vector<float,4> RWTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18538,7 +18151,7 @@ vector<float,4> RWTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18549,11 +18162,11 @@ vector<float,4> RWTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18572,22 +18185,22 @@ vector<float,4> RWTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18595,7 +18208,7 @@ vector<float,4> RWTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18606,11 +18219,11 @@ vector<float,4> RWTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18640,22 +18253,22 @@ vector<float,4> RWTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18663,7 +18276,7 @@ vector<int,4> RWTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18674,11 +18287,11 @@ vector<int,4> RWTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18697,22 +18310,22 @@ vector<int,4> RWTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18720,7 +18333,7 @@ vector<int,4> RWTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -18731,11 +18344,11 @@ vector<int,4> RWTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18754,22 +18367,22 @@ vector<int,4> RWTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18777,7 +18390,7 @@ vector<int,4> RWTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -18788,11 +18401,11 @@ vector<int,4> RWTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18811,22 +18424,22 @@ vector<int,4> RWTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18834,7 +18447,7 @@ vector<int,4> RWTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -18845,11 +18458,11 @@ vector<int,4> RWTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18868,22 +18481,22 @@ vector<int,4> RWTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18891,7 +18504,7 @@ vector<int,4> RWTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -18902,11 +18515,11 @@ vector<int,4> RWTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18936,22 +18549,22 @@ vector<int,4> RWTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18959,7 +18572,7 @@ vector<uint,4> RWTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -18970,11 +18583,11 @@ vector<uint,4> RWTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -18993,22 +18606,22 @@ vector<uint,4> RWTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19016,7 +18629,7 @@ vector<uint,4> RWTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19027,11 +18640,11 @@ vector<uint,4> RWTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19050,22 +18663,22 @@ vector<uint,4> RWTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -19073,7 +18686,7 @@ vector<uint,4> RWTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -19084,11 +18697,11 @@ vector<uint,4> RWTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19107,22 +18720,22 @@ vector<uint,4> RWTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -19130,7 +18743,7 @@ vector<uint,4> RWTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -19141,11 +18754,11 @@ vector<uint,4> RWTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19164,22 +18777,22 @@ vector<uint,4> RWTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -19187,7 +18800,7 @@ vector<uint,4> RWTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RWTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -19198,11 +18811,11 @@ vector<uint,4> RWTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19246,10 +18859,6 @@ float RasterizerOrderedTexture2DArray<T>.CalculateLevelOfDetail(
     vector<float,2>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -19265,10 +18874,6 @@ float RasterizerOrderedTexture2DArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,2>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -19303,13 +18908,9 @@ void RasterizerOrderedTexture2DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -19325,26 +18926,22 @@ void RasterizerOrderedTexture2DArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2DArray<T>.Load(vector<int,3> location);
 T RasterizerOrderedTexture2DArray<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2DArray<T>.Load(
     vector<int,3>        location,
     vector<int,2>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -19361,10 +18958,6 @@ T RasterizerOrderedTexture2DArray<T>.Load(
 T RasterizerOrderedTexture2DArray<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -19375,16 +18968,16 @@ T RasterizerOrderedTexture2DArray<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RasterizerOrderedTexture2DArray<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -19398,11 +18991,11 @@ T RasterizerOrderedTexture2DArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19429,9 +19022,9 @@ T RasterizerOrderedTexture2DArray<T>.SampleBias(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -19457,9 +19050,9 @@ float RasterizerOrderedTexture2DArray<T>.SampleCmp(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -19474,12 +19067,12 @@ float RasterizerOrderedTexture2DArray<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RasterizerOrderedTexture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RasterizerOrderedTexture2DArray<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -19487,10 +19080,10 @@ float RasterizerOrderedTexture2DArray<T>.SampleCmpLevelZero(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -19505,6 +19098,7 @@ float RasterizerOrderedTexture2DArray<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RasterizerOrderedTexture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -19516,6 +19110,7 @@ T RasterizerOrderedTexture2DArray<T>.SampleGrad(
     vector<float,2>      gradX,
     vector<float,2>      gradY,
     vector<int,2>        offset);
+/// See Availability 2
 T RasterizerOrderedTexture2DArray<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -19525,13 +19120,10 @@ T RasterizerOrderedTexture2DArray<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -19548,12 +19140,12 @@ T RasterizerOrderedTexture2DArray<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2DArray<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -19561,10 +19153,10 @@ T RasterizerOrderedTexture2DArray<T>.SampleLevel(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -19594,22 +19186,22 @@ T RasterizerOrderedTexture2DArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -19617,7 +19209,7 @@ vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -19628,11 +19220,11 @@ vector<T,4> RasterizerOrderedTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19651,22 +19243,22 @@ vector<T,4> RasterizerOrderedTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19674,7 +19266,7 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19685,11 +19277,11 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19708,22 +19300,22 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -19731,7 +19323,7 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -19742,11 +19334,11 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19765,22 +19357,22 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -19788,7 +19380,7 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -19799,11 +19391,11 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19822,22 +19414,22 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -19845,7 +19437,7 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -19856,11 +19448,11 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19890,22 +19482,22 @@ vector<T,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -19913,7 +19505,7 @@ vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -19924,11 +19516,11 @@ vector<float,4> RasterizerOrderedTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -19947,22 +19539,22 @@ vector<float,4> RasterizerOrderedTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19970,7 +19562,7 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -19981,11 +19573,11 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20004,22 +19596,22 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20027,7 +19619,7 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20038,11 +19630,11 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20061,22 +19653,22 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20084,7 +19676,7 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20095,11 +19687,11 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20118,22 +19710,22 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20141,7 +19733,7 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20152,11 +19744,11 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20186,22 +19778,22 @@ vector<float,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -20209,7 +19801,7 @@ vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -20220,11 +19812,11 @@ vector<int,4> RasterizerOrderedTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20243,22 +19835,22 @@ vector<int,4> RasterizerOrderedTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -20266,7 +19858,7 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -20277,11 +19869,11 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20300,22 +19892,22 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20323,7 +19915,7 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20334,11 +19926,11 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20357,22 +19949,22 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20380,7 +19972,7 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20391,11 +19983,11 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20414,22 +20006,22 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20437,7 +20029,7 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20448,11 +20040,11 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20482,22 +20074,22 @@ vector<int,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -20505,7 +20097,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -20516,11 +20108,11 @@ vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20539,22 +20131,22 @@ vector<uint,4> RasterizerOrderedTexture2DArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -20562,7 +20154,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -20573,11 +20165,11 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20596,22 +20188,22 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20619,7 +20211,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -20630,11 +20222,11 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20653,22 +20245,22 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20676,7 +20268,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -20687,11 +20279,11 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20710,22 +20302,22 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,2>        offset,
     out uint             status);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20733,7 +20325,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     vector<int,2>        offset2,
     vector<int,2>        offset3,
     vector<int,2>        offset4);
-/// See Target Availability 3
+/// See Availability 3
 vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -20744,11 +20336,11 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -20806,13 +20398,9 @@ void Texture2DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -20832,10 +20420,6 @@ void Texture2DMSArray<T>.GetDimensions(
 vector<float,2> Texture2DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -20846,7 +20430,7 @@ vector<float,2> Texture2DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -20854,7 +20438,7 @@ T Texture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -20862,14 +20446,10 @@ T Texture2DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -20886,10 +20466,6 @@ T Texture2DMSArray<T>.Load(
 ```
 T Texture2DMSArray<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -20940,13 +20516,9 @@ void RWTexture2DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -20966,10 +20538,6 @@ void RWTexture2DMSArray<T>.GetDimensions(
 vector<float,2> RWTexture2DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -20980,7 +20548,7 @@ vector<float,2> RWTexture2DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -20988,7 +20556,7 @@ T RWTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -20996,14 +20564,10 @@ T RWTexture2DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21020,10 +20584,6 @@ T RWTexture2DMSArray<T>.Load(
 ```
 T RWTexture2DMSArray<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -21074,13 +20634,9 @@ void RasterizerOrderedTexture2DMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -21100,10 +20656,6 @@ void RasterizerOrderedTexture2DMSArray<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTexture2DMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -21114,7 +20666,7 @@ vector<float,2> RasterizerOrderedTexture2DMSArray<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -21122,7 +20674,7 @@ T RasterizerOrderedTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,2>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture2DMSArray<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -21130,14 +20682,10 @@ T RasterizerOrderedTexture2DMSArray<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21154,10 +20702,6 @@ T RasterizerOrderedTexture2DMSArray<T>.Load(
 ```
 T RasterizerOrderedTexture2DMSArray<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -21194,10 +20738,6 @@ float Texture3D<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -21213,10 +20753,6 @@ float Texture3D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -21251,13 +20787,9 @@ void Texture3D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -21273,26 +20805,22 @@ void Texture3D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture3D<T>.Load(vector<int,4> location);
 T Texture3D<T>.Load(
     vector<int,4>        location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture3D<T>.Load(
     vector<int,4>        location,
     vector<int,3>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21309,10 +20837,6 @@ T Texture3D<T>.Load(
 T Texture3D<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -21323,16 +20847,16 @@ T Texture3D<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T Texture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T Texture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -21346,11 +20870,11 @@ T Texture3D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -21377,9 +20901,9 @@ T Texture3D<T>.SampleBias(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -21405,9 +20929,9 @@ float Texture3D<T>.SampleCmp(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -21422,12 +20946,12 @@ float Texture3D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float Texture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float Texture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -21435,10 +20959,10 @@ float Texture3D<T>.SampleCmpLevelZero(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21453,6 +20977,7 @@ float Texture3D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T Texture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -21464,6 +20989,7 @@ T Texture3D<T>.SampleGrad(
     vector<float,3>      gradX,
     vector<float,3>      gradY,
     vector<int,3>        offset);
+/// See Availability 2
 T Texture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -21473,13 +20999,10 @@ T Texture3D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -21496,12 +21019,12 @@ T Texture3D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T Texture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -21509,10 +21032,10 @@ T Texture3D<T>.SampleLevel(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -21542,7 +21065,7 @@ T Texture3D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -21550,13 +21073,13 @@ vector<T,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -21564,7 +21087,7 @@ vector<T,4> Texture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -21575,10 +21098,10 @@ vector<T,4> Texture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21597,7 +21120,7 @@ vector<T,4> Texture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -21605,13 +21128,13 @@ vector<T,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -21619,7 +21142,7 @@ vector<T,4> Texture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -21630,10 +21153,10 @@ vector<T,4> Texture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21652,7 +21175,7 @@ vector<T,4> Texture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -21660,13 +21183,13 @@ vector<T,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -21674,7 +21197,7 @@ vector<T,4> Texture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -21685,10 +21208,10 @@ vector<T,4> Texture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21707,7 +21230,7 @@ vector<T,4> Texture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -21715,13 +21238,13 @@ vector<T,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -21729,7 +21252,7 @@ vector<T,4> Texture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -21740,10 +21263,10 @@ vector<T,4> Texture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21762,7 +21285,7 @@ vector<T,4> Texture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -21770,13 +21293,13 @@ vector<T,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -21784,7 +21307,7 @@ vector<T,4> Texture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -21795,10 +21318,10 @@ vector<T,4> Texture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21828,7 +21351,7 @@ vector<T,4> Texture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -21836,13 +21359,13 @@ vector<float,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -21850,7 +21373,7 @@ vector<float,4> Texture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -21861,10 +21384,10 @@ vector<float,4> Texture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21883,7 +21406,7 @@ vector<float,4> Texture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -21891,13 +21414,13 @@ vector<float,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -21905,7 +21428,7 @@ vector<float,4> Texture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -21916,10 +21439,10 @@ vector<float,4> Texture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21938,7 +21461,7 @@ vector<float,4> Texture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -21946,13 +21469,13 @@ vector<float,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -21960,7 +21483,7 @@ vector<float,4> Texture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -21971,10 +21494,10 @@ vector<float,4> Texture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -21993,7 +21516,7 @@ vector<float,4> Texture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -22001,13 +21524,13 @@ vector<float,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22015,7 +21538,7 @@ vector<float,4> Texture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22026,10 +21549,10 @@ vector<float,4> Texture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22048,7 +21571,7 @@ vector<float,4> Texture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -22056,13 +21579,13 @@ vector<float,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22070,7 +21593,7 @@ vector<float,4> Texture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22081,10 +21604,10 @@ vector<float,4> Texture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22114,7 +21637,7 @@ vector<float,4> Texture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -22122,13 +21645,13 @@ vector<int,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -22136,7 +21659,7 @@ vector<int,4> Texture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -22147,10 +21670,10 @@ vector<int,4> Texture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22169,7 +21692,7 @@ vector<int,4> Texture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -22177,13 +21700,13 @@ vector<int,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -22191,7 +21714,7 @@ vector<int,4> Texture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -22202,10 +21725,10 @@ vector<int,4> Texture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22224,7 +21747,7 @@ vector<int,4> Texture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -22232,13 +21755,13 @@ vector<int,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -22246,7 +21769,7 @@ vector<int,4> Texture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -22257,10 +21780,10 @@ vector<int,4> Texture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22279,7 +21802,7 @@ vector<int,4> Texture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -22287,13 +21810,13 @@ vector<int,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22301,7 +21824,7 @@ vector<int,4> Texture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22312,10 +21835,10 @@ vector<int,4> Texture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22334,7 +21857,7 @@ vector<int,4> Texture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -22342,13 +21865,13 @@ vector<int,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22356,7 +21879,7 @@ vector<int,4> Texture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22367,10 +21890,10 @@ vector<int,4> Texture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22400,7 +21923,7 @@ vector<int,4> Texture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -22408,13 +21931,13 @@ vector<uint,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -22422,7 +21945,7 @@ vector<uint,4> Texture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -22433,10 +21956,10 @@ vector<uint,4> Texture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22455,7 +21978,7 @@ vector<uint,4> Texture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -22463,13 +21986,13 @@ vector<uint,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -22477,7 +22000,7 @@ vector<uint,4> Texture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -22488,10 +22011,10 @@ vector<uint,4> Texture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22510,7 +22033,7 @@ vector<uint,4> Texture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -22518,13 +22041,13 @@ vector<uint,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -22532,7 +22055,7 @@ vector<uint,4> Texture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -22543,10 +22066,10 @@ vector<uint,4> Texture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22565,7 +22088,7 @@ vector<uint,4> Texture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -22573,13 +22096,13 @@ vector<uint,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22587,7 +22110,7 @@ vector<uint,4> Texture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -22598,10 +22121,10 @@ vector<uint,4> Texture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22620,7 +22143,7 @@ vector<uint,4> Texture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -22628,13 +22151,13 @@ vector<uint,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22642,7 +22165,7 @@ vector<uint,4> Texture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> Texture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -22653,10 +22176,10 @@ vector<uint,4> Texture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22700,10 +22223,6 @@ float RWTexture3D<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -22719,10 +22238,6 @@ float RWTexture3D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -22757,13 +22272,9 @@ void RWTexture3D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -22779,28 +22290,24 @@ void RWTexture3D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture3D<T>.Load(vector<int,3> location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture3D<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture3D<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -22817,10 +22324,6 @@ T RWTexture3D<T>.Load(
 T RWTexture3D<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -22831,16 +22334,16 @@ T RWTexture3D<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RWTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -22854,11 +22357,11 @@ T RWTexture3D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -22885,9 +22388,9 @@ T RWTexture3D<T>.SampleBias(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -22913,9 +22416,9 @@ float RWTexture3D<T>.SampleCmp(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -22930,12 +22433,12 @@ float RWTexture3D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RWTexture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RWTexture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -22943,10 +22446,10 @@ float RWTexture3D<T>.SampleCmpLevelZero(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -22961,6 +22464,7 @@ float RWTexture3D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RWTexture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -22972,6 +22476,7 @@ T RWTexture3D<T>.SampleGrad(
     vector<float,3>      gradX,
     vector<float,3>      gradY,
     vector<int,3>        offset);
+/// See Availability 2
 T RWTexture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -22981,13 +22486,10 @@ T RWTexture3D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -23004,12 +22506,12 @@ T RWTexture3D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -23017,10 +22519,10 @@ T RWTexture3D<T>.SampleLevel(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -23050,7 +22552,7 @@ T RWTexture3D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -23058,13 +22560,13 @@ vector<T,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23072,7 +22574,7 @@ vector<T,4> RWTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23083,10 +22585,10 @@ vector<T,4> RWTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23105,7 +22607,7 @@ vector<T,4> RWTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -23113,13 +22615,13 @@ vector<T,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23127,7 +22629,7 @@ vector<T,4> RWTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23138,10 +22640,10 @@ vector<T,4> RWTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23160,7 +22662,7 @@ vector<T,4> RWTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -23168,13 +22670,13 @@ vector<T,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23182,7 +22684,7 @@ vector<T,4> RWTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23193,10 +22695,10 @@ vector<T,4> RWTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23215,7 +22717,7 @@ vector<T,4> RWTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -23223,13 +22725,13 @@ vector<T,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23237,7 +22739,7 @@ vector<T,4> RWTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23248,10 +22750,10 @@ vector<T,4> RWTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23270,7 +22772,7 @@ vector<T,4> RWTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -23278,13 +22780,13 @@ vector<T,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23292,7 +22794,7 @@ vector<T,4> RWTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23303,10 +22805,10 @@ vector<T,4> RWTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23336,7 +22838,7 @@ vector<T,4> RWTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -23344,13 +22846,13 @@ vector<float,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23358,7 +22860,7 @@ vector<float,4> RWTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23369,10 +22871,10 @@ vector<float,4> RWTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23391,7 +22893,7 @@ vector<float,4> RWTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -23399,13 +22901,13 @@ vector<float,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23413,7 +22915,7 @@ vector<float,4> RWTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23424,10 +22926,10 @@ vector<float,4> RWTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23446,7 +22948,7 @@ vector<float,4> RWTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -23454,13 +22956,13 @@ vector<float,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23468,7 +22970,7 @@ vector<float,4> RWTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23479,10 +22981,10 @@ vector<float,4> RWTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23501,7 +23003,7 @@ vector<float,4> RWTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -23509,13 +23011,13 @@ vector<float,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23523,7 +23025,7 @@ vector<float,4> RWTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23534,10 +23036,10 @@ vector<float,4> RWTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23556,7 +23058,7 @@ vector<float,4> RWTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -23564,13 +23066,13 @@ vector<float,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23578,7 +23080,7 @@ vector<float,4> RWTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23589,10 +23091,10 @@ vector<float,4> RWTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23622,7 +23124,7 @@ vector<float,4> RWTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -23630,13 +23132,13 @@ vector<int,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23644,7 +23146,7 @@ vector<int,4> RWTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23655,10 +23157,10 @@ vector<int,4> RWTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23677,7 +23179,7 @@ vector<int,4> RWTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -23685,13 +23187,13 @@ vector<int,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23699,7 +23201,7 @@ vector<int,4> RWTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23710,10 +23212,10 @@ vector<int,4> RWTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23732,7 +23234,7 @@ vector<int,4> RWTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -23740,13 +23242,13 @@ vector<int,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23754,7 +23256,7 @@ vector<int,4> RWTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -23765,10 +23267,10 @@ vector<int,4> RWTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23787,7 +23289,7 @@ vector<int,4> RWTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -23795,13 +23297,13 @@ vector<int,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23809,7 +23311,7 @@ vector<int,4> RWTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -23820,10 +23322,10 @@ vector<int,4> RWTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23842,7 +23344,7 @@ vector<int,4> RWTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -23850,13 +23352,13 @@ vector<int,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23864,7 +23366,7 @@ vector<int,4> RWTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -23875,10 +23377,10 @@ vector<int,4> RWTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23908,7 +23410,7 @@ vector<int,4> RWTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -23916,13 +23418,13 @@ vector<uint,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23930,7 +23432,7 @@ vector<uint,4> RWTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -23941,10 +23443,10 @@ vector<uint,4> RWTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -23963,7 +23465,7 @@ vector<uint,4> RWTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -23971,13 +23473,13 @@ vector<uint,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23985,7 +23487,7 @@ vector<uint,4> RWTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -23996,10 +23498,10 @@ vector<uint,4> RWTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24018,7 +23520,7 @@ vector<uint,4> RWTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -24026,13 +23528,13 @@ vector<uint,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24040,7 +23542,7 @@ vector<uint,4> RWTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24051,10 +23553,10 @@ vector<uint,4> RWTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24073,7 +23575,7 @@ vector<uint,4> RWTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -24081,13 +23583,13 @@ vector<uint,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -24095,7 +23597,7 @@ vector<uint,4> RWTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -24106,10 +23608,10 @@ vector<uint,4> RWTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24128,7 +23630,7 @@ vector<uint,4> RWTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -24136,13 +23638,13 @@ vector<uint,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -24150,7 +23652,7 @@ vector<uint,4> RWTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -24161,10 +23663,10 @@ vector<uint,4> RWTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24208,10 +23710,6 @@ float RasterizerOrderedTexture3D<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -24227,10 +23725,6 @@ float RasterizerOrderedTexture3D<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -24265,13 +23759,9 @@ void RasterizerOrderedTexture3D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -24287,26 +23777,22 @@ void RasterizerOrderedTexture3D<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture3D<T>.Load(vector<int,3> location);
 T RasterizerOrderedTexture3D<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture3D<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24323,10 +23809,6 @@ T RasterizerOrderedTexture3D<T>.Load(
 T RasterizerOrderedTexture3D<T>.subscript(vector<uint,3> location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `location`
@@ -24337,16 +23819,16 @@ T RasterizerOrderedTexture3D<T>.subscript(vector<uint,3> location);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 3
+/// See Availability 3
 T RasterizerOrderedTexture3D<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -24360,11 +23842,11 @@ T RasterizerOrderedTexture3D<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -24391,9 +23873,9 @@ T RasterizerOrderedTexture3D<T>.SampleBias(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -24419,9 +23901,9 @@ float RasterizerOrderedTexture3D<T>.SampleCmp(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -24436,12 +23918,12 @@ float RasterizerOrderedTexture3D<T>.SampleCmp(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float RasterizerOrderedTexture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
     float                compareValue);
-/// See Target Availability 2
+/// See Availability 2
 float RasterizerOrderedTexture3D<T>.SampleCmpLevelZero(
     SamplerComparisonState s,
     vector<float,3>      location,
@@ -24449,10 +23931,10 @@ float RasterizerOrderedTexture3D<T>.SampleCmpLevelZero(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24467,6 +23949,7 @@ float RasterizerOrderedTexture3D<T>.SampleCmpLevelZero(
 ## Signature 
 
 ```
+/// See Availability 1
 T RasterizerOrderedTexture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -24478,6 +23961,7 @@ T RasterizerOrderedTexture3D<T>.SampleGrad(
     vector<float,3>      gradX,
     vector<float,3>      gradY,
     vector<int,3>        offset);
+/// See Availability 2
 T RasterizerOrderedTexture3D<T>.SampleGrad(
     SamplerState         s,
     vector<float,3>      location,
@@ -24487,13 +23971,10 @@ T RasterizerOrderedTexture3D<T>.SampleGrad(
     float                lodClamp);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_sparse_texture_clamp`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
 
 ## Parameters
 
@@ -24510,12 +23991,12 @@ T RasterizerOrderedTexture3D<T>.SampleGrad(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
     float                level);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture3D<T>.SampleLevel(
     SamplerState         s,
     vector<float,3>      location,
@@ -24523,10 +24004,10 @@ T RasterizerOrderedTexture3D<T>.SampleLevel(
     vector<int,3>        offset);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -24556,7 +24037,7 @@ T RasterizerOrderedTexture3D<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -24564,13 +24045,13 @@ vector<T,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -24578,7 +24059,7 @@ vector<T,4> RasterizerOrderedTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -24589,10 +24070,10 @@ vector<T,4> RasterizerOrderedTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24611,7 +24092,7 @@ vector<T,4> RasterizerOrderedTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -24619,13 +24100,13 @@ vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -24633,7 +24114,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -24644,10 +24125,10 @@ vector<T,4> RasterizerOrderedTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24666,7 +24147,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -24674,13 +24155,13 @@ vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24688,7 +24169,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24699,10 +24180,10 @@ vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24721,7 +24202,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -24729,13 +24210,13 @@ vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -24743,7 +24224,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -24754,10 +24235,10 @@ vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24776,7 +24257,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -24784,13 +24265,13 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -24798,7 +24279,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -24809,10 +24290,10 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24842,7 +24323,7 @@ vector<T,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -24850,13 +24331,13 @@ vector<float,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -24864,7 +24345,7 @@ vector<float,4> RasterizerOrderedTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -24875,10 +24356,10 @@ vector<float,4> RasterizerOrderedTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24897,7 +24378,7 @@ vector<float,4> RasterizerOrderedTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -24905,13 +24386,13 @@ vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -24919,7 +24400,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -24930,10 +24411,10 @@ vector<float,4> RasterizerOrderedTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -24952,7 +24433,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -24960,13 +24441,13 @@ vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24974,7 +24455,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -24985,10 +24466,10 @@ vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25007,7 +24488,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -25015,13 +24496,13 @@ vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25029,7 +24510,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25040,10 +24521,10 @@ vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25062,7 +24543,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -25070,13 +24551,13 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25084,7 +24565,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25095,10 +24576,10 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25128,7 +24609,7 @@ vector<float,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -25136,13 +24617,13 @@ vector<int,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -25150,7 +24631,7 @@ vector<int,4> RasterizerOrderedTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -25161,10 +24642,10 @@ vector<int,4> RasterizerOrderedTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25183,7 +24664,7 @@ vector<int,4> RasterizerOrderedTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -25191,13 +24672,13 @@ vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -25205,7 +24686,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -25216,10 +24697,10 @@ vector<int,4> RasterizerOrderedTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25238,7 +24719,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -25246,13 +24727,13 @@ vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -25260,7 +24741,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -25271,10 +24752,10 @@ vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25293,7 +24774,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -25301,13 +24782,13 @@ vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25315,7 +24796,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25326,10 +24807,10 @@ vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25348,7 +24829,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -25356,13 +24837,13 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25370,7 +24851,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25381,10 +24862,10 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25414,7 +24895,7 @@ vector<int,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -25422,13 +24903,13 @@ vector<uint,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -25436,7 +24917,7 @@ vector<uint,4> RasterizerOrderedTexture3D.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -25447,10 +24928,10 @@ vector<uint,4> RasterizerOrderedTexture3D.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25469,7 +24950,7 @@ vector<uint,4> RasterizerOrderedTexture3D.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -25477,13 +24958,13 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -25491,7 +24972,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -25502,10 +24983,10 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25524,7 +25005,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -25532,13 +25013,13 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -25546,7 +25027,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -25557,10 +25038,10 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25579,7 +25060,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -25587,13 +25068,13 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25601,7 +25082,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -25612,10 +25093,10 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25634,7 +25115,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -25642,13 +25123,13 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25656,7 +25137,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -25667,10 +25148,10 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25728,13 +25209,9 @@ void Texture3DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -25754,10 +25231,6 @@ void Texture3DMS<T>.GetDimensions(
 vector<float,2> Texture3DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -25768,7 +25241,7 @@ vector<float,2> Texture3DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Texture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -25776,7 +25249,7 @@ T Texture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T Texture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -25784,14 +25257,10 @@ T Texture3DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25808,10 +25277,6 @@ T Texture3DMS<T>.Load(
 ```
 T Texture3DMS<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -25862,13 +25327,9 @@ void RWTexture3DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -25888,10 +25349,6 @@ void RWTexture3DMS<T>.GetDimensions(
 vector<float,2> RWTexture3DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -25902,7 +25359,7 @@ vector<float,2> RWTexture3DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -25910,7 +25367,7 @@ T RWTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RWTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -25918,14 +25375,10 @@ T RWTexture3DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -25942,10 +25395,6 @@ T RWTexture3DMS<T>.Load(
 ```
 T RWTexture3DMS<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -25996,13 +25445,9 @@ void RasterizerOrderedTexture3DMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -26022,10 +25467,6 @@ void RasterizerOrderedTexture3DMS<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTexture3DMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -26036,7 +25477,7 @@ vector<float,2> RasterizerOrderedTexture3DMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -26044,7 +25485,7 @@ T RasterizerOrderedTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTexture3DMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -26052,14 +25493,10 @@ T RasterizerOrderedTexture3DMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26076,10 +25513,6 @@ T RasterizerOrderedTexture3DMS<T>.Load(
 ```
 T RasterizerOrderedTexture3DMS<T>.subscript(vector<uint,3> location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -26115,10 +25548,6 @@ float TextureCube<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -26134,10 +25563,6 @@ float TextureCube<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -26168,13 +25593,9 @@ void TextureCube<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -26189,26 +25610,22 @@ void TextureCube<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T TextureCube<T>.Load(vector<int,4> location);
 T TextureCube<T>.Load(
     vector<int,4>        location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T TextureCube<T>.Load(
     vector<int,4>        location,
     vector<int,3>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26222,11 +25639,11 @@ T TextureCube<T>.Load(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T TextureCube<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T TextureCube<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -26238,10 +25655,10 @@ T TextureCube<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26262,9 +25679,9 @@ T TextureCube<T>.SampleBias(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -26284,9 +25701,9 @@ float TextureCube<T>.SampleCmp(
     float                compareValue);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -26306,9 +25723,9 @@ float TextureCube<T>.SampleCmpLevelZero(
     float                compareValue);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -26329,9 +25746,9 @@ T TextureCube<T>.SampleGrad(
     vector<float,3>      gradY);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -26352,9 +25769,9 @@ T TextureCube<T>.SampleLevel(
     float                level);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -26383,7 +25800,7 @@ T TextureCube<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -26391,13 +25808,13 @@ vector<T,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26405,7 +25822,7 @@ vector<T,4> TextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26416,10 +25833,10 @@ vector<T,4> TextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26438,7 +25855,7 @@ vector<T,4> TextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -26446,13 +25863,13 @@ vector<T,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -26460,7 +25877,7 @@ vector<T,4> TextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -26471,10 +25888,10 @@ vector<T,4> TextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26493,7 +25910,7 @@ vector<T,4> TextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -26501,13 +25918,13 @@ vector<T,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -26515,7 +25932,7 @@ vector<T,4> TextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -26526,10 +25943,10 @@ vector<T,4> TextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26548,7 +25965,7 @@ vector<T,4> TextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -26556,13 +25973,13 @@ vector<T,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -26570,7 +25987,7 @@ vector<T,4> TextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -26581,10 +25998,10 @@ vector<T,4> TextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26603,7 +26020,7 @@ vector<T,4> TextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -26611,13 +26028,13 @@ vector<T,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -26625,7 +26042,7 @@ vector<T,4> TextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -26636,10 +26053,10 @@ vector<T,4> TextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26669,7 +26086,7 @@ vector<T,4> TextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -26677,13 +26094,13 @@ vector<float,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26691,7 +26108,7 @@ vector<float,4> TextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26702,10 +26119,10 @@ vector<float,4> TextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26724,7 +26141,7 @@ vector<float,4> TextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -26732,13 +26149,13 @@ vector<float,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -26746,7 +26163,7 @@ vector<float,4> TextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -26757,10 +26174,10 @@ vector<float,4> TextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26779,7 +26196,7 @@ vector<float,4> TextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -26787,13 +26204,13 @@ vector<float,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -26801,7 +26218,7 @@ vector<float,4> TextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -26812,10 +26229,10 @@ vector<float,4> TextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26834,7 +26251,7 @@ vector<float,4> TextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -26842,13 +26259,13 @@ vector<float,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -26856,7 +26273,7 @@ vector<float,4> TextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -26867,10 +26284,10 @@ vector<float,4> TextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26889,7 +26306,7 @@ vector<float,4> TextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -26897,13 +26314,13 @@ vector<float,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -26911,7 +26328,7 @@ vector<float,4> TextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -26922,10 +26339,10 @@ vector<float,4> TextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -26955,7 +26372,7 @@ vector<float,4> TextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -26963,13 +26380,13 @@ vector<int,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26977,7 +26394,7 @@ vector<int,4> TextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -26988,10 +26405,10 @@ vector<int,4> TextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27010,7 +26427,7 @@ vector<int,4> TextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -27018,13 +26435,13 @@ vector<int,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27032,7 +26449,7 @@ vector<int,4> TextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27043,10 +26460,10 @@ vector<int,4> TextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27065,7 +26482,7 @@ vector<int,4> TextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -27073,13 +26490,13 @@ vector<int,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27087,7 +26504,7 @@ vector<int,4> TextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27098,10 +26515,10 @@ vector<int,4> TextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27120,7 +26537,7 @@ vector<int,4> TextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -27128,13 +26545,13 @@ vector<int,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -27142,7 +26559,7 @@ vector<int,4> TextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -27153,10 +26570,10 @@ vector<int,4> TextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27175,7 +26592,7 @@ vector<int,4> TextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -27183,13 +26600,13 @@ vector<int,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -27197,7 +26614,7 @@ vector<int,4> TextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -27208,10 +26625,10 @@ vector<int,4> TextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27241,7 +26658,7 @@ vector<int,4> TextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -27249,13 +26666,13 @@ vector<uint,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -27263,7 +26680,7 @@ vector<uint,4> TextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -27274,10 +26691,10 @@ vector<uint,4> TextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27296,7 +26713,7 @@ vector<uint,4> TextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -27304,13 +26721,13 @@ vector<uint,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27318,7 +26735,7 @@ vector<uint,4> TextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27329,10 +26746,10 @@ vector<uint,4> TextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27351,7 +26768,7 @@ vector<uint,4> TextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -27359,13 +26776,13 @@ vector<uint,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27373,7 +26790,7 @@ vector<uint,4> TextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27384,10 +26801,10 @@ vector<uint,4> TextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27406,7 +26823,7 @@ vector<uint,4> TextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -27414,13 +26831,13 @@ vector<uint,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -27428,7 +26845,7 @@ vector<uint,4> TextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -27439,10 +26856,10 @@ vector<uint,4> TextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27461,7 +26878,7 @@ vector<uint,4> TextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -27469,13 +26886,13 @@ vector<uint,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -27483,7 +26900,7 @@ vector<uint,4> TextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -27494,10 +26911,10 @@ vector<uint,4> TextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27540,10 +26957,6 @@ float RasterizerOrderedTextureCube<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -27559,10 +26972,6 @@ float RasterizerOrderedTextureCube<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -27593,13 +27002,9 @@ void RasterizerOrderedTextureCube<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -27614,26 +27019,22 @@ void RasterizerOrderedTextureCube<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTextureCube<T>.Load(vector<int,3> location);
 T RasterizerOrderedTextureCube<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTextureCube<T>.Load(
     vector<int,3>        location,
     vector<int,3>        offset,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27647,11 +27048,11 @@ T RasterizerOrderedTextureCube<T>.Load(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTextureCube<T>.Sample(
     SamplerState         s,
     vector<float,3>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTextureCube<T>.Sample(
     SamplerState         s,
     vector<float,3>      location,
@@ -27663,10 +27064,10 @@ T RasterizerOrderedTextureCube<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27687,9 +27088,9 @@ T RasterizerOrderedTextureCube<T>.SampleBias(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -27709,9 +27110,9 @@ float RasterizerOrderedTextureCube<T>.SampleCmp(
     float                compareValue);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -27731,9 +27132,9 @@ float RasterizerOrderedTextureCube<T>.SampleCmpLevelZero(
     float                compareValue);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -27754,9 +27155,9 @@ T RasterizerOrderedTextureCube<T>.SampleGrad(
     vector<float,3>      gradY);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -27777,9 +27178,9 @@ T RasterizerOrderedTextureCube<T>.SampleLevel(
     float                level);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -27808,7 +27209,7 @@ T RasterizerOrderedTextureCube<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -27816,13 +27217,13 @@ vector<T,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -27830,7 +27231,7 @@ vector<T,4> RasterizerOrderedTextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -27841,10 +27242,10 @@ vector<T,4> RasterizerOrderedTextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27863,7 +27264,7 @@ vector<T,4> RasterizerOrderedTextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -27871,13 +27272,13 @@ vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27885,7 +27286,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -27896,10 +27297,10 @@ vector<T,4> RasterizerOrderedTextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27918,7 +27319,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -27926,13 +27327,13 @@ vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27940,7 +27341,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -27951,10 +27352,10 @@ vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -27973,7 +27374,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -27981,13 +27382,13 @@ vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -27995,7 +27396,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28006,10 +27407,10 @@ vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28028,7 +27429,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -28036,13 +27437,13 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28050,7 +27451,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28061,10 +27462,10 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28094,7 +27495,7 @@ vector<T,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -28102,13 +27503,13 @@ vector<float,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28116,7 +27517,7 @@ vector<float,4> RasterizerOrderedTextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28127,10 +27528,10 @@ vector<float,4> RasterizerOrderedTextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28149,7 +27550,7 @@ vector<float,4> RasterizerOrderedTextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -28157,13 +27558,13 @@ vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28171,7 +27572,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28182,10 +27583,10 @@ vector<float,4> RasterizerOrderedTextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28204,7 +27605,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -28212,13 +27613,13 @@ vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28226,7 +27627,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28237,10 +27638,10 @@ vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28259,7 +27660,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -28267,13 +27668,13 @@ vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28281,7 +27682,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28292,10 +27693,10 @@ vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28314,7 +27715,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -28322,13 +27723,13 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28336,7 +27737,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28347,10 +27748,10 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28380,7 +27781,7 @@ vector<float,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -28388,13 +27789,13 @@ vector<int,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28402,7 +27803,7 @@ vector<int,4> RasterizerOrderedTextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28413,10 +27814,10 @@ vector<int,4> RasterizerOrderedTextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28435,7 +27836,7 @@ vector<int,4> RasterizerOrderedTextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -28443,13 +27844,13 @@ vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28457,7 +27858,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28468,10 +27869,10 @@ vector<int,4> RasterizerOrderedTextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28490,7 +27891,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -28498,13 +27899,13 @@ vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28512,7 +27913,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28523,10 +27924,10 @@ vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28545,7 +27946,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -28553,13 +27954,13 @@ vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28567,7 +27968,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28578,10 +27979,10 @@ vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28600,7 +28001,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -28608,13 +28009,13 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28622,7 +28023,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28633,10 +28034,10 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28666,7 +28067,7 @@ vector<int,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location);
@@ -28674,13 +28075,13 @@ vector<uint,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28688,7 +28089,7 @@ vector<uint,4> RasterizerOrderedTextureCube.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.Gather(
     SamplerState         s,
     vector<float,3>      location,
@@ -28699,10 +28100,10 @@ vector<uint,4> RasterizerOrderedTextureCube.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28721,7 +28122,7 @@ vector<uint,4> RasterizerOrderedTextureCube.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location);
@@ -28729,13 +28130,13 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28743,7 +28144,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     SamplerState         s,
     vector<float,3>      location,
@@ -28754,10 +28155,10 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28776,7 +28177,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location);
@@ -28784,13 +28185,13 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28798,7 +28199,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     SamplerState         s,
     vector<float,3>      location,
@@ -28809,10 +28210,10 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28831,7 +28232,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location);
@@ -28839,13 +28240,13 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28853,7 +28254,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     SamplerState         s,
     vector<float,3>      location,
@@ -28864,10 +28265,10 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28886,7 +28287,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location);
@@ -28894,13 +28295,13 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28908,7 +28309,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     SamplerState         s,
     vector<float,3>      location,
@@ -28919,10 +28320,10 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -28975,13 +28376,9 @@ void TextureCubeMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -29000,10 +28397,6 @@ void TextureCubeMS<T>.GetDimensions(
 vector<float,2> TextureCubeMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -29014,7 +28407,7 @@ vector<float,2> TextureCubeMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T TextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -29022,7 +28415,7 @@ T TextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T TextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -29030,14 +28423,10 @@ T TextureCubeMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29086,13 +28475,9 @@ void RasterizerOrderedTextureCubeMS<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -29111,10 +28496,6 @@ void RasterizerOrderedTextureCubeMS<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTextureCubeMS<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -29125,7 +28506,7 @@ vector<float,2> RasterizerOrderedTextureCubeMS<T>.GetSamplePosition(int s);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex);
@@ -29133,7 +28514,7 @@ T RasterizerOrderedTextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTextureCubeMS<T>.Load(
     vector<int,3>        location,
     int                  sampleIndex,
@@ -29141,14 +28522,10 @@ T RasterizerOrderedTextureCubeMS<T>.Load(
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29184,10 +28561,6 @@ float TextureCubeArray<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -29203,10 +28576,6 @@ float TextureCubeArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -29241,13 +28610,9 @@ void TextureCubeArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -29263,11 +28628,11 @@ void TextureCubeArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T TextureCubeArray<T>.Sample(
     SamplerState         s,
     vector<float,4>      location);
-/// See Target Availability 2
+/// See Availability 2
 T TextureCubeArray<T>.Sample(
     SamplerState         s,
     vector<float,4>      location,
@@ -29279,10 +28644,10 @@ T TextureCubeArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29303,9 +28668,9 @@ T TextureCubeArray<T>.SampleBias(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -29326,9 +28691,9 @@ T TextureCubeArray<T>.SampleGrad(
     vector<float,3>      gradY);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -29349,9 +28714,9 @@ T TextureCubeArray<T>.SampleLevel(
     float                level);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -29380,7 +28745,7 @@ T TextureCubeArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -29388,13 +28753,13 @@ vector<T,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29402,7 +28767,7 @@ vector<T,4> TextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29413,10 +28778,10 @@ vector<T,4> TextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29435,7 +28800,7 @@ vector<T,4> TextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -29443,13 +28808,13 @@ vector<T,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -29457,7 +28822,7 @@ vector<T,4> TextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -29468,10 +28833,10 @@ vector<T,4> TextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29490,7 +28855,7 @@ vector<T,4> TextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -29498,13 +28863,13 @@ vector<T,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -29512,7 +28877,7 @@ vector<T,4> TextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -29523,10 +28888,10 @@ vector<T,4> TextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29545,7 +28910,7 @@ vector<T,4> TextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -29553,13 +28918,13 @@ vector<T,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -29567,7 +28932,7 @@ vector<T,4> TextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -29578,10 +28943,10 @@ vector<T,4> TextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29600,7 +28965,7 @@ vector<T,4> TextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -29608,13 +28973,13 @@ vector<T,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -29622,7 +28987,7 @@ vector<T,4> TextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -29633,10 +28998,10 @@ vector<T,4> TextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29666,7 +29031,7 @@ vector<T,4> TextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -29674,13 +29039,13 @@ vector<float,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29688,7 +29053,7 @@ vector<float,4> TextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29699,10 +29064,10 @@ vector<float,4> TextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29721,7 +29086,7 @@ vector<float,4> TextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -29729,13 +29094,13 @@ vector<float,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -29743,7 +29108,7 @@ vector<float,4> TextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -29754,10 +29119,10 @@ vector<float,4> TextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29776,7 +29141,7 @@ vector<float,4> TextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -29784,13 +29149,13 @@ vector<float,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -29798,7 +29163,7 @@ vector<float,4> TextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -29809,10 +29174,10 @@ vector<float,4> TextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29831,7 +29196,7 @@ vector<float,4> TextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -29839,13 +29204,13 @@ vector<float,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -29853,7 +29218,7 @@ vector<float,4> TextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -29864,10 +29229,10 @@ vector<float,4> TextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29886,7 +29251,7 @@ vector<float,4> TextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -29894,13 +29259,13 @@ vector<float,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -29908,7 +29273,7 @@ vector<float,4> TextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -29919,10 +29284,10 @@ vector<float,4> TextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -29952,7 +29317,7 @@ vector<float,4> TextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -29960,13 +29325,13 @@ vector<int,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29974,7 +29339,7 @@ vector<int,4> TextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -29985,10 +29350,10 @@ vector<int,4> TextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30007,7 +29372,7 @@ vector<int,4> TextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -30015,13 +29380,13 @@ vector<int,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30029,7 +29394,7 @@ vector<int,4> TextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30040,10 +29405,10 @@ vector<int,4> TextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30062,7 +29427,7 @@ vector<int,4> TextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -30070,13 +29435,13 @@ vector<int,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30084,7 +29449,7 @@ vector<int,4> TextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30095,10 +29460,10 @@ vector<int,4> TextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30117,7 +29482,7 @@ vector<int,4> TextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -30125,13 +29490,13 @@ vector<int,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30139,7 +29504,7 @@ vector<int,4> TextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30150,10 +29515,10 @@ vector<int,4> TextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30172,7 +29537,7 @@ vector<int,4> TextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -30180,13 +29545,13 @@ vector<int,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30194,7 +29559,7 @@ vector<int,4> TextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30205,10 +29570,10 @@ vector<int,4> TextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30238,7 +29603,7 @@ vector<int,4> TextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -30246,13 +29611,13 @@ vector<uint,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -30260,7 +29625,7 @@ vector<uint,4> TextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -30271,10 +29636,10 @@ vector<uint,4> TextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30293,7 +29658,7 @@ vector<uint,4> TextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -30301,13 +29666,13 @@ vector<uint,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30315,7 +29680,7 @@ vector<uint,4> TextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30326,10 +29691,10 @@ vector<uint,4> TextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30348,7 +29713,7 @@ vector<uint,4> TextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -30356,13 +29721,13 @@ vector<uint,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30370,7 +29735,7 @@ vector<uint,4> TextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30381,10 +29746,10 @@ vector<uint,4> TextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30403,7 +29768,7 @@ vector<uint,4> TextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -30411,13 +29776,13 @@ vector<uint,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30425,7 +29790,7 @@ vector<uint,4> TextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30436,10 +29801,10 @@ vector<uint,4> TextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30458,7 +29823,7 @@ vector<uint,4> TextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -30466,13 +29831,13 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30480,7 +29845,7 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> TextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30491,10 +29856,10 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30534,10 +29899,6 @@ float RasterizerOrderedTextureCubeArray<T>.CalculateLevelOfDetail(
     vector<float,3>      location);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -30553,10 +29914,6 @@ float RasterizerOrderedTextureCubeArray<T>.CalculateLevelOfDetailUnclamped(
     SamplerState         s,
     vector<float,3>      location);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -30591,13 +29948,9 @@ void RasterizerOrderedTextureCubeArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -30613,11 +29966,11 @@ void RasterizerOrderedTextureCubeArray<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedTextureCubeArray<T>.Sample(
     SamplerState         s,
     vector<float,4>      location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedTextureCubeArray<T>.Sample(
     SamplerState         s,
     vector<float,4>      location,
@@ -30629,10 +29982,10 @@ T RasterizerOrderedTextureCubeArray<T>.Sample(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30653,9 +30006,9 @@ T RasterizerOrderedTextureCubeArray<T>.SampleBias(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -30676,9 +30029,9 @@ T RasterizerOrderedTextureCubeArray<T>.SampleGrad(
     vector<float,3>      gradY);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -30699,9 +30052,9 @@ T RasterizerOrderedTextureCubeArray<T>.SampleLevel(
     float                level);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -30730,7 +30083,7 @@ T RasterizerOrderedTextureCubeArray<T>.SampleLevel(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -30738,13 +30091,13 @@ vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -30752,7 +30105,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -30763,10 +30116,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30785,7 +30138,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -30793,13 +30146,13 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30807,7 +30160,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -30818,10 +30171,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30840,7 +30193,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -30848,13 +30201,13 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30862,7 +30215,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -30873,10 +30226,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30895,7 +30248,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -30903,13 +30256,13 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30917,7 +30270,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -30928,10 +30281,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -30950,7 +30303,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -30958,13 +30311,13 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30972,7 +30325,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -30983,10 +30336,10 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31016,7 +30369,7 @@ vector<T,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -31024,13 +30377,13 @@ vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31038,7 +30391,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31049,10 +30402,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31071,7 +30424,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -31079,13 +30432,13 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31093,7 +30446,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31104,10 +30457,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31126,7 +30479,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -31134,13 +30487,13 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31148,7 +30501,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31159,10 +30512,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31181,7 +30534,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -31189,13 +30542,13 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31203,7 +30556,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31214,10 +30567,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31236,7 +30589,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -31244,13 +30597,13 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31258,7 +30611,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31269,10 +30622,10 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31302,7 +30655,7 @@ vector<float,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -31310,13 +30663,13 @@ vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31324,7 +30677,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31335,10 +30688,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31357,7 +30710,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -31365,13 +30718,13 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31379,7 +30732,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31390,10 +30743,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31412,7 +30765,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -31420,13 +30773,13 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31434,7 +30787,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31445,10 +30798,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31467,7 +30820,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -31475,13 +30828,13 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31489,7 +30842,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31500,10 +30853,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31522,7 +30875,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -31530,13 +30883,13 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31544,7 +30897,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31555,10 +30908,10 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31588,7 +30941,7 @@ vector<int,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location);
@@ -31596,13 +30949,13 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31610,7 +30963,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     SamplerState         s,
     vector<float,4>      location,
@@ -31621,10 +30974,10 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31643,7 +30996,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.Gather(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location);
@@ -31651,13 +31004,13 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31665,7 +31018,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     SamplerState         s,
     vector<float,4>      location,
@@ -31676,10 +31029,10 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31698,7 +31051,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherRed(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location);
@@ -31706,13 +31059,13 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31720,7 +31073,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     SamplerState         s,
     vector<float,4>      location,
@@ -31731,10 +31084,10 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31753,7 +31106,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherGreen(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location);
@@ -31761,13 +31114,13 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31775,7 +31128,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     SamplerState         s,
     vector<float,4>      location,
@@ -31786,10 +31139,10 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31808,7 +31161,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherBlue(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location);
@@ -31816,13 +31169,13 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
     vector<int,3>        offset,
     out uint             status);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31830,7 +31183,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     vector<int,3>        offset2,
     vector<int,3>        offset3,
     vector<int,3>        offset4);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     SamplerState         s,
     vector<float,4>      location,
@@ -31841,10 +31194,10 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -31900,13 +31253,9 @@ void TextureCubeMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -31925,10 +31274,6 @@ void TextureCubeMSArray<T>.GetDimensions(
 ```
 vector<float,2> TextureCubeMSArray<T>.GetSamplePosition(int s);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -31977,13 +31322,9 @@ void RasterizerOrderedTextureCubeMSArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
 
 ## Parameters
 
@@ -32003,10 +31344,6 @@ void RasterizerOrderedTextureCubeMSArray<T>.GetDimensions(
 vector<float,2> RasterizerOrderedTextureCubeMSArray<T>.GetSamplePosition(int s);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `s`
@@ -32019,10 +31356,6 @@ vector<float,2> RasterizerOrderedTextureCubeMSArray<T>.GetSamplePosition(int s);
 ```
 T bit_cast<T, U>(U value);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -32043,10 +31376,6 @@ Given a string returns an integer hash of that string.
 int getStringHash(String string);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `string`
@@ -32064,13 +31393,9 @@ Mark beginning of "interlocked" operations in a fragment shader.
 void beginInvocationInterlock();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_fragment_shader_interlock`, `GLSL420`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL420`, `GL_ARB_fragment_shader_interlock` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -32086,13 +31411,9 @@ Mark end of "interlocked" operations in a fragment shader.
 void endInvocationInterlock();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_fragment_shader_interlock`, `GLSL420`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL420`, `GL_ARB_fragment_shader_interlock` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -32123,10 +31444,6 @@ void endInvocationInterlock();
 void AppendStructuredBuffer<T>.Append(T value);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `value`
@@ -32141,10 +31458,6 @@ void AppendStructuredBuffer<T>.GetDimensions(
     out uint             numStructs,
     out uint             stride);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -32170,9 +31483,9 @@ void AppendStructuredBuffer<T>.GetDimensions(
 void ByteAddressBuffer.GetDimensions(out uint dim);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32184,18 +31497,18 @@ void ByteAddressBuffer.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,2> ByteAddressBuffer.Load2(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,2> ByteAddressBuffer.Load2(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32208,18 +31521,18 @@ vector<uint,2> ByteAddressBuffer.Load2(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,3> ByteAddressBuffer.Load3(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,3> ByteAddressBuffer.Load3(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32232,18 +31545,18 @@ vector<uint,3> ByteAddressBuffer.Load3(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> ByteAddressBuffer.Load4(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> ByteAddressBuffer.Load4(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32256,19 +31569,19 @@ vector<uint,4> ByteAddressBuffer.Load4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint ByteAddressBuffer.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 uint ByteAddressBuffer.Load(
     int                  location,
     out uint             status);
 T ByteAddressBuffer.Load<T>(int location);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32299,9 +31612,9 @@ void StructuredBuffer<T>.GetDimensions(
     out uint             stride);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32314,18 +31627,18 @@ void StructuredBuffer<T>.GetDimensions(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T StructuredBuffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T StructuredBuffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32340,10 +31653,6 @@ T StructuredBuffer<T>.Load(
 ```
 T StructuredBuffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -32369,10 +31678,6 @@ T StructuredBuffer<T>.subscript(uint index);
 T ConsumeStructuredBuffer<T>.Consume();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `ConsumeStructuredBuffer<T>.GetDimensions`
@@ -32384,10 +31689,6 @@ void ConsumeStructuredBuffer<T>.GetDimensions(
     out uint             numStructs,
     out uint             stride);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -32414,10 +31715,6 @@ void ConsumeStructuredBuffer<T>.GetDimensions(
 T InputPatch<T, N:int>.subscript(uint index);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `index`
@@ -32441,10 +31738,6 @@ T InputPatch<T, N:int>.subscript(uint index);
 ```
 T OutputPatch<T, N:int>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -32490,9 +31783,9 @@ T OutputPatch<T, N:int>.subscript(uint index);
 void RWByteAddressBuffer.GetDimensions(out uint dim);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32504,18 +31797,18 @@ void RWByteAddressBuffer.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,2> RWByteAddressBuffer.Load2(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,2> RWByteAddressBuffer.Load2(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32528,18 +31821,18 @@ vector<uint,2> RWByteAddressBuffer.Load2(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,3> RWByteAddressBuffer.Load3(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,3> RWByteAddressBuffer.Load3(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32552,18 +31845,18 @@ vector<uint,3> RWByteAddressBuffer.Load3(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RWByteAddressBuffer.Load4(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RWByteAddressBuffer.Load4(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32576,19 +31869,19 @@ vector<uint,4> RWByteAddressBuffer.Load4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint RWByteAddressBuffer.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 uint RWByteAddressBuffer.Load(
     int                  location,
     out uint             status);
 T RWByteAddressBuffer.Load<T>(int location);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -32611,13 +31904,9 @@ void RWByteAddressBuffer.InterlockedAddF32(
     float                valueToAdd);
 ```
 
-## Requirements
+## Availability
 
-`CUDA SM 2.0`, `NVAPI`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**HLSL** `NVAPI` **CUDA** `SM 2.0` 
 
 ## Parameters
 
@@ -32640,13 +31929,9 @@ void RWByteAddressBuffer.InterlockedAddI64(
     int64_t              valueToAdd);
 ```
 
-## Requirements
+## Availability
 
-`CUDA SM 6.0`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**HLSL** **CUDA** `SM 6.0` 
 
 ## Parameters
 
@@ -32667,9 +31952,9 @@ void RWByteAddressBuffer.InterlockedCompareExchangeU64(
     out uint64_t         outOriginalValue);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -32689,13 +31974,9 @@ uint64_t RWByteAddressBuffer.InterlockedMaxU64(
     uint64_t             value);
 ```
 
-## Requirements
+## Availability
 
-`CUDA SM 3.5`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**HLSL** **CUDA** `SM 3.5` 
 
 ## Parameters
 
@@ -32713,13 +31994,9 @@ uint64_t RWByteAddressBuffer.InterlockedMinU64(
     uint64_t             value);
 ```
 
-## Requirements
+## Availability
 
-`CUDA SM 3.5`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**HLSL** **CUDA** `SM 3.5` 
 
 ## Parameters
 
@@ -32737,9 +32014,9 @@ uint64_t RWByteAddressBuffer.InterlockedAndU64(
     uint64_t             value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -32757,9 +32034,9 @@ uint64_t RWByteAddressBuffer.InterlockedOrU64(
     uint64_t             value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -32777,9 +32054,9 @@ uint64_t RWByteAddressBuffer.InterlockedXorU64(
     uint64_t             value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -32797,9 +32074,9 @@ uint64_t RWByteAddressBuffer.InterlockedExchangeU64(
     uint64_t             value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -32821,9 +32098,9 @@ void RWByteAddressBuffer.InterlockedAdd(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32846,9 +32123,9 @@ void RWByteAddressBuffer.InterlockedAnd(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32869,9 +32146,9 @@ void RWByteAddressBuffer.InterlockedCompareExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32892,9 +32169,9 @@ void RWByteAddressBuffer.InterlockedCompareStore(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32914,9 +32191,9 @@ void RWByteAddressBuffer.InterlockedExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32939,9 +32216,9 @@ void RWByteAddressBuffer.InterlockedMax(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32964,9 +32241,9 @@ void RWByteAddressBuffer.InterlockedMin(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -32989,9 +32266,9 @@ void RWByteAddressBuffer.InterlockedOr(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33014,9 +32291,9 @@ void RWByteAddressBuffer.InterlockedXor(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33035,9 +32312,9 @@ void RWByteAddressBuffer.Store2(
     vector<uint,2>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33055,9 +32332,9 @@ void RWByteAddressBuffer.Store3(
     vector<uint,3>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33075,9 +32352,9 @@ void RWByteAddressBuffer.Store4(
     vector<uint,4>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33090,20 +32367,20 @@ void RWByteAddressBuffer.Store4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 void RWByteAddressBuffer.Store(
     uint                 address,
     uint                 value);
-/// See Target Availability 2
+/// See Availability 2
 void RWByteAddressBuffer.Store<T>(
     int                  offset,
     T                    value);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33143,9 +32420,9 @@ void RWByteAddressBuffer.Store<T>(
 void RasterizerOrderedByteAddressBuffer.GetDimensions(out uint dim);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33157,18 +32434,18 @@ void RasterizerOrderedByteAddressBuffer.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,2> RasterizerOrderedByteAddressBuffer.Load2(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,2> RasterizerOrderedByteAddressBuffer.Load2(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33181,18 +32458,18 @@ vector<uint,2> RasterizerOrderedByteAddressBuffer.Load2(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,3> RasterizerOrderedByteAddressBuffer.Load3(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,3> RasterizerOrderedByteAddressBuffer.Load3(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33205,18 +32482,18 @@ vector<uint,3> RasterizerOrderedByteAddressBuffer.Load3(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(int location);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33229,19 +32506,19 @@ vector<uint,4> RasterizerOrderedByteAddressBuffer.Load4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint RasterizerOrderedByteAddressBuffer.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 uint RasterizerOrderedByteAddressBuffer.Load(
     int                  location,
     out uint             status);
 T RasterizerOrderedByteAddressBuffer.Load<T>(int location);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33264,9 +32541,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedAdd(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33289,9 +32566,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedAnd(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33312,9 +32589,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedCompareExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33335,9 +32612,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedCompareStore(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33357,9 +32634,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33382,9 +32659,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedMax(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33407,9 +32684,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedMin(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33432,9 +32709,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedOr(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33457,9 +32734,9 @@ void RasterizerOrderedByteAddressBuffer.InterlockedXor(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33478,9 +32755,9 @@ void RasterizerOrderedByteAddressBuffer.Store2(
     vector<uint,2>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33498,9 +32775,9 @@ void RasterizerOrderedByteAddressBuffer.Store3(
     vector<uint,3>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33518,9 +32795,9 @@ void RasterizerOrderedByteAddressBuffer.Store4(
     vector<uint,4>       value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33533,20 +32810,20 @@ void RasterizerOrderedByteAddressBuffer.Store4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 void RasterizerOrderedByteAddressBuffer.Store(
     uint                 address,
     uint                 value);
-/// See Target Availability 2
+/// See Availability 2
 void RasterizerOrderedByteAddressBuffer.Store<T>(
     int                  offset,
     T                    value);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33578,10 +32855,6 @@ void RasterizerOrderedByteAddressBuffer.Store<T>(
 uint RWStructuredBuffer<T>.DecrementCounter();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `RWStructuredBuffer<T>.GetDimensions`
@@ -33594,9 +32867,9 @@ void RWStructuredBuffer<T>.GetDimensions(
     out uint             stride);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33612,10 +32885,6 @@ void RWStructuredBuffer<T>.GetDimensions(
 uint RWStructuredBuffer<T>.IncrementCounter();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `RWStructuredBuffer<T>.Load`
@@ -33623,18 +32892,18 @@ uint RWStructuredBuffer<T>.IncrementCounter();
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWStructuredBuffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T RWStructuredBuffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33649,10 +32918,6 @@ T RWStructuredBuffer<T>.Load(
 ```
 T RWStructuredBuffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -33681,10 +32946,6 @@ T RWStructuredBuffer<T>.subscript(uint index);
 uint RasterizerOrderedStructuredBuffer<T>.DecrementCounter();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `RasterizerOrderedStructuredBuffer<T>.GetDimensions`
@@ -33697,9 +32958,9 @@ void RasterizerOrderedStructuredBuffer<T>.GetDimensions(
     out uint             stride);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33715,10 +32976,6 @@ void RasterizerOrderedStructuredBuffer<T>.GetDimensions(
 uint RasterizerOrderedStructuredBuffer<T>.IncrementCounter();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `RasterizerOrderedStructuredBuffer<T>.Load`
@@ -33726,18 +32983,18 @@ uint RasterizerOrderedStructuredBuffer<T>.IncrementCounter();
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedStructuredBuffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedStructuredBuffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33752,10 +33009,6 @@ T RasterizerOrderedStructuredBuffer<T>.Load(
 ```
 T RasterizerOrderedStructuredBuffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -33781,9 +33034,9 @@ T RasterizerOrderedStructuredBuffer<T>.subscript(uint index);
 void PointStream<T>.Append(T value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33798,9 +33051,9 @@ void PointStream<T>.Append(T value);
 void PointStream<T>.RestartStrip();
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -33823,9 +33076,9 @@ void PointStream<T>.RestartStrip();
 void LineStream<T>.Append(T value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33840,9 +33093,9 @@ void LineStream<T>.Append(T value);
 void LineStream<T>.RestartStrip();
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -33865,9 +33118,9 @@ void LineStream<T>.RestartStrip();
 void TriangleStream<T>.Append(T value);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -33882,9 +33135,9 @@ void TriangleStream<T>.Append(T value);
 void TriangleStream<T>.RestartStrip();
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -33896,10 +33149,6 @@ void TriangleStream<T>.RestartStrip();
 void abort();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `abs`
@@ -33907,19 +33156,19 @@ void abort();
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T abs<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> abs<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -33934,19 +33183,19 @@ matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T acos<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> acos<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -33961,17 +33210,17 @@ matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool all<T>(T x);
 bool all<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 bool all<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -33989,9 +33238,9 @@ bool all<T, N:int, M:int>(matrix<T,N,M> x);
 void AllMemoryBarrier();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -34003,9 +33252,9 @@ void AllMemoryBarrier();
 void AllMemoryBarrierWithGroupSync();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -34014,17 +33263,17 @@ void AllMemoryBarrierWithGroupSync();
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool any<T>(T x);
 bool any<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 bool any<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34044,13 +33293,9 @@ double asdouble(
     uint                 highbits);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_gpu_shader5`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_ARB_gpu_shader5` **HLSL** 
 
 ## Parameters
 
@@ -34063,12 +33308,12 @@ double asdouble(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float asfloat(int x);
 float asfloat(uint x);
 vector<float,N> asfloat<N:int>(vector<int,N> x);
 vector<float,N> asfloat<N:int>(vector<uint,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<int,N,M> x);
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<uint,N,M> x);
 float asfloat(float x);
@@ -34076,10 +33321,10 @@ vector<float,N> asfloat<N:int>(vector<float,N> x);
 matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34093,19 +33338,19 @@ matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T asin<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> asin<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34120,12 +33365,12 @@ matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 int asint(float x);
 int asint(uint x);
 vector<int,N> asint<N:int>(vector<float,N> x);
 vector<int,N> asint<N:int>(vector<uint,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<int,N,M> asint<N:int, M:int>(matrix<float,N,M> x);
 matrix<int,N,M> asint<N:int, M:int>(matrix<uint,N,M> x);
 int asint(int x);
@@ -34133,10 +33378,10 @@ vector<int,N> asint<N:int>(vector<int,N> x);
 matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34150,16 +33395,17 @@ matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 void asuint(
     double               value,
     out uint             lowbits,
     out uint             highbits);
+/// See Availability 2
 uint asuint(float x);
 uint asuint(int x);
 vector<uint,N> asuint<N:int>(vector<float,N> x);
 vector<uint,N> asuint<N:int>(vector<int,N> x);
-/// See Target Availability 2
+/// See Availability 3
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<float,N,M> x);
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<int,N,M> x);
 uint asuint(uint x);
@@ -34167,14 +33413,11 @@ vector<uint,N> asuint<N:int>(vector<uint,N> x);
 matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_gpu_shader5`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_ARB_gpu_shader5` **HLSL** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34191,24 +33434,24 @@ matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint16_t asuint16(uint16_t value);
 vector<uint16_t,N> asuint16<N:int>(vector<uint16_t,N> value);
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<uint16_t,R,C> value);
 uint16_t asuint16(int16_t value);
 vector<uint16_t,N> asuint16<N:int>(vector<int16_t,N> value);
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<int16_t,R,C> value);
-/// See Target Availability 2
+/// See Availability 2
 uint16_t asuint16(half value);
-/// See Target Availability 1
+/// See Availability 1
 vector<uint16_t,N> asuint16<N:int>(vector<half,N> value);
 matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<half,R,C> value);
 ```
 
-## Target Availability
+## Availability
 
-1. `HLSL`
-2. `GLSL`, `HLSL`
+1. **HLSL** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34234,10 +33477,6 @@ vector<int16_t,N> asint16<N:int>(vector<half,N> value);
 matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `N`
@@ -34251,13 +33490,13 @@ matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 half asfloat16(half value);
 vector<half,N> asfloat16<N:int>(vector<half,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<half,R,C> value);
-/// See Target Availability 2
+/// See Availability 2
 half asfloat16(uint16_t value);
-/// See Target Availability 1
+/// See Availability 1
 vector<half,N> asfloat16<N:int>(vector<uint16_t,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<uint16_t,R,C> value);
 half asfloat16(int16_t value);
@@ -34265,10 +33504,10 @@ vector<half,N> asfloat16<N:int>(vector<int16_t,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 ```
 
-## Target Availability
+## Availability
 
-1. `HLSL`
-2. `GLSL`, `HLSL`
+1. **HLSL** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34283,19 +33522,19 @@ matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T atan<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> atan<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34310,25 +33549,25 @@ matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T atan2<T>(
     T                    y,
     T                    x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> atan2<T, N:int>(
     vector<T,N>          y,
     vector<T,N>          x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> atan2<T, N:int, M:int>(
     matrix<T,N,M>        y,
     matrix<T,N,M>        x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34344,19 +33583,19 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ceil<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> ceil<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> ceil<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34374,10 +33613,6 @@ matrix<T,N,M> ceil<T, N:int, M:int>(matrix<T,N,M> x);
 bool CheckAccessFullyMapped(uint status);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `status`
@@ -34388,7 +33623,7 @@ bool CheckAccessFullyMapped(uint status);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T clamp<T>(
     T                    x,
     T                    minBound,
@@ -34397,17 +33632,17 @@ vector<T,N> clamp<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          minBound,
     vector<T,N>          maxBound);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> clamp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        minBound,
     matrix<T,N,M>        maxBound);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34429,10 +33664,6 @@ void clip<T, N:int>(vector<T,N> x);
 void clip<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -34446,19 +33677,19 @@ void clip<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T cos<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> cos<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34473,19 +33704,19 @@ matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T cosh<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> cosh<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> cosh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34503,9 +33734,9 @@ matrix<T,N,M> cosh<T, N:int, M:int>(matrix<T,N,M> x);
 uint countbits(uint value);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CPP** **CUDA** 
 
 ## Parameters
 
@@ -34522,9 +33753,9 @@ vector<T,3> cross<T>(
     vector<T,3>          right);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34541,10 +33772,6 @@ vector<T,3> cross<T>(
 vector<int,4> D3DCOLORtoUBYTE4(vector<float,4> color);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `color`
@@ -34555,17 +33782,17 @@ vector<int,4> D3DCOLORtoUBYTE4(vector<float,4> color);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddx<T>(T x);
 vector<T,N> ddx<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddx<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34580,21 +33807,17 @@ matrix<T,N,M> ddx<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddx_coarse<T>(T x);
 vector<T,N> ddx_coarse<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddx_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_ARB_derivative_control` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34609,21 +33832,17 @@ matrix<T,N,M> ddx_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddx_fine<T>(T x);
 vector<T,N> ddx_fine<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddx_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_ARB_derivative_control` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34638,17 +33857,17 @@ matrix<T,N,M> ddx_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddy<T>(T x);
 vector<T,N> ddy<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddy<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34663,21 +33882,17 @@ matrix<T,N,M> ddy<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddy_coarse<T>(T x);
 vector<T,N> ddy_coarse<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddy_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_ARB_derivative_control` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34692,21 +33907,17 @@ matrix<T,N,M> ddy_coarse<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T ddy_fine<T>(T x);
 vector<T,N> ddy_fine<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> ddy_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_ARB_derivative_control`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_ARB_derivative_control` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34721,17 +33932,17 @@ matrix<T,N,M> ddy_fine<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T degrees<T>(T x);
 vector<T,N> degrees<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34749,10 +33960,6 @@ matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 T determinant<T, N:int>(matrix<T,N,N> m);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -34768,9 +33975,9 @@ T determinant<T, N:int>(matrix<T,N,N> m);
 void DeviceMemoryBarrier();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -34782,9 +33989,9 @@ void DeviceMemoryBarrier();
 void DeviceMemoryBarrierWithGroupSync();
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -34798,9 +34005,9 @@ T distance<T, N:int>(
     vector<T,N>          y);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34820,9 +34027,9 @@ T dot<T, N:int>(
     vector<T,N>          y);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34842,10 +34049,6 @@ vector<T,4> dst<T>(
     vector<T,4>          y);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -34863,9 +34066,9 @@ vector<T,N> EvaluateAttributeAtCentroid<T, N:int>(vector<T,N> x);
 matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34891,9 +34094,9 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
     uint                 sampleindex);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34920,9 +34123,9 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
     vector<int,2>        offset);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34938,19 +34141,19 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T exp<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> exp<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34965,19 +34168,19 @@ matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T exp2<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> exp2<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -34992,20 +34195,16 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 float f16tof32(uint value);
-/// See Target Availability 2
+/// See Availability 2
 vector<float,N> f16tof32<N:int>(vector<uint,N> value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL420`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GLSL420` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35018,20 +34217,16 @@ vector<float,N> f16tof32<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint f32tof16(float value);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,N> f32tof16<N:int>(vector<float,N> value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL420`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GLSL420` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35050,9 +34245,9 @@ vector<T,N> faceforward<T, N:int>(
     vector<T,N>          ng);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -35068,20 +34263,20 @@ vector<T,N> faceforward<T, N:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 int firstbithigh(int value);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,N> firstbithigh<N:int>(vector<int,N> value);
-/// See Target Availability 1
+/// See Availability 1
 uint firstbithigh(uint value);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -35094,20 +34289,20 @@ vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 int firstbitlow(int value);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,N> firstbitlow<N:int>(vector<int,N> value);
-/// See Target Availability 1
+/// See Availability 1
 uint firstbitlow(uint value);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -35120,19 +34315,19 @@ vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T floor<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> floor<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35147,28 +34342,28 @@ matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 double fma(
     double               a,
     double               b,
     double               c);
-/// See Target Availability 2
+/// See Availability 2
 vector<double,N> fma<N:int>(
     vector<double,N>     a,
     vector<double,N>     b,
     vector<double,N>     c);
-/// See Target Availability 3
+/// See Availability 3
 matrix<double,N,M> fma<N:int, M:int>(
     matrix<double,N,M>   a,
     matrix<double,N,M>   b,
     matrix<double,N,M>   c);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35184,11 +34379,11 @@ matrix<double,N,M> fma<N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T fmod<T>(
     T                    x,
     T                    y);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> fmod<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y);
@@ -35197,10 +34392,10 @@ matrix<T,N,M> fmod<T, N:int, M:int>(
     matrix<T,N,M>        y);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `HLSL`
-2. `HLSL`
+1. **HLSL** **CPP** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35216,19 +34411,19 @@ matrix<T,N,M> fmod<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T frac<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> frac<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35243,23 +34438,23 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T frexp<T>(
     T                    x,
     out T                exp);
 vector<T,N> frexp<T, N:int>(
     vector<T,N>          x,
     out vector<T,N>      exp);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> frexp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     out matrix<T,N,M>    exp);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35275,18 +34470,18 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T fwidth<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> fwidth<T, N:int>(vector<T,N> x);
-/// See Target Availability 1
+/// See Availability 1
 matrix<T,N,M> fwidth<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `HLSL`
-2. `GLSL`, `HLSL`
+1. **HLSL** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -35328,13 +34523,9 @@ matrix<T,N,M> GetAttributeAtVertex<T, N:int, M:int>(
     uint                 vertexIndex);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_NV_fragment_shader_barycentric`, `GLSL450`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL450`, `GL_NV_fragment_shader_barycentric` **HLSL** 
 
 ## Parameters
 
@@ -35353,10 +34544,6 @@ matrix<T,N,M> GetAttributeAtVertex<T, N:int, M:int>(
 uint GetRenderTargetSampleCount();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `GetRenderTargetSamplePosition`
@@ -35366,10 +34553,6 @@ uint GetRenderTargetSampleCount();
 ```
 vector<float,2> GetRenderTargetSamplePosition(int Index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -35384,9 +34567,9 @@ vector<float,2> GetRenderTargetSamplePosition(int Index);
 void GroupMemoryBarrier();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -35398,9 +34581,9 @@ void GroupMemoryBarrier();
 void GroupMemoryBarrierWithGroupSync();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -35425,9 +34608,9 @@ void InterlockedAdd(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35457,9 +34640,9 @@ void InterlockedAnd(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35485,9 +34668,9 @@ void InterlockedCompareExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35512,9 +34695,9 @@ void InterlockedCompareStore(
     uint                 value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35538,9 +34721,9 @@ void InterlockedExchange(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35570,9 +34753,9 @@ void InterlockedMax(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35602,9 +34785,9 @@ void InterlockedMin(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35634,9 +34817,9 @@ void InterlockedOr(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35666,9 +34849,9 @@ void InterlockedXor(
     out uint             original_value);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -35682,17 +34865,17 @@ void InterlockedXor(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool isfinite<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<bool,N> isfinite<T, N:int>(vector<T,N> x);
 matrix<bool,N,M> isfinite<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `HLSL`
-2. `HLSL`
+1. **HLSL** **CPP** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35707,19 +34890,19 @@ matrix<bool,N,M> isfinite<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool isinf<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<bool,N> isinf<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<bool,N,M> isinf<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35734,19 +34917,19 @@ matrix<bool,N,M> isinf<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool isnan<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<bool,N> isnan<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35772,10 +34955,6 @@ matrix<T,N,M> ldexp<T, N:int, M:int>(
     matrix<T,N,M>        exp);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -35793,9 +34972,9 @@ matrix<T,N,M> ldexp<T, N:int, M:int>(
 T length<T, N:int>(vector<T,N> x);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -35809,7 +34988,7 @@ T length<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T lerp<T>(
     T                    x,
     T                    y,
@@ -35818,17 +34997,17 @@ vector<T,N> lerp<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y,
     vector<T,N>          s);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> lerp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y,
     matrix<T,N,M>        s);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -35851,10 +35030,6 @@ vector<float,4> lit(
     float                m);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `n_dot_l`
@@ -35867,19 +35042,19 @@ vector<float,4> lit(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T log<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> log<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35894,19 +35069,19 @@ matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T log10<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> log10<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35921,19 +35096,19 @@ matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T log2<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> log2<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35948,28 +35123,28 @@ matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T mad<T>(
     T                    mvalue,
     T                    avalue,
     T                    bvalue);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> mad<T, N:int>(
     vector<T,N>          mvalue,
     vector<T,N>          avalue,
     vector<T,N>          bvalue);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> mad<T, N:int, M:int>(
     matrix<T,N,M>        mvalue,
     matrix<T,N,M>        avalue,
     matrix<T,N,M>        bvalue);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -35986,25 +35161,25 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T max<T>(
     T                    x,
     T                    y);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> max<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> max<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36020,25 +35195,25 @@ matrix<T,N,M> max<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T min<T>(
     T                    x,
     T                    y);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> min<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> min<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36054,24 +35229,24 @@ matrix<T,N,M> min<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T modf<T>(
     T                    x,
     out T                ip);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> modf<T, N:int>(
     vector<T,N>          x,
     out vector<T,N>      ip);
-/// See Target Availability 1
+/// See Availability 1
 matrix<T,N,M> modf<T, N:int, M:int>(
     matrix<T,N,M>        x,
     out matrix<T,N,M>    ip);
 ```
 
-## Target Availability
+## Availability
 
-1. `HLSL`
-2. `GLSL`, `HLSL`
+1. **HLSL** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36093,10 +35268,6 @@ vector<uint,4> msad4(
     vector<uint,4>       accum);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `reference`
@@ -36109,7 +35280,7 @@ vector<uint,4> msad4(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T mul<T>(
     T                    x,
     T                    y);
@@ -36125,7 +35296,7 @@ matrix<T,N,M> mul<T, N:int, M:int>(
 matrix<T,N,M> mul<T, N:int, M:int>(
     T                    x,
     matrix<T,N,M>        y);
-/// See Target Availability 2
+/// See Availability 2
 T mul<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y);
@@ -36140,10 +35311,10 @@ matrix<T,R,C> mul<T, R:int, N:int, C:int>(
     matrix<T,N,C>        left);
 ```
 
-## Target Availability
+## Availability
 
-1. `HLSL`
-2. `GLSL`, `HLSL`
+1. **HLSL** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36167,10 +35338,6 @@ float noise(float x);
 float noise<N:int>(vector<float,N> x);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `N`
@@ -36186,13 +35353,9 @@ uint NonUniformResourceIndex(uint index);
 int NonUniformResourceIndex(int index);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_nonuniform_qualifier`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_EXT_nonuniform_qualifier` **HLSL** 
 
 ## Parameters
 
@@ -36207,9 +35370,9 @@ int NonUniformResourceIndex(int index);
 vector<T,N> normalize<T, N:int>(vector<T,N> x);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36223,25 +35386,25 @@ vector<T,N> normalize<T, N:int>(vector<T,N> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T pow<T>(
     T                    x,
     T                    y);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> pow<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          y);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> pow<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        y);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36265,10 +35428,6 @@ void Process2DQuadTessFactorsAvg(
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawEdgeFactors`
@@ -36290,10 +35449,6 @@ void Process2DQuadTessFactorsMax(
     out vector<float,2>  RoundedInsideTessFactors,
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -36317,10 +35472,6 @@ void Process2DQuadTessFactorsMin(
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawEdgeFactors`
@@ -36342,10 +35493,6 @@ void ProcessIsolineTessFactors(
     out float            RoundedDensityFactor);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawDetailFactor`
@@ -36366,10 +35513,6 @@ void ProcessQuadTessFactorsAvg(
     out vector<float,2>  RoundedInsideTessFactors,
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -36393,10 +35536,6 @@ void ProcessQuadTessFactorsMax(
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawEdgeFactors`
@@ -36418,10 +35557,6 @@ void ProcessQuadTessFactorsMin(
     out vector<float,2>  RoundedInsideTessFactors,
     out vector<float,2>  UnroundedInsideTessFactors);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -36445,10 +35580,6 @@ void ProcessTriTessFactorsAvg(
     out float            UnroundedInsideTessFactor);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawEdgeFactors`
@@ -36470,10 +35601,6 @@ void ProcessTriTessFactorsMax(
     out float            RoundedInsideTessFactor,
     out float            UnroundedInsideTessFactor);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -36497,10 +35624,6 @@ void ProcessTriTessFactorsMin(
     out float            UnroundedInsideTessFactors);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `RawEdgeFactors`
@@ -36515,17 +35638,17 @@ void ProcessTriTessFactorsMin(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T radians<T>(T x);
 vector<T,N> radians<T, N:int>(vector<T,N> x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -36545,10 +35668,6 @@ vector<T,N> rcp<T, N:int>(vector<T,N> x);
 matrix<T,N,M> rcp<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -36567,9 +35686,9 @@ vector<T,N> reflect<T, N:int>(
     vector<T,N>          n);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36590,9 +35709,9 @@ vector<T,N> refract<T, N:int>(
     T                    eta);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36608,16 +35727,16 @@ vector<T,N> refract<T, N:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 uint reversebits(uint value);
-/// See Target Availability 2
+/// See Availability 2
 vector<uint,N> reversebits<N:int>(vector<uint,N> value);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36630,19 +35749,19 @@ vector<uint,N> reversebits<N:int>(vector<uint,N> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T round<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> round<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36657,19 +35776,19 @@ matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T rsqrt<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> rsqrt<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36689,10 +35808,6 @@ vector<T,N> saturate<T, N:int>(vector<T,N> x);
 matrix<T,N,M> saturate<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -36706,19 +35821,19 @@ matrix<T,N,M> saturate<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 int sign<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<int,N> sign<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36733,19 +35848,19 @@ matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T sin<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> sin<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36760,12 +35875,12 @@ matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 void sincos<T>(
     T                    x,
     out T                s,
     out T                c);
-/// See Target Availability 2
+/// See Availability 2
 void sincos<T, N:int>(
     vector<T,N>          x,
     out vector<T,N>      s,
@@ -36776,10 +35891,10 @@ void sincos<T, N:int, M:int>(
     out matrix<T,N,M>    c);
 ```
 
-## Target Availability
+## Availability
 
-1. `CUDA`, `HLSL`
-2. `HLSL`
+1. **HLSL** **CUDA** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -36796,19 +35911,19 @@ void sincos<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T sinh<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> sinh<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36823,7 +35938,7 @@ matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T smoothstep<T>(
     T                    min,
     T                    max,
@@ -36832,17 +35947,17 @@ vector<T,N> smoothstep<T, N:int>(
     vector<T,N>          min,
     vector<T,N>          max,
     vector<T,N>          x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> smoothstep<T, N:int, M:int>(
     matrix<T,N,M>        min,
     matrix<T,N,M>        max,
     matrix<T,N,M>        x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -36859,19 +35974,19 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T sqrt<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> sqrt<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36886,23 +36001,23 @@ matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T step<T>(
     T                    y,
     T                    x);
 vector<T,N> step<T, N:int>(
     vector<T,N>          y,
     vector<T,N>          x);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> step<T, N:int, M:int>(
     matrix<T,N,M>        y,
     matrix<T,N,M>        x);
 ```
 
-## Target Availability
+## Availability
 
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -36918,19 +36033,19 @@ matrix<T,N,M> step<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T tan<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> tan<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36945,19 +36060,19 @@ matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T tanh<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> tanh<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -36975,9 +36090,9 @@ matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 matrix<T,M,N> transpose<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-`GLSL`, `HLSL`
+**GLSL** **HLSL** 
 
 ## Parameters
 
@@ -36992,19 +36107,19 @@ matrix<T,M,N> transpose<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T trunc<T>(T x);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> trunc<T, N:int>(vector<T,N> x);
-/// See Target Availability 3
+/// See Availability 3
 matrix<T,N,M> trunc<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
-## Target Availability
+## Availability
 
-1. `CPP`, `CUDA`, `GLSL`, `HLSL`
-2. `GLSL`, `HLSL`
-3. `HLSL`
+1. **GLSL** **HLSL** **CPP** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
 
 ## Parameters
 
@@ -37022,13 +36137,9 @@ matrix<T,N,M> trunc<T, N:int, M:int>(matrix<T,N,M> x);
 uint WaveGetConvergedMask();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -37040,13 +36151,9 @@ uint WaveGetConvergedMask();
 uint WaveGetActiveMask();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -37058,13 +36165,9 @@ uint WaveGetActiveMask();
 bool WaveMaskIsFirstLane(uint mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37081,13 +36184,9 @@ bool WaveMaskAllTrue(
     bool                 condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37105,13 +36204,9 @@ bool WaveMaskAnyTrue(
     bool                 condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37129,13 +36224,9 @@ uint WaveMaskBallot(
     bool                 condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37153,13 +36244,9 @@ uint WaveMaskCountBits(
     bool                 value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37175,13 +36262,9 @@ uint WaveMaskCountBits(
 void AllMemoryBarrierWithWaveMaskSync(uint mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37196,13 +36279,9 @@ void AllMemoryBarrierWithWaveMaskSync(uint mask);
 void GroupMemoryBarrierWithWaveMaskSync(uint mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37217,13 +36296,9 @@ void GroupMemoryBarrierWithWaveMaskSync(uint mask);
 void AllMemoryBarrierWithWaveSync();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -37235,13 +36310,9 @@ void AllMemoryBarrierWithWaveSync();
 void GroupMemoryBarrierWithWaveSync();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -37250,7 +36321,7 @@ void GroupMemoryBarrierWithWaveSync();
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskBroadcastLaneAt<T>(
     uint                 mask,
     T                    value,
@@ -37259,21 +36330,17 @@ vector<T,N> WaveMaskBroadcastLaneAt<T, N:int>(
     uint                 mask,
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskBroadcastLaneAt<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37290,7 +36357,7 @@ matrix<T,N,M> WaveMaskBroadcastLaneAt<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskReadLaneAt<T>(
     uint                 mask,
     T                    value,
@@ -37299,21 +36366,17 @@ vector<T,N> WaveMaskReadLaneAt<T, N:int>(
     uint                 mask,
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskReadLaneAt<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37330,7 +36393,7 @@ matrix<T,N,M> WaveMaskReadLaneAt<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskShuffle<T>(
     uint                 mask,
     T                    value,
@@ -37339,21 +36402,17 @@ vector<T,N> WaveMaskShuffle<T, N:int>(
     uint                 mask,
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskShuffle<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37375,13 +36434,9 @@ uint WaveMaskPrefixCountBits(
     bool                 value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37394,27 +36449,23 @@ uint WaveMaskPrefixCountBits(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskBitAnd<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskBitAnd<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskBitAnd<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37430,27 +36481,23 @@ matrix<T,N,M> WaveMaskBitAnd<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskBitOr<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskBitOr<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskBitOr<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37466,27 +36513,23 @@ matrix<T,N,M> WaveMaskBitOr<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskBitXor<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskBitXor<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskBitXor<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37502,27 +36545,23 @@ matrix<T,N,M> WaveMaskBitXor<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskMax<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskMax<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskMax<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37538,27 +36577,23 @@ matrix<T,N,M> WaveMaskMax<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskMin<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskMin<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskMin<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37574,27 +36609,23 @@ matrix<T,N,M> WaveMaskMin<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskProduct<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskProduct<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskProduct<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37610,27 +36641,23 @@ matrix<T,N,M> WaveMaskProduct<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskSum<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskSum<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskSum<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37646,30 +36673,23 @@ matrix<T,N,M> WaveMaskSum<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Requirement 1
-/// See Target Availability 1
+/// See Availability 1
 bool WaveMaskAllEqual<T>(
     uint                 mask,
     T                    value);
 bool WaveMaskAllEqual<T, N:int>(
     uint                 mask,
     vector<T,N>          value);
-/// See Requirement 2
-/// See Target Availability 2
+/// See Availability 2
 bool WaveMaskAllEqual<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        value);
 ```
 
-## Requirements
+## Availability
 
-1. `CUDA SM 7.0`, `GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-2. `CUDA SM 7.0`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** **CUDA** `SM 7.0` 
+2. **HLSL** **CUDA** `SM 7.0` 
 
 ## Parameters
 
@@ -37685,27 +36705,23 @@ bool WaveMaskAllEqual<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskPrefixProduct<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskPrefixProduct<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskPrefixProduct<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37721,27 +36737,23 @@ matrix<T,N,M> WaveMaskPrefixProduct<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskPrefixSum<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskPrefixSum<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskPrefixSum<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37757,27 +36769,23 @@ matrix<T,N,M> WaveMaskPrefixSum<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskReadLaneFirst<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskReadLaneFirst<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskReadLaneFirst<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37804,13 +36812,9 @@ uint WaveMaskMatch<T, N:int, M:int>(
     matrix<T,N,M>        value);
 ```
 
-## Requirements
+## Availability
 
-`CUDA SM 7.0`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+**HLSL** **CUDA** `SM 7.0` 
 
 ## Parameters
 
@@ -37826,28 +36830,25 @@ uint WaveMaskMatch<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskPrefixBitAnd<T>(
     uint                 mask,
     T                    expr);
-/// See Target Availability 2
+/// See Availability 2
 vector<T,N> WaveMaskPrefixBitAnd<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 1
+/// See Availability 3
 matrix<T,N,M> WaveMaskPrefixBitAnd<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `HLSL`
-2. `CUDA`, `GLSL`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+3. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37863,24 +36864,23 @@ matrix<T,N,M> WaveMaskPrefixBitAnd<T, N:int, M:int>(
 ## Signature 
 
 ```
+/// See Availability 1
 T WaveMaskPrefixBitOr<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskPrefixBitOr<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
+/// See Availability 2
 matrix<T,N,M> WaveMaskPrefixBitOr<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37896,27 +36896,23 @@ matrix<T,N,M> WaveMaskPrefixBitOr<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMaskPrefixBitXor<T>(
     uint                 mask,
     T                    expr);
 vector<T,N> WaveMaskPrefixBitXor<T, N:int>(
     uint                 mask,
     vector<T,N>          expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMaskPrefixBitXor<T, N:int, M:int>(
     uint                 mask,
     matrix<T,N,M>        expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -37943,10 +36939,6 @@ matrix<T,N,M> QuadReadLaneAt<T, N:int, M:int>(
     uint                 quadLaneID);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -37966,10 +36958,6 @@ vector<T,N> QuadReadAcrossX<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossX<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -37987,10 +36975,6 @@ T QuadReadAcrossY<T>(T localValue);
 vector<T,N> QuadReadAcrossY<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossY<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -38010,10 +36994,6 @@ vector<T,N> QuadReadAcrossDiagonal<T, N:int>(vector<T,N> localValue);
 matrix<T,N,M> QuadReadAcrossDiagonal<T, N:int, M:int>(matrix<T,N,M> localValue);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `T`
@@ -38027,21 +37007,17 @@ matrix<T,N,M> QuadReadAcrossDiagonal<T, N:int, M:int>(matrix<T,N,M> localValue);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveBitAnd<T>(T expr);
 vector<T,N> WaveActiveBitAnd<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveBitAnd<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38056,21 +37032,17 @@ matrix<T,N,M> WaveActiveBitAnd<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveBitOr<T>(T expr);
 vector<T,N> WaveActiveBitOr<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveBitOr<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38085,21 +37057,17 @@ matrix<T,N,M> WaveActiveBitOr<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveBitXor<T>(T expr);
 vector<T,N> WaveActiveBitXor<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveBitXor<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38114,21 +37082,17 @@ matrix<T,N,M> WaveActiveBitXor<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveMax<T>(T expr);
 vector<T,N> WaveActiveMax<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveMax<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38143,21 +37107,17 @@ matrix<T,N,M> WaveActiveMax<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveMin<T>(T expr);
 vector<T,N> WaveActiveMin<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveMin<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38172,21 +37132,17 @@ matrix<T,N,M> WaveActiveMin<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveProduct<T>(T expr);
 vector<T,N> WaveActiveProduct<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38201,21 +37157,17 @@ matrix<T,N,M> WaveActiveProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveActiveSum<T>(T expr);
 vector<T,N> WaveActiveSum<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveActiveSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38230,21 +37182,17 @@ matrix<T,N,M> WaveActiveSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 bool WaveActiveAllEqual<T>(T value);
 bool WaveActiveAllEqual<T, N:int>(vector<T,N> value);
-/// See Target Availability 2
+/// See Availability 2
 bool WaveActiveAllEqual<T, N:int, M:int>(matrix<T,N,M> value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38262,13 +37210,9 @@ bool WaveActiveAllEqual<T, N:int, M:int>(matrix<T,N,M> value);
 bool WaveActiveAllTrue(bool condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** 
 
 ## Parameters
 
@@ -38283,13 +37227,9 @@ bool WaveActiveAllTrue(bool condition);
 bool WaveActiveAnyTrue(bool condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_vote`, `SPIR-V 1.3` **HLSL** 
 
 ## Parameters
 
@@ -38304,13 +37244,9 @@ bool WaveActiveAnyTrue(bool condition);
 vector<uint,4> WaveActiveBallot(bool condition);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
 
 ## Parameters
 
@@ -38325,10 +37261,6 @@ vector<uint,4> WaveActiveBallot(bool condition);
 uint WaveActiveCountBits(bool value);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `value`
@@ -38342,13 +37274,9 @@ uint WaveActiveCountBits(bool value);
 uint WaveGetLaneCount();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -38360,13 +37288,9 @@ uint WaveGetLaneCount();
 uint WaveGetLaneIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -38378,13 +37302,9 @@ uint WaveGetLaneIndex();
 bool WaveIsFirstLane();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -38396,10 +37316,6 @@ bool WaveIsFirstLane();
 uint _WaveCountBits(vector<uint,4> value);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `value`
@@ -38410,21 +37326,17 @@ uint _WaveCountBits(vector<uint,4> value);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WavePrefixProduct<T>(T expr);
 vector<T,N> WavePrefixProduct<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WavePrefixProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38439,21 +37351,17 @@ matrix<T,N,M> WavePrefixProduct<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WavePrefixSum<T>(T expr);
 vector<T,N> WavePrefixSum<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WavePrefixSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38468,21 +37376,17 @@ matrix<T,N,M> WavePrefixSum<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveReadLaneFirst<T>(T expr);
 vector<T,N> WaveReadLaneFirst<T, N:int>(vector<T,N> expr);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveReadLaneFirst<T, N:int, M:int>(matrix<T,N,M> expr);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38497,27 +37401,23 @@ matrix<T,N,M> WaveReadLaneFirst<T, N:int, M:int>(matrix<T,N,M> expr);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveBroadcastLaneAt<T>(
     T                    value,
     int                  lane);
 vector<T,N> WaveBroadcastLaneAt<T, N:int>(
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveBroadcastLaneAt<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38533,27 +37433,23 @@ matrix<T,N,M> WaveBroadcastLaneAt<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveReadLaneAt<T>(
     T                    value,
     int                  lane);
 vector<T,N> WaveReadLaneAt<T, N:int>(
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveReadLaneAt<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38569,27 +37465,23 @@ matrix<T,N,M> WaveReadLaneAt<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveShuffle<T>(
     T                    value,
     int                  lane);
 vector<T,N> WaveShuffle<T, N:int>(
     vector<T,N>          value,
     int                  lane);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveShuffle<T, N:int, M:int>(
     matrix<T,N,M>        value,
     int                  lane);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_shuffle`, `SPIR-V 1.3` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38608,13 +37500,9 @@ matrix<T,N,M> WaveShuffle<T, N:int, M:int>(
 uint WavePrefixCountBits(bool value);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
 
 ## Parameters
 
@@ -38629,13 +37517,9 @@ uint WavePrefixCountBits(bool value);
 vector<uint,4> WaveGetConvergedMulti();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -38647,13 +37531,9 @@ vector<uint,4> WaveGetConvergedMulti();
 vector<uint,4> WaveGetActiveMulti();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -38666,10 +37546,6 @@ vector<uint,4> WaveMatch<T>(T value);
 vector<uint,4> WaveMatch<T, N:int>(vector<T,N> value);
 vector<uint,4> WaveMatch<T, N:int, M:int>(matrix<T,N,M> value);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -38689,9 +37565,9 @@ uint WaveMultiPrefixCountBits(
     vector<uint,4>       mask);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38704,27 +37580,23 @@ uint WaveMultiPrefixCountBits(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMultiPrefixBitAnd<T>(
     T                    expr,
     vector<uint,4>       mask);
 vector<T,N> WaveMultiPrefixBitAnd<T, N:int>(
     vector<T,N>          expr,
     vector<uint,4>       mask);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMultiPrefixBitAnd<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38740,24 +37612,23 @@ matrix<T,N,M> WaveMultiPrefixBitAnd<T, N:int, M:int>(
 ## Signature 
 
 ```
+/// See Availability 1
 T WaveMultiPrefixBitOr<T>(
     T                    expr,
     vector<uint,4>       mask);
 vector<T,N> WaveMultiPrefixBitOr<T, N:int>(
     vector<T,N>          expr,
     vector<uint,4>       mask);
+/// See Availability 2
 matrix<T,N,M> WaveMultiPrefixBitOr<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-`CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38773,27 +37644,23 @@ matrix<T,N,M> WaveMultiPrefixBitOr<T, N:int, M:int>(
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T WaveMultiPrefixBitXor<T>(
     T                    expr,
     vector<uint,4>       mask);
 vector<T,N> WaveMultiPrefixBitXor<T, N:int>(
     vector<T,N>          expr,
     vector<uint,4>       mask);
-/// See Target Availability 2
+/// See Availability 2
 matrix<T,N,M> WaveMultiPrefixBitXor<T, N:int, M:int>(
     matrix<T,N,M>        expr,
     vector<uint,4>       mask);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3`
-
-## Target Availability
-
-1. `CUDA`, `GLSL`, `HLSL`
-2. `CUDA`, `HLSL`
+1. **GLSL** `GL_KHR_shader_subgroup_arithmetic`, `SPIR-V 1.3` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38820,9 +37687,9 @@ matrix<T,N,M> WaveMultiPrefixProduct<T, N:int, M:int>(
     vector<uint,4>       mask);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38849,9 +37716,9 @@ matrix<T,N,M> WaveMultiPrefixSum<T, N:int, M:int>(
     vector<uint,4>       mask);
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `HLSL`
+**HLSL** **CUDA** 
 
 ## Parameters
 
@@ -38882,10 +37749,6 @@ matrix<T,N,M> WaveMultiPrefixSum<T, N:int, M:int>(
 void Buffer<T>.GetDimensions(out uint dim);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `dim`
@@ -38896,22 +37759,18 @@ void Buffer<T>.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T Buffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T Buffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -38926,10 +37785,6 @@ T Buffer<T>.Load(
 ```
 T Buffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -38956,10 +37811,6 @@ T Buffer<T>.subscript(uint index);
 void RWBuffer<T>.GetDimensions(out uint dim);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `dim`
@@ -38970,22 +37821,18 @@ void RWBuffer<T>.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RWBuffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T RWBuffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -39000,10 +37847,6 @@ T RWBuffer<T>.Load(
 ```
 T RWBuffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39030,10 +37873,6 @@ T RWBuffer<T>.subscript(uint index);
 void RasterizerOrderedBuffer<T>.GetDimensions(out uint dim);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `dim`
@@ -39044,22 +37883,18 @@ void RasterizerOrderedBuffer<T>.GetDimensions(out uint dim);
 ## Signature 
 
 ```
-/// See Target Availability 1
+/// See Availability 1
 T RasterizerOrderedBuffer<T>.Load(int location);
-/// See Target Availability 2
+/// See Availability 2
 T RasterizerOrderedBuffer<T>.Load(
     int                  location,
     out uint             status);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_samplerless_texture_functions`
-
-## Target Availability
-
-1. `GLSL`, `HLSL`
-2. `HLSL`
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
 
 ## Parameters
 
@@ -39074,10 +37909,6 @@ T RasterizerOrderedBuffer<T>.Load(
 ```
 T RasterizerOrderedBuffer<T>.subscript(uint index);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39203,10 +38034,6 @@ void CallShader<Payload>(
     inout Payload        payload);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `Payload`
@@ -39229,10 +38056,6 @@ void TraceRay<payload_t>(
     RayDesc              Ray,
     inout payload_t      Payload);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39258,10 +38081,6 @@ bool ReportHit<A>(
     A                    attributes);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `A`
@@ -39278,9 +38097,9 @@ bool ReportHit<A>(
 void IgnoreHit();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39292,9 +38111,9 @@ void IgnoreHit();
 void AcceptHitAndEndSearch();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39306,9 +38125,9 @@ void AcceptHitAndEndSearch();
 vector<uint,3> DispatchRaysIndex();
 ```
 
-## Target Availability
+## Availability
 
-`CUDA`, `GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 
 --------------------------------------------------------------------------------
@@ -39320,9 +38139,9 @@ vector<uint,3> DispatchRaysIndex();
 vector<uint,3> DispatchRaysDimensions();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39334,9 +38153,9 @@ vector<uint,3> DispatchRaysDimensions();
 vector<float,3> WorldRayOrigin();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39348,9 +38167,9 @@ vector<float,3> WorldRayOrigin();
 vector<float,3> WorldRayDirection();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39362,9 +38181,9 @@ vector<float,3> WorldRayDirection();
 float RayTMin();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39376,9 +38195,9 @@ float RayTMin();
 float RayTCurrent();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39390,9 +38209,9 @@ float RayTCurrent();
 uint RayFlags();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39404,9 +38223,9 @@ uint RayFlags();
 uint InstanceIndex();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39418,9 +38237,9 @@ uint InstanceIndex();
 uint InstanceID();
 ```
 
-## Target Availability
+## Availability
 
-`HLSL`, `__GLSLRAYTRACING`
+**GLSL** `__glslRayTracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39432,9 +38251,9 @@ uint InstanceID();
 uint PrimitiveIndex();
 ```
 
-## Target Availability
+## Availability
 
-`HLSL`, `__GLSLRAYTRACING`
+**GLSL** `__glslRayTracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39446,9 +38265,9 @@ uint PrimitiveIndex();
 vector<float,3> ObjectRayOrigin();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39460,9 +38279,9 @@ vector<float,3> ObjectRayOrigin();
 vector<float,3> ObjectRayDirection();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39474,9 +38293,9 @@ vector<float,3> ObjectRayDirection();
 matrix<float,3,4> ObjectToWorld3x4();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39488,9 +38307,9 @@ matrix<float,3,4> ObjectToWorld3x4();
 matrix<float,3,4> WorldToObject3x4();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39502,9 +38321,9 @@ matrix<float,3,4> WorldToObject3x4();
 matrix<float,4,3> ObjectToWorld4x3();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39516,9 +38335,9 @@ matrix<float,4,3> ObjectToWorld4x3();
 matrix<float,4,3> WorldToObject4x3();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39530,10 +38349,6 @@ matrix<float,4,3> WorldToObject4x3();
 matrix<float,3,4> ObjectToWorld();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `WorldToObject`
@@ -39543,10 +38358,6 @@ matrix<float,3,4> ObjectToWorld();
 ```
 matrix<float,3,4> WorldToObject();
 ```
-
-## Target Availability
-
-`HLSL`
 
 
 --------------------------------------------------------------------------------
@@ -39558,9 +38369,9 @@ matrix<float,3,4> WorldToObject();
 uint HitKind();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `GL_NV_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -39591,10 +38402,6 @@ uint dot4add_u8packed(
     uint                 acc);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `left`
@@ -39612,10 +38419,6 @@ int dot4add_i8packed(
     uint                 right,
     int                  acc);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39635,10 +38438,6 @@ float dot2add(
     float                acc);
 ```
 
-## Target Availability
-
-`HLSL`
-
 ## Parameters
 
 * `left`
@@ -39655,10 +38454,6 @@ void SetMeshOutputCounts(
     uint                 vertexCount,
     uint                 primitiveCount);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39677,10 +38472,6 @@ void DispatchMesh<P>(
     uint                 threadGroupCountZ,
     P                    meshPayload);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -39736,10 +38527,6 @@ void FeedbackTexture2D<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Target Availability
-
-``, `HLSL`
-
 ## Parameters
 
 * `width`
@@ -39760,9 +38547,9 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackLevel<S>(
     float                lod);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39789,9 +38576,9 @@ void FeedbackTexture2D<T>.WriteSamplerFeedback<S>(
     vector<float,2>      location);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39820,9 +38607,9 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackBias<S>(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39854,9 +38641,9 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
     vector<float,2>      ddy);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39906,10 +38693,6 @@ void FeedbackTexture2DArray<T>.GetDimensions(
     out float            numberOfLevels);
 ```
 
-## Target Availability
-
-``, `HLSL`
-
 ## Parameters
 
 * `width`
@@ -39931,9 +38714,9 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackLevel<S>(
     float                lod);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39960,9 +38743,9 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedback<S>(
     vector<float,3>      location);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -39991,9 +38774,9 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackBias<S>(
     float                bias);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -40025,9 +38808,9 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
     vector<float,3>      ddy);
 ```
 
-## Target Availability
+## Availability
 
-`CPP`, `HLSL`
+**HLSL** **CPP** 
 
 ## Parameters
 
@@ -40048,9 +38831,9 @@ void FeedbackTexture2DArray<T>.WriteSamplerFeedbackGrad<S>(
 uint GeometryIndex();
 ```
 
-## Target Availability
+## Availability
 
-`GL_EXT_RAY_TRACING`, `HLSL`
+**GLSL** `GL_EXT_ray_tracing` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40152,10 +38935,6 @@ uint CANDIDATE_PROCEDURAL_PRIMITIVE
 RayQuery<rayFlags:uint>.init();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.TraceRayInline`
@@ -40169,10 +38948,6 @@ void RayQuery<rayFlags:uint>.TraceRayInline(
     uint                 instanceInclusionMask,
     RayDesc              ray);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
@@ -40190,13 +38965,9 @@ void RayQuery<rayFlags:uint>.TraceRayInline(
 bool RayQuery<rayFlags:uint>.Proceed();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40208,13 +38979,9 @@ bool RayQuery<rayFlags:uint>.Proceed();
 void RayQuery<rayFlags:uint>.Abort();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40226,13 +38993,9 @@ void RayQuery<rayFlags:uint>.Abort();
 uint RayQuery<rayFlags:uint>.CandidateType();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40244,13 +39007,9 @@ uint RayQuery<rayFlags:uint>.CandidateType();
 matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateObjectToWorld3x4();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40262,13 +39021,9 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateObjectToWorld3x4();
 matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateObjectToWorld4x3();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40280,13 +39035,9 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateObjectToWorld4x3();
 matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateWorldToObject3x4();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40298,13 +39049,9 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateWorldToObject3x4();
 matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateWorldToObject4x3();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40316,13 +39063,9 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateWorldToObject4x3();
 uint RayQuery<rayFlags:uint>.CandidateInstanceIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40334,13 +39077,9 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceIndex();
 uint RayQuery<rayFlags:uint>.CandidateInstanceID();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40352,13 +39091,9 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceID();
 uint RayQuery<rayFlags:uint>.CandidateGeometryIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40370,13 +39105,9 @@ uint RayQuery<rayFlags:uint>.CandidateGeometryIndex();
 uint RayQuery<rayFlags:uint>.CandidatePrimitiveIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40388,13 +39119,9 @@ uint RayQuery<rayFlags:uint>.CandidatePrimitiveIndex();
 uint RayQuery<rayFlags:uint>.CandidateInstanceContributionToHitGroupIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40406,13 +39133,9 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceContributionToHitGroupIndex();
 vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayOrigin();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40424,13 +39147,9 @@ vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayOrigin();
 vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayDirection();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40442,13 +39161,9 @@ vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayDirection();
 bool RayQuery<rayFlags:uint>.CandidateProceduralPrimitiveNonOpaque();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40460,13 +39175,9 @@ bool RayQuery<rayFlags:uint>.CandidateProceduralPrimitiveNonOpaque();
 bool RayQuery<rayFlags:uint>.CandidateTriangleFrontFace();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40478,13 +39189,9 @@ bool RayQuery<rayFlags:uint>.CandidateTriangleFrontFace();
 vector<float,2> RayQuery<rayFlags:uint>.CandidateTriangleBarycentrics();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40496,13 +39203,9 @@ vector<float,2> RayQuery<rayFlags:uint>.CandidateTriangleBarycentrics();
 float RayQuery<rayFlags:uint>.CandidateTriangleRayT();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40514,13 +39217,9 @@ float RayQuery<rayFlags:uint>.CandidateTriangleRayT();
 void RayQuery<rayFlags:uint>.CommitNonOpaqueTriangleHit();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40532,13 +39231,9 @@ void RayQuery<rayFlags:uint>.CommitNonOpaqueTriangleHit();
 void RayQuery<rayFlags:uint>.CommitProceduralPrimitiveHit(float t);
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 ## Parameters
 
@@ -40553,13 +39248,9 @@ void RayQuery<rayFlags:uint>.CommitProceduralPrimitiveHit(float t);
 uint RayQuery<rayFlags:uint>.CommittedStatus();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40571,13 +39262,9 @@ uint RayQuery<rayFlags:uint>.CommittedStatus();
 matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedObjectToWorld3x4();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40589,13 +39276,9 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedObjectToWorld3x4();
 matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedObjectToWorld4x3();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40607,13 +39290,9 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedObjectToWorld4x3();
 matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedWorldToObject3x4();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40625,13 +39304,9 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedWorldToObject3x4();
 matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedWorldToObject4x3();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40643,13 +39318,9 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedWorldToObject4x3();
 float RayQuery<rayFlags:uint>.CommittedRayT();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40661,13 +39332,9 @@ float RayQuery<rayFlags:uint>.CommittedRayT();
 uint RayQuery<rayFlags:uint>.CommittedInstanceIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40679,13 +39346,9 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceIndex();
 uint RayQuery<rayFlags:uint>.CommittedInstanceID();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40697,13 +39360,9 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceID();
 uint RayQuery<rayFlags:uint>.CommittedGeometryIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40715,13 +39374,9 @@ uint RayQuery<rayFlags:uint>.CommittedGeometryIndex();
 uint RayQuery<rayFlags:uint>.CommittedPrimitiveIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40733,13 +39388,9 @@ uint RayQuery<rayFlags:uint>.CommittedPrimitiveIndex();
 uint RayQuery<rayFlags:uint>.CommittedInstanceContributionToHitGroupIndex();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40751,13 +39402,9 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceContributionToHitGroupIndex();
 vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayOrigin();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40769,13 +39416,9 @@ vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayOrigin();
 vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayDirection();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40787,13 +39430,9 @@ vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayDirection();
 bool RayQuery<rayFlags:uint>.CommittedTriangleFrontFace();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40805,13 +39444,9 @@ bool RayQuery<rayFlags:uint>.CommittedTriangleFrontFace();
 vector<float,2> RayQuery<rayFlags:uint>.CommittedTriangleBarycentrics();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40823,13 +39458,9 @@ vector<float,2> RayQuery<rayFlags:uint>.CommittedTriangleBarycentrics();
 uint RayQuery<rayFlags:uint>.RayFlags();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40841,13 +39472,9 @@ uint RayQuery<rayFlags:uint>.RayFlags();
 vector<float,3> RayQuery<rayFlags:uint>.WorldRayOrigin();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40859,13 +39486,9 @@ vector<float,3> RayQuery<rayFlags:uint>.WorldRayOrigin();
 vector<float,3> RayQuery<rayFlags:uint>.WorldRayDirection();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40877,13 +39500,9 @@ vector<float,3> RayQuery<rayFlags:uint>.WorldRayDirection();
 float RayQuery<rayFlags:uint>.RayTMin();
 ```
 
-## Requirements
+## Availability
 
-`GLSL GL_EXT_ray_query`, `GLSL460`
-
-## Target Availability
-
-`GLSL`, `HLSL`
+**GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
 
 --------------------------------------------------------------------------------
@@ -40905,10 +39524,6 @@ float RayQuery<rayFlags:uint>.RayTMin();
 T VkSubpassInput<T>.SubpassLoad();
 ```
 
-## Target Availability
-
-`HLSL`
-
 
 --------------------------------------------------------------------------------
 # `struct VkSubpassInputMS<T>`
@@ -40928,10 +39543,6 @@ T VkSubpassInput<T>.SubpassLoad();
 ```
 T VkSubpassInputMS<T>.SubpassLoad(int sampleIndex);
 ```
-
-## Target Availability
-
-`HLSL`
 
 ## Parameters
 
