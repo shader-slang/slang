@@ -4055,6 +4055,23 @@ namespace slang
             virtual SLANG_NO_THROW SlangResult SLANG_MCALL link(
                 IComponentType**            outLinkedComponentType,
                 ISlangBlob**                outDiagnostics = nullptr) = 0;
+
+                /** Get entry point 'callable' functions accessible through the ISlangSharedLibrary interface.
+
+                The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+
+                NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+    
+                @param entryPointIndex  The index of the entry point to get code for.
+                @param targetIndex      The index of the target to get code for (default: zero).
+                @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried on.
+                @returns                A `SlangResult` to indicate success or failure.
+                */
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+                int                     entryPointIndex,
+                int                     targetIndex,
+                ISlangSharedLibrary**   outSharedLibrary,
+                slang::IBlob**          outDiagnostics = 0) = 0;
     };
     #define SLANG_UUID_IComponentType { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
 

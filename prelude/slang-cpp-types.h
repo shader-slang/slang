@@ -446,9 +446,9 @@ struct TextureDimensions
 struct ITexture
 {
     virtual TextureDimensions GetDimensions(int mipLevel = -1) = 0;
-    virtual void Load(const int* v, void* out) = 0;
-    virtual void Sample(SamplerState samplerState, const float* loc, void* out) = 0;
-    virtual void SampleLevel(SamplerState samplerState, const float* loc, float level, void* out) = 0;
+    virtual void Load(const int32_t* v, void* outData, size_t dataSize) = 0;
+    virtual void Sample(SamplerState samplerState, const float* loc, void* outData, size_t dataSize) = 0;
+    virtual void SampleLevel(SamplerState samplerState, const float* loc, float level, void* outData, size_t dataSize) = 0;
 };
 
 template <typename T>
@@ -470,9 +470,9 @@ struct Texture1D
         *outNumberOfLevels = dims.numberOfLevels; 
     }
     
-    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T Sample(SamplerState samplerState, float loc) const { T out; texture->Sample(samplerState, &loc, &out); return out; }
-    T SampleLevel(SamplerState samplerState, float loc, float level) { T out; texture->SampleLevel(samplerState, &loc, level, &out); return out; }
+    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
+    T Sample(SamplerState samplerState, float loc) const { T out; texture->Sample(samplerState, &loc, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, float loc, float level) { T out; texture->SampleLevel(samplerState, &loc, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -507,9 +507,9 @@ struct Texture2D
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
+    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -548,9 +548,9 @@ struct Texture3D
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -585,8 +585,8 @@ struct TextureCube
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -611,9 +611,9 @@ struct Texture1DArray
         *outElements = dims.arrayElementCount; 
     }
     
-    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
+    T Sample(SamplerState samplerState, const float2& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float2& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -653,9 +653,9 @@ struct Texture2DArray
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out); return out; }
-    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Load(const int4& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
+    T Sample(SamplerState samplerState, const float3& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float3& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
@@ -695,20 +695,16 @@ struct TextureCubeArray
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Sample(SamplerState samplerState, const float4& loc) const { T out; texture->Sample(samplerState, &loc.x, &out); return out; }
-    T SampleLevel(SamplerState samplerState, const float4& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out); return out; }
+    T Sample(SamplerState samplerState, const float4& loc) const { T out; texture->Sample(samplerState, &loc.x, &out, sizeof(out)); return out; }
+    T SampleLevel(SamplerState samplerState, const float4& loc, float level) { T out; texture->SampleLevel(samplerState, &loc.x, level, &out, sizeof(out)); return out; }
     
     ITexture* texture;              
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! RWTexture !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-struct IRWTexture
+struct IRWTexture : ITexture
 {
-    virtual TextureDimensions GetDimensions(int mipLevel = -1) = 0;
-    
-        /// Load at specified location. 
-    virtual void Load(const int32_t* loc, void* out) = 0;
         /// Get the reference to the element at loc. 
     virtual void* refAt(const uint32_t* loc) = 0;
 };
@@ -722,7 +718,7 @@ struct RWTexture1D
     void GetDimensions(float* outWidth) { *outWidth = texture->GetDimensions().width; }
     void GetDimensions(uint32_t mipLevel, float* outWidth, float* outNumberOfLevels) { auto dims = texture->GetDimensions(mipLevel); *outWidth = dims.width; *outNumberOfLevels = dims.numberOfLevels; }
     
-    T Load(int32_t loc) const { T out; texture->Load(&loc, &out); return out; }
+    T Load(int32_t loc) const { T out; texture->Load(&loc, &out, sizeof(out)); return out; }
     T& operator[](uint32_t loc) { return *(T*)texture->refAt(&loc); }
     IRWTexture* texture;              
 };
@@ -757,7 +753,7 @@ struct RWTexture2D
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Load(const int2& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
     T& operator[](const uint2& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
 };
@@ -796,7 +792,7 @@ struct RWTexture3D
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
     IRWTexture* texture;
 };
@@ -832,7 +828,7 @@ struct RWTexture1DArray
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(int2 loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Load(int2 loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
     T& operator[](uint2 loc) { return *(T*)texture->refAt(&loc.x); }
 
     IRWTexture* texture;
@@ -872,7 +868,7 @@ struct RWTexture2DArray
         *outNumberOfLevels = dims.numberOfLevels;
     }
     
-    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out); return out; }
+    T Load(const int3& loc) const { T out; texture->Load(&loc.x, &out, sizeof(out)); return out; }
     T& operator[](const uint3& loc) { return *(T*)texture->refAt(&loc.x); }
 
     IRWTexture* texture;

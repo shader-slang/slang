@@ -52,15 +52,15 @@ struct ValueTexture : public CPUComputeUtil::Resource, public CPPPrelude::ITextu
     {
         return _calcMipDims(mipLevel, m_dims);
     }
-    virtual void Load(const int32_t* loc, void* out) SLANG_OVERRIDE
+    virtual void Load(const int32_t* loc, void* out, size_t dataSize) SLANG_OVERRIDE
     {
         _set(out);
     }
-    virtual void Sample(CPPPrelude::SamplerState samplerState, const float* loc, void* out) SLANG_OVERRIDE
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const float* loc, void* out, size_t dataSize) SLANG_OVERRIDE
     {
         _set(out);
     }
-    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const float* loc, float level, void* out) SLANG_OVERRIDE
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const float* loc, float level, void* out, size_t dataSize) SLANG_OVERRIDE
     {
         _set(out);
     }
@@ -201,8 +201,14 @@ struct FloatRWTexture : public CPUComputeUtil::Resource, public CPPPrelude::IRWT
     {
         return _calcMipDims(mipLevel, m_dims);
     }
-    virtual void Load(const int32_t* loc, void* out) SLANG_OVERRIDE { m_data.getAt((const uint32_t*)loc, (float*)out); }
+    virtual void Load(const int32_t* loc, void* out, size_t dataSize) SLANG_OVERRIDE { m_data.getAt((const uint32_t*)loc, (float*)out); }
     virtual void* refAt(const uint32_t* loc) SLANG_OVERRIDE { return m_data.getAt(loc); }
+
+    virtual void Sample(CPPPrelude::SamplerState samplerState, const float* loc, void* out, size_t dataSize) SLANG_OVERRIDE
+    {}
+
+    virtual void SampleLevel(CPPPrelude::SamplerState samplerState, const float* loc, float level, void* out, size_t dataSize) SLANG_OVERRIDE
+    {}
 
     FloatRWTexture(int elementCount, const CPPPrelude::TextureDimensions& inDims, float initialValue):
         m_dims(inDims)
