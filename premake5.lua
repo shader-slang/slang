@@ -351,6 +351,48 @@ function getBuildLocationName()
     end 
 end
 
+-- Adds CUDA dependency to a project
+function addCUDAIfEnabled()
+    if type(cudaPath) == "string" and isTargetWindows then
+        filter {}
+        includedirs { cudaPath .. "/include" }
+        includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
+        links { "cuda", "cudart" }
+        if optixPath then
+            defines { "RENDER_TEST_OPTIX" }
+            includedirs { optixPath .. "include/" }
+        end
+        
+        filter { "platforms:x86" }
+            libdirs { cudaPath .. "/lib/Win32/" }
+           
+        filter { "platforms:x64" }
+            libdirs { cudaPath .. "/lib/x64/" }       
+        filter {}
+        return true
+    elseif enableCuda then
+        filter {}
+        if type(cudaPath) == "string" then
+            includedirs { cudaPath .. "/include" }
+            includedirs { cudaPath .. "/include" }
+            if optixPath then
+                defines { "GFX_OPTIX" }
+                includedirs { optixPath .. "include/" }
+            end
+            filter { "platforms:x86" }
+            libdirs { cudaPath .. "/lib32/" }
+            filter { "platforms:x64" }
+            libdirs { cudaPath .. "/lib64/" }
+            filter {}
+            links { "cuda", "cudart" }
+        else
+            print "Error: CUDA is enabled but --cuda-sdk-path is not specified."
+        end
+        return true
+    end
+    return false
+end
+
 --
 -- Next we will define a helper routine that all of our
 -- projects will bottleneck through. Here `name` is
@@ -477,6 +519,8 @@ function tool(name)
     -- default.
     --
     kind "ConsoleApp"
+
+    includedirs { "source/" }
 end
 
 -- "Standard" projects will be those that go to make the binary
@@ -501,6 +545,8 @@ function toolSharedLibrary(name)
     --
     baseSlangProject(name .. "-tool", "tools/" .. name)
     
+    includedirs { "source/" }
+
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
     kind "SharedLib"
@@ -547,6 +593,8 @@ function example(name)
             links {"X11"}
         end
     end
+
+    addCUDAIfEnabled();
 end
 
 --
@@ -716,7 +764,6 @@ toolSharedLibrary "render-test"
     
     includedirs { ".", "external", "source", "tools/gfx", "tools/platform" }
     links { "core", "slang", "gfx", "gfx-util", "platform" }
-   
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         
@@ -727,28 +774,15 @@ toolSharedLibrary "render-test"
         -- directory into the output directory.
         -- d3dcompiler_47.dll is copied from the external/slang-binaries submodule.
         postbuildcommands { '"$(SolutionDir)tools\\copy-hlsl-libs.bat" "$(WindowsSdkDir)Redist/D3D/%{cfg.platform:lower()}/" "%{cfg.targetdir}/" "windows-%{cfg.platform:lower()}"'}    
-    end
-   
-    if type(cudaPath) == "string" and isTargetWindows then
-        addSourceDir "tools/render-test/cuda"
-        defines { "RENDER_TEST_CUDA" }
-        includedirs { cudaPath .. "/include" }
-        includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
-        links { "cuda", "cudart" }
-        if optixPath then
-            defines { "RENDER_TEST_OPTIX" }
-            includedirs { optixPath .. "include/" }
+        if (type(cudaPath) == "string") then
+            addSourceDir "tools/render-test/cuda"
         end
-        
-        filter { "platforms:x86" }
-            libdirs { cudaPath .. "/lib/Win32/" }
-           
-        filter { "platforms:x64" }
-            libdirs { cudaPath .. "/lib/x64/" }       
-        
     end
-  
---
+    if addCUDAIfEnabled() then
+        defines { "RENDER_TEST_CUDA" }
+    end
+
+--  
 -- `gfx` is a abstraction layer for different GPU platforms.
 --
 
@@ -769,6 +803,7 @@ tool "gfx"
     -- Will compile across targets
     addSourceDir "tools/gfx/cpu"
     addSourceDir "tools/gfx/nvapi"
+    addSourceDir "tools/gfx/cuda"
 
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
     -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
@@ -786,22 +821,6 @@ tool "gfx"
         addSourceDir "tools/gfx/d3d" 
         addSourceDir "tools/gfx/d3d11"
         addSourceDir "tools/gfx/d3d12"
-        addSourceDir "tools/gfx/cuda"
-
-        if type(cudaPath) == "string" then
-            defines { "GFX_ENABLE_CUDA" }
-            includedirs { cudaPath .. "/include" }
-            includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
-            if optixPath then
-                defines { "GFX_OPTIX" }
-                includedirs { optixPath .. "include/" }
-            end
-            links { "cuda", "cudart" }   
-            filter { "platforms:x86" }
-                libdirs { cudaPath .. "/lib/Win32/" }
-            filter { "platforms:x64" }
-                libdirs { cudaPath .. "/lib/x64/" }
-        end
     elseif targetDetail == "mingw" or targetDetail == "cygwin" then
         -- Don't support any render techs...
     elseif os.target() == "macosx" then
@@ -835,6 +854,9 @@ tool "gfx"
             libdirs { nvapiPath .. "/amd64" }
             links { "nvapi64" }
             
+    end
+    if addCUDAIfEnabled() then
+        defines { "GFX_ENABLE_CUDA" }
     end
 
 --

@@ -4,7 +4,7 @@
 #include "../slang-support.h"
 #include "../options.h"
 
-#include "../../source/core/slang-smart-pointer.h"
+#include "source/core/slang-smart-pointer.h"
 
 namespace renderer_test {
 
