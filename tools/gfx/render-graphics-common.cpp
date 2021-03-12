@@ -109,29 +109,6 @@ public:
             }
         }
 
-        slang::TypeLayoutReflection* unwrapParameterGroups(slang::TypeLayoutReflection* typeLayout)
-        {
-            for (;;)
-            {
-                if (!typeLayout->getType())
-                {
-                    if (auto elementTypeLayout = typeLayout->getElementTypeLayout())
-                        typeLayout = elementTypeLayout;
-                }
-
-                switch (typeLayout->getKind())
-                {
-                default:
-                    return typeLayout;
-
-                case slang::TypeReflection::Kind::ConstantBuffer:
-                case slang::TypeReflection::Kind::ParameterBlock:
-                    typeLayout = typeLayout->getElementTypeLayout();
-                    continue;
-                }
-            }
-        }
-
         void _addDescriptorSets(
             slang::TypeLayoutReflection* typeLayout,
             slang::VariableLayoutReflection* varLayout = nullptr)
@@ -178,7 +155,7 @@ public:
 
         Result setElementTypeLayout(slang::TypeLayoutReflection* typeLayout)
         {
-            typeLayout = unwrapParameterGroups(typeLayout);
+            typeLayout = _unwrapParameterGroups(typeLayout);
 
             m_elementTypeLayout = typeLayout;
 
@@ -414,8 +391,8 @@ public:
 
     struct Builder : Super::Builder
     {
-        Builder(IDevice* renderer)
-            : Super::Builder(static_cast<RendererBase*>(renderer))
+        Builder(IDevice* device)
+            : Super::Builder(static_cast<RendererBase*>(device))
         {}
 
         Result build(EntryPointLayout** outLayout)
@@ -1249,7 +1226,7 @@ protected:
             return SLANG_OK;
 
         // Once we have computed how large the buffer should be, we can allocate
-        // it using the existing public `IRenderer` API.
+        // it using the existing public `IDevice` API.
         //
         IDevice* device = getRenderer();
         IBufferResource::Desc bufferDesc;
