@@ -543,7 +543,7 @@ void DocMarkdownWriter::_writeTargetRequirements(const Requirement* reqs, Index 
 
     // Okay we need the name of the CodeGen target
     UnownedStringSlice name = TypeTextUtil::getCompileTargetName(SlangCompileTarget(reqs->target));
-    out << toSlice("*") << name << toSlice("*");
+    out << toSlice("**") << String(name).toUpper() << toSlice("**");
 
     if (!(reqsCount == 1 && reqs[0].value.getLength() == 0))
     {
