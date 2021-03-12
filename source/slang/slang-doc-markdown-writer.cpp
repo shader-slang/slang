@@ -830,6 +830,8 @@ void DocMarkdownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
                 _appendAsBullets(_getUniqueParams(genericDecls), '`');
                 // And parameters
                 _appendAsBullets(_getUniqueParams(paramDecls), '`');
+
+                out << toSlice("\n");
             }
         }
     }
@@ -1034,8 +1036,9 @@ void DocMarkdownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
     
         if (params.getCount())
         {
-            out << "## Generic Parameters\n\n";
+            out << toSlice("## Generic Parameters\n\n");
             _appendAsBullets(_getAsNameAndTextList(params), '`');
+            out << toSlice("\n");
         }
     }
 
@@ -1044,9 +1047,9 @@ void DocMarkdownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
         _getDeclsOfType<VarDecl>(aggTypeDecl, fields);
         if (fields.getCount())
         {
-            out << "## Fields\n\n";
-
+            out << toSlice("## Fields\n\n");
             _appendAsBullets(_getAsNameAndTextList(fields), '`');
+            out << toSlice("\n");
         }
     }
 
@@ -1072,6 +1075,7 @@ void DocMarkdownWriter::writeAggType(const DocMarkup::Entry& entry, AggTypeDeclB
 
             out << "## Methods\n\n";
             _appendAsBullets(_getAsStringList(uniqueMethods), '`');
+            out << toSlice("\n");
         }
     }
 }
@@ -1081,7 +1085,8 @@ void DocMarkdownWriter::writePreamble(const DocMarkup::Entry& entry)
     SLANG_UNUSED(entry);
     auto& out = m_builder;
 
-    out << toSlice("\n");
+    //out << toSlice("\n");
+
     out.appendRepeatedChar('-', 80);
     out << toSlice("\n");
 }
