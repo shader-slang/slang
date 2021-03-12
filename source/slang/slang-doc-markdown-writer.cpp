@@ -2,49 +2,13 @@
 #include "slang-doc-markdown-writer.h"
 
 #include "../core/slang-string-util.h"
+#include "../core/slang-type-text-util.h"
 
 #include "slang-ast-builder.h"
 #include "slang-lookup.h"
 
 namespace Slang {
 
-struct DocMarkdownWriter::StringListSet
-{
-    Index add(const HashSet<String>& set)
-    {
-        // -1 means empty, which we don't explicitly store
-        Index index = -1;
-        if (set.Count())
-        {
-            List<String> values;
-            for (auto& value : set)
-            {
-                values.add(value);
-            }
-            // Sort so that can be compared for uniqueness
-            values.sort();
-
-            index = m_uniqueValues.indexOf(values);
-            if (index < 0)
-            {
-                index = m_uniqueValues.getCount();
-                m_uniqueValues.add(values);
-            }
-        }
-        m_map.add(index);
-        return index;
-    }
-
-    Index getValueIndex(Index index) const { return m_map[index]; }
-    List<String>& getValuesAt(Index valueIndex) { return m_uniqueValues[valueIndex]; }
-    const List<List<String>>& getUniqueValues() const { return m_uniqueValues; }
-
-    StringListSet() {}
-
-protected:
-    List<Index> m_map;
-    List<List<String>> m_uniqueValues;
-};
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DocMarkDownWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -435,8 +399,92 @@ List<DocMarkdownWriter::NameAndText> DocMarkdownWriter::_getUniqueParams(const L
     return out;
 }
 
-static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
+static void _addRequirement(const DocMarkdownWriter::Requirement& req, List<DocMarkdownWriter::Requirement>& ioReqs)
 {
+    if (ioReqs.indexOf(req) < 0)
+    {
+        ioReqs.add(req);
+    }
+}
+
+static void _addRequirement(CodeGenTarget target, const String& value, List<DocMarkdownWriter::Requirement>& ioReqs)
+{
+    _addRequirement(DocMarkdownWriter::Requirement{ target, value }, ioReqs);
+}
+
+static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token& tok)
+{
+    typedef DocMarkdownWriter::Requirement Requirement;
+
+    if (tok.type == TokenType::Unknown)
+    {
+        return Requirement{ CodeGenTarget::None, String() };
+    }
+
+    auto targetName = tok.getContent();
+    const CapabilityAtom targetCap = findCapabilityAtom(targetName);
+
+    if (targetCap == CapabilityAtom::Invalid)
+    {
+        return Requirement{ CodeGenTarget::None, String() };
+    }
+
+    static const CapabilityAtom rootAtoms[] =
+    {
+        CapabilityAtom::GLSL,
+        CapabilityAtom::HLSL,
+        CapabilityAtom::CUDA,
+        CapabilityAtom::CPP,
+        CapabilityAtom::C,
+    };
+
+    for (auto rootAtom : rootAtoms)
+    {
+        if (rootAtom == targetCap)
+        {
+            // If its one of the roots we don't need to store the name
+            targetName = UnownedStringSlice();
+            break;
+        }
+    }
+
+    if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::GLSL))
+    {
+        return Requirement{CodeGenTarget::GLSL, targetName};
+    }
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::HLSL))
+    {
+        return Requirement{ CodeGenTarget::HLSL, targetName };
+    }
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::CUDA))
+    {
+        return Requirement{ CodeGenTarget::CUDASource, targetName };
+    }
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::CPP))
+    {
+        return Requirement{ CodeGenTarget::CPPSource, targetName };
+    }
+    else if (isCapabilityDerivedFrom(targetCap, CapabilityAtom::C))
+    {
+        return Requirement{ CodeGenTarget::CSource, targetName };
+    }
+    
+    return Requirement{ CodeGenTarget::Unknown, String() };
+}
+
+static void _addRequirementFromTargetToken(const Token& tok, List<DocMarkdownWriter::Requirement>& ioReqs)
+{
+    auto req = _getRequirementFromTargetToken(tok);
+    if (req.target != CodeGenTarget::None)
+    {
+        _addRequirement(req, ioReqs);
+    }
+}
+
+static void _addRequirements(Decl* decl, List<DocMarkdownWriter::Requirement>& ioReqs)
+{
+    typedef DocMarkdownWriter::Requirement Requirement;
+
     StringBuilder buf;
 
     if (auto spirvRequiredModifier = decl->findModifier<RequiredSPIRVVersionModifier>())
@@ -444,63 +492,137 @@ static void _addRequirements(Decl* decl, HashSet<String>& outRequirements)
         buf.Clear();
         buf << "SPIR-V ";
         spirvRequiredModifier->version.append(buf);
-        outRequirements.Add(buf);
+        _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
     if (auto glslRequiredModifier = decl->findModifier<RequiredGLSLVersionModifier>())
     {
         buf.Clear();
         buf << "GLSL" << glslRequiredModifier->versionNumberToken.getContent();
-        outRequirements.Add(buf);
+        _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
     if (auto cudaSMVersionModifier = decl->findModifier<RequiredCUDASMVersionModifier>())
     {
         buf.Clear();
-        buf << "CUDA SM ";
+        buf << "SM ";
         cudaSMVersionModifier->version.append(buf);
-        outRequirements.Add(buf);
+        _addRequirement(CodeGenTarget::CUDASource, buf, ioReqs);
     }
 
     if (auto extensionModifier = decl->findModifier<RequiredGLSLExtensionModifier>())
     {
         buf.Clear();
-        buf << "GLSL " << extensionModifier->extensionNameToken.getContent();
-        outRequirements.Add(buf);
+        buf << extensionModifier->extensionNameToken.getContent();
+        _addRequirement(CodeGenTarget::GLSL, buf, ioReqs);
     }
 
     if (auto requiresNVAPIAttribute = decl->findModifier<RequiresNVAPIAttribute>())
     {
-        outRequirements.Add("NVAPI");
+        _addRequirement(CodeGenTarget::HLSL, "NVAPI", ioReqs);
+    }
+
+    for (auto targetIntrinsic : decl->getModifiersOfType<TargetIntrinsicModifier>())
+    {
+        _addRequirementFromTargetToken(targetIntrinsic->targetToken, ioReqs);
+    }
+    for (auto specializedForTarget : decl->getModifiersOfType<SpecializedForTargetModifier>())
+    {
+        _addRequirementFromTargetToken(specializedForTarget->targetToken, ioReqs);
     }
 }
 
-void DocMarkdownWriter::_maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set)
+void DocMarkdownWriter::_writeTargetRequirements(const Requirement* reqs, Index reqsCount)
 {
+    if (reqsCount == 0)
+    {
+        return;
+    }
+
      auto& out = m_builder;
 
-    const auto& uniqueValues = set.getUniqueValues();
+    // Okay we need the name of the CodeGen target
+    UnownedStringSlice name = TypeTextUtil::getCompileTargetName(SlangCompileTarget(reqs->target));
+    out << toSlice("*") << name << toSlice("*");
 
-    const Index uniqueCount = uniqueValues.getCount();
-    if (uniqueCount > 0 && uniqueValues[0].getCount() > 0)
+    if (!(reqsCount == 1 && reqs[0].value.getLength() == 0))
     {
-        out << title;
-        if (uniqueCount > 1)
+        // Put in a list so we can use convenience funcs
+        List<String> values;
+        for (Index i = 0; i < reqsCount; i++)
         {
-            for (Index i = 0; i < uniqueCount; ++i)
+            if (reqs[i].value.getLength() > 0)
             {
-                out << (i + 1) << (". ");
-                _appendCommaList(uniqueValues[i], '`');
-                out << toSlice("\n");
+                values.add(reqs[i].value);
             }
         }
-        else
+
+        out << toSlice(" ");
+        _appendCommaList(values, '`');
+    }
+
+    out << toSlice(" ");
+}
+
+void DocMarkdownWriter::_appendRequirements(const List<Requirement>& requirements)
+{
+    Index startIndex = 0;
+    CodeGenTarget curTarget = CodeGenTarget::None;
+
+    for (Index i = 0; i < requirements.getCount(); ++i)
+    {
+        const auto& req = requirements[i];
+
+        if (req.target != curTarget)
         {
-            _appendCommaList(uniqueValues[0], '`');
+            _writeTargetRequirements(requirements.getBuffer() + startIndex, i - startIndex);
+
+            startIndex = i;
+            curTarget = req.target;
+        }
+    }
+
+    _writeTargetRequirements(requirements.getBuffer() + startIndex, requirements.getCount() - startIndex);
+}
+
+void DocMarkdownWriter::_maybeAppendRequirements(const UnownedStringSlice& title, const List<List<DocMarkdownWriter::Requirement>>& uniqueRequirements)
+{
+     auto& out = m_builder;
+     const Index uniqueCount = uniqueRequirements.getCount();
+
+     if (uniqueCount <= 0)
+     {
+         return;
+     }
+
+     if (uniqueCount == 1)
+     {
+         const auto& reqs = uniqueRequirements[0];
+
+         // If just HLSL on own, then ignore
+         if (reqs.getCount() == 0 || (reqs.getCount() == 1 && reqs[0] == Requirement{ CodeGenTarget::HLSL, String() }))
+         {
+             return;
+         }
+
+         out << title;
+
+         _appendRequirements(reqs);
+         out << toSlice("\n");
+     }
+     else
+     {
+         out << title;
+
+        for (Index i = 0; i < uniqueCount; ++i)
+        {
+            out << (i + 1) << (". ");
+            _appendRequirements(uniqueRequirements[i]);
             out << toSlice("\n");
         }
-        out << toSlice("\n");
-    }
+     }
+
+     out << toSlice("\n");
 }
 
 static Decl* _getSameNameDecl(Decl* decl)
@@ -600,92 +722,58 @@ void DocMarkdownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
         sigs.sort([](CallableDecl* a, CallableDecl* b) -> bool { return a->loc.getRaw() < b->loc.getRaw(); });
     }
 
-    // Set of sets of requirements, holds index map from addition to the set entry 
-    StringListSet requirementsSetSet;
+    // The unique requirements found 
+    List<List<Requirement>> uniqueRequirements;
+    // Maps a sig index to a unique requirements set
+    List<Index> requirementsMap;
 
-    // Similarly for targets 
-    StringListSet targetSetSet;
-
-    // We want to determine the unique signature, and then the requirements for the signature
+    for (Index i = 0; i < sigs.getCount(); ++i)
     {
-        for (Index i = 0; i < sigs.getCount(); ++i)
+        CallableDecl* sig = sigs[i];
+
+        // Add the requirements for all the different versions
+        List<Requirement> requirements;
+        for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
         {
-            CallableDecl* sig = sigs[i];
-            // Add the requirements for all the different versions
-            {
-                HashSet<String> requirementsSet;
-                HashSet<String> targetSet;
-                for (CallableDecl* curSig = sig; curSig; curSig = curSig->nextDecl)
-                {
-                    _addRequirements(sig, requirementsSet);
-
-                    // Handle Target info
-
-                    for (auto targetIntrinsic : sig->getModifiersOfType<TargetIntrinsicModifier>())
-                    {
-                        targetSet.Add(String(targetIntrinsic->targetToken.getContent()).toUpper());
-                    }
-                    for (auto specializedForTarget : sig->getModifiersOfType<SpecializedForTargetModifier>())
-                    {
-                        targetSet.Add(String(specializedForTarget->targetToken.getContent()).toUpper());
-                    }
-                }
-                
-                requirementsSetSet.add(requirementsSet);
-
-                // TODO(JS): This really isn't right, we ideally have markup that made hlsl availability explicit
-                // We *assume* that we have 'hlsl' for now
-                targetSet.Add(String("HLSL"));
-                targetSetSet.add(targetSet);
-            }
+            _addRequirements(sig, requirements);
         }
+
+        // TODO(JS): HACK - almost everything is available for HLSL, and is generally not marked up in stdlib
+        // So assume here it's available
+        _addRequirement(Requirement{ CodeGenTarget::HLSL, String() }, requirements);
+
+        requirements.sort();
+
+        Index index = uniqueRequirements.indexOf(requirements);
+        if (index < 0)
+        {
+            index = uniqueRequirements.getCount();
+            uniqueRequirements.add(requirements);
+        }
+        requirementsMap.add(index);
     }
-    
+
     // Output the signature
     {          
         out << toSlice("## Signature \n\n");
         out << toSlice("```\n");
 
         Index prevRequirementsIndex = -1;
-        Index prevTargetIndex = -1;
-
+        
         const Int sigCount = sigs.getCount();
         for (Index i = 0; i < sigCount; ++i)
-        {
+        {            
             auto sig = sigs[i];
+            // Get the requirements index for this sig
+            const Index requirementsIndex = requirementsMap[i];
 
             // Output if needs unique requirements
-            if (requirementsSetSet.getUniqueValues().getCount() > 1)
+            if (uniqueRequirements.getCount() > 1 )
             {
-                const Index requirementsIndex = requirementsSetSet.getValueIndex(i);
                 if (requirementsIndex != prevRequirementsIndex)
                 {
-                    if (requirementsIndex >= 0)
-                    {
-                        out << toSlice("/// See Requirement ") << (requirementsIndex + 1) << toSlice("\n");
-                    }
-                    else
-                    {
-                        out << toSlice("/// No requirements\n");
-                    }
+                    out << toSlice("/// See Availability ") << (requirementsIndex + 1) << toSlice("\n");
                     prevRequirementsIndex = requirementsIndex;
-                }
-            }
-
-            if (targetSetSet.getUniqueValues().getCount() > 1)
-            {
-                const Index targetIndex = targetSetSet.getValueIndex(i);
-                if (targetIndex != prevTargetIndex)
-                {
-                    if (targetIndex >= 0)
-                    {
-                        out << toSlice("/// See Target Availability ") << (targetIndex + 1) << toSlice("\n");
-                    }
-                    else
-                    {
-                        out << toSlice("/// All Targets\n");
-                    }
-                    prevTargetIndex = targetIndex;
                 }
             }
 
@@ -694,26 +782,7 @@ void DocMarkdownWriter::writeCallableOverridable(const DocMarkup::Entry& entry, 
         out << "```\n\n";
     }
 
-    _maybeAppendSet(toSlice("## Requirements\n\n"), requirementsSetSet);
-
-    // Target availability
-
-    {
-        const auto& uniqueValues = targetSetSet.getUniqueValues();
-        if (uniqueValues.getCount() == 1 && uniqueValues[0].getCount() == 1 && uniqueValues[0][0] == "hlsl")
-        {
-            // TODO(JS):
-            // If something is marked up for hlsl, and nothing else, that indicates it might *only* be available on hlsl, but
-            // we don't correctly handle that here.
-
-            // If the only thing we have is 'hlsl' - we injected that so we'll *assume* it's available everywhere, so
-            // don't bother outputting.
-        }
-        else
-        {
-            _maybeAppendSet(toSlice("## Target Availability\n\n"), targetSetSet);
-        }
-    }
+    _maybeAppendRequirements(toSlice("## Availability\n\n"), uniqueRequirements);
 
     {
         // We will use the first documentation found for each parameter type
