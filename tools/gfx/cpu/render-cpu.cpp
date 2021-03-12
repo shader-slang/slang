@@ -769,32 +769,6 @@ public:
         return static_cast<CPUShaderObjectLayout*>(m_layout.Ptr());
     }
 
-#if 0
-    virtual SLANG_NO_THROW Result SLANG_MCALL initBuffer(IDevice* device, size_t bufferSize)
-    {
-        BufferResource::Desc bufferDesc;
-        bufferDesc.init(bufferSize);
-        bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-        ComPtr<IBufferResource> constantBuffer;
-        SLANG_RETURN_ON_FAIL(renderer->createBufferResource(
-            IResource::Usage::ConstantBuffer, bufferDesc, nullptr, constantBuffer.writeRef()));
-        bufferResource = dynamic_cast<MemoryCUDAResource*>(constantBuffer.get());
-        return SLANG_OK;
-    }
-#endif
-
-#if 0
-    virtual SLANG_NO_THROW void* SLANG_MCALL getBuffer()
-    {
-        return bufferResource ? bufferResource->m_cudaMemory : nullptr;
-    }
-
-    virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize()
-    {
-        return bufferResource ? bufferResource->getDesc()->sizeInBytes : 0;
-    }
-#endif
-
     virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() override
     {
         return getLayout()->getElementTypeLayout();
@@ -808,7 +782,7 @@ public:
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size)
+        setData(ShaderOffset const& offset, void const* data, size_t size) override
     {
         size = Math::Min(size, getLayout()->getSize() - offset.uniformOffset);
         memcpy((char*)m_data + offset.uniformOffset, data, size);
@@ -816,7 +790,7 @@ public:
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL getObject(
         ShaderOffset const& offset,
-        IShaderObject**     outObject)
+        IShaderObject**     outObject) override
     {
         auto layout = getLayout();
 
@@ -834,7 +808,7 @@ public:
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL setObject(
         ShaderOffset const& offset,
-        IShaderObject*      object)
+        IShaderObject*      object) override
     {
         auto layout = getLayout();
 
@@ -950,7 +924,7 @@ public:
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* inView)
+        setResource(ShaderOffset const& offset, IResourceView* inView) override
     {
         auto layout = getLayout();
 
@@ -1000,14 +974,14 @@ public:
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler)
+        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override
     {
         SLANG_UNUSED(sampler);
         SLANG_UNUSED(offset);
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler)
+        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override
     {
         SLANG_UNUSED(sampler);
         setResource(offset, textureView);
@@ -1171,8 +1145,8 @@ private:
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
         public:
             CommandWriter* m_writer;
@@ -1231,8 +1205,8 @@ private:
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
         public:
             CommandWriter* m_writer;
@@ -1254,7 +1228,7 @@ private:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data)
+            uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
             {
                 m_writer->uploadBufferData(dst, offset, size, data);
             }
