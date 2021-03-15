@@ -7,6 +7,7 @@
 #include "open-gl/render-gl.h"
 #include "vulkan/render-vk.h"
 #include "cuda/render-cuda.h"
+#include "cpu/render-cpu.h"
 #include <cstring>
 
 namespace gfx {
@@ -97,6 +98,11 @@ extern "C"
                 return createVKDevice(desc, outDevice);
             }
 #endif
+        case DeviceType::CPU:
+            {
+                return createCPUDevice(desc, outDevice);
+            }
+            break;
 
         default:
             return SLANG_FAIL;
@@ -153,6 +159,5 @@ extern "C"
         }
     }
 }
-
 
 } // renderer_test
