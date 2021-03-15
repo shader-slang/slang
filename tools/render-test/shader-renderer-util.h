@@ -73,13 +73,13 @@ struct ShaderRendererUtil
         bool isOutput,
         size_t bufferSize,
         const void* initData,
-        IDevice* renderer,
+        IDevice* device,
         ComPtr<IBufferResource>& bufferOut);
 
         /// Create BindingState::Desc from the contents of layout
     static Slang::Result createBindingState(
         const ShaderInputLayout& layout,
-        IDevice* renderer,
+        IDevice* device,
         IBufferResource* addedConstantBuffer,
         BindingStateImpl** outBindingState);
 };

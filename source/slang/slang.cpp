@@ -1843,26 +1843,22 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         // cause any problems with scoping
         ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
-        for (TranslationUnitRequest* translationUnit : translationUnits)
+        ISlangWriter* writer = getSink()->writer;
+
+        // Write output to the diagnostic writer
+        if (writer)
         {
-            RefPtr<DocMarkup> markup(new DocMarkup);
-            DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
-
-            // Hmm.. we can have multiple sourcefiles. So fir now we just pick the first, so as to come up with
-            // a reasonable name
-            SourceFile* sourceFile = translationUnit->getSourceFiles()[0];
-
-            // Extract to a file
-            const String& path = sourceFile->getPathInfo().foundPath;
-            if (path.getLength())
+            for (TranslationUnitRequest* translationUnit : translationUnits)
             {
-                String fileName = Path::getFileNameWithoutExt(path);
-                fileName.append(".md");
+                RefPtr<DocMarkup> markup(new DocMarkup);
+                DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
-                DocMarkdownWriter writer(markup, astBuilder);
-                writer.writeAll();
+                // Convert to markdown            
+                DocMarkdownWriter markdownWriter(markup, astBuilder);
+                markdownWriter.writeAll();
 
-                File::writeAllText(fileName, writer.getOutput());
+                UnownedStringSlice docText = markdownWriter.getOutput().getUnownedSlice();
+                writer->write(docText.begin(), docText.getLength());            
             }
         }
     }
@@ -2730,6 +2726,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     ComPtr<ISlangBlob> blob;
     SLANG_RETURN_ON_FAIL(entryPointResult.getBlob(blob));
     *outCode = blob.detach();
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
+    int                     entryPointIndex,
+    int                     targetIndex,
+    ISlangSharedLibrary**   outSharedLibrary,
+    slang::IBlob**          outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if(targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    auto& entryPointResult = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if(entryPointResult.format == ResultFormat::None )
+        return SLANG_FAIL;
+
+    ComPtr<ISlangSharedLibrary> sharedLibrary;
+    SLANG_RETURN_ON_FAIL(entryPointResult.getSharedLibrary(sharedLibrary));
+
+    *outSharedLibrary = sharedLibrary.detach();
     return SLANG_OK;
 }
 
@@ -4385,7 +4408,10 @@ SlangReflection* EndToEndCompileRequest::getReflection()
 
     auto targetReq = linkage->targets[targetIndex];
     auto targetProgram = program->getTargetProgram(targetReq);
-    auto programLayout = targetProgram->getExistingLayout();
+
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    auto programLayout = targetProgram->getOrCreateLayout(&sink);
 
     return (SlangReflection*)programLayout;
 }
