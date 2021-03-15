@@ -92,11 +92,15 @@ extern "C"
             }
             break;
 #elif SLANG_LINUX_FAMILY
-            case DeviceType::Default:
-            case DeviceType::Vulkan:
-            {
-                return createVKDevice(desc, outDevice);
-            }
+        case DeviceType::Default:
+        case DeviceType::Vulkan:
+        {
+            return createVKDevice(desc, outDevice);
+        }
+        case DeviceType::CUDA:
+        {
+            return createCUDADevice(desc, outDevice);
+        }
 #endif
         case DeviceType::CPU:
             {
