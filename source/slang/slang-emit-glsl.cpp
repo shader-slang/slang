@@ -1831,17 +1831,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                     // could provide the `accelerationSturctureEXT` type, but there
                     // can be drivers that provide only one and not the other.
                     //
-                    // Because we can't pick one upon just seeing the type, we need to
-                    // emit the type here but *not* call `_requireRayTracing()` or
-                    // anything like it, because we don't yet know the specific extension
-                    // we should ask for.
+                    // For now we will just kludge this by assuming that any driver
+                    // that supports one of these extensions supports the other.
                     //
-                    // TODO: We might eventually want to have this step set a flag that
-                    // will cause a compilation error if nothing else in the code requires
-                    // a specific concrete ray-tracing extension. Ideally all of these
-                    // details could be subusmed under the capability system sooner or
-                    // later.
-                    // 
+                    // TODO: Revisit that decision once the driver landscape is more stable/clear.
+                    //
+                    _requireRayTracing();
+
                     m_writer->emit("accelerationStructureEXT");
                 }
                 break;
