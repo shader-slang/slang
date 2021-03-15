@@ -519,8 +519,6 @@ function tool(name)
     -- default.
     --
     kind "ConsoleApp"
-
-    includedirs { "source/" }
 end
 
 -- "Standard" projects will be those that go to make the binary
@@ -544,8 +542,6 @@ function toolSharedLibrary(name)
     -- specifying that the project lives under the `tools/` path.
     --
     baseSlangProject(name .. "-tool", "tools/" .. name)
-    
-    includedirs { "source/" }
 
     defines { "SLANG_SHARED_LIBRARY_TOOL" }
    
@@ -782,7 +778,7 @@ toolSharedLibrary "render-test"
         defines { "RENDER_TEST_CUDA" }
     end
 
---  
+--
 -- `gfx` is a abstraction layer for different GPU platforms.
 --
 
