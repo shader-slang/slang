@@ -156,6 +156,9 @@ inline bool operator!=(CapabilitySet const& left, CapabilitySet const& right)
     return !(left == right);
 }
 
+    /// Returns true if atom is derived from base
+bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base);
+
     /// Find a capability atom with the given `name`, or return CapabilityAtom::Invalid.
 CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name);
 }

@@ -127,6 +127,31 @@ CapabilityAtom findCapabilityAtom(UnownedStringSlice const& name)
     return CapabilityAtom::Invalid;
 }
 
+bool isCapabilityDerivedFrom(CapabilityAtom atom, CapabilityAtom base)
+{
+    if (atom == base)
+    {
+        return true;
+    }
+
+    const auto& info = kCapabilityAtoms[Index(atom)];
+
+    for (auto cur : info.bases)
+    {
+        if (cur == CapabilityAtom::Invalid)
+        {
+            return false;
+        }
+
+        if (isCapabilityDerivedFrom(cur, base))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 //
 // CapabilitySet
 //

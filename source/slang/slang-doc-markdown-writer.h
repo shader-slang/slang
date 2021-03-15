@@ -4,6 +4,7 @@
 
 #include "slang-doc-extractor.h"
 #include "slang-ast-print.h"
+#include "slang-compiler.h"
 
 namespace Slang {
 
@@ -26,6 +27,23 @@ struct DocMarkdownWriter
         List<PartPair> params;
         List<GenericParam> genericParams;
         Part name;
+    };
+
+    struct Requirement
+    {
+        typedef Requirement ThisType;
+
+        bool operator<(const ThisType& rhs) const { return Index(target) < Index(rhs.target) || (target == rhs.target && value < rhs.value); } 
+
+        bool operator==(const ThisType& rhs) const { return target == rhs.target && value == rhs.value; }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+            /// Using CodeGenTarget may not be most appropriate, perhaps it should use a CapabilityAtom
+            /// For now use target, and since we always go through Source -> byte code it is fairly straight forward to understand the
+            /// meaning.
+        CodeGenTarget target;
+            /// The 'value' requirement associated with a target. If it's empty it's just the target that is a requirement.
+        String value;
     };
 
         /// Write out all documentation to the output buffer
@@ -106,7 +124,9 @@ struct DocMarkdownWriter
 
     void _appendCommaList(const List<String>& strings, char wrapChar);
 
-    void _maybeAppendSet(const UnownedStringSlice& title, const StringListSet& set);
+    void _appendRequirements(const List<DocMarkdownWriter::Requirement>& requirements);
+    void _maybeAppendRequirements(const UnownedStringSlice& title, const List<List<DocMarkdownWriter::Requirement>>& uniqueRequirements);
+    void _writeTargetRequirements(const Requirement* reqs, Index reqsCount);
 
         /// Appends prefix and the list of types derived from
     void _appendDerivedFrom(const UnownedStringSlice& prefix, AggTypeDeclBase* aggTypeDecl);
