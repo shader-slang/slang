@@ -1843,26 +1843,22 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         // cause any problems with scoping
         ASTBuilder* astBuilder = getLinkage()->getASTBuilder();
 
-        for (TranslationUnitRequest* translationUnit : translationUnits)
+        ISlangWriter* writer = getSink()->writer;
+
+        // Write output to the diagnostic writer
+        if (writer)
         {
-            RefPtr<DocMarkup> markup(new DocMarkup);
-            DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
-
-            // Hmm.. we can have multiple sourcefiles. So fir now we just pick the first, so as to come up with
-            // a reasonable name
-            SourceFile* sourceFile = translationUnit->getSourceFiles()[0];
-
-            // Extract to a file
-            const String& path = sourceFile->getPathInfo().foundPath;
-            if (path.getLength())
+            for (TranslationUnitRequest* translationUnit : translationUnits)
             {
-                String fileName = Path::getFileNameWithoutExt(path);
-                fileName.append(".md");
+                RefPtr<DocMarkup> markup(new DocMarkup);
+                DocMarkupExtractor::extract(translationUnit->getModuleDecl(), getSourceManager(), getSink(), markup);
 
-                DocMarkdownWriter writer(markup, astBuilder);
-                writer.writeAll();
+                // Convert to markdown            
+                DocMarkdownWriter markdownWriter(markup, astBuilder);
+                markdownWriter.writeAll();
 
-                File::writeAllText(fileName, writer.getOutput());
+                UnownedStringSlice docText = markdownWriter.getOutput().getUnownedSlice();
+                writer->write(docText.begin(), docText.getLength());            
             }
         }
     }
