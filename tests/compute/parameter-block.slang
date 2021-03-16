@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE:
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST_DISABLED(compute):COMPARE_COMPUTE:
+//TEST_DISABLED(compute):COMPARE_COMPUTE:-cpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=block0.buffer
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):name=block1.buffer

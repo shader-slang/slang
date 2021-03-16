@@ -5,10 +5,10 @@
 // shader parameters.
 //
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 // A lot of the setup is the same as for `interface-shader-param`,
 // so look there if you want the comments.

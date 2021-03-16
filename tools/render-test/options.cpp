@@ -253,7 +253,9 @@ static SlangResult _setRendererType(DeviceType type, const char* arg, Slang::Wri
         }
         else if (strcmp(arg, "-shaderobj") == 0)
         {
-            outOptions.useShaderObjects = true;
+            // Note: We ignore this option because it is always enabled now.
+            //
+            // TODO: At some point we could warn/error and deprecate this option.
         }
         else
         {

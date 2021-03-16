@@ -23,18 +23,12 @@
 
 #include "../../source/core/slang-test-tool-util.h"
 
-#include "cpu-compute-util.h"
-
 #define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    define WIN32_LEAN_AND_MEAN
 #    include <Windows.h>
-#endif
-
-#if RENDER_TEST_CUDA
-#   include "cuda/cuda-compute-util.h"
 #endif
 
 namespace renderer_test {
@@ -80,8 +74,9 @@ struct ShaderOutputPlan
 {
     struct Item
     {
-        Index               inputLayoutEntryIndex;
-        ComPtr<IResource>   resource;
+        Index                           inputLayoutEntryIndex;
+        ComPtr<IResource>               resource;
+        slang::TypeLayoutReflection*    typeLayout = nullptr;
     };
 
     List<Item> items;
@@ -105,7 +100,7 @@ public:
 
     virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) = 0;
     virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) = 0;
-    virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) = 0;
+    virtual Result writeBindingOutput(const char* fileName) = 0;
 
     Result writeScreen(const char* filename);
 
@@ -142,29 +137,6 @@ protected:
     Options m_options;
 };
 
-class LegacyRenderTestApp : public RenderTestApp
-{
-public:
-    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) SLANG_OVERRIDE;
-    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) SLANG_OVERRIDE;
-    virtual Result initialize(
-        SlangSession* session,
-        IDevice* device,
-        const Options& options,
-        const ShaderCompilerUtil::Input& input) SLANG_OVERRIDE;
-
-    BindingStateImpl* getBindingState() const { return m_bindingState; }
-
-    virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) override;
-    virtual void finalizeImpl() SLANG_OVERRIDE;
-
-protected:
-	uintptr_t m_constantBufferSize;
-	ComPtr<IBufferResource>	m_constantBuffer;
-	RefPtr<BindingStateImpl>    m_bindingState;
-    int m_numAddedConstantBuffers;                      ///< Constant buffers can be added to the binding directly. Will be added at the end.
-};
-
 class ShaderObjectRenderTestApp : public RenderTestApp
 {
 public:
@@ -175,7 +147,7 @@ public:
         IDevice* device,
         const Options& options,
         const ShaderCompilerUtil::Input& input) SLANG_OVERRIDE;
-    virtual Result writeBindingOutput(BindRoot* bindRoot, const char* fileName) override;
+    virtual Result writeBindingOutput(const char* fileName) override;
 
 protected:
     virtual void finalizeImpl() SLANG_OVERRIDE;
@@ -223,6 +195,7 @@ SlangResult _assignVarsFromLayout(
             StdWriters::getError().print("error: could not find shader parameter matching '%s'\n", entry.name.begin());
             return SLANG_E_INVALID_ARG;
         }
+        slang::TypeLayoutReflection* typeLayout = entryCursor.getTypeLayout();
 
         ComPtr<IResource> resource;
         switch(entry.type)
@@ -296,35 +269,6 @@ SlangResult _assignVarsFromLayout(
                     }
                     break;
                 }
-
-#if 0
-                switch(srcBuffer.type)
-                {
-                case InputBufferType::ConstantBuffer:
-                    descriptorSet->setConstantBuffer(rangeIndex, 0, bufferResource);
-                    break;
-
-                case InputBufferType::StorageBuffer:
-                    {
-                        ResourceView::Desc viewDesc;
-                        viewDesc.type = ResourceView::Type::UnorderedAccess;
-                        viewDesc.format = srcBuffer.format;
-                        auto bufferView = renderer->createBufferView(
-                            bufferResource,
-                            viewDesc);
-                        descriptorSet->setResource(rangeIndex, 0, bufferView);
-                    }
-                    break;
-                }
-
-                if(srcEntry.isOutput)
-                {
-                    BindingStateImpl::OutputBinding binding;
-                    binding.entryIndex = i;
-                    binding.resource = bufferResource;
-                    outputBindings.add(binding);
-                }
-#endif
             }
             break;
 
@@ -344,18 +288,6 @@ SlangResult _assignVarsFromLayout(
                     viewDesc);
 
                 entryCursor.setCombinedTextureSampler(textureView, sampler);
-
-#if 0
-                descriptorSet->setCombinedTextureSampler(rangeIndex, 0, textureView, sampler);
-
-                if(srcEntry.isOutput)
-                {
-                    BindingStateImpl::OutputBinding binding;
-                    binding.entryIndex = i;
-                    binding.resource = texture;
-                    outputBindings.add(binding);
-                }
-#endif
             }
             break;
 
@@ -381,18 +313,6 @@ SlangResult _assignVarsFromLayout(
                 }
 
                 entryCursor.setResource(textureView);
-
-#if 0
-                descriptorSet->setResource(rangeIndex, 0, textureView);
-
-                if(srcEntry.isOutput)
-                {
-                    BindingStateImpl::OutputBinding binding;
-                    binding.entryIndex = i;
-                    binding.resource = texture;
-                    outputBindings.add(binding);
-                }
-#endif
             }
             break;
 
@@ -401,9 +321,6 @@ SlangResult _assignVarsFromLayout(
                 auto sampler = _createSamplerState(device, entry.samplerDesc);
 
                 entryCursor.setSampler(sampler);
-#if 0
-                descriptorSet->setSampler(rangeIndex, 0, sampler);
-#endif
             }
             break;
 
@@ -459,16 +376,12 @@ SlangResult _assignVarsFromLayout(
             ShaderOutputPlan::Item item;
             item.inputLayoutEntryIndex = entryIndex;
             item.resource = resource;
+            item.typeLayout = typeLayout;
             ioOutputPlan.items.add(item);
         }
 
     }
     return SLANG_OK;
-}
-
-void LegacyRenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
-{
-    m_bindingState->apply(encoder, pipelineType);
 }
 
 void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
@@ -494,112 +407,6 @@ void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommand
     default:
         throw "unknown pipeline type";
     }
-}
-
-SlangResult LegacyRenderTestApp::initialize(
-    SlangSession* session,
-    IDevice* device,
-    const Options& options,
-    const ShaderCompilerUtil::Input& input)
-{
-    m_options = options;
-
-    m_device = device;
-
-    SLANG_RETURN_ON_FAIL(_initializeShaders(session, device, options.shaderType, input));
-
-    _initializeRenderPass();
-
-    m_numAddedConstantBuffers = 0;
-
-    // TODO(tfoley): use each API's reflection interface to query the constant-buffer size needed
-    m_constantBufferSize = 16 * sizeof(float);
-
-    IBufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(m_constantBufferSize);
-    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-
-    m_constantBuffer =
-        device->createBufferResource(IResource::Usage::ConstantBuffer, constantBufferDesc);
-    if (!m_constantBuffer)
-        return SLANG_FAIL;
-
-    //! Hack -> if doing a graphics test, add an extra binding for our dynamic constant buffer
-    //
-    // TODO: Should probably be more sophisticated than this - with 'dynamic' constant buffer/s
-    // binding always being specified in the test file
-    ComPtr<IBufferResource> addedConstantBuffer;
-    switch (m_options.shaderType)
-    {
-    default:
-        break;
-
-    case Options::ShaderProgramType::Graphics:
-    case Options::ShaderProgramType::GraphicsCompute:
-        addedConstantBuffer = m_constantBuffer;
-        m_numAddedConstantBuffers++;
-        break;
-    }
-
-    BindingStateImpl* bindingState = nullptr;
-    SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBindingState(
-        m_shaderInputLayout, m_device, addedConstantBuffer, &bindingState));
-    m_bindingState = bindingState;
-
-    // Do other initialization that doesn't depend on the source language.
-
-    // Input Assembler (IA)
-
-    const InputElementDesc inputElements[] = {
-        {"A", 0, Format::RGB_Float32, offsetof(Vertex, position)},
-        {"A", 1, Format::RGB_Float32, offsetof(Vertex, color)},
-        {"A", 2, Format::RG_Float32, offsetof(Vertex, uv)},
-    };
-
-    m_inputLayout = m_device->createInputLayout(inputElements, SLANG_COUNT_OF(inputElements));
-    if (!m_inputLayout)
-        return SLANG_FAIL;
-
-    IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
-
-    m_vertexBuffer = m_device->createBufferResource(
-        IResource::Usage::VertexBuffer, vertexBufferDesc, kVertexData);
-    if (!m_vertexBuffer)
-        return SLANG_FAIL;
-
-    {
-        switch (m_options.shaderType)
-        {
-        default:
-            assert(!"unexpected test shader type");
-            return SLANG_FAIL;
-
-        case Options::ShaderProgramType::Compute:
-            {
-                ComputePipelineStateDesc desc;
-                desc.pipelineLayout = m_bindingState->pipelineLayout;
-                desc.program = m_shaderProgram;
-
-                m_pipelineState = m_device->createComputePipelineState(desc);
-            }
-            break;
-
-        case Options::ShaderProgramType::Graphics:
-        case Options::ShaderProgramType::GraphicsCompute:
-            {
-                GraphicsPipelineStateDesc desc;
-                desc.pipelineLayout = m_bindingState->pipelineLayout;
-                desc.program = m_shaderProgram;
-                desc.inputLayout = m_inputLayout;
-                desc.framebufferLayout = m_framebufferLayout;
-                m_pipelineState = m_device->createGraphicsPipelineState(desc);
-            }
-            break;
-        }
-    }
-    // If success must have a pipeline state
-    return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
 SlangResult ShaderObjectRenderTestApp::initialize(
@@ -700,13 +507,6 @@ SlangResult ShaderObjectRenderTestApp::initialize(
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
-void LegacyRenderTestApp::finalizeImpl()
-{
-    m_constantBuffer = nullptr;
-    m_bindingState = nullptr;
-    RenderTestApp::finalizeImpl();
-}
-
 void ShaderObjectRenderTestApp::finalizeImpl()
 {
     m_programVars = nullptr;
@@ -802,12 +602,6 @@ void RenderTestApp::_initializeRenderPass()
     m_device->createRenderPassLayout(renderPassDesc, m_renderPass.writeRef());
 }
 
-void LegacyRenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
-{
-    auto info = m_device->getDeviceInfo();
-    encoder->uploadBufferData(m_constantBuffer, 0, sizeof(float) * 16, info.identityProjectionMatrix);
-}
-
 void ShaderObjectRenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
 {
     SLANG_UNUSED(encoder);
@@ -863,50 +657,7 @@ void RenderTestApp::finalizeImpl()
 {
 }
 
-Result LegacyRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
-{
-    // Wait until everything is complete
-    m_queue->wait();
-
-    FILE * f = fopen(fileName, "wb");
-    if (!f)
-    {
-        return SLANG_FAIL;
-    }
-    FileWriter writer(f, WriterFlags(0));
-
-    for(auto binding : m_bindingState->outputBindings)
-    {
-        auto i = binding.entryIndex;
-        const auto& layoutBinding = m_shaderInputLayout.entries[i];
-
-        assert(layoutBinding.isOutput);
-        
-        if (binding.resource && binding.resource->getType() == IResource::Type::Buffer)
-        {
-            IBufferResource* bufferResource = static_cast<IBufferResource*>(binding.resource.get());
-            const size_t bufferSize = bufferResource->getDesc()->sizeInBytes;
-            ComPtr<ISlangBlob> blob;
-            m_device->readBufferResource(bufferResource, 0, bufferSize, blob.writeRef());
-            if (!blob)
-            {
-                return SLANG_FAIL;
-            }
-
-            const SlangResult res = ShaderInputLayout::writeBinding(
-                bindRoot, m_shaderInputLayout.entries[i], blob->getBufferPointer(), bufferSize, &writer);
-            SLANG_RETURN_ON_FAIL(res);
-        }
-        else
-        {
-            printf("invalid output type at %d.\n", int(i));
-        }
-    }
-    
-    return SLANG_OK;
-}
-
-Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const char* fileName)
+Result ShaderObjectRenderTestApp::writeBindingOutput(const char* fileName)
 {
     // Wait until everything is complete
     m_queue->wait();
@@ -935,8 +686,12 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const c
             {
                 return SLANG_FAIL;
             }
-            const SlangResult res =
-                ShaderInputLayout::writeBinding(bindRoot, inputEntry, blob->getBufferPointer(), bufferSize, &writer);
+            const SlangResult res = ShaderInputLayout::writeBinding(
+                inputEntry,
+                m_options.outputUsingType ? outputItem.typeLayout : nullptr, // TODO: always output using type
+                blob->getBufferPointer(),
+                bufferSize,
+                &writer);
             SLANG_RETURN_ON_FAIL(res);
         }
         else
@@ -946,7 +701,6 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(BindRoot* bindRoot, const c
     }
     return SLANG_OK;
 }
-
 
 Result RenderTestApp::writeScreen(const char* filename)
 {
@@ -1037,13 +791,7 @@ Result RenderTestApp::update()
                 auto request = m_compilationOutput.output.getRequestForReflection();
                 auto slangReflection = (slang::ShaderReflection*) spGetReflection(request);
 
-                BindSet bindSet;
-                GPULikeBindRoot bindRoot;
-                bindRoot.init(&bindSet, slangReflection, 0);
-
-                BindRoot* outputBindRoot = m_options.outputUsingType ? &bindRoot : nullptr;
-
-                SLANG_RETURN_ON_FAIL(writeBindingOutput(outputBindRoot, m_options.outputPath));
+                SLANG_RETURN_ON_FAIL(writeBindingOutput(m_options.outputPath));
             }
             else
             {
@@ -1258,7 +1006,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             case DeviceType::CUDA:
             {
 #if RENDER_TEST_CUDA
-                return SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)) && CUDAComputeUtil::canCreateDevice() ? SLANG_OK : SLANG_FAIL;
+                SLANG_RETURN_ON_FAIL(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC));
 #else
                 return SLANG_FAIL;
 #endif
@@ -1291,119 +1039,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     if (SLANG_FAILED(_setSessionPrelude(options, argvIn[0], session)))
     {
         return SLANG_E_NOT_AVAILABLE;
-    }
-
-    // If it's CPU testing we don't need a window or a renderer
-    if (options.deviceType == DeviceType::CPU && !options.useShaderObjects)
-    {
-        // Check we have all the required features
-        for (const auto& renderFeature : options.renderFeatures)
-        {
-            if (!CPUComputeUtil::hasFeature(renderFeature.getUnownedSlice()))
-            {
-                return SLANG_E_NOT_AVAILABLE;
-            }
-        }
-
-        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, options, input, compilationAndLayout));
-
-        {
-            // Get the shared library -> it contains the executable code, we need to keep around if we recompile
-            ComPtr<ISlangSharedLibrary> sharedLibrary;
-            SLANG_RETURN_ON_FAIL(spGetEntryPointHostCallable(compilationAndLayout.output.getRequestForKernels(), 0, 0, sharedLibrary.writeRef()));
-
-            // This is a hack to work around, reflection when compiling straight C/C++ code. In that case the code is just passed
-            // straight through to the C++ compiler so no reflection. In these tests though we should have conditional code
-            // (performance-profile.slang for example), such that there is both a slang and C++ code, and it is the job
-            // of the test implementer to *ensure* that the straight C++ code has the same layout as the slang C++ backend.
-            //
-            // If we are running c/c++ we still need binding information, so compile again as slang source
-            if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_C || input.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP)
-            {
-                ShaderCompilerUtil::Input slangInput = input;
-                slangInput.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
-                slangInput.passThrough = SLANG_PASS_THROUGH_NONE;
-                // We just want CPP, so we get suitable reflection
-                slangInput.target = SLANG_CPP_SOURCE;
-
-                SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, options, slangInput, compilationAndLayout));
-            }
-
-            // calculate binding
-            CPUComputeUtil::Context context;
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::createBindlessResources(compilationAndLayout, context));
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::fillRuntimeHandleInBuffers(compilationAndLayout, context, sharedLibrary.get()));
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcBindings(compilationAndLayout, context));
-
-            // Get the execution info from the lib
-            CPUComputeUtil::ExecuteInfo info;
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::calcExecuteInfo(CPUComputeUtil::ExecuteStyle::GroupRange, sharedLibrary, options.computeDispatchSize, compilationAndLayout, context, info));
-
-            const uint64_t startTicks = ProcessUtil::getClockTick();
-
-            SLANG_RETURN_ON_FAIL(CPUComputeUtil::execute(info));
-
-            if (options.performanceProfile)
-            {
-                const uint64_t endTicks = ProcessUtil::getClockTick();
-                _outputProfileTime(startTicks, endTicks);
-            }
-
-            if (options.outputPath)
-            {
-                BindRoot* outputBindRoot = options.outputUsingType ? &context.m_bindRoot : nullptr;
-
-
-                // Dump everything out that was written
-                SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, options.outputPath));
-
-                // Check all execution styles produce the same result
-                SLANG_RETURN_ON_FAIL(CPUComputeUtil::checkStyleConsistency(sharedLibrary, options.computeDispatchSize, compilationAndLayout));
-            }
-        }
-
-        return SLANG_OK;
-    }
-
-    if (options.deviceType == DeviceType::CUDA && !options.useShaderObjects)
-    {        
-#if RENDER_TEST_CUDA
-        // Check we have all the required features
-        for (const auto& renderFeature : options.renderFeatures)
-        {
-            if (!CUDAComputeUtil::hasFeature(renderFeature.getUnownedSlice()))
-            {
-                return SLANG_E_NOT_AVAILABLE;
-            }
-        }
-
-        ShaderCompilerUtil::OutputAndLayout compilationAndLayout;
-        SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, options, input, compilationAndLayout));
-
-        const uint64_t startTicks = ProcessUtil::getClockTick();
-
-        CUDAComputeUtil::Context context;
-        SLANG_RETURN_ON_FAIL(CUDAComputeUtil::execute(compilationAndLayout, options.computeDispatchSize, context));
-
-        if (options.performanceProfile)
-        {
-            const uint64_t endTicks = ProcessUtil::getClockTick();
-            _outputProfileTime(startTicks, endTicks);
-        }
-
-        if (options.outputPath)
-        {
-            BindRoot* outputBindRoot = options.outputUsingType ? &context.m_bindRoot : nullptr;
-
-            // Dump everything out that was written
-            SLANG_RETURN_ON_FAIL(ShaderInputLayout::writeBindings(outputBindRoot, compilationAndLayout.layout, context.m_buffers, options.outputPath));
-        }
-
-        return SLANG_OK;
-#else
-        return SLANG_FAIL;
-#endif
     }
 
     Slang::ComPtr<IDevice> device;
@@ -1465,11 +1100,10 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     }
 
 	{
-        RefPtr<RenderTestApp> app;
-        if (options.useShaderObjects)
-            app = new ShaderObjectRenderTestApp();
-        else
-            app = new LegacyRenderTestApp();
+        // TODO: We shouldn't need to heap-allocate the `ShaderObjectRenderTestApp`
+        // since there is no longer any meaningful inheritance going on.
+        //
+        RefPtr<RenderTestApp> app = new ShaderObjectRenderTestApp();
         renderDocBeginFrame();
         SLANG_RETURN_ON_FAIL(app->initialize(session, device, options, input));
         app->update();

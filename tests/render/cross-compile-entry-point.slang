@@ -1,5 +1,5 @@
-//TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER:
-//TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER: -dx12
+//DISABLED_TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER:
+//DISABLED_TEST(render):COMPARE_HLSL_CROSS_COMPILE_RENDER: -dx12
 
 // This is a test to ensure that we can cross-compile a complete entry point.
 

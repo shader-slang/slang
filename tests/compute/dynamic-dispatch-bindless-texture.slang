@@ -1,6 +1,6 @@
 // Test using interface typed shader parameters with texture typed fields.
-//TEST(compute):COMPARE_COMPUTE:-cpu
-//TEST(compute):COMPARE_COMPUTE:-cuda
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(16)]
 interface IInterface

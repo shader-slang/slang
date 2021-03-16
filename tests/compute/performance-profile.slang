@@ -1,5 +1,5 @@
 //TEST(compute):PERFORMANCE_PROFILE:-cpu -compute -compile-arg -O3 -compute-dispatch 256,1,1  -shaderobj
-//TEST(compute):PERFORMANCE_PROFILE:-cpu -compute -source-language cpp -compile-arg -O3 -compute-dispatch 256,1,1
+//TEST_DISABLED(compute):PERFORMANCE_PROFILE:-cpu -compute -source-language cpp -compile-arg -O3 -compute-dispatch 256,1,1
 //TEST(compute):PERFORMANCE_PROFILE:-slang -compute -compute-dispatch 256,1,1 -shaderobj
 //TEST(compute):PERFORMANCE_PROFILE:-slang -compute -dx12 -compute-dispatch 256,1,1 -shaderobj
 //TEST(compute, vulkan):PERFORMANCE_PROFILE:-vk -compute -compute-dispatch 256,1,1 -shaderobj
