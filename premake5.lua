@@ -79,7 +79,7 @@ newoption {
    trigger     = "build-glslang",
    description = "(Optional) If true glslang and spirv-opt will be built",
    value       = "bool",
-   default     = "true",
+   default     = "false",
    allowed     = { { "true", "True"}, { "false", "False" } }
 }
 

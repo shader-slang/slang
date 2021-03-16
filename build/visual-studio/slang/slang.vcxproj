@@ -110,6 +110,9 @@
       <ImportLibrary>..\..\..\bin\windows-x86\debug\slang.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\debug &gt; nul)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -128,6 +131,9 @@
       <ImportLibrary>..\..\..\bin\windows-x64\debug\slang.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\debug &gt; nul)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -150,6 +156,9 @@
       <ImportLibrary>..\..\..\bin\windows-x86\release\slang.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\release &gt; nul)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -172,6 +181,9 @@
       <ImportLibrary>..\..\..\bin\windows-x64\release\slang.lib</ImportLibrary>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
+    <PostBuildEvent>
+      <Command>IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\release &gt; nul)</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\slang.h" />
