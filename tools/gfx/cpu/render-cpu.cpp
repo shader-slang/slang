@@ -269,7 +269,7 @@ public:
             totalDataSize += levelDataSize;
         }
 
-        void* textureData = malloc(totalDataSize);
+        void* textureData = malloc((size_t)totalDataSize);
         m_data = textureData;
 
         if( initData )

@@ -364,45 +364,6 @@ void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::ComPtr<IPipelin
     specializedPipelines[key] = specializedPipeline;
 }
 
-struct ShaderBinaryEntryHeader
-{
-    StageType stage;
-    uint32_t nameLength;
-    uint32_t codeLength;
-};
-
-Result ShaderBinary::loadFromBlob(ISlangBlob* blob)
-{
-    MemoryStreamBase memStream(Slang::FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
-    uint32_t nameLength = 0;
-    ShaderBinaryEntryHeader header;
-    if (memStream.read(&header, sizeof(header)) != sizeof(header))
-        return SLANG_FAIL;
-    const uint8_t* name = memStream.getContents().getBuffer() + memStream.getPosition();
-    const uint8_t* code = name + header.nameLength;
-    entryPointName = reinterpret_cast<const char*>(name);
-    stage = header.stage;
-    source.addRange(code, header.codeLength);
-    return SLANG_OK;
-}
-
-Result ShaderBinary::writeToBlob(ISlangBlob** outBlob)
-{
-    OwnedMemoryStream outStream(FileAccess::Write);
-    ShaderBinaryEntryHeader header;
-    header.stage = stage;
-    header.nameLength = static_cast<uint32_t>(entryPointName.getLength() + 1);
-    header.codeLength = static_cast<uint32_t>(source.getCount());
-    outStream.write(&header, sizeof(header));
-    outStream.write(entryPointName.getBuffer(), header.nameLength - 1);
-    uint8_t zeroTerminator = 0;
-    outStream.write(&zeroTerminator, 1);
-    outStream.write(source.getBuffer(), header.codeLength);
-    RefPtr<RawBlob> blob = new RawBlob(outStream.getContents().getBuffer(), outStream.getContents().getCount());
-    *outBlob = blob.detach();
-    return SLANG_OK;
-}
-
 void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutReflection* elementTypeLayout)
 {
     m_renderer = renderer;

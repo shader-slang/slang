@@ -3154,8 +3154,8 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
                     int subResourceIndex = subResourceCounter++;
                     auto initSubresource = initData[subResourceIndex];
 
-                    const ptrdiff_t srcRowStride = initSubresource.strideY;
-                    const ptrdiff_t srcLayerStride = initSubresource.strideZ;
+                    const ptrdiff_t srcRowStride = (ptrdiff_t)initSubresource.strideY;
+                    const ptrdiff_t srcLayerStride = (ptrdiff_t)initSubresource.strideZ;
 
                     auto dstRowSizeInBytes = calcRowSize(desc.format, mipSize.width);
                     auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -3923,6 +3923,8 @@ void VKDevice::DescriptorSetImpl::setResource(UInt range, UInt index, IResourceV
     auto descriptorType = rangeInfo.vkDescriptorType;
 
     auto viewImpl = (ResourceViewImpl*)view;
+    if (!viewImpl)
+        return;
     switch (viewImpl->m_type)
     {
     case ResourceViewImpl::ViewType::Texture:
@@ -3993,7 +3995,8 @@ void VKDevice::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerSta
     auto bindingIndex = rangeInfo.vkBindingIndex;
     auto boundObjectIndex = rangeInfo.arrayIndex + index;
     auto descriptorType = rangeInfo.vkDescriptorType;
-
+    if (!sampler)
+        return;
     VkWriteDescriptorSet writeInfo = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     writeInfo.dstSet = m_descriptorSet.handle;
     writeInfo.dstBinding = uint32_t(bindingIndex);

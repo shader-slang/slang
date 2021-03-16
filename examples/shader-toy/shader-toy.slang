@@ -202,7 +202,7 @@ cbuffer ShaderToyUniforms
     // exposed by Shader Toy, but rather just the most commonly
     // used ones.
     //
-    // TODO: We can and should fill in teh rest over time.
+    // TODO: We can and should fill in the rest over time.
     //
     float4 iMouse;
     float2 iResolution;
