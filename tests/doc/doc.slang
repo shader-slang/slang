@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE:-entry computeMain -target spirv -stage compute -doc
+//TEST:DOC:-entry computeMain -target hlsl -stage compute -doc -no-codegen
 
 void outFunc(out int v)
 {

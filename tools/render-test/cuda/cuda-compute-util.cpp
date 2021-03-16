@@ -1,11 +1,11 @@
 
 #include "cuda-compute-util.h"
 
-#include "../../slang-com-helper.h"
+#include "slang-com-helper.h"
 
-#include "../../source/core/slang-std-writers.h"
-#include "../../source/core/slang-token-reader.h"
-#include "../../source/core/slang-semantic-version.h"
+#include "source/core/slang-std-writers.h"
+#include "source/core/slang-token-reader.h"
+#include "source/core/slang-semantic-version.h"
 
 #include "../bind-location.h"
 

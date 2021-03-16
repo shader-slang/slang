@@ -2,6 +2,7 @@
 //TEST_IGNORE_FILE:
 
 #version 460
+#extension GL_EXT_ray_tracing : require
 #extension GL_EXT_ray_query : require
 
 struct SLANG_ParameterGroup_C_0

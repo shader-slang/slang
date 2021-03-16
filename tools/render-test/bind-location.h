@@ -1,10 +1,10 @@
 #ifndef BIND_LOCATION_H
 #define BIND_LOCATION_H
 
-#include "core/slang-basic.h"
-#include "core/slang-free-list.h"
-#include "core/slang-memory-arena.h"
-#include "core/slang-writer.h"
+#include "source/core/slang-basic.h"
+#include "source/core/slang-free-list.h"
+#include "source/core/slang-memory-arena.h"
+#include "source/core/slang-writer.h"
 
 #include "slang.h"
 
