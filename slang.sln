@@ -33,6 +33,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang", "build\visual-studi
 		{E145B2B8-CD13-A6BE-B6A7-16E5A2148223} = {E145B2B8-CD13-A6BE-B6A7-16E5A2148223}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-glslang", "build\visual-studio\slang-glslang\slang-glslang.vcxproj", "{C495878A-832C-485B-B347-0998A90CC936}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-spirv-tools", "build\visual-studio\slang-spirv-tools\slang-spirv-tools.vcxproj", "{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slangc", "build\visual-studio\slangc\slangc.vcxproj", "{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test-tool", "test-tool", "{57B5AA5E-C340-1823-CC51-9B17385C7423}"
@@ -145,6 +149,22 @@ Global
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|Win32.Build.0 = Release|Win32
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|x64.ActiveCfg = Release|x64
 		{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}.Release|x64.Build.0 = Release|x64
+		{C495878A-832C-485B-B347-0998A90CC936}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C495878A-832C-485B-B347-0998A90CC936}.Debug|Win32.Build.0 = Debug|Win32
+		{C495878A-832C-485B-B347-0998A90CC936}.Debug|x64.ActiveCfg = Debug|x64
+		{C495878A-832C-485B-B347-0998A90CC936}.Debug|x64.Build.0 = Debug|x64
+		{C495878A-832C-485B-B347-0998A90CC936}.Release|Win32.ActiveCfg = Release|Win32
+		{C495878A-832C-485B-B347-0998A90CC936}.Release|Win32.Build.0 = Release|Win32
+		{C495878A-832C-485B-B347-0998A90CC936}.Release|x64.ActiveCfg = Release|x64
+		{C495878A-832C-485B-B347-0998A90CC936}.Release|x64.Build.0 = Release|x64
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Debug|Win32.Build.0 = Debug|Win32
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Debug|x64.ActiveCfg = Debug|x64
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Debug|x64.Build.0 = Debug|x64
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Release|Win32.ActiveCfg = Release|Win32
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Release|Win32.Build.0 = Release|Win32
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Release|x64.ActiveCfg = Release|x64
+		{C36F6185-49B3-467E-8388-D0E9BF5F7BB8}.Release|x64.Build.0 = Release|x64
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|Win32.ActiveCfg = Debug|Win32
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|Win32.Build.0 = Debug|Win32
 		{D56CBCEB-1EB5-4CA8-AEC4-48EA35ED61C7}.Debug|x64.ActiveCfg = Debug|x64
