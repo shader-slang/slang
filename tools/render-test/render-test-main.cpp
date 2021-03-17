@@ -1006,7 +1006,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
             case DeviceType::CUDA:
             {
 #if RENDER_TEST_CUDA
-                SLANG_RETURN_ON_FAIL(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC));
+                if(SLANG_FAILED(spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)))
+                    return SLANG_FAIL;
 #else
                 return SLANG_FAIL;
 #endif
