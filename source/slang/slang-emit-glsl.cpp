@@ -1822,6 +1822,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
                     // We know that the acceleration structure type will translate
                     // to the one from that extension:
                     //
+                    _requireRayTracing();
                     m_writer->emit("accelerationStructureNV");
                 }
                 else
