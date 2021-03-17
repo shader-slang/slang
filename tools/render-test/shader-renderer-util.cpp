@@ -93,7 +93,6 @@ using Slang::Result;
 
 /* static */ Result ShaderRendererUtil::createBufferResource(
     const InputBufferDesc& inputDesc,
-    bool isOutput,
     size_t bufferSize,
     const void* initData,
     IDevice* device,
@@ -106,22 +105,10 @@ using Slang::Result;
     srcDesc.format = inputDesc.format;
 
     int bindFlags = 0;
-    if (inputDesc.type == InputBufferType::ConstantBuffer)
-    {
-        bindFlags |= IResource::BindFlag::ConstantBuffer;
-        srcDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-        initialUsage = IResource::Usage::ConstantBuffer;
-    }
-    else
     {
         bindFlags |= IResource::BindFlag::UnorderedAccess | IResource::BindFlag::PixelShaderResource | IResource::BindFlag::NonPixelShaderResource;
         srcDesc.elementSize = inputDesc.stride;
         initialUsage = IResource::Usage::UnorderedAccess;
-    }
-
-    if (isOutput)
-    {
-        srcDesc.cpuAccessFlags |= IResource::AccessFlag::Read;
     }
 
     srcDesc.bindFlags = bindFlags;

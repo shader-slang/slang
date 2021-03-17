@@ -197,6 +197,8 @@ public:
         NonPixelShaderResource,
         ShaderResource,
         GenericRead,
+        CopySource,
+        CopyDest,
         CountOf,
     };
 
@@ -268,6 +270,10 @@ public:
             return BindFlag::Enum(
                 BindFlag::PixelShaderResource |
                 BindFlag::NonPixelShaderResource);
+        case Usage::CopySource:
+            return BindFlag::Enum(0);
+        case Usage::CopyDest:
+            return BindFlag::Enum(0);
         default:
             return BindFlag::Enum(-1);
         }

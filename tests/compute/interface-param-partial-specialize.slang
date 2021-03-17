@@ -3,8 +3,8 @@
 // with __Dynamic. This verifies that the handling of
 // "partially" specializing an existential type is correct.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 [anyValueSize(8)]
 interface IInterface
@@ -38,7 +38,12 @@ void compute(uint tid, Params p)
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID,
-//TEST_INPUT:ubuffer(data=[rtti(Impl) witness(Impl, IInterface) 1 0], stride=4):name=params.obj
+
+//TEST_INPUT:begin_buffer(stride=8):name=params.obj
+//TEST_INPUT:begin_object(type=Impl)
+//TEST_INPUT:uniform(data=[1]):name=val
+//TEST_INPUT:end
+//TEST_INPUT:end
     uniform Params params)
 {
 	uint tid = dispatchThreadID.x;

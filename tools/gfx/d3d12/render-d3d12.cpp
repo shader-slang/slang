@@ -2840,11 +2840,15 @@ public:
                 size_t srcOffset,
                 size_t size) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(size);
+                auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
+                auto srcBuffer = static_cast<BufferResourceImpl*>(src);
+
+                m_commandBuffer->m_cmdList->CopyBufferRegion(
+                    dstBuffer->m_resource.getResource(),
+                    dstOffset,
+                    srcBuffer->m_resource.getResource(),
+                    srcOffset,
+                    size);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferData(
                 IBufferResource* dst,
@@ -3810,6 +3814,8 @@ static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
         case Usage::ShaderResource:         return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
                                                    D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         case Usage::GenericRead:            return D3D12_RESOURCE_STATE_GENERIC_READ;
+        case Usage::CopySource:             return D3D12_RESOURCE_STATE_COPY_SOURCE;
+        case Usage::CopyDest:               return D3D12_RESOURCE_STATE_COPY_DEST;
         default: return D3D12_RESOURCE_STATES(0);
     }
 }
