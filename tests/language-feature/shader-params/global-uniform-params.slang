@@ -1,6 +1,6 @@
 // global-uniform-params.slang
 
-//TEST(compute):COMPARE_COMPUTE:
+//DISABLED_TEST(compute):COMPARE_COMPUTE:
 
 // Test that code can use uniform parameters
 // of "ordinary" type declared at the global scope

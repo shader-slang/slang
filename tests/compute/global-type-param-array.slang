@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//DISABLED_TEST(compute):COMPARE_COMPUTE:
 
 //TEST_INPUT: cbuffer(data=[1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0], stride=4):name impl
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer

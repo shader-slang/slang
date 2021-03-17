@@ -171,29 +171,6 @@ protected:
         D3D11Device* m_renderer;
     };
 
-#if 0
-    struct BindingDetail
-    {
-        ComPtr<ID3D11ShaderResourceView>    m_srv;
-        ComPtr<ID3D11UnorderedAccessView>   m_uav;
-        ComPtr<ID3D11SamplerState>          m_samplerState;
-    };
-
-    class BindingStateImpl: public BindingState
-    {
-		public:
-        typedef BindingState Parent;
-
-            /// Ctor
-        BindingStateImpl(const Desc& desc):
-            Parent(desc)
-        {}
-
-        List<BindingDetail> m_bindingDetails;
-    };
-#endif
-
-    
     enum class D3D11DescriptorSlotType
     {
         ConstantBuffer,

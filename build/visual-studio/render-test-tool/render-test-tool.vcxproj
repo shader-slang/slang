@@ -179,8 +179,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\tools\render-test\bind-location.h" />
-    <ClInclude Include="..\..\..\tools\render-test\cpu-compute-util.h" />
     <ClInclude Include="..\..\..\tools\render-test\options.h" />
     <ClInclude Include="..\..\..\tools\render-test\png-serialize-util.h" />
     <ClInclude Include="..\..\..\tools\render-test\shader-input-layout.h" />
@@ -188,8 +186,6 @@
     <ClInclude Include="..\..\..\tools\render-test\slang-support.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\render-test\bind-location.cpp" />
-    <ClCompile Include="..\..\..\tools\render-test\cpu-compute-util.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\options.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\png-serialize-util.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\render-test-main.cpp" />

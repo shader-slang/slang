@@ -1,4 +1,4 @@
-//TEST:COMPARE_HLSL: -profile sm_5_1 -entry HS -stage hull -entry DS -stage domain
+//DISABLED_TEST:COMPARE_HLSL: -profile sm_5_1 -entry HS -stage hull -entry DS -stage domain
 
 // tests/render/tess.hlsl
 

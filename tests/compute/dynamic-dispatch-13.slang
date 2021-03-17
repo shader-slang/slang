@@ -1,9 +1,9 @@
 // Test using interface typed shader parameters wrapped inside a `StructuredBuffer`.
 
-//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-dx11
-//TEST(compute):COMPARE_COMPUTE:-vk
-//TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-dx11
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-vk
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
 
 [anyValueSize(8)]
 interface IInterface

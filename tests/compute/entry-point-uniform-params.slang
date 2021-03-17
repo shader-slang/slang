@@ -5,10 +5,10 @@
 
 //DISABLE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
 struct Signs
 {

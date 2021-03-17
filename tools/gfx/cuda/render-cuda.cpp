@@ -14,6 +14,19 @@
 #include "../renderer-shared.h"
 #include "../render-graphics-common.h"
 #include "../slang-context.h"
+
+#   ifdef RENDER_TEST_OPTIX
+
+// The `optix_stubs.h` header produces warnings when compiled with MSVC
+#       ifdef _MSC_VER
+#           pragma warning(disable: 4996)
+#       endif
+
+#       include <optix.h>
+#       include <optix_function_table_definition.h>
+#       include <optix_stubs.h>
+#   endif
+
 #endif
 
 namespace gfx
