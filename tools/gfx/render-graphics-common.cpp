@@ -226,23 +226,6 @@ public:
                 bindingRangeInfo.rangeIndexInDescriptorSet = rangeIndexInDescriptorSet;
 
                 m_bindingRanges.add(bindingRangeInfo);
-
-#if 0
-                SlangInt binding = typeLayout->getBindingRangeIndexOffset(r);
-                SlangInt space = typeLayout->getBindingRangeSpaceOffset(r);
-                SlangInt subObjectRangeIndex = typeLayout->getBindingRangeSubObjectRangeIndex(r);
-
-                DescriptorSetLayout::SlotRangeDesc slotRange;
-                slotRange.type = _mapDescriptorType(slangBindingType);
-                slotRange.count = count;
-                slotRange.binding = binding;
-
-                Index descriptorSetIndex = findOrAddDescriptorSet(space);
-                RefPtr<DescriptorSetBuildInfo> descriptorSetInfo = m_descriptorSetInfos[descriptorSetIndex];
-
-                Index slotRangeIndex = descriptorSetInfo->slotRanges.getCount();
-                descriptorSetInfo->slotRanges.add(slotRange);
-#endif
             }
 
             SlangInt subObjectRangeCount = typeLayout->getSubObjectRangeCount();
@@ -275,17 +258,6 @@ public:
 
                 m_subObjectRanges.add(subObjectRange);
             }
-
-#if 0
-            SlangInt subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-            for(SlangInt r = 0; r < subObjectRangeCount; ++r)
-            {
-
-                // TODO: Still need a way to map the binding ranges for
-                // the sub-object over so that they can be used to
-                // set/get the sub-object as needed.
-            }
-#endif
             return SLANG_OK;
         }
 

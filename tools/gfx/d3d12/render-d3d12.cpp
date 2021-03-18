@@ -1548,7 +1548,9 @@ protected:
         ComPtr<ID3D12CommandQueue> m_queue;
         ComPtr<IDXGIFactory> m_dxgiFactory;
         ComPtr<IDXGISwapChain3> m_swapChain3;
-
+        ComPtr<ID3D12Fence> m_fence;
+        ShortList<HANDLE, kMaxNumRenderFrames> m_frameEvents;
+        uint64_t fenceValue = 0;
         Result init(
             D3D12Device* renderer,
             const ISwapchain::Desc& swapchainDesc,
@@ -1558,7 +1560,17 @@ protected:
             m_dxgiFactory = renderer->m_deviceInfo.m_dxgiFactory;
             SLANG_RETURN_ON_FAIL(
                 D3DSwapchainBase::init(swapchainDesc, window, DXGI_SWAP_EFFECT_FLIP_DISCARD));
+            renderer->m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef()));
+
             SLANG_RETURN_ON_FAIL(m_swapChain->QueryInterface(m_swapChain3.writeRef()));
+            for (uint32_t i = 0; i < swapchainDesc.imageCount; i++)
+            {
+                m_frameEvents.add(CreateEventEx(
+                    nullptr,
+                    false,
+                    CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+                    EVENT_ALL_ACCESS));
+            }
             return SLANG_OK;
         }
 
@@ -1586,7 +1598,18 @@ protected:
         virtual IUnknown* getOwningDevice() override { return m_queue; }
         virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override
         {
-            return (int)m_swapChain3->GetCurrentBackBufferIndex();
+            auto result = (int)m_swapChain3->GetCurrentBackBufferIndex();
+            WaitForSingleObject(m_frameEvents[result], INFINITE);
+            ResetEvent(m_frameEvents[result]);
+            return result;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL present() override
+        {
+            SLANG_RETURN_ON_FAIL(D3DSwapchainBase::present());
+            fenceValue++;
+            m_fence->SetEventOnCompletion(fenceValue, m_frameEvents[m_swapChain3->GetCurrentBackBufferIndex()]);
+            m_queue->Signal(m_fence, fenceValue);
+            return SLANG_OK;
         }
     };
 
@@ -2579,7 +2602,7 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
                     uint8_t* dstRow = dstLayer;
                     for (int k = 0; k < mipSize.height; ++k)
                     {
-                        ::memcpy(dstRow, srcRow, mipRowSize);
+                        ::memcpy(dstRow, srcRow, (size_t)mipRowSize);
 
                         srcRow += srcMipRowPitch;
                         dstRow += dstMipRowPitch;
@@ -3185,11 +3208,14 @@ void D3D12Device::DescriptorSetImpl::setResource(UInt range, UInt index, IResour
     auto descriptorIndex = m_resourceTable + arrayIndex;
 
     m_resourceObjects[arrayIndex] = viewImpl;
-    dxDevice->CopyDescriptorsSimple(
-        1,
-        m_resourceHeap->getCpuHandle(int(descriptorIndex)),
-        viewImpl->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (viewImpl)
+    {
+        dxDevice->CopyDescriptorsSimple(
+            1,
+            m_resourceHeap->getCpuHandle(int(descriptorIndex)),
+            viewImpl->m_descriptor.cpuHandle,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 }
 
 void D3D12Device::DescriptorSetImpl::setSampler(UInt range, UInt index, ISamplerState* sampler)
@@ -3216,28 +3242,31 @@ void D3D12Device::DescriptorSetImpl::setSampler(UInt range, UInt index, ISampler
     auto descriptorIndex = m_samplerTable + arrayIndex;
 
     m_samplerObjects[arrayIndex] = samplerImpl;
-    dxDevice->CopyDescriptorsSimple(
-        1,
-        m_samplerHeap->getCpuHandle(int(descriptorIndex)),
-        samplerImpl->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    if (samplerImpl)
+    {
+        dxDevice->CopyDescriptorsSimple(
+            1,
+            m_samplerHeap->getCpuHandle(int(descriptorIndex)),
+            samplerImpl->m_descriptor.cpuHandle,
+            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    }
 }
 
 void D3D12Device::DescriptorSetImpl::setCombinedTextureSampler(
     UInt range,
     UInt index,
-    IResourceView*   textureView,
-    ISamplerState*   sampler)
+    IResourceView* textureView,
+    ISamplerState* sampler)
 {
     auto dxDevice = m_renderer->m_device;
 
-    auto viewImpl = (ResourceViewImpl*) textureView;
-    auto samplerImpl = (SamplerStateImpl*) sampler;
+    auto viewImpl = (ResourceViewImpl*)textureView;
+    auto samplerImpl = (SamplerStateImpl*)sampler;
 
     auto& rangeInfo = m_layout->m_ranges[range];
 
 #ifdef _DEBUG
-    switch(rangeInfo.type)
+    switch (rangeInfo.type)
     {
     default:
         assert(!"incorrect slot type");
@@ -3253,18 +3282,24 @@ void D3D12Device::DescriptorSetImpl::setCombinedTextureSampler(
     auto samplerDescriptorIndex = m_samplerTable + arrayIndex;
 
     m_resourceObjects[arrayIndex] = viewImpl;
-    dxDevice->CopyDescriptorsSimple(
-        1,
-        m_resourceHeap->getCpuHandle(int(resourceDescriptorIndex)),
-        viewImpl->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (viewImpl)
+    {
+        dxDevice->CopyDescriptorsSimple(
+            1,
+            m_resourceHeap->getCpuHandle(int(resourceDescriptorIndex)),
+            viewImpl->m_descriptor.cpuHandle,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
 
     m_samplerObjects[arrayIndex] = samplerImpl;
-    dxDevice->CopyDescriptorsSimple(
-        1,
-        m_samplerHeap->getCpuHandle(int(samplerDescriptorIndex)),
-        samplerImpl->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    if (samplerImpl)
+    {
+        dxDevice->CopyDescriptorsSimple(
+            1,
+            m_samplerHeap->getCpuHandle(int(samplerDescriptorIndex)),
+            samplerImpl->m_descriptor.cpuHandle,
+            D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    }
 }
 
 void D3D12Device::DescriptorSetImpl::setRootConstants(
