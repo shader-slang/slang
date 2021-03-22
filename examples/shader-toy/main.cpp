@@ -315,7 +315,6 @@ Result initialize()
     gWindow->events.sizeChanged = Slang::Action<>(this, &ShaderToyApp::windowSizeChanged);
 
     IDevice::Desc deviceDesc;
-    deviceDesc.deviceType = DeviceType::Vulkan;
     Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if(SLANG_FAILED(res)) return res;
 

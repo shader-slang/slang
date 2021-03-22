@@ -136,7 +136,6 @@ int main()
     // interacting with the graphics API.
     Slang::ComPtr<gfx::IDevice> device;
     IDevice::Desc deviceDesc = {};
-    deviceDesc.deviceType = DeviceType::DirectX11;
     SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, device.writeRef()));
 
     // Now we can load the shader code.
