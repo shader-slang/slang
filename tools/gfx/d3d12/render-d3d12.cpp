@@ -1758,8 +1758,6 @@ public:
         }
 
     protected:
-        friend class ProgramVars;
-
         Result init(D3D12Device* device, ShaderObjectLayoutImpl* layout)
         {
             m_layout = layout;
@@ -2162,7 +2160,7 @@ public:
 
         /// Create the layout for this shader object with specialization arguments considered
         ///
-        /// This operation is virtual so that it can be customized by `ProgramVars`.
+        /// This operation is virtual so that it can be customized by `RootShaderObject`.
         ///
         virtual Result _createSpecializedLayout(ShaderObjectLayoutImpl** outLayout)
         {
