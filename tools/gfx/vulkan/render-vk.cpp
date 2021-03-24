@@ -2362,7 +2362,6 @@ public:
                         VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
                         m_resourceViews.getArrayView(baseIndex, count));
                     offset.descriptorRangeOffset++;
-                    offset.descriptorRangeOffset++;
                     break;
 
                 case slang::BindingType::VaryingInput:
