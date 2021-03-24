@@ -112,33 +112,6 @@ public:
         UInt inputElementCount,
         IInputLayout** outLayout) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const IDescriptorSetLayout::Desc& desc,
-        IDescriptorSetLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_FAIL;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(
-        const IPipelineLayout::Desc& desc,
-        IPipelineLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_FAIL;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(
-        IDescriptorSetLayout* layout,
-        IDescriptorSet::Flag::Enum flag,
-        IDescriptorSet** outDescriptorSet) override
-    {
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(flag);
-        SLANG_UNUSED(outDescriptorSet);
-        return SLANG_FAIL;
-    }
-
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
@@ -2083,25 +2056,36 @@ public:
             }
             bindingState->futureRootParamOffset =
                 Math::Max(descTableIndex, bindingState->futureRootParamOffset);
-            for (Index i = 0; i < layout->getSubObjectCount(); i++)
+            auto& subObjectRanges = layout->getSubObjectRanges();
+            for (Index i = 0; i < subObjectRanges.getCount(); i++)
             {
+                auto bindingRange =
+                    layout->getBindingRange(layout->getSubObjectRange(i).bindingRangeIndex);
                 switch (layout->getSubObjectRange(i).bindingType)
                 {
                 case slang::BindingType::ParameterBlock:
                     {
-                        auto newBindingState = *bindingState;
-                        newBindingState.offset.resource = 0;
-                        newBindingState.offset.sampler = 0;
-                        newBindingState.rootParamIndex =
-                            bindingState->futureRootParamOffset;
-                        newBindingState.futureRootParamOffset = newBindingState.rootParamIndex;
-                        m_objects[i]->bindObject(encoder, &newBindingState);
-                        bindingState->futureRootParamOffset = newBindingState.futureRootParamOffset;
+                        auto baseIndex = bindingRange.binding.index;
+                        for (uint32_t j = 0; j < bindingRange.count; j++)
+                        {
+                            auto newBindingState = *bindingState;
+                            newBindingState.offset.resource = 0;
+                            newBindingState.offset.sampler = 0;
+                            newBindingState.rootParamIndex = bindingState->futureRootParamOffset;
+                            newBindingState.futureRootParamOffset = newBindingState.rootParamIndex;
+                            m_objects[baseIndex + j]->bindObject(encoder, &newBindingState);
+                            bindingState->futureRootParamOffset =
+                                newBindingState.futureRootParamOffset;
+                        }
                     }
                     break;
                 case slang::BindingType::ConstantBuffer:
                     {
-                        m_objects[i]->bindObject(encoder, bindingState);
+                        auto baseIndex = bindingRange.binding.index;
+                        for (uint32_t j = 0; j < bindingRange.count; j++)
+                        {
+                            m_objects[baseIndex + j]->bindObject(encoder, bindingState);
+                        }
                     }
                     break;
                 case slang::BindingType::ExistentialValue:
@@ -2534,16 +2518,6 @@ public:
                 bindRootShaderObjectImpl(object);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                IPipelineLayout* layout,
-                UInt index,
-                IDescriptorSet* descriptorSet) override
-            {
-                SLANG_UNUSED(layout);
-                SLANG_UNUSED(index);
-                SLANG_UNUSED(descriptorSet);
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
             {
@@ -2816,16 +2790,6 @@ public:
                 bindRootShaderObject(IShaderObject* object) override
             {
                 bindRootShaderObjectImpl(object);
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                IPipelineLayout* layout,
-                UInt index,
-                IDescriptorSet* descriptorSet) override
-            {
-                SLANG_UNUSED(layout);
-                SLANG_UNUSED(index);
-                SLANG_UNUSED(descriptorSet);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override

@@ -25,11 +25,6 @@ private:
 public:
     // Immediate commands to be implemented by each target.
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setViewports(UInt count, const Viewport* viewports) = 0;

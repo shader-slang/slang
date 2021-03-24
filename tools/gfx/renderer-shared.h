@@ -99,11 +99,6 @@ protected:
     Desc m_desc;
 };
 
-Result createProgramFromSlang(
-    IDevice* device,
-    IShaderProgram::Desc const& desc,
-    IShaderProgram** outProgram);
-
 class RendererBase;
 
 typedef uint32_t ShaderComponentID;
@@ -278,8 +273,6 @@ public:
     // pipeline cannot be used directly and must be specialized first.
     bool isSpecializable = false;
     ComPtr<IShaderProgram> m_program;
-
-    ComPtr<IPipelineLayout> m_pipelineLayout;
 
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);

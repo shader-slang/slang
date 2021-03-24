@@ -195,7 +195,6 @@
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
-    <ClInclude Include="..\..\..\tools\gfx\render-graphics-common.h" />
     <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h" />
     <ClInclude Include="..\..\..\tools\gfx\simple-render-pass-layout.h" />
     <ClInclude Include="..\..\..\tools\gfx\slang-context.h" />
@@ -220,7 +219,6 @@
     <ClCompile Include="..\..\..\tools\gfx\immediate-renderer-base.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\nvapi\nvapi-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\open-gl\render-gl.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\render-graphics-common.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\render.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\renderer-shared.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\simple-render-pass-layout.cpp" />

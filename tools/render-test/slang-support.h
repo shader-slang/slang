@@ -60,8 +60,6 @@ struct ShaderCompilerUtil
     {
         void set(
             PipelineType                        pipelineType,
-            const IShaderProgram::KernelDesc*   kernelDescs,
-            Slang::Index                        kernelDescCount,
             slang::IComponentType*              slangProgram);
         void reset();
         ~Output()
@@ -69,19 +67,6 @@ struct ShaderCompilerUtil
             reset();
         }
 
-        Slang::Index findKernelDescIndex(gfx::StageType stage) const
-        {
-            for (Slang::Index i = 0; i < kernelDescs.getCount(); ++i)
-            {
-                if (kernelDescs[i].stage == stage)
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        Slang::List<IShaderProgram::KernelDesc> kernelDescs;
         ComPtr<slang::IComponentType> slangProgram;
         IShaderProgram::Desc desc = {};
 

@@ -56,9 +56,7 @@ ComPtr<slang::ISession> gSlangSession;
 ComPtr<slang::IModule>   gSlangModule;
 ComPtr<gfx::IShaderProgram> gProgram;
 
-ComPtr<gfx::IPipelineLayout> gPipelineLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
-ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 
 Slang::Dictionary<int, std::string> gHashedStrings;
 
@@ -74,21 +72,9 @@ ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char
 
     gGPUPrinting.loadStrings(linkedProgram->getLayout());
 
-    ComPtr<ISlangBlob> codeBlob;
-    linkedProgram->getEntryPointCode(0, 0, codeBlob.writeRef());
-
-    char const* code = (char const*) codeBlob->getBufferPointer();
-    char const* codeEnd = code + codeBlob->getBufferSize();
-
-    gfx::IShaderProgram::KernelDesc kernelDescs[] =
-    {
-        { gfx::StageType::Compute,    code,     codeEnd },
-    };
-
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Compute;
-    programDesc.kernels = &kernelDescs[0];
-    programDesc.kernelCount = 2;
+    programDesc.slangProgram = linkedProgram;
 
     auto shaderProgram = gDevice->createProgram(programDesc);
 
@@ -107,40 +93,7 @@ Result execute()
     gProgram = loadComputeProgram(gSlangModule, "computeMain");
     if(!gProgram) return SLANG_FAIL;
 
-    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
-    {
-        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::StorageBuffer),
-    };
-    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = 1;
-    descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
-    auto descriptorSetLayout = gDevice->createDescriptorSetLayout(descriptorSetLayoutDesc);
-    if(!descriptorSetLayout) return SLANG_FAIL;
-
-    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
-    {
-        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
-    };
-    IPipelineLayout::Desc pipelineLayoutDesc;
-    pipelineLayoutDesc.renderTargetCount = 1;
-    pipelineLayoutDesc.descriptorSetCount = 1;
-    pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
-    auto pipelineLayout = gDevice->createPipelineLayout(pipelineLayoutDesc);
-    if(!pipelineLayout) return SLANG_FAIL;
-
-    gPipelineLayout = pipelineLayout;
-
-    // Once we have the descriptor set layout, we can allocate
-    // and fill in a descriptor set to hold our parameters.
-    //
-    auto descriptorSet =
-        gDevice->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
-    if(!descriptorSet) return SLANG_FAIL;
-
-    gDescriptorSet = descriptorSet;
-
     ComputePipelineStateDesc desc;
-    desc.pipelineLayout = gPipelineLayout;
     desc.program = gProgram;
     auto pipelineState = gDevice->createComputePipelineState(desc);
     if(!pipelineState) return SLANG_FAIL;
@@ -164,12 +117,9 @@ Result execute()
     auto queue = gDevice->createCommandQueue(queueDesc);
     auto commandBuffer = queue->createCommandBuffer();
     auto encoder = commandBuffer->encodeComputeCommands();
-    // TODO: need to copy a zero into the start of the print buffer!
-
-    gDescriptorSet->setResource(0, 0, printBufferView);
-    encoder->setDescriptorSet(gPipelineLayout, 0, gDescriptorSet);
-
+    auto rootShaderObject = gDevice->createRootShaderObject(gProgram);
     encoder->setPipelineState(gPipelineState);
+    encoder->bindRootShaderObject(rootShaderObject);
     encoder->dispatchCompute(1, 1, 1);
     encoder->endEncoding();
     commandBuffer->close();
