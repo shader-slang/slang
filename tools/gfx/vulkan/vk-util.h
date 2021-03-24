@@ -38,6 +38,10 @@ struct VulkanUtil
 
         /// Returns Slang::Result equivalent of a VkResult
     static Slang::Result toSlangResult(VkResult res);
+
+    static VkShaderStageFlags getShaderStage(SlangStage stage);
+
+    static VkPipelineBindPoint getPipelineBindPoint(PipelineType pipelineType);
 };
 
 } // renderer_test

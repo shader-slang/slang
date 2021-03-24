@@ -110,14 +110,6 @@ public:
             m_writer->bindRootShaderObject(PipelineType::Graphics, object);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            IPipelineLayout* layout,
-            UInt index,
-            IDescriptorSet* descriptorSet) override
-        {
-            m_writer->setDescriptorSet(PipelineType::Graphics, layout, index, descriptorSet);
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL
             setViewports(uint32_t count, const Viewport* viewports) override
         {
@@ -218,14 +210,6 @@ public:
             m_writer->bindRootShaderObject(PipelineType::Compute, object);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            IPipelineLayout* layout,
-            UInt index,
-            IDescriptorSet* descriptorSet) override
-        {
-            m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
         {
             m_writer->dispatchCompute(x, y, z);
@@ -309,13 +293,6 @@ public:
                 m_renderer->bindRootShaderObject(
                     (PipelineType)cmd.operands[0],
                     m_writer.getObject<IShaderObject>(cmd.operands[1]));
-                break;
-            case CommandName::SetDescriptorSet:
-                m_renderer->setDescriptorSet(
-                    (gfx::PipelineType)cmd.operands[0],
-                    m_writer.getObject<IPipelineLayout>(cmd.operands[1]),
-                    (UInt)cmd.operands[2],
-                    m_writer.getObject<IDescriptorSet>(cmd.operands[3]));
                 break;
             case CommandName::SetFramebuffer:
                 m_renderer->setFramebuffer(m_writer.getObject<IFramebuffer>(cmd.operands[0]));

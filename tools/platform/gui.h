@@ -26,8 +26,6 @@ private:
     Slang::ComPtr<gfx::ICommandQueue> queue;
     Slang::ComPtr<gfx::IRenderPassLayout> renderPass;
     Slang::ComPtr<gfx::IPipelineState>       pipelineState;
-    Slang::ComPtr<gfx::IDescriptorSetLayout> descriptorSetLayout;
-    Slang::ComPtr<gfx::IPipelineLayout>      pipelineLayout;
     Slang::ComPtr<gfx::ISamplerState>        samplerState;
 };
 

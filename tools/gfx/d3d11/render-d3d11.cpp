@@ -98,42 +98,6 @@ public:
         UInt inputElementCount,
         IInputLayout** outLayout) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_FAIL;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_FAIL;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(
-        IDescriptorSetLayout* layout,
-        IDescriptorSet::Flag::Enum flag,
-        IDescriptorSet** outDescriptorSet) override
-    {
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(flag);
-        SLANG_UNUSED(outDescriptorSet);
-        return SLANG_FAIL;
-    }
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) override
-    {
-        SLANG_UNUSED(pipelineType);
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(index);
-        SLANG_UNUSED(descriptorSet);
-    }
-
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
