@@ -116,7 +116,6 @@ public:
     struct Desc
     {
         PipelineType        pipelineType;
-            /// Use instead of `kernels`/`kernelCount` if loading a Slang program.
         slang::IComponentType*  slangProgram;
     };
 };
