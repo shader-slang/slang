@@ -1975,8 +1975,8 @@ public:
         };
 
         // A shared template function for composing a VkWriteDescriptorSet structure.
-        // WriteDescriptorInfoFunc is `void(VkWriteDescriptorSet&, RootBindingState*,
-        // TResourceArrayView, int startElement, int elementCount)`, which sets up
+        // The signature for `WriteDescriptorInfoFunc` is
+        // `void(VkWriteDescriptorSet&, int startElement, int elementCount)`, which sets up
         // `VkWriteDescriptorSet::pBufferInfo`, `pImageInfo` or `pTexelBufferView` fields.
         template<typename WriteDescriptorInfoFunc, typename TResourceArrayView>
         static void _writeDescriptorRange(
