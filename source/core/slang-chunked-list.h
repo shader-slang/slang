@@ -93,14 +93,12 @@ public:
         // Could just do a swap here, and memory would be freed on rhs dtor
         _deallocateBuffer();
         m_count = list.m_count;
-        firstChunk = list.m_buffer;
-
-        list.m_buffer = nullptr;
+        m_firstChunk = _Move(list.m_firstChunk);
+        m_lastChunk = list.m_lastChunk;
         list.m_count = 0;
-        list.m_capacity = 0;
-
-        for (Index i = 0; i < Math::Min((Index)shortListSize, m_count); i++)
-            m_shortBuffer[i] = _Move(list.m_shortBuffer[i]);
+        list.m_firstChunk.next = nullptr;
+        list.m_lastChunk = &list.m_firstChunk;
+        list.m_firstChunk.size = 0;
         return *this;
     }
 
@@ -126,7 +124,7 @@ public:
         }
         T* operator->()
         {
-            SLANG_ASSERT(container);
+            SLANG_ASSERT(chunk);
             return chunk->begin() + index;
         }
         T& operator*()
@@ -213,14 +211,14 @@ public:
 
     template <typename TContainer> T* addRange(const TContainer& list)
     {
-        Chunk* chunk = _maybeReserveForAdd((uint32_t)n);
+        Chunk* chunk = _maybeReserveForAdd((uint32_t)list.getCount());
         auto result = chunk->begin() + chunk->size;
         for (auto& obj : list)
         {
             chunk->begin()[chunk->size] = obj;
             chunk->size++;
+            m_count++;
         }
-        m_count += n;
         return result;
     }
 
