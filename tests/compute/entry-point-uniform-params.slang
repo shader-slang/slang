@@ -4,11 +4,13 @@
 // entry points are allowed, and work as expected.
 
 //DISABLE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE: -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+
+
 
 struct Signs
 {

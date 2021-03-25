@@ -1152,6 +1152,10 @@ namespace Slang
         {
             return SLANG_BINDING_TYPE_SAMPLER;
         }
+        else if (as<ParameterBlockType>(type))
+        {
+            return SLANG_BINDING_TYPE_PARAMETER_BLOCK;
+        }
         else
         {
             return SLANG_BINDING_TYPE_UNKNOWN;
