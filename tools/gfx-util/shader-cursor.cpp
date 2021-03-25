@@ -42,7 +42,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
             //
             SlangInt fieldIndex = m_typeLayout->findFieldIndexByName(name, nameEnd);
             if (fieldIndex == -1)
-                return SLANG_E_INVALID_ARG;
+                break;
 
             // Once we know the index of the field being referenced,
             // we create a cursor to point at the field, based on
@@ -113,6 +113,30 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
             return d.getField(name, nameEnd, outCursor);
         }
         break;
+    }
+
+    // If a cursor is pointing at a root shader object (created for a
+    // program), then we will also iterate over the entry point shader
+    // objects attached to it and look for a matching parameter name
+    // on them.
+    //
+    // This is a bit of "do what I mean" logic and could potentially
+    // lead to problems if there could be multiple entry points with
+    // the same parameter name.
+    //
+    // TODO: figure out whether we should support this long-term.
+    //
+    auto entryPointCount = (gfx::Int) m_baseObject->getEntryPointCount();
+    for( gfx::Int e = 0; e < entryPointCount; ++e )
+    {
+        ComPtr<IShaderObject> entryPoint;
+        m_baseObject->getEntryPoint(e, entryPoint.writeRef());
+
+        ShaderCursor entryPointCursor(entryPoint);
+
+        auto result = entryPointCursor.getField(name, nameEnd, outCursor);
+        if(SLANG_SUCCEEDED(result))
+            return result;
     }
 
     return SLANG_E_INVALID_ARG;

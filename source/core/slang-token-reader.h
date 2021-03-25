@@ -231,6 +231,15 @@ namespace Slang
                 return false;
             }
         }
+        bool AdvanceIf(String token)
+        {
+            if( LookAhead(token) )
+            {
+                ReadToken();
+                return true;
+            }
+            return false;
+        }
         bool IsEnd()
         {
             return tokenPtr == (int)tokens.getCount();

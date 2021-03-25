@@ -363,7 +363,6 @@ void ShaderCompilerUtil::Output::reset()
 
     // Parse the layout
     layout.parse(rand, sourceText.getBuffer());
-    layout.updateForTarget(input.target);
 
     // Setup SourceInfo
     ShaderCompileRequest::SourceInfo sourceInfo;

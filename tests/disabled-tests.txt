@@ -39,3 +39,5 @@ These tests will need to be re-enabled together with changes to the shader objec
 * render/render0.hlsl
 * render/tess.hlsl
 * render/unused-discard.hlsl
+* compute/interface-param-partial-specialize.slang
+* compute/array-existential-parameter.slang

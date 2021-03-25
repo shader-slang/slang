@@ -74,7 +74,6 @@ struct ShaderOutputPlan
 {
     struct Item
     {
-        Index                           inputLayoutEntryIndex;
         ComPtr<IResource>               resource;
         slang::TypeLayoutReflection*    typeLayout = nullptr;
     };
@@ -82,25 +81,25 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
-class RenderTestApp : public RefObject
+class RenderTestApp
 {
 public:
     Result update();
 
     // At initialization time, we are going to load and compile our Slang shader
     // code, and then create the API objects we need for rendering.
-    virtual Result initialize(
+    Result initialize(
         SlangSession* session,
         IDevice* device,
         const Options& options,
-        const ShaderCompilerUtil::Input& input) = 0;
+        const ShaderCompilerUtil::Input& input);
     void runCompute(IComputeCommandEncoder* encoder);
     void renderFrame(IRenderCommandEncoder* encoder);
     void finalize();
 
-    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) = 0;
-    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) = 0;
-    virtual Result writeBindingOutput(const char* fileName) = 0;
+    void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
+    void setProjectionMatrix(IResourceCommandEncoder* encoder);
+    Result writeBindingOutput(const char* fileName);
 
     Result writeScreen(const char* filename);
 
@@ -112,7 +111,6 @@ protected:
         Options::ShaderProgramType shaderType,
         const ShaderCompilerUtil::Input& input);
     void _initializeRenderPass();
-    virtual void finalizeImpl();
 
     uint64_t m_startTicks;
 
@@ -135,25 +133,238 @@ protected:
     ShaderInputLayout m_shaderInputLayout; ///< The binding layout
 
     Options m_options;
-};
-
-class ShaderObjectRenderTestApp : public RenderTestApp
-{
-public:
-    virtual void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder) SLANG_OVERRIDE;
-    virtual void setProjectionMatrix(IResourceCommandEncoder* encoder) SLANG_OVERRIDE;
-    virtual Result initialize(
-        SlangSession* session,
-        IDevice* device,
-        const Options& options,
-        const ShaderCompilerUtil::Input& input) SLANG_OVERRIDE;
-    virtual Result writeBindingOutput(const char* fileName) override;
-
-protected:
-    virtual void finalizeImpl() SLANG_OVERRIDE;
 
     ComPtr<IShaderObject> m_programVars;
     ShaderOutputPlan m_outputPlan;
+};
+
+struct AssignValsFromLayoutContext
+{
+    IDevice*                device;
+    ShaderOutputPlan&       outputPlan;
+    slang::ProgramLayout*   slangReflection;
+
+    AssignValsFromLayoutContext(
+        IDevice*                    device,
+        ShaderOutputPlan&           outputPlan,
+        slang::ProgramLayout*       slangReflection)
+        : device(device)
+        , outputPlan(outputPlan)
+        , slangReflection(slangReflection)
+    {}
+
+    void maybeAddOutput(ShaderCursor const& dstCursor, ShaderInputLayout::Val* srcVal, IResource* resource)
+    {
+        if(srcVal->isOutput)
+        {
+            ShaderOutputPlan::Item item;
+            item.resource = resource;
+            item.typeLayout = dstCursor.getTypeLayout();
+            outputPlan.items.add(item);
+        }
+    }
+
+    SlangResult assignData(ShaderCursor const& dstCursor, ShaderInputLayout::DataVal* srcVal)
+    {
+        const size_t bufferSize = srcVal->bufferData.getCount() * sizeof(uint32_t);
+
+        ShaderCursor dataCursor = dstCursor;
+        switch(dataCursor.getTypeLayout()->getKind())
+        {
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::ParameterBlock:
+            dataCursor = dataCursor.getDereferenced();
+            break;
+
+        default:
+            break;
+
+        }
+
+        SLANG_RETURN_ON_FAIL(dataCursor.setData(srcVal->bufferData.getBuffer(), bufferSize));
+        return SLANG_OK;
+    }
+
+    SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
+    {
+        const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
+        auto& bufferData = srcVal->bufferData;
+        const size_t bufferSize = bufferData.getCount() * sizeof(uint32_t);
+
+        ComPtr<IBufferResource> bufferResource;
+        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
+
+        IResourceView::Desc viewDesc;
+        viewDesc.type = IResourceView::Type::UnorderedAccess;
+        viewDesc.format = srcBuffer.format;
+        auto bufferView = device->createBufferView(
+            bufferResource,
+            viewDesc);
+        dstCursor.setResource(bufferView);
+        maybeAddOutput(dstCursor, srcVal, bufferResource);
+
+        return SLANG_OK;
+    }
+
+    SlangResult assignCombinedTextureSampler(ShaderCursor const& dstCursor, ShaderInputLayout::CombinedTextureSamplerVal* srcVal)
+    {
+        auto& textureEntry = srcVal->textureVal;
+        auto& samplerEntry = srcVal->samplerVal;
+
+        ComPtr<ITextureResource> texture;
+        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
+            textureEntry->textureDesc, textureBindFlags, device, texture));
+
+        auto sampler = _createSamplerState(device, samplerEntry->samplerDesc);
+
+        IResourceView::Desc viewDesc;
+        viewDesc.type = IResourceView::Type::ShaderResource;
+        auto textureView = device->createTextureView(
+            texture,
+            viewDesc);
+
+        dstCursor.setCombinedTextureSampler(textureView, sampler);
+        maybeAddOutput(dstCursor, srcVal, texture);
+
+        return SLANG_OK;
+    }
+
+    static const int textureBindFlags = IResource::BindFlag::NonPixelShaderResource | IResource::BindFlag::PixelShaderResource;
+
+    SlangResult assignTexture(ShaderCursor const& dstCursor, ShaderInputLayout::TextureVal* srcVal)
+    {
+        ComPtr<ITextureResource> texture;
+        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
+            srcVal->textureDesc, textureBindFlags, device, texture));
+
+        // TODO: support UAV textures...
+
+        IResourceView::Desc viewDesc;
+        viewDesc.type = IResourceView::Type::ShaderResource;
+        viewDesc.format = texture->getDesc()->format;
+        auto textureView = device->createTextureView(
+            texture,
+            viewDesc);
+
+        if (!textureView)
+        {
+            return SLANG_FAIL;
+        }
+
+        dstCursor.setResource(textureView);
+        maybeAddOutput(dstCursor, srcVal, texture);
+        return SLANG_OK;
+    }
+
+    SlangResult assignSampler(ShaderCursor const& dstCursor, ShaderInputLayout::SamplerVal* srcVal)
+    {
+        auto sampler = _createSamplerState(device, srcVal->samplerDesc);
+
+        dstCursor.setSampler(sampler);
+        return SLANG_OK;
+    }
+
+    SlangResult assignAggregate(ShaderCursor const& dstCursor, ShaderInputLayout::AggVal* srcVal)
+    {
+        Index fieldCount = srcVal->fields.getCount();
+        for(Index fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
+        {
+            auto& field = srcVal->fields[fieldIndex];
+
+            if(field.name.getLength() == 0)
+            {
+                StdWriters::getError().print("error: entries in `ShaderInputLayout` must include a name\n");
+                return SLANG_E_INVALID_ARG;
+            }
+
+            auto fieldCursor = dstCursor.getPath(field.name.getBuffer());
+
+            if(!fieldCursor.isValid())
+            {
+                StdWriters::getError().print("error: could not find shader parameter matching '%s'\n", field.name.begin());
+                return SLANG_E_INVALID_ARG;
+            }
+
+            assign(fieldCursor, field.val);
+        }
+        return SLANG_OK;
+    }
+
+    SlangResult assignObject(ShaderCursor const& dstCursor, ShaderInputLayout::ObjectVal* srcVal)
+    {
+        auto typeName = srcVal->typeName;
+        slang::TypeReflection* slangType = nullptr;
+        if(typeName.getLength() != 0)
+        {
+            // If the input line specified the name of the type
+            // to allocate, then we use it directly.
+            //
+            slangType = slangReflection->findTypeByName(typeName.getBuffer());
+        }
+        else
+        {
+            // if the user did not specify what type to allocate,
+            // then we will infer the type from the type of the
+            // value pointed to by `entryCursor`.
+            //
+            auto slangTypeLayout = dstCursor.getTypeLayout();
+            switch(slangTypeLayout->getKind())
+            {
+            default:
+                break;
+
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            case slang::TypeReflection::Kind::ParameterBlock:
+                // If the cursor is pointing at a constant buffer
+                // or parameter block, then we assume the user
+                // actually means to allocate an object based on
+                // the element type of the block.
+                //
+                slangTypeLayout = slangTypeLayout->getElementTypeLayout();
+                break;
+            }
+            slangType = slangTypeLayout->getType();
+        }
+
+        ComPtr<IShaderObject> shaderObject = device->createShaderObject(slangType);
+
+        assign(ShaderCursor(shaderObject), srcVal->contentVal);
+
+        dstCursor.setObject(shaderObject);
+        return SLANG_OK;
+    }
+
+    SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
+    {
+        auto& entryCursor = dstCursor;
+        switch(srcVal->kind)
+        {
+        case ShaderInputType::UniformData:
+            return assignData(dstCursor, (ShaderInputLayout::DataVal*) srcVal.Ptr());
+
+        case ShaderInputType::Buffer:
+            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*) srcVal.Ptr());
+
+        case ShaderInputType::CombinedTextureSampler:
+            return assignCombinedTextureSampler(dstCursor, (ShaderInputLayout::CombinedTextureSamplerVal*) srcVal.Ptr());
+
+        case ShaderInputType::Texture:
+            return assignTexture(dstCursor, (ShaderInputLayout::TextureVal*) srcVal.Ptr());
+
+        case ShaderInputType::Sampler:
+            return assignSampler(dstCursor, (ShaderInputLayout::SamplerVal*) srcVal.Ptr());
+
+        case ShaderInputType::Object:
+            return assignObject(dstCursor, (ShaderInputLayout::ObjectVal*) srcVal.Ptr());
+
+        case ShaderInputType::Aggregate:
+            return assignAggregate(dstCursor, (ShaderInputLayout::AggVal*) srcVal.Ptr());
+
+        default:
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
+        }
+    }
 };
 
 SlangResult _assignVarsFromLayout(
@@ -163,228 +374,12 @@ SlangResult _assignVarsFromLayout(
     ShaderOutputPlan&           ioOutputPlan,
     slang::ProgramLayout*       slangReflection)
 {
+    AssignValsFromLayoutContext context(device, ioOutputPlan, slangReflection);
     ShaderCursor rootCursor = ShaderCursor(shaderObject);
-
-    const int textureBindFlags = IResource::BindFlag::NonPixelShaderResource | IResource::BindFlag::PixelShaderResource;
-
-    Index entryCount = layout.entries.getCount();
-    for(Index entryIndex = 0; entryIndex < entryCount; ++entryIndex)
-    {
-        auto& entry = layout.entries[entryIndex];
-        if(entry.name.getLength() == 0)
-        {
-            StdWriters::getError().print("error: entries in `ShaderInputLayout` must include a name\n");
-            return SLANG_E_INVALID_ARG;
-        }
-
-        auto entryCursor = rootCursor.getPath(entry.name.getBuffer());
-
-        if(!entryCursor.isValid())
-        {
-            for(gfx::UInt i = 0; i < shaderObject->getEntryPointCount(); i++)
-            {
-                entryCursor = ShaderCursor(shaderObject->getEntryPoint(i)).getPath(entry.name.getBuffer());
-                if(entryCursor.isValid())
-                    break;
-            }
-        }
-
-
-        if(!entryCursor.isValid())
-        {
-            StdWriters::getError().print("error: could not find shader parameter matching '%s'\n", entry.name.begin());
-            return SLANG_E_INVALID_ARG;
-        }
-        slang::TypeLayoutReflection* typeLayout = entryCursor.getTypeLayout();
-
-        ComPtr<IResource> resource;
-        switch(entry.type)
-        {
-        case ShaderInputType::Uniform:
-            {
-                const size_t bufferSize = entry.bufferData.getCount() * sizeof(uint32_t);
-
-                ShaderCursor dataCursor = entryCursor;
-                switch(dataCursor.getTypeLayout()->getKind())
-                {
-                case slang::TypeReflection::Kind::ConstantBuffer:
-                case slang::TypeReflection::Kind::ParameterBlock:
-                    dataCursor = dataCursor.getDereferenced();
-                    break;
-
-                default:
-                    break;
-
-                }
-
-                dataCursor.setData(entry.bufferData.getBuffer(), bufferSize);
-            }
-            break;
-
-        case ShaderInputType::Buffer:
-            {
-                const InputBufferDesc& srcBuffer = entry.bufferDesc;
-                const size_t bufferSize = entry.bufferData.getCount() * sizeof(uint32_t);
-
-                switch(srcBuffer.type)
-                {
-                case InputBufferType::ConstantBuffer:
-                    {
-                        // A `cbuffer` input line actually represents the data we
-                        // want to write *into* the buffer, and shouldn't
-                        // allocate a buffer itself.
-                        //
-                        entryCursor.getDereferenced().setData(entry.bufferData.getBuffer(), bufferSize);
-                    }
-                    break;
-
-                case InputBufferType::RootConstantBuffer:
-                    {
-                        // A `root_constants` input line actually represents the data we
-                        // want to write *into* the buffer, and shouldn't
-                        // allocate a buffer itself.
-                        //
-                        // Note: we are not doing `.getDereferenced()` here because the
-                        // `root_constant` line should be referring to a parameter value
-                        // inside the root-constant range, and not the range/buffer itself.
-                        //
-                        entryCursor.setData(entry.bufferData.getBuffer(), bufferSize);
-                    }
-                    break;
-
-                default:
-                    {
-
-                        ComPtr<IBufferResource> bufferResource;
-                        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(entry.bufferDesc, entry.isOutput, bufferSize, entry.bufferData.getBuffer(), device, bufferResource));
-                        resource = bufferResource;
-
-                        IResourceView::Desc viewDesc;
-                        viewDesc.type = IResourceView::Type::UnorderedAccess;
-                        viewDesc.format = srcBuffer.format;
-                        auto bufferView = device->createBufferView(
-                            bufferResource,
-                            viewDesc);
-                        entryCursor.setResource(bufferView);
-                    }
-                    break;
-                }
-            }
-            break;
-
-        case ShaderInputType::CombinedTextureSampler:
-            {
-                ComPtr<ITextureResource> texture;
-                SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
-                    entry.textureDesc, textureBindFlags, device, texture));
-                resource = texture;
-
-                auto sampler = _createSamplerState(device, entry.samplerDesc);
-
-                IResourceView::Desc viewDesc;
-                viewDesc.type = IResourceView::Type::ShaderResource;
-                auto textureView = device->createTextureView(
-                    texture,
-                    viewDesc);
-
-                entryCursor.setCombinedTextureSampler(textureView, sampler);
-            }
-            break;
-
-        case ShaderInputType::Texture:
-            {
-                ComPtr<ITextureResource> texture;
-                SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
-                    entry.textureDesc, textureBindFlags, device, texture));
-                resource = texture;
-
-                // TODO: support UAV textures...
-
-                IResourceView::Desc viewDesc;
-                viewDesc.type = IResourceView::Type::ShaderResource;
-                viewDesc.format = texture->getDesc()->format;
-                auto textureView = device->createTextureView(
-                    texture,
-                    viewDesc);
-
-                if (!textureView)
-                {
-                    return SLANG_FAIL;
-                }
-
-                entryCursor.setResource(textureView);
-            }
-            break;
-
-        case ShaderInputType::Sampler:
-            {
-                auto sampler = _createSamplerState(device, entry.samplerDesc);
-
-                entryCursor.setSampler(sampler);
-            }
-            break;
-
-        case ShaderInputType::Object:
-            {
-                auto typeName = entry.objectDesc.typeName;
-                slang::TypeReflection* slangType = nullptr;
-                if(typeName.getLength() != 0)
-                {
-                    // If the input line specified the name of the type
-                    // to allocate, then we use it directly.
-                    //
-                    slangType = slangReflection->findTypeByName(typeName.getBuffer());
-                }
-                else
-                {
-                    // if the user did not specify what type to allocate,
-                    // then we will infer the type from the type of the
-                    // value pointed to by `entryCursor`.
-                    //
-                    auto slangTypeLayout = entryCursor.getTypeLayout();
-                    switch(slangTypeLayout->getKind())
-                    {
-                    default:
-                        break;
-
-                    case slang::TypeReflection::Kind::ConstantBuffer:
-                    case slang::TypeReflection::Kind::ParameterBlock:
-                        // If the cursor is pointing at a constant buffer
-                        // or parameter block, then we assume the user
-                        // actually means to allocate an object based on
-                        // the element type of the block.
-                        //
-                        slangTypeLayout = slangTypeLayout->getElementTypeLayout();
-                        break;
-                    }
-                    slangType = slangTypeLayout->getType();
-                }
-
-                ComPtr<IShaderObject> shaderObject = device->createShaderObject(slangType);
-
-                entryCursor.setObject(shaderObject);
-            }
-            break;
-
-        default:
-            assert(!"Unhandled type");
-            return SLANG_FAIL;
-        }
-
-        if(entry.isOutput)
-        {
-            ShaderOutputPlan::Item item;
-            item.inputLayoutEntryIndex = entryIndex;
-            item.resource = resource;
-            item.typeLayout = typeLayout;
-            ioOutputPlan.items.add(item);
-        }
-
-    }
-    return SLANG_OK;
+    return context.assign(rootCursor, layout.rootVal);
 }
 
-void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
+void RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
 {
     switch (pipelineType)
     {
@@ -409,7 +404,7 @@ void ShaderObjectRenderTestApp::applyBinding(PipelineType pipelineType, ICommand
     }
 }
 
-SlangResult ShaderObjectRenderTestApp::initialize(
+SlangResult RenderTestApp::initialize(
     SlangSession* session,
     IDevice* device,
     const Options& options,
@@ -507,12 +502,6 @@ SlangResult ShaderObjectRenderTestApp::initialize(
     return m_pipelineState ? SLANG_OK : SLANG_FAIL;
 }
 
-void ShaderObjectRenderTestApp::finalizeImpl()
-{
-    m_programVars = nullptr;
-    RenderTestApp::finalizeImpl();
-}
-
 Result RenderTestApp::_initializeShaders(
     SlangSession* session,
     IDevice* device,
@@ -602,7 +591,7 @@ void RenderTestApp::_initializeRenderPass()
     m_device->createRenderPassLayout(renderPassDesc, m_renderPass.writeRef());
 }
 
-void ShaderObjectRenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
+void RenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
 {
     SLANG_UNUSED(encoder);
     auto info = m_device->getDeviceInfo();
@@ -639,8 +628,7 @@ void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 
 void RenderTestApp::finalize()
 {
-    finalizeImpl();
-
+    m_programVars = nullptr;
     m_inputLayout = nullptr;
     m_vertexBuffer = nullptr;
     m_shaderProgram = nullptr;
@@ -653,11 +641,7 @@ void RenderTestApp::finalize()
     m_device = nullptr;
 }
 
-void RenderTestApp::finalizeImpl()
-{
-}
-
-Result ShaderObjectRenderTestApp::writeBindingOutput(const char* fileName)
+Result RenderTestApp::writeBindingOutput(const char* fileName)
 {
     // Wait until everything is complete
     m_queue->wait();
@@ -671,23 +655,51 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(const char* fileName)
 
     for(auto outputItem : m_outputPlan.items)
     {
-        auto& inputEntry = m_shaderInputLayout.entries[outputItem.inputLayoutEntryIndex];
-        assert(inputEntry.isOutput);
-
         auto resource = outputItem.resource;
         if (resource && resource->getType() == IResource::Type::Buffer)
         {
             IBufferResource* bufferResource = static_cast<IBufferResource*>(resource.get());
-            const size_t bufferSize = bufferResource->getDesc()->sizeInBytes;
+            auto bufferDesc = *bufferResource->getDesc();
+            const size_t bufferSize = bufferDesc.sizeInBytes;
 
             ComPtr<ISlangBlob> blob;
-            m_device->readBufferResource(bufferResource, 0, bufferSize, blob.writeRef());
+            if(bufferDesc.cpuAccessFlags & IResource::AccessFlag::Read)
+            {
+                // The buffer is already allocated for CPU access, so we can read it back directly.
+                //
+                m_device->readBufferResource(bufferResource, 0, bufferSize, blob.writeRef());
+            }
+            else
+            {
+                // The buffer is not CPU-readable, so we will copy it using a staging buffer.
+
+                auto stagingBufferDesc = bufferDesc;
+                stagingBufferDesc.cpuAccessFlags = IResource::AccessFlag::Read;
+                stagingBufferDesc.bindFlags = 0;
+
+                ComPtr<IBufferResource> stagingBuffer;
+                SLANG_RETURN_ON_FAIL(m_device->createBufferResource(IResource::Usage::CopyDest, stagingBufferDesc, nullptr, stagingBuffer.writeRef()));
+
+                ComPtr<ICommandBuffer> commandBuffer;
+                SLANG_RETURN_ON_FAIL(m_queue->createCommandBuffer(commandBuffer.writeRef()));
+
+                ComPtr<IResourceCommandEncoder> encoder;
+                commandBuffer->encodeResourceCommands(encoder.writeRef());
+                encoder->copyBuffer(stagingBuffer, 0, bufferResource, 0, bufferSize);
+                encoder->endEncoding();
+
+                commandBuffer->close();
+                m_queue->executeCommandBuffer(commandBuffer);
+                m_queue->wait();
+
+                m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef());
+            }
+
             if (!blob)
             {
                 return SLANG_FAIL;
             }
             const SlangResult res = ShaderInputLayout::writeBinding(
-                inputEntry,
                 m_options.outputUsingType ? outputItem.typeLayout : nullptr, // TODO: always output using type
                 blob->getBufferPointer(),
                 bufferSize,
@@ -696,7 +708,8 @@ Result ShaderObjectRenderTestApp::writeBindingOutput(const char* fileName)
         }
         else
         {
-            printf("invalid output type at %d.\n", int(outputItem.inputLayoutEntryIndex));
+            auto typeName = outputItem.typeLayout->getName();
+            printf("invalid output type '%s'.\n", typeName ? typeName : "UNKNOWN");
         }
     }
     return SLANG_OK;
@@ -1101,15 +1114,12 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     }
 
 	{
-        // TODO: We shouldn't need to heap-allocate the `ShaderObjectRenderTestApp`
-        // since there is no longer any meaningful inheritance going on.
-        //
-        RefPtr<RenderTestApp> app = new ShaderObjectRenderTestApp();
+        RenderTestApp app;
         renderDocBeginFrame();
-        SLANG_RETURN_ON_FAIL(app->initialize(session, device, options, input));
-        app->update();
+        SLANG_RETURN_ON_FAIL(app.initialize(session, device, options, input));
+        app.update();
         renderDocEndFrame();
-        app->finalize();
+        app.finalize();
         return SLANG_OK;
 	}
 }

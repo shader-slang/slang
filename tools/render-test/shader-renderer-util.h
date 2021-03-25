@@ -31,7 +31,6 @@ struct ShaderRendererUtil
         /// Create the BufferResource using the renderer from the contents of inputDesc
     static Slang::Result createBufferResource(
         const InputBufferDesc& inputDesc,
-        bool isOutput,
         size_t bufferSize,
         const void* initData,
         IDevice* device,

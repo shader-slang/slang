@@ -23,7 +23,7 @@ int test(int val, int a, int b)
 [shader("compute")]
 void computeMain(
 
-//TEST_INPUT:root_constants(data=[256 1]):name=d
+//TEST_INPUT:uniform(data=[256 1]):name=d
 	uniform Data d,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

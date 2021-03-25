@@ -3116,11 +3116,26 @@ public:
                 size_t srcOffset,
                 size_t size) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(size);
+                auto& vkAPI = m_commandBuffer->m_renderer->m_api;
+
+                auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
+                auto srcBuffer = static_cast<BufferResourceImpl*>(src);
+
+                VkBufferCopy copyRegion;
+                copyRegion.dstOffset = dstOffset;
+                copyRegion.srcOffset = srcOffset;
+                copyRegion.size = size;
+
+                // Note: Vulkan puts the source buffer first in the copy
+                // command, going against the dominant tradition for copy
+                // operations in C/C++.
+                //
+                vkAPI.vkCmdCopyBuffer(
+                    m_commandBuffer->m_commandBuffer,
+                    srcBuffer->m_buffer.m_buffer,
+                    dstBuffer->m_buffer.m_buffer,
+                    /* regionCount: */ 1,
+                    &copyRegion);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
                 uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data) override
