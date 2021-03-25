@@ -2210,15 +2210,13 @@ public:
     public:
         virtual Result bindObject(PipelineCommandEncoder* encoder, RootBindingState* bindingState) override
         {
-            RootBindingState globalBindingState = *bindingState;
             SLANG_RETURN_ON_FAIL(Super::bindObject(encoder, bindingState));
 
             auto entryPointCount = m_entryPoints.getCount();
             for (Index i = 0; i < entryPointCount; ++i)
             {
                 auto entryPoint = m_entryPoints[i];
-                auto bindingStateCopy = globalBindingState;
-                SLANG_RETURN_ON_FAIL(entryPoint->bindObject(encoder, &bindingStateCopy));
+                SLANG_RETURN_ON_FAIL(entryPoint->bindObject(encoder, bindingState));
             }
 
             return SLANG_OK;

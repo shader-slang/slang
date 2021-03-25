@@ -13,14 +13,12 @@ These tests will need to be re-enabled together with changes to the shader objec
 * compute/dynamic-dispatch-13.slang
 * compute/dynamic-dispatch-14.slang
 * compute/dynamic-dispatch-bindless-texture.slang
-* compute/entry-point-uniform-params.slang
 * compute/global-type-param2.slang
 * compute/global-type-param-array.slang
 * compute/global-type-param1.slang
 * compute/interface-shader-param-in-struct.slang
 * compute/interface-shader-param-legalization.slang
 * compute/interface-shader-param.slang
-* compute/parameter-block.slang
 * compute/performance-profile.slang
 * compute/rewriter-parameter-block-complex.hlsl
 * compute/unbounded-array-of-array-syntax.slang
@@ -35,7 +33,6 @@ These tests will need to be re-enabled together with changes to the shader objec
 * language-feature/shader-params/global-uniform-params.slang
 * tests/serialization/serialized-module-entry-point-test.slang
 * serialization/library-entry-point/library-entry-point-test.slang
-* render/cross-compile-entry-point.slang
 * render/cross-compile0.hlsl
 * render/imported-parameters.hlsl
 * render/nointerpolation.hlsl

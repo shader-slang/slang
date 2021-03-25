@@ -700,10 +700,11 @@ public:
             Index bindingRangeIndex;
         };
 
-        struct DescriptorSetInfo : public RefObject
+        struct DescriptorSetInfo
         {
             List<VkDescriptorSetLayoutBinding> vkBindings;
             Slang::Int space = -1;
+            VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
         };
 
         struct Builder
@@ -780,19 +781,21 @@ public:
                 }
             }
 
-            void _addDescriptorSets(
+            Result _addDescriptorSets(
                 slang::TypeLayoutReflection* typeLayout,
                 slang::VariableLayoutReflection* varLayout = nullptr)
             {
                 SlangInt descriptorSetCount = typeLayout->getDescriptorSetCount();
                 for (SlangInt s = 0; s < descriptorSetCount; ++s)
                 {
+                    SlangInt descriptorRangeCount =
+                        typeLayout->getDescriptorSetDescriptorRangeCount(s);
+                    if (descriptorRangeCount == 0)
+                        continue;
                     auto descriptorSetIndex =
                         findOrAddDescriptorSet(typeLayout->getDescriptorSetSpaceOffset(s));
                     auto& descriptorSetInfo = m_descriptorSetBuildInfos[descriptorSetIndex];
 
-                    SlangInt descriptorRangeCount =
-                        typeLayout->getDescriptorSetDescriptorRangeCount(s);
                     for (SlangInt r = 0; r < descriptorRangeCount; ++r)
                     {
                         auto slangBindingType =
@@ -826,7 +829,16 @@ public:
                         }
                         descriptorSetInfo.vkBindings.add(vkBindingRangeDesc);
                     }
+                    VkDescriptorSetLayoutCreateInfo createInfo = {};
+                    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                    createInfo.pBindings = descriptorSetInfo.vkBindings.getBuffer();
+                    createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
+                    VkDescriptorSetLayout vkDescSetLayout;
+                    SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreateDescriptorSetLayout(
+                        m_renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
+                    descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
                 }
+                return SLANG_OK;
             }
 
             Result setElementTypeLayout(slang::TypeLayoutReflection* typeLayout)
@@ -839,7 +851,7 @@ public:
                 // the descriptor set layout(s) required to store values
                 // of the given type.
                 //
-                _addDescriptorSets(typeLayout);
+                SLANG_RETURN_ON_FAIL(_addDescriptorSets(typeLayout));
 
                 // Next we will compute the binding ranges that are used to store
                 // the logical contents of the object in memory. These will relate
@@ -930,7 +942,6 @@ public:
                     SubObjectRangeInfo subObjectRange;
                     subObjectRange.bindingRangeIndex = bindingRangeIndex;
                     subObjectRange.layout = subObjectLayout;
-
                     m_subObjectRanges.add(subObjectRange);
                 }
                 return SLANG_OK;
@@ -956,6 +967,15 @@ public:
             return builder.build(outLayout);
         }
 
+        ~ShaderObjectLayoutImpl()
+        {
+            for (auto& descSetInfo : m_descriptorSetInfos)
+            {
+                getDevice()->m_api.vkDestroyDescriptorSetLayout(
+                    getDevice()->m_api.m_device, descSetInfo.descriptorSetLayout, nullptr);
+            }
+        }
+
         List<DescriptorSetInfo> const& getDescriptorSets() { return m_descriptorSetInfos; }
 
         uint32_t getPushConstantSize() { return m_pushConstantSize; }
@@ -979,7 +999,7 @@ public:
         }
         List<SubObjectRangeInfo> const& getSubObjectRanges() { return m_subObjectRanges; }
 
-        RendererBase* getRenderer() { return m_renderer; }
+        VKDevice* getDevice() { return static_cast<VKDevice*>(m_renderer); }
 
         slang::TypeReflection* getType() { return m_elementTypeLayout->getType(); }
 
@@ -1072,11 +1092,6 @@ public:
     public:
         ~RootShaderObjectLayout()
         {
-            for (auto descSetLayout : m_vkDescriptorSetLayouts)
-            {
-                m_renderer->m_api.vkDestroyDescriptorSetLayout(
-                    m_renderer->m_api.m_device, descSetLayout, nullptr);
-            }
             if (m_pipelineLayout)
             {
                 m_renderer->m_api.vkDestroyPipelineLayout(
@@ -1203,8 +1218,8 @@ public:
 
             // For fully specialized shader programs, we create a Vulkan pipeline layout now.
 
-            // First, create `VkDescriptorSetLayout`s for the global scope and all sub-objects
-            // referenced via a `ParameterBlock`.
+            // First, collect `VkDescriptorSetLayout`s for the global scope and all sub-objects
+            // referenced via a `ParameterBlock` from shader object layouts.
             SLANG_RETURN_ON_FAIL(addDescriptorSetLayoutRec(this));
 
             // Next, collect push constant ranges. We will use one descriptor range for each
@@ -1241,20 +1256,13 @@ public:
             return SLANG_OK;
         }
 
-        // Recusively create `VkDescriptorSetLayout` for all descriptor sets used by this and children
+        // Recusively add `VkDescriptorSetLayout` for all descriptor sets used by this and children
         // shader objects and add them to `m_vkDescriptorSetLayouts`.
         Result addDescriptorSetLayoutRec(ShaderObjectLayoutImpl* layout)
         {
             for (auto& descSetInfo : layout->getDescriptorSets())
             {
-                VkDescriptorSetLayoutCreateInfo createInfo = {};
-                createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                createInfo.pBindings = descSetInfo.vkBindings.getBuffer();
-                createInfo.bindingCount = (uint32_t)descSetInfo.vkBindings.getCount();
-                VkDescriptorSetLayout vkDescSetLayout;
-                SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreateDescriptorSetLayout(
-                    m_renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
-                m_vkDescriptorSetLayouts.add(vkDescSetLayout);
+                m_vkDescriptorSetLayouts.add(descSetInfo.descriptorSetLayout);
             }
 
             // Note: entry point parameters in a `RootShaderObject` has already been included
@@ -1436,6 +1444,7 @@ public:
         Array<VkDescriptorSet, kMaxDescriptorSets> descriptorSets;
         ArrayView<VkPushConstantRange> pushConstantRanges;
         VkPipelineLayout pipelineLayout;
+        DescriptorSetAllocator* descriptorSetAllocator;
         VKDevice* device;
     };
     struct BindingOffset
@@ -1443,7 +1452,6 @@ public:
         uint32_t uniformOffset;
         uint32_t pushConstantRangeOffset;
         uint32_t descriptorSetIndexOffset;
-        uint32_t subObjectDescriptorSetIndexOffset;
         uint32_t descriptorRangeOffset;
     };
 
@@ -2272,8 +2280,6 @@ public:
             //
             for (auto bindingRangeInfo : layout->getBindingRanges())
             {
-                auto descriptorSet =
-                    bindingState->descriptorSets[bindingRangeInfo.descriptorSetIndex];
                 auto rangeIndex =
                     bindingRangeInfo.rangeIndexInDescriptorSet + offset.descriptorRangeOffset;
                 auto baseIndex = bindingRangeInfo.baseIndex;
@@ -2284,22 +2290,15 @@ public:
                     for (uint32_t i = 0; i < count; ++i)
                     {
                         ShaderObjectImpl* subObject = m_objects[baseIndex + i];
-                        subObject->bindObject(encoder, bindingState, offset);
+                        subObject->bindObjectIntoConstantBuffer(encoder, bindingState, offset);
                     }
                     break;
                 case slang::BindingType::ParameterBlock:
                     for (uint32_t i = 0; i < count; ++i)
                     {
-                        offset.subObjectDescriptorSetIndexOffset++;
                         ShaderObjectImpl* subObject = m_objects[baseIndex + i];
                         auto newOffset = offset;
-                        newOffset.descriptorSetIndexOffset =
-                            offset.subObjectDescriptorSetIndexOffset;
-                        newOffset.uniformOffset = 0;
-                        newOffset.descriptorRangeOffset = 0;
-                        subObject->bindObject(encoder, bindingState, newOffset);
-                        offset.subObjectDescriptorSetIndexOffset =
-                            newOffset.subObjectDescriptorSetIndexOffset;
+                        subObject->bindObjectIntoParameterBlock(encoder, bindingState, newOffset);
                         offset.pushConstantRangeOffset = newOffset.pushConstantRangeOffset;
                     }
                     break;
@@ -2387,7 +2386,7 @@ public:
             return SLANG_OK;
         }
 
-        virtual Result bindObject(
+        virtual Result bindObjectIntoConstantBuffer(
             PipelineCommandEncoder* encoder,
             RootBindingState* bindingState,
             BindingOffset& offset)
@@ -2395,6 +2394,25 @@ public:
             SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(encoder, bindingState, offset));
 
             SLANG_RETURN_ON_FAIL(bindDescriptorRanges(encoder, bindingState, offset));
+            return SLANG_OK;
+        }
+
+        virtual Result bindObjectIntoParameterBlock(
+            PipelineCommandEncoder* encoder,
+            RootBindingState* bindingState,
+            BindingOffset& offset)
+        {
+            auto& descriptorSetInfos = getLayout()->getDescriptorSets();
+            offset.descriptorSetIndexOffset = (uint32_t)bindingState->descriptorSets.getCount();
+            offset.uniformOffset = 0;
+            offset.descriptorRangeOffset = 0;
+            for (auto info : descriptorSetInfos)
+            {
+                bindingState->descriptorSets.add(
+                    bindingState->descriptorSetAllocator->allocate(info.descriptorSetLayout)
+                        .handle);
+            }
+            SLANG_RETURN_ON_FAIL(bindObjectIntoConstantBuffer(encoder, bindingState, offset));
             return SLANG_OK;
         }
 
@@ -2439,10 +2457,10 @@ public:
             ExtendedShaderObjectType extendedType;
             SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
 
-            auto renderer = getRenderer();
+            auto device = getDevice();
             RefPtr<ShaderObjectLayoutBase> layout;
             SLANG_RETURN_ON_FAIL(
-                renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+                device->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
 
             *outLayout = static_cast<ShaderObjectLayoutImpl*>(layout.detach());
             return SLANG_OK;
@@ -2470,7 +2488,7 @@ public:
 
         EntryPointLayout* getLayout() { return static_cast<EntryPointLayout*>(m_layout.Ptr()); }
 
-        virtual Result bindObject(
+        virtual Result bindObjectIntoConstantBuffer(
             PipelineCommandEncoder* encoder,
             RootBindingState* bindingState,
             BindingOffset& offset) override
@@ -2546,17 +2564,17 @@ public:
             return SLANG_OK;
         }
 
-        virtual Result bindObject(
+        virtual Result bindObjectIntoParameterBlock(
             PipelineCommandEncoder* encoder,
             RootBindingState* bindingState,
             BindingOffset& offset) override
         {
-            SLANG_RETURN_ON_FAIL(Super::bindObject(encoder, bindingState, offset));
+            SLANG_RETURN_ON_FAIL(Super::bindObjectIntoParameterBlock(encoder, bindingState, offset));
 
             // Bind all entry points.
             for (auto& entryPoint : m_entryPoints)
             {
-                entryPoint->bindObject(encoder, bindingState, offset);
+                entryPoint->bindObjectIntoConstantBuffer(encoder, bindingState, offset);
             }
             return SLANG_OK;
         }
@@ -3715,7 +3733,7 @@ public:
     DeviceInfo m_info;
     String m_adapterName;
 
-    VkDebugReportCallbackEXT m_debugReportCallback;
+    VkDebugReportCallbackEXT m_debugReportCallback = VK_NULL_HANDLE;
 
     VkDevice m_device = VK_NULL_HANDLE;
 
@@ -3756,17 +3774,12 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
     bindState.pushConstantRanges = specializedLayout->m_pushConstantRanges.getView();
     bindState.pipelineLayout = specializedLayout->m_pipelineLayout;
     bindState.device = m_device;
-    // Create transient descriptor tables for binding.
-    for (auto descSetLayout : specializedLayout->m_vkDescriptorSetLayouts)
-    {
-        auto descSet = m_commandBuffer->m_transientDescSetAllocator->allocate(descSetLayout);
-        bindState.descriptorSets.add(descSet.handle);
-    }
+    bindState.descriptorSetAllocator = m_commandBuffer->m_transientDescSetAllocator;
 
-    // Write bindings into descriptor sets. This step collects
+    // Write bindings into descriptor sets. This step allocate descriptor sets and collects
     // all `VkWriteDescriptorSet` operations in `bindState.descriptorSetWrites`.
     BindingOffset offset = {};
-    rootObjectImpl->bindObject(this, &bindState, offset);
+    rootObjectImpl->bindObjectIntoParameterBlock(this, &bindState, offset);
 
     // Execute descriptor writes collected in `bindState.descriptorSetWrites`.
     m_device->m_api.vkUpdateDescriptorSets(
@@ -3843,6 +3856,8 @@ VKDevice::~VKDevice()
         waitForGpu();
     }
 
+    m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)();
+
     shaderCache.free();
 
     // Same as clear but, also dtors all elements, which clear does not
@@ -3854,6 +3869,8 @@ VKDevice::~VKDevice()
     {
         m_api.vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
+        if (m_debugReportCallback != VK_NULL_HANDLE)
+            m_api.vkDestroyDebugReportCallbackEXT(m_api.m_instance, m_debugReportCallback, nullptr);
         if (m_api.m_instance != VK_NULL_HANDLE)
             m_api.vkDestroyInstance(m_api.m_instance, nullptr);
     }
@@ -4234,7 +4251,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(m_module.init());
     SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
     descriptorSetAllocator.m_api = &m_api;
-    SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice(false));
+    SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice(_DEBUG));
     {
         VkQueue queue;
         m_api.vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &queue);
