@@ -1,6 +1,6 @@
 // Test using existential shader parameter that is an interface array.
 
-//TEST(compute):COMPARE_COMPUTE:-cpu
+//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
