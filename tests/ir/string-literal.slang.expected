@@ -1,8 +1,8 @@
 result code = 0
 standard error = {
 ### LOWER-TO-IR:
-[entryPoint(6, "main")]
-[numThreads(1, 1, 1)]
+[entryPoint(6 : Int, "main")]
+[numThreads(1 : Int, 1 : Int, 1 : Int)]
 [export("_S3tu04mainp1puV")]
 [nameHint("main")]
 func %main	: Func(Void, UInt)
