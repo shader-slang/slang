@@ -108,6 +108,8 @@ protected:
 
     void _requireRayTracing();
 
+    void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
+
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
 };
 
