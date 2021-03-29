@@ -529,6 +529,10 @@ struct OptionsParser
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
+                else if (argStr == "-E" || argStr == "-output-preprocessor")
+                {
+                    requestImpl->getFrontEndReq()->outputPreprocessor = true;
+                }
                 else if (argStr == "-dump-ast")
                 {
                     requestImpl->getFrontEndReq()->shouldDumpAST = true;

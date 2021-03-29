@@ -229,8 +229,13 @@ struct Preprocessor
         /// File system to use when looking up files
     ISlangFileSystemExt*                    fileSystem = nullptr;
 
-        /// Source maanger to use when loading source files
+        /// Source manager to use when loading source files
     SourceManager*                          sourceManager = nullptr;
+
+        /// Holds __LINE__ as a name
+    Name*                                   lineSpecialName = nullptr;
+        /// Holds __FILE__ as a name
+    Name*                                   fileSpecialName = nullptr;
 
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
@@ -898,6 +903,63 @@ static void MaybeBeginMacroExpansion(
         // Look for a macro with the given name.
         Name* name = token.getName();
         PreprocessorMacro* macro = LookupMacro(preprocessor, name);
+
+        if (name == preprocessor->lineSpecialName || name == preprocessor->fileSpecialName)
+        {
+            AdvanceRawToken(preprocessor);
+
+            SourceManager* sourceManager = preprocessor->getSourceManager();
+
+            // Since the location can be overridden by #line directives, use the slower path to get the line number
+            const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
+
+            Token newToken;
+            
+            StringBuilder buf;
+            if (name == preprocessor->lineSpecialName)
+            {
+                newToken.type = TokenType::IntegerLiteral;
+                buf << humaneSourceLoc.line;
+            }
+            else
+            {
+                // We need to escape to a string
+                newToken.type = TokenType::StringLiteral;
+
+                buf.appendChar('"');
+                StringUtil::appendEscaped(humaneSourceLoc.pathInfo.foundPath.getUnownedSlice(), buf);
+                buf.appendChar('"');
+            }
+
+            // We are going to keep the actual text in the slice pool, so it stays in scope
+            // and if the value appears multiple times, it will shared
+            auto& pool = sourceManager->getStringSlicePool();
+
+            auto poolHandle = pool.add(buf.getUnownedSlice());
+
+            auto slice = pool.getSlice(poolHandle);
+
+            newToken.setContent(slice);
+
+            // We set the location to be the same as where the original location was
+            newToken.loc = token.loc;
+
+            SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, newToken);
+            PushInputStream(preprocessor, simpleStream);
+            return;
+        }
+        else if (name == preprocessor->fileSpecialName)
+        {
+            AdvanceRawToken(preprocessor);
+
+            /// It's '__FILE__' and there isn't a __FILE__ macro definition
+            SourceManager* sourceManager = preprocessor->getSourceManager();
+
+            // Since the location can be overridden by #line directives, use the slower path to get the line number
+            const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
+
+            return;
+        }
 
         // Not a macro? Can't be an invocation.
         if (!macro)
@@ -2538,6 +2600,9 @@ TokenList preprocessSource(
     preprocessor.includeSystem = desc.includeSystem;
     preprocessor.fileSystem = desc.fileSystem;
     preprocessor.namePool = desc.namePool;
+
+    preprocessor.fileSpecialName = desc.namePool->getName("__FILE__");
+    preprocessor.lineSpecialName = desc.namePool->getName("__LINE__");
 
     auto sourceManager = desc.sourceManager;
     preprocessor.sourceManager = sourceManager;

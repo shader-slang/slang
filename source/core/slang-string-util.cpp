@@ -445,4 +445,76 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     return SLANG_OK;
 }
 
+static char _getHexChar(int v)
+{
+    return (v <= 9) ? char(v + '0') : char(v - 10 + 'A');
+}
+
+static char _getEscapedChar(char c)
+{
+    switch (c)
+    {
+        case '\b':      return 'b';
+        case '\f':      return 'f';
+        case '\n':      return 'n';
+        case '\r':      return 'r';
+        case '\a':      return 'a';
+        case '\t':      return 't';
+        case '\v':      return 'v';
+        case '\'':      return '\'';
+        case '\"':      return '"';
+        case '\\':      return '\\';
+        default:        return 0;
+    }
+}
+
+/* static */void StringUtil::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const char* start = slice.begin();
+    const char* cur = start;
+    const char*const end = slice.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+        const char escapedChar = _getEscapedChar(c);
+
+        if (escapedChar)
+        {
+            // Flush
+            if (start < cur)
+            {
+                out.append(start, end);
+            }
+            out.appendChar('\\');
+            out.appendChar(escapedChar);
+
+            start = cur + 1;
+        }
+        else if ( c < ' ' || c > 126)
+        {
+            // Flush
+            if (start < cur)
+            {
+                out.append(start, end);
+            }
+
+            char buf[5] = "\\0x0";
+
+            buf[3] = _getHexChar((int(c) >> 4) & 0xf);
+            buf[4] = _getHexChar(c & 0xf);
+
+            out.append(buf, buf + 4);
+
+            start = cur + 1;
+        }
+    }
+
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+}
+
+
 } // namespace Slang
