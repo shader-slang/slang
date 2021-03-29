@@ -175,6 +175,15 @@ namespace Slang
             }
             throw TextFormatException("Text parsing error: \'" + expectedStr + "\' expected.");
         }
+        bool Read(TokenType tokenType)
+        {
+            if( NextToken().Type == tokenType )
+            {
+                ReadToken();
+                return true;
+            }
+            throw TextFormatException("Text parsing error: unexpected '" + NextToken().Content + "'.");
+        }
 
         String ReadStringLiteral()
         {
@@ -225,6 +234,18 @@ namespace Slang
             {
                 auto next = NextToken();
                 return next.Content == token;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        bool LookAhead(TokenType tokenType)
+        {
+            if (tokenPtr < (int)tokens.getCount())
+            {
+                auto next = NextToken();
+                return next.Type == tokenType;
             }
             else
             {

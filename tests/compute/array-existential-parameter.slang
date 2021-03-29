@@ -1,7 +1,7 @@
 // Test using existential shader parameter that is an interface array.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(8)]
 interface IInterface
@@ -17,10 +17,10 @@ struct Params
     IInterface values[2];
 };
 
-//TEST_INPUT:cbuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb
+//TEST_INPUT:set gCb = new{ values: [ new MyImpl{ val: 1 } ] }
 ConstantBuffer<Params> gCb;
 
-//TEST_INPUT:cbuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb2
+//TEST_INPUT:set gCb2 = new{ values: [ new MyImpl{ val: 1 } ] }
 ConstantBuffer<Params> gCb2;
 
 [numthreads(4, 1, 1)]
