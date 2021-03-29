@@ -1,5 +1,5 @@
 //DISABLE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp 
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 
 struct IntAoa { RWStructuredBuffer<int> array[]; }
 

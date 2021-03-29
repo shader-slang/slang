@@ -67,8 +67,6 @@ struct Options
     bool useDXIL = false;
     bool onlyStartup = false;
 
-    bool useShaderObjects = false;
-
     bool performanceProfile = false;
 
     bool dontAddDefaultEntryPoints = false;

@@ -4,7 +4,7 @@
 // Provides shared implementation of public API objects for targets with
 // an immediate mode execution context.
 
-#include "render-graphics-common.h"
+#include "renderer-shared.h"
 
 namespace gfx
 {
@@ -17,7 +17,7 @@ enum class MapFlavor
     WriteDiscard,
 };
 
-class ImmediateRendererBase : public GraphicsAPIRenderer
+class ImmediateRendererBase : public RendererBase
 {
 private:
     ComPtr<IPipelineState> m_currentPipelineState;
@@ -25,11 +25,6 @@ private:
 public:
     // Immediate commands to be implemented by each target.
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        PipelineType pipelineType,
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setViewports(UInt count, const Viewport* viewports) = 0;
@@ -59,7 +54,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() = 0;
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual void unmap(IBufferResource* buffer) = 0;
-    void bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject);
+    virtual void bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject) = 0;
 
 public:
     Slang::ComPtr<ICommandQueue> m_queue;
@@ -72,8 +67,6 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createRenderPassLayout(
         const IRenderPassLayout::Desc& desc,
         IRenderPassLayout** outRenderPassLayout) override;
-
-    void _setPipelineState(IPipelineState* state);
 
     void uploadBufferData(
         IBufferResource* dst,

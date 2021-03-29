@@ -113,35 +113,10 @@ enum class BindingStyle
 class IShaderProgram: public ISlangUnknown
 {
 public:
-
-    struct KernelDesc
-    {
-        StageType   stage;
-        void const* codeBegin;
-        void const* codeEnd;
-        char const* entryPointName;
-
-        UInt getCodeSize() const { return (char const*)codeEnd - (char const*)codeBegin; }
-    };
-
     struct Desc
     {
         PipelineType        pipelineType;
-
-        KernelDesc const*   kernels;
-        Int                 kernelCount;
-
-            /// Use instead of `kernels`/`kernelCount` if loading a Slang program.
         slang::IComponentType*  slangProgram;
-
-            /// Find and return the kernel for `stage`, if present.
-        KernelDesc const* findKernel(StageType stage) const
-        {
-            for(Int ii = 0; ii < kernelCount; ++ii)
-                if(kernels[ii].stage == stage)
-                    return &kernels[ii];
-            return nullptr;
-        }
     };
 };
 #define SLANG_UUID_IShaderProgram                                                       \
@@ -222,6 +197,8 @@ public:
         NonPixelShaderResource,
         ShaderResource,
         GenericRead,
+        CopySource,
+        CopyDest,
         CountOf,
     };
 
@@ -293,6 +270,10 @@ public:
             return BindFlag::Enum(
                 BindFlag::PixelShaderResource |
                 BindFlag::NonPixelShaderResource);
+        case Usage::CopySource:
+            return BindFlag::Enum(0);
+        case Usage::CopyDest:
+            return BindFlag::Enum(0);
         default:
             return BindFlag::Enum(-1);
         }
@@ -727,109 +708,6 @@ public:
         0x8b8055df, 0x9377, 0x401d, { 0x91, 0xff, 0x3f, 0xa3, 0xbf, 0x66, 0x64, 0xf4 } \
     }
 
-
-enum class DescriptorSlotType
-{
-    Unknown,
-
-    Sampler,
-    CombinedImageSampler,
-    SampledImage,
-    StorageImage,
-    UniformTexelBuffer,
-    StorageTexelBuffer,
-    UniformBuffer,
-    ReadOnlyStorageBuffer,
-    StorageBuffer,
-    DynamicUniformBuffer,
-    DynamicStorageBuffer,
-    InputAttachment,
-    RootConstant,
-    InlineUniformBlock,
-    RayTracingAccelerationStructure,
-};
-
-class IDescriptorSetLayout : public ISlangUnknown
-{
-public:
-    struct SlotRangeDesc
-    {
-        DescriptorSlotType  type            = DescriptorSlotType::Unknown;
-        UInt                count           = 1;
-
-            /// The underlying API-specific binding/register to use for this slot range.
-            ///
-            /// A value of `-1` indicates that the implementation should
-            /// automatically compute the binding/register to use
-            /// based on the preceeding slot range(s).
-            ///
-            /// Some implementations do not have a concept of bindings/regsiters
-            /// for slot ranges, and will ignore this field.
-            ///
-        Int                 binding         = -1;
-
-        SlotRangeDesc()
-        {}
-
-        SlotRangeDesc(
-            DescriptorSlotType  type,
-            UInt                count = 1)
-            : type(type)
-            , count(count)
-        {}
-    };
-
-    struct Desc
-    {
-        UInt                    slotRangeCount  = 0;
-        SlotRangeDesc const*    slotRanges      = nullptr;
-    };
-};
-#define SLANG_UUID_IDescriptorSetLayout                                                 \
-    {                                                                                  \
-        0x9fe39a2f, 0xdf8b, 0x4690, { 0x90, 0x6a, 0x10, 0x1e, 0xed, 0xf9, 0xbe, 0xc0 } \
-    }
-
-
-class IPipelineLayout : public ISlangUnknown
-{
-public:
-    struct DescriptorSetDesc
-    {
-        IDescriptorSetLayout*    layout          = nullptr;
-
-            /// The underlying API-specific space/set number to use for this set.
-            ///
-            /// A value of `-1` indicates that the implementation should
-            /// automatically compute the space/set to use basd on
-            /// the preceeding set(s)
-            ///
-            /// Some implementations do not have a concept of space/set numbers
-            /// for descriptor sets, and will ignore this field.
-            ///
-        Int                     space = -1;
-
-        DescriptorSetDesc()
-        {}
-
-        DescriptorSetDesc(
-            IDescriptorSetLayout*    layout)
-            : layout(layout)
-        {}
-    };
-
-    struct Desc
-    {
-        UInt                        renderTargetCount   = 0;
-        UInt                        descriptorSetCount  = 0;
-        DescriptorSetDesc const*    descriptorSets      = nullptr;
-    };
-};
-#define SLANG_UUID_IPipelineLayout                                                      \
-    {                                                                                  \
-        0x9d644a9a, 0x3e6f, 0x4350, { 0xa3, 0x5a, 0xe8, 0xe3, 0xbc, 0xef, 0xb9, 0xcf } \
-    }
-
 class IResourceView : public ISlangUnknown
 {
 public:
@@ -866,42 +744,6 @@ public:
     {                                                                                 \
         0x7b6c4926, 0x884, 0x408c, { 0xad, 0x8a, 0x50, 0x3a, 0x8e, 0x23, 0x98, 0xa4 } \
     }
-
-
-class IDescriptorSet : public ISlangUnknown
-{
-public:
-    struct Flag
-    {
-        enum Enum
-        {
-            None = 0,
-            Transient = 1,
-            Persistent = 2
-        };
-    };
-    virtual SLANG_NO_THROW void SLANG_MCALL setConstantBuffer(UInt range, UInt index, IBufferResource* buffer) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setResource(UInt range, UInt index, IResourceView* view) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setSampler(UInt range, UInt index, ISamplerState* sampler) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL setCombinedTextureSampler(
-        UInt range,
-        UInt index,
-        IResourceView*   textureView,
-        ISamplerState*   sampler) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setRootConstants(
-        UInt range,
-        UInt offset,
-        UInt size,
-        void const* data) = 0;
-};
-#define SLANG_UUID_IDescriptorSet                                                     \
-    {                                                                                \
-        0x29a881ea, 0xd7, 0x41d4, { 0xa3, 0x2d, 0x6c, 0x78, 0x4b, 0x79, 0xda, 0x2e } \
-    }
-
 
 struct ShaderOffset
 {
@@ -1116,10 +958,6 @@ struct GraphicsPipelineStateDesc
 {
     IShaderProgram*      program = nullptr;
 
-    // If `pipelineLayout` is null, then layout information will be extracted
-    // from `program`, which must have been created with Slang reflection info.
-    IPipelineLayout* pipelineLayout = nullptr;
-
     IInputLayout*       inputLayout = nullptr;
     IFramebufferLayout* framebufferLayout = nullptr;
     PrimitiveType       primitiveType = PrimitiveType::Triangle;
@@ -1131,10 +969,6 @@ struct GraphicsPipelineStateDesc
 struct ComputePipelineStateDesc
 {
     IShaderProgram*  program;
-
-    // If `pipelineLayout` is null, then layout information will be extracted
-    // from `program`, which must have been created with Slang reflection info.
-    IPipelineLayout* pipelineLayout = nullptr;
 };
 
 class IPipelineState : public ISlangUnknown
@@ -1280,11 +1114,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindRootShaderObject(IShaderObject* object) = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) = 0;
-
     virtual SLANG_NO_THROW void
         SLANG_MCALL setViewports(uint32_t count, const Viewport* viewports) = 0;
     virtual SLANG_NO_THROW void
@@ -1329,11 +1158,6 @@ class IComputeCommandEncoder : public ICommandEncoder
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindRootShaderObject(IShaderObject* object) = 0;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-        IPipelineLayout* layout,
-        UInt index,
-        IDescriptorSet* descriptorSet) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
@@ -1674,16 +1498,6 @@ public:
         return queue;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) = 0;
-
-    inline ComPtr<IDescriptorSetLayout> createDescriptorSetLayout(const IDescriptorSetLayout::Desc& desc)
-    {
-        ComPtr<IDescriptorSetLayout> layout;
-        SLANG_RETURN_NULL_ON_FAIL(createDescriptorSetLayout(desc, layout.writeRef()));
-        return layout;
-    }
-
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) = 0;
 
     inline ComPtr<IShaderObject> createShaderObject(slang::TypeReflection* type)
@@ -1700,24 +1514,6 @@ public:
         ComPtr<IShaderObject> object;
         SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(program, object.writeRef()));
         return object;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) = 0;
-
-    inline ComPtr<IPipelineLayout> createPipelineLayout(const IPipelineLayout::Desc& desc)
-    {
-        ComPtr<IPipelineLayout> layout;
-        SLANG_RETURN_NULL_ON_FAIL(createPipelineLayout(desc, layout.writeRef()));
-        return layout;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag, IDescriptorSet** outDescriptorSet) = 0;
-
-    inline ComPtr<IDescriptorSet> createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flag)
-    {
-        ComPtr<IDescriptorSet> descriptorSet;
-        SLANG_RETURN_NULL_ON_FAIL(createDescriptorSet(layout, flag, descriptorSet.writeRef()));
-        return descriptorSet;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) = 0;

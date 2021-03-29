@@ -12,8 +12,20 @@
 #include "slang-com-helper.h"
 #include "../command-writer.h"
 #include "../renderer-shared.h"
-#include "../render-graphics-common.h"
 #include "../slang-context.h"
+
+#   ifdef RENDER_TEST_OPTIX
+
+// The `optix_stubs.h` header produces warnings when compiled with MSVC
+#       ifdef _MSC_VER
+#           pragma warning(disable: 4996)
+#       endif
+
+#       include <optix.h>
+#       include <optix_function_table_definition.h>
+#       include <optix_stubs.h>
+#   endif
+
 #endif
 
 namespace gfx
@@ -1025,14 +1037,6 @@ public:
                 m_writer->bindRootShaderObject(PipelineType::Compute, object);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                IPipelineLayout* layout,
-                UInt index,
-                IDescriptorSet* descriptorSet) override
-            {
-                m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 m_writer->dispatchCompute(x, y, z);
@@ -1848,27 +1852,29 @@ public:
         // If this is a specializable program, we just keep a reference to the slang program and
         // don't actually create any kernels. This program will be specialized later when we know
         // the shader object bindings.
-        if (desc.slangProgram && desc.slangProgram->getSpecializationParamCount() != 0)
+        RefPtr<CUDAShaderProgram> cudaProgram = new CUDAShaderProgram();
+        cudaProgram->slangProgram = desc.slangProgram;
+        if (desc.slangProgram->getSpecializationParamCount() != 0)
         {
-            RefPtr<CUDAShaderProgram> cudaProgram = new CUDAShaderProgram();
-            cudaProgram->slangProgram = desc.slangProgram;
             cudaProgram->layout = new CUDAProgramLayout(this, desc.slangProgram->getLayout());
             *outProgram = cudaProgram.detach();
             return SLANG_OK;
         }
 
-        if( desc.kernelCount == 0 )
+        ComPtr<ISlangBlob> kernelCode;
+        ComPtr<ISlangBlob> diagnostics;
+        auto compileResult = desc.slangProgram->getEntryPointCode(
+            (SlangInt)0, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
         {
-            return createProgramFromSlang(this, desc, outProgram);
+            // TODO: report compile error.
         }
-
-        if (desc.kernelCount != 1)
-            return SLANG_E_INVALID_ARG;
-        RefPtr<CUDAShaderProgram> cudaProgram = new CUDAShaderProgram();
-        SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&cudaProgram->cudaModule, desc.kernels[0].codeBegin));
-        SLANG_CUDA_RETURN_ON_FAIL(
-            cuModuleGetFunction(&cudaProgram->cudaKernel, cudaProgram->cudaModule, desc.kernels[0].entryPointName));
-        cudaProgram->kernelName = desc.kernels[0].entryPointName;
+        SLANG_RETURN_ON_FAIL(compileResult);
+        
+        SLANG_CUDA_RETURN_ON_FAIL(cuModuleLoadData(&cudaProgram->cudaModule, kernelCode->getBufferPointer()));
+        cudaProgram->kernelName = desc.slangProgram->getLayout()->getEntryPointByIndex(0)->getName();
+        SLANG_CUDA_RETURN_ON_FAIL(cuModuleGetFunction(
+            &cudaProgram->cudaKernel, cudaProgram->cudaModule, cudaProgram->kernelName.getBuffer()));
 
         auto slangProgram = desc.slangProgram;
         if( slangProgram )
@@ -1969,31 +1975,6 @@ public:
         SLANG_UNUSED(inputElements);
         SLANG_UNUSED(inputElementCount);
         SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flags, IDescriptorSet** outDescriptorSet) override
-    {
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(flags);
-        SLANG_UNUSED(outDescriptorSet);
         return SLANG_E_NOT_AVAILABLE;
     }
 

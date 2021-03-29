@@ -178,6 +178,7 @@
     <ClInclude Include="..\..\..\source\core\slang-blob.h" />
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />

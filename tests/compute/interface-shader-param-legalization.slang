@@ -3,7 +3,7 @@
 // Test case where concrete type implementing
 // an interface has resource-type fields nested in it.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 
 interface IModifier
 {

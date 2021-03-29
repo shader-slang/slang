@@ -20,6 +20,7 @@ using Slang::ComPtr;
 // compiler, and API.
 //
 #include "slang-gfx.h"
+#include "tools/gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "tools/platform/performance-counter.h"
 #include "source/core/slang-basic.h"
@@ -275,70 +276,24 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     diagnoseIfNeeded(diagnosticsBlob);
     SLANG_RETURN_ON_FAIL(result);
 
-    // Given a linked program (one with no unresolved external references,
-    // and no not-yet-set specialization parameters), we can request kernel
-    // code for the entry points of that program by their indices.
-    //
-    // Because Slang supports a session with multiple active code generation
-    // targets, we also need to specify the index of the target we want
-    // code for, but since we have only a single target in this application,
-    // there isn't actually a choice.
-    //
-    int targetIndex = 0;
-    //
-    // Note: it is possible to get diagnostic messages when generating kernel
-    // code, but this is not a common occurence. Most semantic errors in
-    // user code will be detected at earlier steps in this compilation flow,
-    // but there are certain errors that are currently caught during final
-    // code generation (e.g., when using a function that is specific to one
-    // target, and then requesting kernel code for another target).
-    //
-    ComPtr<ISlangBlob> vertexShaderBlob;
-    result = linkedProgram->getEntryPointCode(vertexEntryPointIndex, targetIndex, vertexShaderBlob.writeRef(), diagnosticsBlob.writeRef());
-    diagnoseIfNeeded(diagnosticsBlob);
-    SLANG_RETURN_ON_FAIL(result);
-    ComPtr<ISlangBlob> fragmentShaderBlob;
-    result = linkedProgram->getEntryPointCode(fragmentEntryPointIndex, targetIndex, fragmentShaderBlob.writeRef(), diagnosticsBlob.writeRef());
-    diagnoseIfNeeded(diagnosticsBlob);
-    SLANG_RETURN_ON_FAIL(result);
-
-    // Once kernel code has been extracted from Slang, the rest of the logic
-    // here is basically the same as in the `hello-world` example.
-
-    char const* vertexCode = (char const*) vertexShaderBlob->getBufferPointer();
-    char const* vertexCodeEnd = vertexCode + vertexShaderBlob->getBufferSize();
-
-    char const* fragmentCode = (char const*) fragmentShaderBlob->getBufferPointer();
-    char const* fragmentCodeEnd = fragmentCode + fragmentShaderBlob->getBufferSize();
-
-    gfx::IShaderProgram::KernelDesc kernelDescs[] =
-    {
-        { gfx::StageType::Vertex,    vertexCode,     vertexCodeEnd },
-        { gfx::StageType::Fragment,  fragmentCode,   fragmentCodeEnd },
-    };
-
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.pipelineType = gfx::PipelineType::Graphics;
-    programDesc.kernels = &kernelDescs[0];
-    programDesc.kernelCount = 2;
-
+    programDesc.slangProgram = linkedProgram.get();
     auto shaderProgram = device->createProgram(programDesc);
-
     outShaderProgram = shaderProgram;
     return SLANG_OK;
 }
 
 int gWindowWidth = 1024;
 int gWindowHeight = 768;
-const uint32_t kSwapchainImageCount = 2;
+static const uint32_t kSwapchainImageCount = 2;
 
 Slang::RefPtr<platform::Window> gWindow;
 Slang::ComPtr<gfx::IDevice> gDevice;
-ComPtr<gfx::IBufferResource> gConstantBuffer;
-ComPtr<gfx::IPipelineLayout> gPipelineLayout;
+ComPtr<IShaderProgram> gShaderProgram;
+ComPtr<gfx::IShaderObject> gRootObject[kSwapchainImageCount];
 ComPtr<gfx::IFramebufferLayout> gFramebufferLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
-ComPtr<gfx::IDescriptorSet> gDescriptorSet;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
 ComPtr<gfx::ISwapchain> gSwapchain;
 Slang::List<ComPtr<gfx::IFramebuffer>> gFramebuffers;
@@ -360,7 +315,6 @@ Result initialize()
     gWindow->events.sizeChanged = Slang::Action<>(this, &ShaderToyApp::windowSizeChanged);
 
     IDevice::Desc deviceDesc;
-    deviceDesc.deviceType = DeviceType::Vulkan;
     Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if(SLANG_FAILED(res)) return res;
 
@@ -372,17 +326,6 @@ Result initialize()
     ICommandQueue::Desc queueDesc = {};
     queueDesc.type = ICommandQueue::QueueType::Graphics;
     gQueue = gDevice->createCommandQueue(queueDesc);
-
-    int constantBufferSize = sizeof(Uniforms);
-
-    IBufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(constantBufferSize);
-    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
-    constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-
-    gConstantBuffer =
-        gDevice->createBufferResource(IResource::Usage::ConstantBuffer, constantBufferDesc);
-    if(!gConstantBuffer) return SLANG_FAIL;
 
     InputElementDesc inputElements[] = {
         { "POSITION", 0, Format::RG_Float32, offsetof(FullScreenTriangle::Vertex, position) },
@@ -401,39 +344,7 @@ Result initialize()
         &FullScreenTriangle::kVertices[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
 
-    ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, shaderProgram));
-
-    IDescriptorSetLayout::SlotRangeDesc slotRanges[] =
-    {
-        IDescriptorSetLayout::SlotRangeDesc(DescriptorSlotType::UniformBuffer),
-    };
-    IDescriptorSetLayout::Desc descriptorSetLayoutDesc;
-    descriptorSetLayoutDesc.slotRangeCount = 1;
-    descriptorSetLayoutDesc.slotRanges = &slotRanges[0];
-    auto descriptorSetLayout = gDevice->createDescriptorSetLayout(descriptorSetLayoutDesc);
-    if(!descriptorSetLayout) return SLANG_FAIL;
-
-    IPipelineLayout::DescriptorSetDesc descriptorSets[] =
-    {
-        IPipelineLayout::DescriptorSetDesc( descriptorSetLayout ),
-    };
-    IPipelineLayout::Desc pipelineLayoutDesc;
-    pipelineLayoutDesc.renderTargetCount = 1;
-    pipelineLayoutDesc.descriptorSetCount = 1;
-    pipelineLayoutDesc.descriptorSets = &descriptorSets[0];
-    auto pipelineLayout = gDevice->createPipelineLayout(pipelineLayoutDesc);
-    if(!pipelineLayout) return SLANG_FAIL;
-
-    gPipelineLayout = pipelineLayout;
-
-    auto descriptorSet =
-        gDevice->createDescriptorSet(descriptorSetLayout, IDescriptorSet::Flag::Transient);
-    if(!descriptorSet) return SLANG_FAIL;
-
-    descriptorSet->setConstantBuffer(0, 0, gConstantBuffer);
-
-    gDescriptorSet = descriptorSet;
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, gShaderProgram));
 
     // Create swapchain and framebuffers.
     gfx::ISwapchain::Desc swapchainDesc = {};
@@ -458,9 +369,8 @@ Result initialize()
     // Create pipeline.
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
-    desc.program = shaderProgram;
+    desc.program = gShaderProgram;
     desc.framebufferLayout = gFramebufferLayout;
-    desc.pipelineLayout = pipelineLayout;
     auto pipelineState = gDevice->createGraphicsPipelineState(desc);
     if (!pipelineState)
         return SLANG_FAIL;
@@ -511,7 +421,6 @@ void renderFrame()
     }
 
     // Update uniform buffer.
-    auto uploadEncoder = commandBuffer->encodeResourceCommands();
 
     Uniforms uniforms = {};
     {
@@ -532,9 +441,10 @@ void renderFrame()
         uniforms.iResolution[0] = float(gWindowWidth);
         uniforms.iResolution[1] = float(gWindowHeight);
 
-        uploadEncoder->uploadBufferData(gConstantBuffer, 0, sizeof(Uniforms), &uniforms);
     }
-    uploadEncoder->endEncoding();
+    gRootObject[frameIndex] = gDevice->createRootShaderObject(gShaderProgram);
+    auto constantBuffer = gRootObject[frameIndex]->getObject(ShaderOffset());
+    constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
 
     // Encode render commands.
     auto encoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
@@ -545,7 +455,7 @@ void renderFrame()
     viewport.extentY = (float)gWindowHeight;
     encoder->setViewportAndScissor(viewport);
     encoder->setPipelineState(gPipelineState);
-    encoder->setDescriptorSet(gPipelineLayout, 0, gDescriptorSet);
+    encoder->bindRootShaderObject(gRootObject[frameIndex]);
     encoder->setVertexBuffer(0, gVertexBuffer, sizeof(FullScreenTriangle::Vertex));
     encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->draw(3);

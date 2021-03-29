@@ -110,14 +110,6 @@ public:
             m_writer->bindRootShaderObject(PipelineType::Graphics, object);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            IPipelineLayout* layout,
-            UInt index,
-            IDescriptorSet* descriptorSet) override
-        {
-            m_writer->setDescriptorSet(PipelineType::Graphics, layout, index, descriptorSet);
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL
             setViewports(uint32_t count, const Viewport* viewports) override
         {
@@ -218,14 +210,6 @@ public:
             m_writer->bindRootShaderObject(PipelineType::Compute, object);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-            IPipelineLayout* layout,
-            UInt index,
-            IDescriptorSet* descriptorSet) override
-        {
-            m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
         {
             m_writer->dispatchCompute(x, y, z);
@@ -303,19 +287,12 @@ public:
             switch (name)
             {
             case CommandName::SetPipelineState:
-                m_renderer->_setPipelineState(m_writer.getObject<IPipelineState>(cmd.operands[0]));
+                m_renderer->setPipelineState(m_writer.getObject<IPipelineState>(cmd.operands[0]));
                 break;
             case CommandName::BindRootShaderObject:
                 m_renderer->bindRootShaderObject(
                     (PipelineType)cmd.operands[0],
                     m_writer.getObject<IShaderObject>(cmd.operands[1]));
-                break;
-            case CommandName::SetDescriptorSet:
-                m_renderer->setDescriptorSet(
-                    (gfx::PipelineType)cmd.operands[0],
-                    m_writer.getObject<IPipelineLayout>(cmd.operands[1]),
-                    (UInt)cmd.operands[2],
-                    m_writer.getObject<IDescriptorSet>(cmd.operands[3]));
                 break;
             case CommandName::SetFramebuffer:
                 m_renderer->setFramebuffer(m_writer.getObject<IFramebuffer>(cmd.operands[0]));
@@ -450,41 +427,8 @@ public:
 };
 }
 
-
 ImmediateRendererBase::ImmediateRendererBase() {
     m_queue = new CommandQueueImpl(this);
-}
-
-void ImmediateRendererBase::bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject)
-{
-    class ImmediateCommandEncoder : public GraphicsComputeCommandEncoderBase
-    {
-    public:
-        virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSetImpl(
-            PipelineType pipelineType,
-            IPipelineLayout* layout,
-            UInt index,
-            IDescriptorSet* descriptorSet) override
-        {
-            auto renderer = static_cast<ImmediateRendererBase*>(m_rendererBase);
-            renderer->setDescriptorSet(pipelineType, layout, index, descriptorSet);
-        }
-
-        virtual SLANG_NO_THROW void SLANG_MCALL uploadBufferDataImpl(
-            IBufferResource* buffer,
-            size_t offset,
-            size_t size,
-            void* data) override
-        {
-            auto renderer = static_cast<ImmediateRendererBase*>(m_rendererBase);
-            renderer->uploadBufferData(buffer, offset, size, data);
-        }
-    };
-    ImmediateCommandEncoder encoder;
-    encoder.m_rendererBase = this;
-    encoder.m_currentPipeline = static_cast<PipelineStateBase*>(m_currentPipelineState.get());
-    encoder.bindRootShaderObjectImpl(pipelineType, shaderObject);
-    _setPipelineState(encoder.m_currentPipeline);
 }
 
 SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createCommandQueue(
@@ -508,16 +452,6 @@ SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createRenderPassLayout(
     renderPass->init(desc);
     *outRenderPassLayout = renderPass.detach();
     return SLANG_OK;
-}
-
-void ImmediateRendererBase::_setPipelineState(IPipelineState* state)
-{
-    PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
-    if (!pipelineImpl->isSpecializable)
-    {
-        setPipelineState(state);
-    }
-    m_currentPipelineState = state;
 }
 
 void ImmediateRendererBase::uploadBufferData(

@@ -4,11 +4,13 @@
 // entry points are allowed, and work as expected.
 
 //DISABLE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE: -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+
+
 
 struct Signs
 {
@@ -33,9 +35,9 @@ ConstantBuffer<Signs> signs;
 
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:root_constants(data=[2 0 0 0 3 0 0 0]):name=stuff
+//TEST_INPUT:uniform(data=[2]):name=stuff
 	uniform Stuff  stuff,
-//TEST_INPUT:root_constants(data=[3]):onlyCPULikeBinding,name=things
+//TEST_INPUT:uniform(data=[3]):name=things
 	uniform Things things,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

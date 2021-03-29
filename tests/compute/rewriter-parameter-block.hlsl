@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE:
+//DISABLED_TEST(compute):COMPARE_COMPUTE:
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
 

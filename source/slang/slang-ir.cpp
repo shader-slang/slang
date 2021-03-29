@@ -4945,10 +4945,14 @@ namespace Slang
             {
             case kIROp_IntLit:
                 dump(context, irConst->value.intVal);
+                dump(context, " : ");
+                dumpType(context, irConst->getFullType());
                 return;
 
             case kIROp_FloatLit:
                 dump(context, irConst->value.floatVal);
+                dump(context, " : ");
+                dumpType(context, irConst->getFullType());
                 return;
 
             case kIROp_BoolLit:

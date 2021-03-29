@@ -52,16 +52,10 @@ gfx::StageType translateStage(SlangStage slangStage)
 
 void ShaderCompilerUtil::Output::set(
     PipelineType                        pipelineType,
-    const IShaderProgram::KernelDesc*   inKernelDescs,
-    Slang::Index                        kernelDescCount,
     slang::IComponentType*              inSlangProgram)
 {
-    kernelDescs.clear();
-    kernelDescs.addRange(inKernelDescs, kernelDescCount);
     slangProgram = inSlangProgram;
     desc.pipelineType = pipelineType;
-    desc.kernels = kernelDescs.getBuffer();
-    desc.kernelCount = kernelDescCount;
     desc.slangProgram = inSlangProgram;
 }
 
@@ -70,11 +64,8 @@ void ShaderCompilerUtil::Output::reset()
     {
         desc.pipelineType = PipelineType::Unknown;
         desc.slangProgram = nullptr;
-        desc.kernels = nullptr;
-        desc.kernelCount = 0;
     }
 
-    kernelDescs.clear();
     if (m_requestForKernels && session)
     {
         spDestroyCompileRequest(m_requestForKernels);
@@ -245,28 +236,7 @@ void ShaderCompilerUtil::Output::reset()
         actualEntryPoints = request.entryPoints;
     }
 
-    Slang::List<IShaderProgram::KernelDesc> kernelDescs;
-
-    Index actualEntryPointCount = actualEntryPoints.getCount();
-    for(Index ee = 0; ee < actualEntryPointCount; ++ee)
-    {
-        auto& actualEntryPoint = actualEntryPoints[ee];
-
-        size_t codeSize = 0;
-        char const* code = (char const*) spGetEntryPointCode(slangRequest, int(ee), &codeSize);
-
-        auto gfxStage = translateStage(actualEntryPoint.slangStage);
-
-        IShaderProgram::KernelDesc kernelDesc;
-        kernelDesc.stage = gfxStage;
-        kernelDesc.codeBegin = code;
-        kernelDesc.codeEnd = code + codeSize;
-        kernelDesc.entryPointName = actualEntryPoint.name;
-
-        kernelDescs.add(kernelDesc);
-    }
-
-    out.set(input.pipelineType, kernelDescs.getBuffer(), kernelDescs.getCount(), linkedSlangProgram);
+    out.set(input.pipelineType, linkedSlangProgram);
 
     return SLANG_OK;
 }
@@ -393,7 +363,6 @@ void ShaderCompilerUtil::Output::reset()
 
     // Parse the layout
     layout.parse(rand, sourceText.getBuffer());
-    layout.updateForTarget(input.target);
 
     // Setup SourceInfo
     ShaderCompileRequest::SourceInfo sourceInfo;

@@ -33,6 +33,9 @@
     <ClInclude Include="..\..\..\source\core\slang-char-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-chunked-list.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-common.h">
       <Filter>Header Files</Filter>
     </ClInclude>

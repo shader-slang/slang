@@ -83,6 +83,8 @@ class D3DUtil
         /// True if the adapter is warp
     static bool isWarp(IDXGIFactory* dxgiFactory, IDXGIAdapter* adapter);
 
+    static bool isUAVBinding(slang::BindingType bindingType);
+
 };
 
 } // renderer_test

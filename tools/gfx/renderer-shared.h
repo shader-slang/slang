@@ -99,11 +99,6 @@ protected:
     Desc m_desc;
 };
 
-Result createProgramFromSlang(
-    IDevice* device,
-    IShaderProgram::Desc const& desc,
-    IShaderProgram** outProgram);
-
 class RendererBase;
 
 typedef uint32_t ShaderComponentID;
@@ -148,7 +143,7 @@ protected:
     RendererBase* m_renderer;
     slang::TypeLayoutReflection* m_elementTypeLayout = nullptr;
     ShaderComponentID m_componentID = 0;
-
+public:
     static slang::TypeLayoutReflection* _unwrapParameterGroups(slang::TypeLayoutReflection* typeLayout)
     {
         for (;;)
@@ -279,20 +274,8 @@ public:
     bool isSpecializable = false;
     ComPtr<IShaderProgram> m_program;
 
-    ComPtr<IPipelineLayout> m_pipelineLayout;
-
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);
-};
-
-class ShaderBinary : public Slang::RefObject
-{
-public:
-    Slang::List<uint8_t> source;
-    StageType stage;
-    Slang::String entryPointName;
-    Result loadFromBlob(ISlangBlob* blob);
-    Result writeToBlob(ISlangBlob** outBlob);
 };
 
 struct ComponentKey

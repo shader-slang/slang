@@ -511,6 +511,19 @@ static bool _isMatch(IDXGIAdapter* adapter, const Slang::UnownedStringSlice& low
     return false;
 }
 
+bool D3DUtil::isUAVBinding(slang::BindingType bindingType)
+{
+    switch (bindingType)
+    {
+    case slang::BindingType::MutableRawBuffer:
+    case slang::BindingType::MutableTexture:
+    case slang::BindingType::MutableTypedBuffer:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     Slang::String lowerAdapterName = Slang::String(adapterName).toLower();

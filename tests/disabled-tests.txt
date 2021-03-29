@@ -1,0 +1,43 @@
+Tests that were disabled for Reasons
+====================================
+
+This document is intended to track tests that have been disabled temporarily so that we can understand the cause and try to re-enable them when possible.
+
+Test that don't work with shader objects in render-test
+-------------------------------------------------------
+
+The following tests were disabled because they had been running on non `-shaderobj` code paths that have since been removed.
+These tests will need to be re-enabled together with changes to the shader object implementation, or removed entirely if they no longer test useful functionality.
+
+* compute/dynamic-dispatch-12.slang
+* compute/dynamic-dispatch-13.slang
+* compute/dynamic-dispatch-14.slang
+* compute/dynamic-dispatch-bindless-texture.slang
+* compute/global-type-param2.slang
+* compute/global-type-param-array.slang
+* compute/global-type-param1.slang
+* compute/interface-shader-param-in-struct.slang
+* compute/interface-shader-param-legalization.slang
+* compute/interface-shader-param.slang
+* compute/performance-profile.slang
+* compute/rewriter-parameter-block-complex.hlsl
+* compute/unbounded-array-of-array-syntax.slang
+* compute/unbounded-array-of-array.slang
+* render/cross-compile-entry-point.slang
+* compute/interface-shader-param2.slang
+* compute/interface-shader-param3.slang
+* compute/interface-shader-param4.slang
+* compute/rewriter-parameter-block.hlsl
+* compute/tagged-union.slang
+* compute/type-param-varying.slang
+* language-feature/shader-params/global-uniform-params.slang
+* tests/serialization/serialized-module-entry-point-test.slang
+* serialization/library-entry-point/library-entry-point-test.slang
+* render/cross-compile0.hlsl
+* render/imported-parameters.hlsl
+* render/nointerpolation.hlsl
+* render/render0.hlsl
+* render/tess.hlsl
+* render/unused-discard.hlsl
+* compute/interface-param-partial-specialize.slang
+* compute/array-existential-parameter.slang

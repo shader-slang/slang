@@ -3,10 +3,10 @@
 // Test using interface tops as top-level shader parameters
 // (whether global, or on an entry point).
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 
 // First we will define some fake interfaces for testing.

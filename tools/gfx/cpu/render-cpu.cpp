@@ -269,7 +269,7 @@ public:
             totalDataSize += levelDataSize;
         }
 
-        void* textureData = malloc(totalDataSize);
+        void* textureData = malloc((size_t)totalDataSize);
         m_data = textureData;
 
         if( initData )
@@ -1167,14 +1167,6 @@ private:
                 m_writer->bindRootShaderObject(PipelineType::Compute, object);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL setDescriptorSet(
-                IPipelineLayout* layout,
-                UInt index,
-                IDescriptorSet* descriptorSet) override
-            {
-                m_writer->setDescriptorSet(PipelineType::Compute, layout, index, descriptorSet);
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 m_writer->dispatchCompute(x, y, z);
@@ -1521,14 +1513,6 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override
     {
-        if( desc.kernelCount == 0 )
-        {
-            return createProgramFromSlang(this, desc, outProgram);
-        }
-
-        if (desc.kernelCount != 1)
-            return SLANG_E_INVALID_ARG;
-
         RefPtr<CPUShaderProgram> cpuProgram = new CPUShaderProgram();
 
         // TODO: stuff?
@@ -1621,28 +1605,6 @@ public:
         SLANG_UNUSED(inputElements);
         SLANG_UNUSED(inputElementCount);
         SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL createDescriptorSetLayout(
-        const IDescriptorSetLayout::Desc& desc, IDescriptorSetLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createPipelineLayout(const IPipelineLayout::Desc& desc, IPipelineLayout** outLayout) override
-    {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outLayout);
-        return SLANG_E_NOT_AVAILABLE;
-    }
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createDescriptorSet(IDescriptorSetLayout* layout, IDescriptorSet::Flag::Enum flags, IDescriptorSet** outDescriptorSet) override
-    {
-        SLANG_UNUSED(layout);
-        SLANG_UNUSED(flags);
-        SLANG_UNUSED(outDescriptorSet);
         return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
