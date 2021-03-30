@@ -1,3 +1,6 @@
+Slang User Guide
+------------------
+
 Welcome to the Slang User's Guide, an introduction to the Slang language, compiler, and API. In this guide, you will learn:
 - Slang's language features, including those inherited from HLSL and additional language features to make it easy to work with shaders.
 - The compiler API that controls how to assemble shaders from different pieces of code, and how they are compiled for different targets.
@@ -7,7 +10,7 @@ Welcome to the Slang User's Guide, an introduction to the Slang language, compil
 Table of Contents
 ----------------
 1. [Introduction](00-introduction.md)
-2. [Getting Started](01-getting-started.md)
+2. [Getting Started](01-get-started.md)
 3. [Conventional Language Features](02-conventional-features.md)
 4. [Extended language features](03-convenience-features.md)
 5. [Interfaces and Generics](04-interfaces-generics.md)
