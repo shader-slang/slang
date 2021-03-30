@@ -1,4 +1,4 @@
-Slang User Guide
+Slang User's Guide
 ------------------
 
 Welcome to the Slang User's Guide, an introduction to the Slang language, compiler, and API. In this guide, you will learn:
