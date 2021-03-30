@@ -1963,6 +1963,7 @@ extern "C"
 
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorSetIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt index);
+    SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorRangeCount(SlangReflectionTypeLayout* typeLayout, SlangInt index);
 
     SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetSpaceOffset(SlangReflectionTypeLayout* typeLayout, SlangInt setIndex);
@@ -2578,6 +2579,12 @@ namespace slang
                 index);
         }
 
+        SlangInt getBindingRangeDescriptorRangeCount(SlangInt index)
+        {
+            return spReflectionTypeLayout_getBindingRangeDescriptorRangeCount(
+                (SlangReflectionTypeLayout*) this,
+                index);
+        }
 
         SlangInt getDescriptorSetCount()
         {

@@ -504,10 +504,17 @@ namespace renderer_test
                         val->contentVal = parseValExpr(parser);
                         return val;
                     }
+                    else if( parser.AdvanceIf("out") )
+                    {
+                        auto val = parseValExpr(parser);
+                        val->isOutput = true;
+                        return val;
+                    }
                     else
                     {
-                        // TODO: other named cases
-                        throw ShaderInputLayoutFormatException(String("Unexpected '") + parser.NextToken().Content + String("' at line") + String(parser.NextToken().Position.Line));
+                        // We assume that any other word is introducing one of the other
+                        // cases for a parse-able value.
+                        return parseVal(parser);
                     }
                 }
                 break;
