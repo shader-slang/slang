@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE:-E
 
 // First check we can define __LINE__ all C/C++ compilers test allowed this without error, behaviour
-// did change based on compiler. Visual Studio ignored the define, other compilers honored it.
+// did change based on compiler. Visual Studio ignored the define, other compilers honored it, but may give a warning (Clang).
 // Slang is going to honor it.
 
 #define __LINE__ "Hello"
@@ -19,9 +19,9 @@ __LINE__(There)
 
 #undef __LINE__
 
-// Lets try some macro pasting
-
-#define CONCAT(x, y) x ## y
+// Lets try some macro pasting. NOTE strictly speaking we need CONCAT2 (as tested on other compilers, but Slang does not indicating a preprocessor bug!)
+#define CONCAT2(x, y) x ## y
+#define CONCAT(x, y) CONCAT2(x, y)
 
 CONCAT(Thing, __LINE__)
 
