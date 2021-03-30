@@ -1,5 +1,5 @@
 ---
-layout: user-guide
+layout: documentation
 ---
 
 Introduction
