@@ -919,8 +919,8 @@ static void MaybeBeginMacroExpansion(
         Name* name = token.getName();
         PreprocessorMacro* macro = LookupMacro(preprocessor, name);
 
-        // Do we don't have a macro we are done
-        if (!macro) 
+        // Not a macro? Can't be an invocation.
+        if (!macro)
         {
             return;
         }
