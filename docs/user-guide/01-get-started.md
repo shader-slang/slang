@@ -1,3 +1,7 @@
+---
+layout: user-guide
+---
+
 # Getting Started with Slang
 
 Slang enables you to do many powerful things with shader code, including compiling shader code to many different platforms, obtaining reflection information, organizing your shader library in a modern modular fashion, controlling specialization and more. The following sections help you getting started with the basics of Slang in a simple example. We will assume Windows as the operating system, but the steps performed here are similar for other platforms.
