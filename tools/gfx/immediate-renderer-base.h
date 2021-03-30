@@ -64,6 +64,9 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc,
+        ITransientResourceHeap** outHeap) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createRenderPassLayout(
         const IRenderPassLayout::Desc& desc,
         IRenderPassLayout** outRenderPassLayout) override;

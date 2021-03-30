@@ -186,7 +186,6 @@
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-swapchain.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d\d3d-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d11\render-d3d11.h" />
-    <ClInclude Include="..\..\..\tools\gfx\d3d12\circular-resource-heap-d3d12.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\render-d3d12.h" />
     <ClInclude Include="..\..\..\tools\gfx\d3d12\resource-d3d12.h" />
@@ -197,6 +196,7 @@
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />
     <ClInclude Include="..\..\..\tools\gfx\renderer-shared.h" />
     <ClInclude Include="..\..\..\tools\gfx\simple-render-pass-layout.h" />
+    <ClInclude Include="..\..\..\tools\gfx\simple-transient-resource-heap.h" />
     <ClInclude Include="..\..\..\tools\gfx\slang-context.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h" />
@@ -211,7 +211,6 @@
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-swapchain.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d\d3d-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d11\render-d3d11.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx\d3d12\circular-resource-heap-d3d12.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\descriptor-heap-d3d12.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\render-d3d12.cpp" />
     <ClCompile Include="..\..\..\tools\gfx\d3d12\resource-d3d12.cpp" />

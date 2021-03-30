@@ -23,6 +23,7 @@ using Slang::ComPtr;
 #include "tools/gfx-util/shader-cursor.h"
 #include "tools/platform/window.h"
 #include "tools/platform/performance-counter.h"
+#include "examples/example-base/example-base.h"
 #include "source/core/slang-basic.h"
 
 #include <chrono>
@@ -54,7 +55,7 @@ const FullScreenTriangle::Vertex FullScreenTriangle::kVertices[FullScreenTriangl
 // The application itself will be encapsulated in a C++ `struct` type
 // so that it can easily scope its state without use of global variables.
 //
-struct ShaderToyApp
+struct ShaderToyApp : public WindowedAppBase
 {
 
 // The uniform data used by the shader is defined here as a simple
@@ -284,48 +285,17 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     return SLANG_OK;
 }
 
-int gWindowWidth = 1024;
-int gWindowHeight = 768;
-static const uint32_t kSwapchainImageCount = 2;
-
-Slang::RefPtr<platform::Window> gWindow;
-Slang::ComPtr<gfx::IDevice> gDevice;
 ComPtr<IShaderProgram> gShaderProgram;
 ComPtr<gfx::IShaderObject> gRootObject[kSwapchainImageCount];
-ComPtr<gfx::IFramebufferLayout> gFramebufferLayout;
 ComPtr<gfx::IPipelineState> gPipelineState;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
-ComPtr<gfx::ISwapchain> gSwapchain;
-Slang::List<ComPtr<gfx::IFramebuffer>> gFramebuffers;
-ComPtr<gfx::IRenderPassLayout> gRenderPass;
-ComPtr<gfx::ICommandQueue> gQueue;
 
 Result initialize()
 {
-    platform::WindowDesc windowDesc;
-    const char* title = "Slang Shader Toy";
-    windowDesc.title = title;
-    windowDesc.width = gWindowWidth;
-    windowDesc.height = gWindowHeight;
-    gWindow = platform::Application::createWindow(windowDesc);
-    gWindow->events.mainLoop = [this]() { renderFrame(); };
+    initializeBase("Shader Toy", 1024, 768);
     gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
     gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
     gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
-    gWindow->events.sizeChanged = Slang::Action<>(this, &ShaderToyApp::windowSizeChanged);
-
-    IDevice::Desc deviceDesc;
-    Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
-    if(SLANG_FAILED(res)) return res;
-
-    auto deviceInfo = gDevice->getDeviceInfo();
-    Slang::StringBuilder titleSb;
-    titleSb << title << " (" << deviceInfo.apiName << ": " << deviceInfo.adapterName << ")";
-    gWindow->setText(titleSb.getBuffer());
-
-    ICommandQueue::Desc queueDesc = {};
-    queueDesc.type = ICommandQueue::QueueType::Graphics;
-    gQueue = gDevice->createCommandQueue(queueDesc);
 
     InputElementDesc inputElements[] = {
         { "POSITION", 0, Format::RG_Float32, offsetof(FullScreenTriangle::Vertex, position) },
@@ -346,26 +316,6 @@ Result initialize()
 
     SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, gShaderProgram));
 
-    // Create swapchain and framebuffers.
-    gfx::ISwapchain::Desc swapchainDesc = {};
-    swapchainDesc.format = gfx::Format::RGBA_Unorm_UInt8;
-    swapchainDesc.width = gWindowWidth;
-    swapchainDesc.height = gWindowHeight;
-    swapchainDesc.imageCount = kSwapchainImageCount;
-    swapchainDesc.queue = gQueue;
-    gSwapchain = gDevice->createSwapchain(swapchainDesc, gWindow->getNativeHandle().convert<gfx::WindowHandle>());
-
-    IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
-    IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
-    IFramebufferLayout::Desc framebufferLayoutDesc;
-    framebufferLayoutDesc.renderTargetCount = 1;
-    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
-    framebufferLayoutDesc.depthStencil = &depthLayout;
-    SLANG_RETURN_ON_FAIL(
-        gDevice->createFramebufferLayout(framebufferLayoutDesc, gFramebufferLayout.writeRef()));
-
-    createSwapchainFramebuffers();
-
     // Create pipeline.
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
@@ -377,23 +327,6 @@ Result initialize()
 
     gPipelineState = pipelineState;
 
-    // Create render pass.
-    gfx::IRenderPassLayout::Desc renderPassDesc = {};
-    renderPassDesc.framebufferLayout = gFramebufferLayout;
-    renderPassDesc.renderTargetCount = 1;
-    IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-    IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
-    renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
-    renderTargetAccess.initialState = ResourceState::Undefined;
-    renderTargetAccess.finalState = ResourceState::Present;
-    depthStencilAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    depthStencilAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
-    depthStencilAccess.initialState = ResourceState::Undefined;
-    depthStencilAccess.finalState = ResourceState::DepthWrite;
-    renderPassDesc.renderTargetAccess = &renderTargetAccess;
-    renderPassDesc.depthStencilAccess = &depthStencilAccess;
-    gRenderPass = gDevice->createRenderPassLayout(renderPassDesc);
     return SLANG_OK;
 }
 
@@ -407,13 +340,9 @@ float clickMouseY = 0.0f;
 bool firstTime = true;
 platform::TimePoint startTime;
 
-void renderFrame()
+virtual void renderFrame(int frameIndex) override
 {
-    auto frameIndex = gSwapchain->acquireNextImage();
-    if (frameIndex == -1)
-        return;
-
-    auto commandBuffer = gQueue->createCommandBuffer();
+    auto commandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
     if( firstTime )
     {
         startTime = platform::PerformanceCounter::now();
@@ -438,8 +367,8 @@ void renderFrame()
         uniforms.iMouse[2] = isMouseDown ? clickMouseX : -clickMouseX;
         uniforms.iMouse[3] = isMouseClick ? clickMouseY : -clickMouseY;
         uniforms.iTime = platform::PerformanceCounter::getElapsedTimeInSeconds(startTime);
-        uniforms.iResolution[0] = float(gWindowWidth);
-        uniforms.iResolution[1] = float(gWindowHeight);
+        uniforms.iResolution[0] = float(windowWidth);
+        uniforms.iResolution[1] = float(windowHeight);
 
     }
     gRootObject[frameIndex] = gDevice->createRootShaderObject(gShaderProgram);
@@ -451,8 +380,8 @@ void renderFrame()
 
     gfx::Viewport viewport = {};
     viewport.maxZ = 1.0f;
-    viewport.extentX = (float)gWindowWidth;
-    viewport.extentY = (float)gWindowHeight;
+    viewport.extentX = (float)windowWidth;
+    viewport.extentY = (float)windowHeight;
     encoder->setViewportAndScissor(viewport);
     encoder->setPipelineState(gPipelineState);
     encoder->bindRootShaderObject(gRootObject[frameIndex]);
@@ -466,101 +395,14 @@ void renderFrame()
     gSwapchain->present();
 }
 
-void finalize()
-{
-    gQueue->wait();
-}
-
 void handleEvent(const platform::MouseEventArgs& event)
 {
     isMouseDown = ((int)event.buttons & (int)platform::ButtonState::Enum::LeftButton) != 0;
     lastMouseX = (float)event.x;
     lastMouseY = (float)event.y;
 }
-
-void createSwapchainFramebuffers()
-{
-    gFramebuffers.clear();
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
-    {
-        gfx::ITextureResource::Desc depthBufferDesc;
-        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
-        depthBufferDesc.init2D(
-            gfx::IResource::Type::Texture2D,
-            gfx::Format::D_Float32,
-            gSwapchain->getDesc().width,
-            gSwapchain->getDesc().height,
-            0);
-
-        ComPtr<gfx::ITextureResource> depthBufferResource = gDevice->createTextureResource(
-            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
-        ComPtr<gfx::ITextureResource> colorBuffer;
-        gSwapchain->getImage(i, colorBuffer.writeRef());
-
-        gfx::IResourceView::Desc colorBufferViewDesc;
-        memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-        colorBufferViewDesc.format = gSwapchain->getDesc().format;
-        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-        ComPtr<gfx::IResourceView> rtv =
-            gDevice->createTextureView(colorBuffer.get(), colorBufferViewDesc);
-
-        gfx::IResourceView::Desc depthBufferViewDesc;
-        memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
-        depthBufferViewDesc.format = gfx::Format::D_Float32;
-        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
-        ComPtr<gfx::IResourceView> dsv =
-            gDevice->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
-
-        gfx::IFramebuffer::Desc framebufferDesc;
-        framebufferDesc.renderTargetCount = 1;
-        framebufferDesc.depthStencilView = dsv.get();
-        framebufferDesc.renderTargetViews = rtv.readRef();
-        framebufferDesc.layout = gFramebufferLayout;
-        ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
-        gFramebuffers.add(frameBuffer);
-    }
-}
-
-void windowSizeChanged()
-{
-    // Wait for the GPU to finish.
-    gQueue->wait();
-
-    auto clientRect = gWindow->getClientRect();
-    if (clientRect.width > 0 && clientRect.height > 0)
-    {
-        // Free all framebuffers before resizing swapchain.
-        gFramebuffers = decltype(gFramebuffers)();
-
-        // Resize swapchain.
-        if (gSwapchain->resize(clientRect.width, clientRect.height) == SLANG_OK)
-        {
-            // Recreate framebuffers for each swapchain back buffer image.
-            createSwapchainFramebuffers();
-            gWindowWidth = clientRect.width;
-            gWindowHeight = clientRect.height;
-        }
-    }
-}
-
 };
 
-int innerMain()
-{
-    ShaderToyApp app;
-
-    if (SLANG_FAILED(app.initialize()))
-    {
-        return -1;
-    }
-
-    platform::Application::run(app.gWindow);
-
-    app.finalize();
-
-    return 0;
-}
-
-PLATFORM_UI_MAIN(innerMain)
+// This macro instantiates an appropriate main function to
+// run the application defined above.
+PLATFORM_UI_MAIN(innerMain<ShaderToyApp>)

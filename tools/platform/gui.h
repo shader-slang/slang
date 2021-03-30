@@ -19,7 +19,7 @@ struct GUI : Slang::RefObject
     ~GUI();
 
     void beginFrame();
-    void endFrame(gfx::IFramebuffer* framebuffer);
+    void endFrame(gfx::ITransientResourceHeap* transientHeap, gfx::IFramebuffer* framebuffer);
 
 private:
     Slang::ComPtr<gfx::IDevice> device;
