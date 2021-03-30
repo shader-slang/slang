@@ -15,17 +15,15 @@
       }
       #leftColumn {
           float: left;
-          width: 20%;
+          width: 25%;
           height: 100%;
-	  box-sizing: border-box;
           overflow: auto;
       }
       #rightColumn {
           float: left;
-          width: 80%;
+          width: 75%;
           height: 100%;
           overflow: auto;
-	  box-sizing: border-box;
       }
     </style>
 {% seo %}
@@ -33,15 +31,19 @@
 
   <body>
     <div id="container">
-      <div class="inner">
-
-        <header>
-          <h1>Slang User's Guide</h1>
-        </header>
-        <hr>
+      <div class="inner" style="padding:40px;width:1000px">
         <div id="dividerContainer">
             <div id="leftColumn">
-              Table of Contents
+		    <a href="/slang/user-guide/00-introduction.html">Slang User's Guide</a>
+		    <ol>
+			  <li><a href="/slang/user-guide/00-introduction.html">Introduction</a></li>
+			  <li><a href="/slang/user-guide/01-get-started.html">Getting Started</a></li>
+			  <li><a href="/slang/user-guide/02-conventional-features.html">Conventional Language Features</a></li>
+			  <li><a href="/slang/user-guide/03-convenience-features.html">Extended language features</a></li>
+			  <li><a href="/slang/user-guide/04-interfaces-generics.html">Interfaces and Generics</a></li>
+			  <li><a href="/slang/user-guide/05-compiling.html">Compiling Code with Slang</a></li>
+			  <li><a href="/slang/user-guide/06-targets.html">Supported Compilation Targets</a></li>
+		   </ol>
             </div>
             <div id="rightColumn">
               <section id="main_content">   
