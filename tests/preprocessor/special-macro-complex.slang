@@ -1,23 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE:-E
 
 // First check we can define __LINE__ all C/C++ compilers test allowed this without error, behaviour
-// did change based on compiler. Visual Studio ignored the define, other compilers honored it, but may give a warning (Clang).
-// Slang is going to honor it.
-
-#define __LINE__ "Hello"
-
-__LINE__
-
-#undef __LINE__
-
-__LINE__
-
-#define __LINE__(x) "Is" x
-
-__LINE__("Anybody")
-__LINE__(There)
-
-#undef __LINE__
+// did change based on compiler. Visual Studio ignored the define. 
+// Other compilers (Clang,Gcc) honored it, they may give a warning. Once it has been defined, doing #undef actually *disables* builtin macro.
 
 // Lets try some macro pasting. NOTE strictly speaking we need CONCAT2 (as tested on other compilers, but Slang does not indicating a preprocessor bug!)
 #define CONCAT2(x, y) x ## y
@@ -27,14 +12,14 @@ CONCAT(Thing, __LINE__)
 
 // Lets see if works okay in conditionals
 
-#if __LINE__ == 30
+#if __LINE__ == 15
 Yeppers
 #else
 Nopers
 #endif
 
 // Lets try a paste in a conditional
-#if CONCAT(__LINE__, __LINE__) == 3737
+#if CONCAT(__LINE__, __LINE__) == 2222
 PasteConditional
 #endif
 

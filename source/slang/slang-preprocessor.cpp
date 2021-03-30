@@ -159,6 +159,8 @@ enum class PreprocessorMacroFlavor
     ObjectLike,
     FunctionArg,
     FunctionLike,
+    Line,                   /// 'special' macro __LINE__
+    File,                   /// 'speical' macro __FILE__
 };
 
 // In the current design (which we may want to re-consider),
@@ -167,6 +169,9 @@ enum class PreprocessorMacroFlavor
 // can be "played back."
 struct PreprocessorMacro
 {
+    // The flavor of macro
+    PreprocessorMacroFlavor     flavor;
+
     // The name under which the macro was `#define`d
     NameLoc                     nameAndLoc;
 
@@ -175,9 +180,6 @@ struct PreprocessorMacro
 
     // The tokens that make up the macro body
     TokenList                   tokens;
-
-    // The flavor of macro
-    PreprocessorMacroFlavor     flavor;
 
     // The environment in which this macro needs to be expanded.
     // For ordinary macros this will be the global environment,
@@ -231,11 +233,6 @@ struct Preprocessor
 
         /// Source manager to use when loading source files
     SourceManager*                          sourceManager = nullptr;
-
-        /// Holds __LINE__ as a name
-    Name*                                   lineSpecialName = nullptr;
-        /// Holds __FILE__ as a name
-    Name*                                   fileSpecialName = nullptr;
 
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
@@ -904,11 +901,104 @@ static void MaybeBeginMacroExpansion(
         Name* name = token.getName();
         PreprocessorMacro* macro = LookupMacro(preprocessor, name);
 
-        // Do we don't have a user defined macro, we can't expand using regular macro logic
-        if (macro == nullptr)
+        // Do we don't have a macro we are done
+        if (!macro) 
         {
-            // We may have a 'special macro' like __LINE__ or __FILE__, if so process that
-            if (name == preprocessor->lineSpecialName || name == preprocessor->fileSpecialName)
+            return;
+        }
+
+        // If the macro is busy (already being expanded),
+        // don't try to trigger recursive expansion
+        if (_isMacroBusy(macro, GetCurrentEnvironment(preprocessor)))
+            return;
+
+        // We might already have looked at this token,
+        // and need to suppress expansion
+        if (token.flags & TokenFlag::SuppressMacroExpansion)
+            return;
+
+        // A function-style macro invocation should only match
+        // if the token *after* the identifier is `(`. This
+        // requires more lookahead than we usually have/need
+
+        switch (macro->flavor)
+        {
+            case PreprocessorMacroFlavor::FunctionLike:
+            {
+                // Consume the token that (possibly) triggered macro expansion
+                AdvanceRawToken(preprocessor);
+
+                // Look at the next token, and see if it is an opening `(`
+                // that indicates we should actually expand a macro.
+                if(PeekRawTokenType(preprocessor) != TokenType::LParent)
+                {
+                    // In this case, we are in a bit of a mess, because we have
+                    // consumed the token that named the macro, but we need to
+                    // make sure that token (and not whatever came after it)
+                    // gets returned to the user.
+                    //
+                    // To work around this we will construct a short-lived input
+                    // stream just to handle that one token, and also set
+                    // a flag on the token to keep us from doing this logic again.
+
+                    token.flags |= TokenFlag::SuppressMacroExpansion;
+
+                    SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, token);
+                    PushInputStream(preprocessor, simpleStream);
+                    return;
+                }
+
+                MacroExpansion* expansion = new MacroExpansion();
+                initializeMacroExpansion(preprocessor, expansion, macro);
+
+                // Consume the opening `(`
+                Token leftParen = AdvanceRawToken(preprocessor);
+
+                // Parse the arguments to the macro invocation
+                Index argCount = _parseMacroArgs(preprocessor, macro, expansion);
+
+                // Expect a closing ')'
+                if(PeekRawTokenType(preprocessor) == TokenType::RParent)
+                {
+                    AdvanceRawToken(preprocessor);
+                }
+                else
+                {
+                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
+                }
+
+                // If we didn't parse the expected number of arguments,
+                // then diagnose an error and do not attempt expansion.
+                //
+                // TODO: This check will need to be updated for variadic macros.
+                //
+                const Index paramCount = Index(macro->params.getCount());
+                if (argCount != paramCount)
+                {
+                    GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
+                    return;
+                }
+
+                // Now that the arguments have been parsed and validated,
+                // we are ready to proceed with expansion of the macro body.
+                //
+                pushMacroExpansion(preprocessor, expansion);
+                break;
+            }
+            case PreprocessorMacroFlavor::FunctionArg:
+            case PreprocessorMacroFlavor::ObjectLike:
+            {
+                // Consume the token that triggered macro expansion
+                AdvanceRawToken(preprocessor);
+
+                // Object-like macros are the easy case.
+                MacroExpansion* expansion = new MacroExpansion();
+                initializeMacroExpansion(preprocessor, expansion, macro);
+                pushMacroExpansion(preprocessor, expansion);
+                break;
+            }
+            case PreprocessorMacroFlavor::Line:
+            case PreprocessorMacroFlavor::File:
             {
                 AdvanceRawToken(preprocessor);
 
@@ -918,9 +1008,9 @@ static void MaybeBeginMacroExpansion(
                 const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
 
                 Token newToken;
-            
+
                 StringBuilder buf;
-                if (name == preprocessor->lineSpecialName)
+                if (macro->flavor == PreprocessorMacroFlavor::Line)
                 {
                     newToken.type = TokenType::IntegerLiteral;
                     buf << humaneSourceLoc.line;
@@ -950,94 +1040,9 @@ static void MaybeBeginMacroExpansion(
 
                 // Add to the start of the stream
                 SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, newToken);
-                PushInputStream(preprocessor, simpleStream);    
-            }
-            return;
-        }
-
-        // If the macro is busy (already being expanded),
-        // don't try to trigger recursive expansion
-        if (_isMacroBusy(macro, GetCurrentEnvironment(preprocessor)))
-            return;
-
-        // We might already have looked at this token,
-        // and need to suppress expansion
-        if (token.flags & TokenFlag::SuppressMacroExpansion)
-            return;
-
-        // A function-style macro invocation should only match
-        // if the token *after* the identifier is `(`. This
-        // requires more lookahead than we usually have/need
-        if (macro->flavor == PreprocessorMacroFlavor::FunctionLike)
-        {
-            // Consume the token that (possibly) triggered macro expansion
-            AdvanceRawToken(preprocessor);
-
-            // Look at the next token, and see if it is an opening `(`
-            // that indicates we should actually expand a macro.
-            if(PeekRawTokenType(preprocessor) != TokenType::LParent)
-            {
-                // In this case, we are in a bit of a mess, because we have
-                // consumed the token that named the macro, but we need to
-                // make sure that token (and not whatever came after it)
-                // gets returned to the user.
-                //
-                // To work around this we will construct a short-lived input
-                // stream just to handle that one token, and also set
-                // a flag on the token to keep us from doing this logic again.
-
-                token.flags |= TokenFlag::SuppressMacroExpansion;
-
-                SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, token);
                 PushInputStream(preprocessor, simpleStream);
-                return;
+                break;
             }
-
-            MacroExpansion* expansion = new MacroExpansion();
-            initializeMacroExpansion(preprocessor, expansion, macro);
-
-            // Consume the opening `(`
-            Token leftParen = AdvanceRawToken(preprocessor);
-
-            // Parse the arguments to the macro invocation
-            Index argCount = _parseMacroArgs(preprocessor, macro, expansion);
-
-            // Expect a closing ')'
-            if(PeekRawTokenType(preprocessor) == TokenType::RParent)
-            {
-                AdvanceRawToken(preprocessor);
-            }
-            else
-            {
-                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
-            }
-
-            // If we didn't parse the expected number of arguments,
-            // then diagnose an error and do not attempt expansion.
-            //
-            // TODO: This check will need to be updated for variadic macros.
-            //
-            const Index paramCount = Index(macro->params.getCount());
-            if (argCount != paramCount)
-            {
-                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
-                return;
-            }
-
-            // Now that the arguments have been parsed and validated,
-            // we are ready to proceed with expansion of the macro body.
-            //
-            pushMacroExpansion(preprocessor, expansion);
-        }
-        else
-        {
-            // Consume the token that triggered macro expansion
-            AdvanceRawToken(preprocessor);
-
-            // Object-like macros are the easy case.
-            MacroExpansion* expansion = new MacroExpansion();
-            initializeMacroExpansion(preprocessor, expansion, macro);
-            pushMacroExpansion(preprocessor, expansion);
         }
     }
 }
@@ -1959,8 +1964,18 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     PreprocessorMacro* oldMacro = LookupMacro(&context->preprocessor->globalEnv, name);
     if (oldMacro)
     {
-        GetSink(context)->diagnose(nameToken.loc, Diagnostics::macroRedefinition, name);
-        GetSink(context)->diagnose(oldMacro->getLoc(), Diagnostics::seePreviousDefinitionOf, name);
+        auto sink = GetSink(context);
+
+        if (oldMacro->flavor == PreprocessorMacroFlavor::Line ||
+            oldMacro->flavor == PreprocessorMacroFlavor::File)
+        {
+            sink->diagnose(nameToken.loc, Diagnostics::builtinMacroRedefinition, name);
+        }
+        else
+        {
+            sink->diagnose(nameToken.loc, Diagnostics::macroRedefinition, name);
+            sink->diagnose(oldMacro->getLoc(), Diagnostics::seePreviousDefinitionOf, name);
+        }
 
         DestroyMacro(context->preprocessor, oldMacro);
     }
@@ -2591,8 +2606,30 @@ TokenList preprocessSource(
     preprocessor.fileSystem = desc.fileSystem;
     preprocessor.namePool = desc.namePool;
 
-    preprocessor.fileSpecialName = desc.namePool->getName("__FILE__");
-    preprocessor.lineSpecialName = desc.namePool->getName("__LINE__");
+    // Add 'special' macros
+    {
+        auto namePool = desc.namePool;
+
+        {
+            auto name = namePool->getName("__FILE__");
+
+            PreprocessorMacro* macro = CreateMacro(&preprocessor);
+            macro->flavor = PreprocessorMacroFlavor::File;
+            macro->nameAndLoc = NameLoc(name);
+
+            preprocessor.globalEnv.macros[name] = macro;
+        }
+
+        {
+            auto name = namePool->getName("__LINE__");
+
+            PreprocessorMacro* macro = CreateMacro(&preprocessor);
+            macro->flavor = PreprocessorMacroFlavor::Line;
+            macro->nameAndLoc = NameLoc(name);
+
+            preprocessor.globalEnv.macros[name] = macro;
+        }
+    }
 
     auto sourceManager = desc.sourceManager;
     preprocessor.sourceManager = sourceManager;
