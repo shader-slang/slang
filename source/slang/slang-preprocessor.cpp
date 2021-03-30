@@ -136,7 +136,7 @@ struct MacroExpansion : PretokenizedInputStream
     // The macro we will expand
     PreprocessorMacro*  macro;
 
-        /// State for marking `macro` as busy in thsi expansion
+        /// State for marking `macro` as busy in this expansion
     BusyMacro busy;
 
     // Environment for macro expansion.
@@ -234,9 +234,13 @@ struct Preprocessor
         /// Source manager to use when loading source files
     SourceManager*                          sourceManager = nullptr;
 
+        /// Stores the initiating macro source location.
+    SourceLoc                               initiatingMacroSourceLoc;
+
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 };
+
 
 
 static Token AdvanceToken(Preprocessor* preprocessor);
@@ -499,6 +503,7 @@ static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, Name
     return NULL;
 }
 
+
 static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor)
 {
     // The environment we will use for looking up a macro is associated
@@ -531,6 +536,12 @@ static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor
         return inputStream->environment;
     }
 }
+
+static bool _isInMacroExpansion(Preprocessor* preprocessor)
+{
+    return preprocessor->inputStream->environment->busyMacros != nullptr;
+}
+
 
 static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, Name* name)
 {
@@ -638,8 +649,15 @@ static void initializeMacroExpansion(
 
 static void pushMacroExpansion(
     Preprocessor*   preprocessor,
-    MacroExpansion* expansion)
+    MacroExpansion* expansion,
+    SourceLoc       initiatingMacroSourceLoc)
 {
+    // Only set the initiating if outside of a macro expansion
+    if (!_isInMacroExpansion(preprocessor))
+    {
+        preprocessor->initiatingMacroSourceLoc = initiatingMacroSourceLoc;
+    }
+
     // Before pushing a macro as an input stream,
     // we need to set the appropraite "busy" state
     // that will be used during expansions of that
@@ -982,7 +1000,7 @@ static void MaybeBeginMacroExpansion(
                 // Now that the arguments have been parsed and validated,
                 // we are ready to proceed with expansion of the macro body.
                 //
-                pushMacroExpansion(preprocessor, expansion);
+                pushMacroExpansion(preprocessor, expansion, token.loc);
                 break;
             }
             case PreprocessorMacroFlavor::FunctionArg:
@@ -994,18 +1012,26 @@ static void MaybeBeginMacroExpansion(
                 // Object-like macros are the easy case.
                 MacroExpansion* expansion = new MacroExpansion();
                 initializeMacroExpansion(preprocessor, expansion, macro);
-                pushMacroExpansion(preprocessor, expansion);
+                pushMacroExpansion(preprocessor, expansion, token.loc);
                 break;
             }
             case PreprocessorMacroFlavor::Line:
             case PreprocessorMacroFlavor::File:
             {
+                const SourceLoc loc = _isInMacroExpansion(preprocessor) ? preprocessor->initiatingMacroSourceLoc : token.loc;
+
+                if (!loc.isValid())
+                {
+                    // If we don't have a valid source location, don't expand
+                    return;
+                }
+
                 AdvanceRawToken(preprocessor);
 
                 SourceManager* sourceManager = preprocessor->getSourceManager();
 
                 // Since the location can be overridden by #line directives, use the slower path to get the line number
-                const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
+                const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(loc);
 
                 Token newToken;
 
@@ -2542,7 +2568,9 @@ Result findMacroValue(
 
     MacroExpansion* expansion = new MacroExpansion();
     initializeMacroExpansion(preprocessor, expansion, macro);
-    pushMacroExpansion(preprocessor, expansion);
+
+    // Don't set macro expansion location
+    pushMacroExpansion(preprocessor, expansion, SourceLoc());
 
     String value;
     for(bool first = true;;first = false)
