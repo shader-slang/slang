@@ -904,66 +904,56 @@ static void MaybeBeginMacroExpansion(
         Name* name = token.getName();
         PreprocessorMacro* macro = LookupMacro(preprocessor, name);
 
-        if (name == preprocessor->lineSpecialName || name == preprocessor->fileSpecialName)
+        // Do we don't have a user defined macro, we can't expand using regular macro logic
+        if (macro == nullptr)
         {
-            AdvanceRawToken(preprocessor);
+            // We may have a 'special macro' like __LINE__ or __FILE__, if so process that
+            if (name == preprocessor->lineSpecialName || name == preprocessor->fileSpecialName)
+            {
+                AdvanceRawToken(preprocessor);
 
-            SourceManager* sourceManager = preprocessor->getSourceManager();
+                SourceManager* sourceManager = preprocessor->getSourceManager();
 
-            // Since the location can be overridden by #line directives, use the slower path to get the line number
-            const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
+                // Since the location can be overridden by #line directives, use the slower path to get the line number
+                const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
 
-            Token newToken;
+                Token newToken;
             
-            StringBuilder buf;
-            if (name == preprocessor->lineSpecialName)
-            {
-                newToken.type = TokenType::IntegerLiteral;
-                buf << humaneSourceLoc.line;
+                StringBuilder buf;
+                if (name == preprocessor->lineSpecialName)
+                {
+                    newToken.type = TokenType::IntegerLiteral;
+                    buf << humaneSourceLoc.line;
+                }
+                else
+                {
+                    // We need to escape to a string
+                    newToken.type = TokenType::StringLiteral;
+
+                    buf.appendChar('"');
+                    StringUtil::appendEscaped(humaneSourceLoc.pathInfo.foundPath.getUnownedSlice(), buf);
+                    buf.appendChar('"');
+                }
+
+                // We are going to keep the actual text in the slice pool, so it stays in scope
+                // and if the value appears multiple times, it will shared
+                auto& pool = sourceManager->getStringSlicePool();
+
+                auto poolHandle = pool.add(buf.getUnownedSlice());
+
+                auto slice = pool.getSlice(poolHandle);
+
+                newToken.setContent(slice);
+
+                // We set the location to be the same as where the original location was
+                newToken.loc = token.loc;
+
+                // Add to the start of the stream
+                SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, newToken);
+                PushInputStream(preprocessor, simpleStream);    
             }
-            else
-            {
-                // We need to escape to a string
-                newToken.type = TokenType::StringLiteral;
-
-                buf.appendChar('"');
-                StringUtil::appendEscaped(humaneSourceLoc.pathInfo.foundPath.getUnownedSlice(), buf);
-                buf.appendChar('"');
-            }
-
-            // We are going to keep the actual text in the slice pool, so it stays in scope
-            // and if the value appears multiple times, it will shared
-            auto& pool = sourceManager->getStringSlicePool();
-
-            auto poolHandle = pool.add(buf.getUnownedSlice());
-
-            auto slice = pool.getSlice(poolHandle);
-
-            newToken.setContent(slice);
-
-            // We set the location to be the same as where the original location was
-            newToken.loc = token.loc;
-
-            SimpleTokenInputStream* simpleStream = createSimpleInputStream(preprocessor, newToken);
-            PushInputStream(preprocessor, simpleStream);
             return;
         }
-        else if (name == preprocessor->fileSpecialName)
-        {
-            AdvanceRawToken(preprocessor);
-
-            /// It's '__FILE__' and there isn't a __FILE__ macro definition
-            SourceManager* sourceManager = preprocessor->getSourceManager();
-
-            // Since the location can be overridden by #line directives, use the slower path to get the line number
-            const HumaneSourceLoc humaneSourceLoc = sourceManager->getHumaneLoc(token.loc);
-
-            return;
-        }
-
-        // Not a macro? Can't be an invocation.
-        if (!macro)
-            return;
 
         // If the macro is busy (already being expanded),
         // don't try to trigger recursive expansion
