@@ -2,4 +2,4 @@ result code = 0
 standard error = {
 }
 standard output = {
-5 "tests/preprocessor/line-simple.slang" }
+5 "tests/preprocessor/special-macro-simple.slang" }

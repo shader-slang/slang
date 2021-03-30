@@ -1557,6 +1557,8 @@ static void _outputPreprocessorTokens(const TokenList& toks, ISlangWriter* write
         buf.appendChar(' ');
     }
 
+    buf.appendChar('\n');
+
     writer->write(buf.getBuffer(), buf.getLength());
 }
 
