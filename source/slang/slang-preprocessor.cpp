@@ -159,9 +159,14 @@ enum class PreprocessorMacroFlavor
     ObjectLike,
     FunctionArg,
     FunctionLike,
-    Line,                   /// 'special' macro __LINE__
-    File,                   /// 'speical' macro __FILE__
+    Line,                   /// builtin macro __LINE__
+    File,                   /// builtin macro __FILE__
 };
+
+SLANG_FORCE_INLINE bool isBuiltinMacro(PreprocessorMacroFlavor flavor)
+{
+    return flavor == PreprocessorMacroFlavor::Line || flavor == PreprocessorMacroFlavor::File;
+}
 
 // In the current design (which we may want to re-consider),
 // a macro is a specialized flavor of input stream, that
@@ -1992,8 +1997,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     {
         auto sink = GetSink(context);
 
-        if (oldMacro->flavor == PreprocessorMacroFlavor::Line ||
-            oldMacro->flavor == PreprocessorMacroFlavor::File)
+        if (isBuiltinMacro(oldMacro->flavor))
         {
             sink->diagnose(nameToken.loc, Diagnostics::builtinMacroRedefinition, name);
         }
@@ -2634,25 +2638,19 @@ TokenList preprocessSource(
     preprocessor.fileSystem = desc.fileSystem;
     preprocessor.namePool = desc.namePool;
 
-    // Add 'special' macros
+    // Add builtin macros
     {
         auto namePool = desc.namePool;
 
+        const char*const builtinNames[] = { "__FILE__", "__LINE__" };
+        const PreprocessorMacroFlavor builtinFlavors[] = { PreprocessorMacroFlavor::File, PreprocessorMacroFlavor::Line };
+
+        for (Index i = 0; i < SLANG_COUNT_OF(builtinNames); i++)
         {
-            auto name = namePool->getName("__FILE__");
+            auto name = namePool->getName(builtinNames[i]);
 
             PreprocessorMacro* macro = CreateMacro(&preprocessor);
-            macro->flavor = PreprocessorMacroFlavor::File;
-            macro->nameAndLoc = NameLoc(name);
-
-            preprocessor.globalEnv.macros[name] = macro;
-        }
-
-        {
-            auto name = namePool->getName("__LINE__");
-
-            PreprocessorMacro* macro = CreateMacro(&preprocessor);
-            macro->flavor = PreprocessorMacroFlavor::Line;
+            macro->flavor = builtinFlavors[i];
             macro->nameAndLoc = NameLoc(name);
 
             preprocessor.globalEnv.macros[name] = macro;
