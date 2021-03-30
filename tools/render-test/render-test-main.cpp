@@ -334,6 +334,17 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
+    SlangResult assignArray(ShaderCursor const& dstCursor, ShaderInputLayout::ArrayVal* srcVal)
+    {
+        Index elementCounter = 0;
+        for(auto elementVal : srcVal->vals)
+        {
+            Index elementIndex = elementCounter++;
+            SLANG_RETURN_ON_FAIL(assign(dstCursor[elementIndex], elementVal));
+        }
+        return SLANG_OK;
+    }
+
     SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
     {
         auto& entryCursor = dstCursor;
@@ -359,6 +370,9 @@ struct AssignValsFromLayoutContext
 
         case ShaderInputType::Aggregate:
             return assignAggregate(dstCursor, (ShaderInputLayout::AggVal*) srcVal.Ptr());
+
+        case ShaderInputType::Array:
+            return assignArray(dstCursor, (ShaderInputLayout::ArrayVal*) srcVal.Ptr());
 
         default:
             assert(!"Unhandled type");

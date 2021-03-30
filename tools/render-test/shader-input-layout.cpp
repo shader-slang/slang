@@ -381,6 +381,142 @@ namespace renderer_test
             }
         }
 
+        RefPtr<ShaderInputLayout::Val> parseNumericValExpr(TokenReader& parser, bool negate = false)
+        {
+            switch(parser.NextToken().Type)
+            {
+            case TokenType::IntLiteral:
+                {
+                    RefPtr<ShaderInputLayout::DataVal> val = new ShaderInputLayout::DataVal;
+
+                    uint32_t value = parser.ReadUInt();
+                    if(negate) value = uint32_t(-int32_t(value));
+                    val->bufferData.add(value);
+
+                    return val;
+                }
+                break;
+
+            case TokenType::DoubleLiteral:
+                {
+                    RefPtr<ShaderInputLayout::DataVal> val = new ShaderInputLayout::DataVal;
+
+                    float floatValue = parser.ReadFloat();
+                    if(negate) floatValue = -floatValue;
+
+                    uint32_t value = 0;
+                    memcpy(&value, &floatValue, sizeof(floatValue));
+                    val->bufferData.add(value);
+
+                    return val;
+                }
+                break;
+
+            default:
+                throw ShaderInputLayoutFormatException(String("Expected a numeric literal but found '") + parser.NextToken().Content + String("' at line") + String(parser.NextToken().Position.Line));
+            }
+        }
+
+        String parseTypeName(TokenReader& parser)
+        {
+            return parser.ReadWord();
+        }
+
+        RefPtr<ShaderInputLayout::Val> parseValExpr(TokenReader& parser)
+        {
+            switch(parser.NextToken().Type)
+            {
+            case TokenType::OpSub:
+                {
+                    parser.ReadToken();
+                    return parseNumericValExpr(parser, true);
+                }
+                break;
+
+            case TokenType::IntLiteral:
+            case TokenType::DoubleLiteral:
+                return parseNumericValExpr(parser);
+
+            case TokenType::LBrace:
+                {
+                    // aggregate
+                    parser.ReadToken();
+                    RefPtr<ShaderInputLayout::AggVal> val = new ShaderInputLayout::AggVal;
+
+                    while( !parser.IsEnd() && !parser.LookAhead(TokenType::RBrace) )
+                    {
+                        ShaderInputLayout::Field field;
+
+                        if( parser.LookAhead(TokenType::Identifier) && parser.NextToken(1).Type == TokenType::Colon )
+                        {
+                            field.name = parser.ReadWord();
+                            parser.Read(TokenType::Colon);
+                        }
+
+                        field.val = parseValExpr(parser);
+
+                        val->fields.add(field);
+
+                        if(parser.LookAhead(TokenType::RBrace))
+                            break;
+
+                        parser.Read(TokenType::Comma);
+                    }
+                    parser.Read(TokenType::RBrace);
+
+
+                    return val;
+                }
+                break;
+
+            case TokenType::LBracket:
+                {
+                    // array
+                    parser.ReadToken();
+                    RefPtr<ShaderInputLayout::ArrayVal> val = new ShaderInputLayout::ArrayVal;
+
+                    while( !parser.IsEnd() && !parser.LookAhead(TokenType::RBracket) )
+                    {
+                        val->vals.add(parseValExpr(parser));
+
+                        if(parser.LookAhead(TokenType::RBracket))
+                            break;
+
+                        parser.Read(TokenType::Comma);
+                    }
+                    parser.Read(TokenType::RBracket);
+
+                    return val;
+                }
+                break;
+
+            case TokenType::Identifier:
+                {
+                    if( parser.AdvanceIf("new") )
+                    {
+                        RefPtr<ShaderInputLayout::ObjectVal> val = new ShaderInputLayout::ObjectVal;
+
+                        if( parser.NextToken().Type == TokenType::Identifier )
+                        {
+                            val->typeName = parseTypeName(parser);
+                        }
+
+                        val->contentVal = parseValExpr(parser);
+                        return val;
+                    }
+                    else
+                    {
+                        // TODO: other named cases
+                        throw ShaderInputLayoutFormatException(String("Unexpected '") + parser.NextToken().Content + String("' at line") + String(parser.NextToken().Position.Line));
+                    }
+                }
+                break;
+
+            default:
+                throw ShaderInputLayoutFormatException(String("Unexpected '") + parser.NextToken().Content + String("' at line") + String(parser.NextToken().Position.Line));
+            }
+        }
+
         RefPtr<ShaderInputLayout::Val> parseVal(TokenReader& parser)
         {
             auto word = parser.NextToken().Content;
@@ -507,6 +643,44 @@ namespace renderer_test
             parser.ReadToken();
         }
 
+        String parseName(TokenReader& parser)
+        {
+            StringBuilder builder;
+
+            Token nameToken = parser.ReadToken();
+            if (nameToken.Type != TokenType::Identifier)
+            {
+                throw ShaderInputLayoutFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
+            }
+            builder << nameToken.Content;
+
+            for(;;)
+            {
+                Token token = parser.NextToken(0);
+
+                if (token.Type == TokenType::LBracket)
+                {
+                    parser.ReadToken();
+                    int index = parser.ReadInt();
+                    SLANG_ASSERT(index >= 0);
+                    parser.ReadMatchingToken(TokenType::RBracket);
+
+                    builder << "[" << index << "]";
+                }
+                else if (token.Type == TokenType::Dot)
+                {
+                    parser.ReadToken();
+                    Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
+
+                    builder << "." << identifierToken.Content; 
+                }
+                else
+                {
+                    return builder;
+                }
+            }
+        }
+
         void parseFieldBindings(TokenReader& parser, ShaderInputLayout::Field& ioField)
         {
             // parse bindings
@@ -527,47 +701,7 @@ namespace renderer_test
                             parser.ReadToken();
                         }
 
-                        StringBuilder builder;
-
-                        Token nameToken = parser.ReadToken();
-                        if (nameToken.Type != TokenType::Identifier)
-                        {
-                            throw ShaderInputLayoutFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
-                        }
-                        builder << nameToken.Content;
-
-                        while (!parser.IsEnd())
-                        {
-                            Token token = parser.NextToken(0);
-
-                            if (token.Type == TokenType::LBracket)
-                            {
-                                parser.ReadToken();
-                                int index = parser.ReadInt();
-                                SLANG_ASSERT(index >= 0);
-                                parser.ReadMatchingToken(TokenType::RBracket);
-
-                                builder << "[" << index << "]";
-                            }
-                            else if (token.Type == TokenType::Dot)
-                            {
-                                parser.ReadToken();
-                                Token identifierToken = parser.ReadMatchingToken(TokenType::Identifier);
-
-                                builder << "." << identifierToken.Content; 
-                            }
-                            else if (token.Type == TokenType::Comma)
-                            {
-                                // Break out
-                                break;
-                            }
-                            else
-                            {
-                                throw ShaderInputLayoutFormatException(StringBuilder() << "Invalid input syntax at line " << parser.NextToken().Position.Line);
-                            }
-                        }
-
-                        ioField.name = builder;
+                        ioField.name = parseName(parser);
                     }
                     else
                     {
@@ -594,6 +728,18 @@ namespace renderer_test
             ShaderInputLayout::Field field;
             field.val = parseVal(parser);
             parseFieldBindings(parser, field);
+
+            parentForNewVal->addField(field);
+        }
+
+        void parseSetEntry(TokenReader& parser)
+        {
+            auto parentForNewVal = parentVal;
+
+            ShaderInputLayout::Field field;
+            field.name = parseName(parser);
+            parser.Read(TokenType::OpAssign);
+            field.val = parseValExpr(parser);
 
             parentForNewVal->addField(field);
         }
@@ -628,6 +774,10 @@ namespace renderer_test
             {
                 parentVal = parentValStack.getLast();
                 parentValStack.removeLast();
+            }
+            else if( parser.AdvanceIf("set") )
+            {
+                parseSetEntry(parser);
             }
             else
             {
