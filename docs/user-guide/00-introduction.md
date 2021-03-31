@@ -1,3 +1,7 @@
+---
+layout: user-guide
+---
+
 Introduction
 ============
 

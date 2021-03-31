@@ -1,3 +1,7 @@
+---
+layout: user-guide
+---
+
 # Basic Convenience Features
 
 This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users. 

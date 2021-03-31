@@ -1,3 +1,7 @@
+---
+layout: user-guide
+---
+
 Interfaces and Generics
 ===========================
 
@@ -55,8 +59,7 @@ int myGenericMethod<T: IFoo>(T arg)
 The above listing defines a generic method named `myGenericMethod`, which accepts an argument that can be of any type `T` as long as `T` conforms to the `IFoo` interface. The `T` here is called a _generic type parameter_, and it is associated with an _type constraint_ that any type represented by `T` must conform to the interface `IFoo`.
 
 The following listing shows how to invoke a generic method:
-```
-C#
+```C#
 MyType obj;
 int a = myGenericMethod<MyType>(obj); // OK, explicit type argument
 int b = myGenericMethod(obj); // OK, automatic type deduction
