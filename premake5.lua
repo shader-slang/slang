@@ -694,11 +694,6 @@ tool "slang-cpp-extractor"
     uuid "CA8A30D1-8FA9-4330-B7F7-84709246D8DC"
     includedirs { "." }
     
-    files { 
-        "source/slang/slang-file-system.cpp",
-        "source/slang/slang-file-system.h",
-    }
-    
     links { "core", "compiler-core" }
     
 --

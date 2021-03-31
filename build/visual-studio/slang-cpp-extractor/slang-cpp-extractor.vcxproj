@@ -162,12 +162,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\slang\slang-file-system.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp" />
   </ItemGroup>

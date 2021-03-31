@@ -6,6 +6,7 @@
 
 #include "../core/slang-downstream-compiler.h"
 #include "../core/slang-archive-file-system.h"
+#include "../core/slang-file-system.h"
 
 #include "../compiler-core/slang-name.h"
 
@@ -18,7 +19,6 @@
 #include "slang-profile.h"
 #include "slang-syntax.h"
 
-#include "slang-file-system.h"
 
 #include "slang-include-system.h"
 

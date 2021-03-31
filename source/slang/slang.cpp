@@ -18,8 +18,7 @@
 
 #include "slang-repro.h"
 
-#include "slang-file-system.h"
-
+#include "../core/slang-file-system.h"
 #include "../core/slang-writer.h"
 
 #include "../compiler-core/slang-source-loc.h"

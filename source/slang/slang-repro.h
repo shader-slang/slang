@@ -9,8 +9,7 @@
 #include "slang-compiler.h"
 
 #include "../core/slang-offset-container.h"
-
-#include "slang-file-system.h"
+#include "../core/slang-file-system.h"
 
 namespace Slang {
 
