@@ -491,7 +491,9 @@ void DiagnosticsLookup::addAlias(const char* name, const char* diagnosticName)
 
 Index DiagnosticsLookup::add(const DiagnosticInfo* info)
 {
-    SLANG_ASSERT(m_infos.indexOf(info) < 0);
+    // Check it's not already added
+    SLANG_ASSERT(m_diagnostics.indexOf(info) < 0);
+
     const Index index = m_diagnostics.getCount();
 
     _add(info->name, index);
