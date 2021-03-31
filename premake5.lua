@@ -590,7 +590,7 @@ function example(name)
     -- and the `gfx` abstraction layer (which in turn
     -- depends on the `core` library). We specify all of that here,
     -- rather than in each example.
-    links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
+    links { "example-base", "slang", "gfx", "gfx-util", "platform", "core", "compiler-core" }
 
     if isTargetWindows then
     else
