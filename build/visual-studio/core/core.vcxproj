@@ -183,12 +183,10 @@
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-dictionary.h" />
-    <ClInclude Include="..\..\..\source\core\slang-downstream-compiler.h" />
     <ClInclude Include="..\..\..\source\core\slang-exception.h" />
     <ClInclude Include="..\..\..\source\core\slang-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-free-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-func-ptr.h" />
-    <ClInclude Include="..\..\..\source\core\slang-gcc-compiler-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-hash.h" />
     <ClInclude Include="..\..\..\source\core\slang-hex-dump-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-io.h" />
@@ -198,7 +196,6 @@
     <ClInclude Include="..\..\..\source\core\slang-math.h" />
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h" />
     <ClInclude Include="..\..\..\source\core\slang-name-convention-util.h" />
-    <ClInclude Include="..\..\..\source\core\slang-nvrtc-compiler.h" />
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
@@ -223,10 +220,8 @@
     <ClInclude Include="..\..\..\source\core\slang-type-traits.h" />
     <ClInclude Include="..\..\..\source\core\slang-uint-set.h" />
     <ClInclude Include="..\..\..\source\core\slang-virtual-object-pool.h" />
-    <ClInclude Include="..\..\..\source\core\slang-visual-studio-compiler-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-writer.h" />
     <ClInclude Include="..\..\..\source\core\slang-zip-file-system.h" />
-    <ClInclude Include="..\..\..\source\core\windows\slang-win-visual-studio-util.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
@@ -234,16 +229,13 @@
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-downstream-compiler.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-gcc-compiler-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-hex-dump-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-io.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-lz4-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-name-convention-util.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-nvrtc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp" />
@@ -262,11 +254,9 @@
     <ClCompile Include="..\..\..\source\core\slang-token-reader.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-type-text-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-uint-set.cpp" />
-    <ClCompile Include="..\..\..\source\core\slang-visual-studio-compiler-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-writer.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-zip-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\windows\slang-win-process-util.cpp" />
-    <ClCompile Include="..\..\..\source\core\windows\slang-win-visual-studio-util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />

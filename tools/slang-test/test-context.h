@@ -9,7 +9,8 @@
 #include "../../source/core/slang-dictionary.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-downstream-compiler.h"
+
+#include "../../source/compiler-core/slang-downstream-compiler.h"
 
 #include "../../slang-com-ptr.h"
 

@@ -1,15 +1,15 @@
 // slang-downstream-compiler.cpp
 #include "slang-downstream-compiler.h"
 
-#include "slang-common.h"
+#include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
-#include "slang-string-util.h"
+#include "../core/slang-string-util.h"
 
-#include "slang-type-text-util.h"
+#include "../core/slang-type-text-util.h"
 
-#include "slang-io.h"
-#include "slang-shared-library.h"
-#include "slang-blob.h"
+#include "../core/slang-io.h"
+#include "../core/slang-shared-library.h"
+#include "../core/slang-blob.h"
 
 #ifdef SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"

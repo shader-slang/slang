@@ -11,7 +11,7 @@
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
 
-#include "../../source/core/slang-downstream-compiler.h"
+#include "../../source/compiler-core/slang-downstream-compiler.h"
 
 using namespace Slang;
 

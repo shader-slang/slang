@@ -3,11 +3,10 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
-
-#include "../core/slang-downstream-compiler.h"
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-file-system.h"
 
+#include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-name.h"
 
 #include "../../slang-com-ptr.h"
