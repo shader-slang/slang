@@ -1,10 +1,10 @@
-#ifndef RASTER_RENDERER_COMPILE_ERROR_H
-#define RASTER_RENDERER_COMPILE_ERROR_H
+#ifndef SLANG_DIAGNOSTICS_H
+#define SLANG_DIAGNOSTICS_H
 
 #include "../core/slang-basic.h"
 #include "../core/slang-writer.h"
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 #include "slang-token.h"
 
 #include "../../slang.h"

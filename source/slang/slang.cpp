@@ -22,7 +22,7 @@
 
 #include "../core/slang-writer.h"
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 
 #include "slang-ast-dump.h"
 

@@ -4,7 +4,7 @@
 
 #include "../core/slang-basic.h"
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 #include "slang-name.h"
 
 namespace Slang {

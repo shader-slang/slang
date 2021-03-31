@@ -670,6 +670,20 @@ standardProject("core", "source/core")
         addSourceDir "source/core/unix"
     end
     
+standardProject("compiler-core", "source/compiler-core")
+    uuid "12C1E89D-F5D0-41D3-8E8D-FB3F358F8126"
+    kind "StaticLib"
+    -- We need the compiler-core library to be relocatable to be able to link with slang.so
+    pic "On"
+
+    -- For our core implementation, we want to use the most
+    -- aggressive warning level supported by the target, and
+    -- to treat every warning as an error to make sure we
+    -- keep our code free of warnings.
+    --
+    warnings "Extra"
+    flags { "FatalWarnings" }    
+    
 --
 -- The cpp extractor is a tool that scans C++ header files to extract
 -- reflection like information, and generate files to handle 
@@ -683,8 +697,6 @@ tool "slang-cpp-extractor"
     files { 
         "source/slang/slang-lexer.cpp",
         "source/slang/slang-lexer.h",
-        "source/slang/slang-source-loc.cpp",
-        "source/slang/slang-source-loc.h",
         "source/slang/slang-file-system.cpp",
         "source/slang/slang-file-system.h",
         "source/slang/slang-diagnostics.cpp",
@@ -695,7 +707,7 @@ tool "slang-cpp-extractor"
         "source/slang/slang-token.h",
     }
     
-    links { "core" }
+    links { "core", "compiler-core" }
     
 --
 -- `slang-generate` is a tool we use for source code generation on
@@ -1148,7 +1160,7 @@ end
 standardProject("slang", "source/slang")
     uuid "DB00DA62-0533-4AFD-B59F-A67D5B3A0808"
     kind "SharedLib"
-    links { "core", "miniz", "lz4"}
+    links { "core", "compiler-core", "miniz", "lz4"}
     warnings "Extra"
     flags { "FatalWarnings" }
     pic "On"
