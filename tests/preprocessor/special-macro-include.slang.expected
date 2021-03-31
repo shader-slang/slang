@@ -1,0 +1,6 @@
+result code = 0
+standard error = {
+}
+standard output = {
+"tests/preprocessor/include/special-macro-include.h" 5 "tests/preprocessor/include/special-macro-include.h" 5 
+}
