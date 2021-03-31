@@ -50,7 +50,10 @@ public:
     };
     // Renderer    implementation
     Result initVulkanInstanceAndDevice(bool useValidationLayer);
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc,
+        ITransientResourceHeap** outHeap) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
@@ -795,7 +798,6 @@ public:
                     auto descriptorSetIndex =
                         findOrAddDescriptorSet(typeLayout->getDescriptorSetSpaceOffset(s));
                     auto& descriptorSetInfo = m_descriptorSetBuildInfos[descriptorSetIndex];
-
                     for (SlangInt r = 0; r < descriptorRangeCount; ++r)
                     {
                         auto slangBindingType =
@@ -812,7 +814,6 @@ public:
                         }
 
                         auto vkDescriptorType = _mapDescriptorType(slangBindingType);
-
                         VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
                         vkBindingRangeDesc.binding =
                             (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(s, r);
@@ -829,14 +830,6 @@ public:
                         }
                         descriptorSetInfo.vkBindings.add(vkBindingRangeDesc);
                     }
-                    VkDescriptorSetLayoutCreateInfo createInfo = {};
-                    createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-                    createInfo.pBindings = descriptorSetInfo.vkBindings.getBuffer();
-                    createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
-                    VkDescriptorSetLayout vkDescSetLayout;
-                    SLANG_RETURN_ON_FAIL(m_renderer->m_api.vkCreateDescriptorSetLayout(
-                        m_renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
-                    descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
                 }
                 return SLANG_OK;
             }
@@ -1019,6 +1012,19 @@ public:
             m_combinedTextureSamplerCount = builder->m_combinedTextureSamplerCount;
             m_subObjectCount = builder->m_subObjectCount;
             m_subObjectRanges = builder->m_subObjectRanges;
+
+            // Create VkDescriptorSetLayout for all descriptor sets.
+            for (auto& descriptorSetInfo : m_descriptorSetInfos)
+            {
+                VkDescriptorSetLayoutCreateInfo createInfo = {};
+                createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+                createInfo.pBindings = descriptorSetInfo.vkBindings.getBuffer();
+                createInfo.bindingCount = (uint32_t)descriptorSetInfo.vkBindings.getCount();
+                VkDescriptorSetLayout vkDescSetLayout;
+                SLANG_RETURN_ON_FAIL(renderer->m_api.vkCreateDescriptorSetLayout(
+                    renderer->m_api.m_device, &createInfo, nullptr, &vkDescSetLayout));
+                descriptorSetInfo.descriptorSetLayout = vkDescSetLayout;
+            }
             return SLANG_OK;
         }
 
@@ -1145,7 +1151,8 @@ public:
 
                 auto slangEntryPointLayout = entryPointLayout->getSlangLayout();
                 _addDescriptorSets(
-                    slangEntryPointLayout->getTypeLayout(), slangEntryPointLayout->getVarLayout());
+                    _unwrapParameterGroups(slangEntryPointLayout->getTypeLayout()),
+                    slangEntryPointLayout->getVarLayout());
                 m_entryPoints.add(info);
             }
 
@@ -1210,7 +1217,7 @@ public:
 
             m_program = builder->m_program;
             m_programLayout = builder->m_programLayout;
-            m_entryPoints = builder->m_entryPoints;
+            m_entryPoints = _Move(builder->m_entryPoints);
             m_renderer = renderer;
 
             if (m_program->getSpecializationParamCount() != 0)
@@ -2709,8 +2716,10 @@ public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
         VkCommandPool m_pool;
+        VkFence m_fence;
         VKDevice* m_renderer;
         DescriptorSetAllocator* m_transientDescSetAllocator;
+        bool m_isPreCommandBufferEmpty = true;
         // Command buffers are deallocated by its command pool,
         // so no need to free individually.
         ~CommandBufferImpl() = default;
@@ -2718,11 +2727,13 @@ public:
         Result init(
             VKDevice* renderer,
             VkCommandPool pool,
+            VkFence fence,
             DescriptorSetAllocator* transientDescSetAllocator)
         {
             m_renderer = renderer;
             m_transientDescSetAllocator = transientDescSetAllocator;
             m_pool = pool;
+            m_fence = fence;
 
             auto& api = renderer->m_api;
             VkCommandBufferAllocateInfo allocInfo = {};
@@ -2733,12 +2744,23 @@ public:
             SLANG_VK_RETURN_ON_FAIL(
                 api.vkAllocateCommandBuffers(api.m_device, &allocInfo, &m_commandBuffer));
 
+            beginCommandBuffer();
+            return SLANG_OK;
+        }
+
+        void beginCommandBuffer()
+        {
+            auto& api = m_renderer->m_api;
             VkCommandBufferBeginInfo beginInfo = {
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 nullptr,
                 VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
             api.vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
-            return SLANG_OK;
+            if (m_preCommandBuffer)
+            {
+                api.vkBeginCommandBuffer(m_preCommandBuffer, &beginInfo);
+            }
+            m_isPreCommandBufferEmpty = true;
         }
 
         Result createPreCommandBuffer()
@@ -2761,6 +2783,7 @@ public:
 
         VkCommandBuffer getPreCommandBuffer()
         {
+            m_isPreCommandBufferEmpty = false;
             if (m_preCommandBuffer)
                 return m_preCommandBuffer;
             createPreCommandBuffer();
@@ -3191,7 +3214,7 @@ public:
         virtual SLANG_NO_THROW void SLANG_MCALL close() override
         {
             auto& vkAPI = m_renderer->m_api;
-            if (m_preCommandBuffer != VK_NULL_HANDLE)
+            if (!m_isPreCommandBufferEmpty)
             {
                 // `preCmdBuffer` contains buffer transfer commands for shader object
                 // uniform buffers, and we need a memory barrier here to ensure the
@@ -3231,80 +3254,40 @@ public:
 
     public:
         Desc m_desc;
-        uint32_t m_poolIndex;
         RefPtr<VKDevice> m_renderer;
         VkQueue m_queue;
         uint32_t m_queueFamilyIndex;
         VkSemaphore m_pendingWaitSemaphore = VK_NULL_HANDLE;
         List<VkCommandBuffer> m_submitCommandBuffers;
-        static const int kCommandPoolCount = 8;
-        VkCommandPool m_commandPools[kCommandPoolCount];
-        DescriptorSetAllocator m_descSetAllocators[kCommandPoolCount];
-        VkFence m_fences[kCommandPoolCount];
-        VkSemaphore m_semaphores[kCommandPoolCount];
+        static const int kSemaphoreCount = 2;
+        uint32_t m_currentSemaphoreIndex;
+        VkSemaphore m_semaphores[kSemaphoreCount];
         ~CommandQueueImpl()
         {
             m_renderer->m_api.vkQueueWaitIdle(m_queue);
 
             m_renderer->m_queueAllocCount--;
-            for (int i = 0; i < kCommandPoolCount; i++)
+            for (int i = 0; i < kSemaphoreCount; i++)
             {
-                m_renderer->m_api.vkDestroyCommandPool(
-                    m_renderer->m_api.m_device, m_commandPools[i], nullptr);
-                m_renderer->m_api.vkDestroyFence(m_renderer->m_api.m_device, m_fences[i], nullptr);
                 m_renderer->m_api.vkDestroySemaphore(
                     m_renderer->m_api.m_device, m_semaphores[i], nullptr);
-                m_descSetAllocators[i].close();
             }
         }
 
         void init(VKDevice* renderer, VkQueue queue, uint32_t queueFamilyIndex)
         {
             m_renderer = renderer;
-            m_poolIndex = 0;
+            m_currentSemaphoreIndex = 0;
             m_queue = queue;
             m_queueFamilyIndex = queueFamilyIndex;
-            for (int i = 0; i < kCommandPoolCount; i++)
+            for (int i = 0; i < kSemaphoreCount; i++)
             {
-                m_descSetAllocators[i].m_api = &m_renderer->m_api;
-
-                VkCommandPoolCreateInfo poolCreateInfo = {};
-                poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-                poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-                poolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-                m_renderer->m_api.vkCreateCommandPool(
-                    m_renderer->m_api.m_device, &poolCreateInfo, nullptr, &m_commandPools[i]);
-
-                VkFenceCreateInfo fenceCreateInfo = {};
-                fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-                fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-                m_renderer->m_api.vkCreateFence(
-                    m_renderer->m_api.m_device, &fenceCreateInfo, nullptr, &m_fences[i]);
-
                 VkSemaphoreCreateInfo semaphoreCreateInfo = {};
                 semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
                 semaphoreCreateInfo.flags = 0;
                 m_renderer->m_api.vkCreateSemaphore(
                     m_renderer->m_api.m_device, &semaphoreCreateInfo, nullptr, &m_semaphores[i]);
             }
-        }
-
-        // Swaps to and resets the next command pool.
-        // Wait if command lists in the next pool are still in flight.
-        Result swapPools()
-        {
-            auto& vkAPI = m_renderer->m_api;
-            m_poolIndex++;
-            m_poolIndex = m_poolIndex % kCommandPoolCount;
-
-            if (vkAPI.vkWaitForFences(vkAPI.m_device, 1, &m_fences[m_poolIndex], 1, UINT64_MAX) !=
-                VK_SUCCESS)
-            {
-                return SLANG_FAIL;
-            }
-            vkAPI.vkResetCommandPool(vkAPI.m_device, m_commandPools[m_poolIndex], 0);
-            m_descSetAllocators[m_poolIndex].reset();
-            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL wait() override
@@ -3318,33 +3301,26 @@ public:
             return m_desc;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            createCommandBuffer(ICommandBuffer** result) override
-        {
-            RefPtr<CommandBufferImpl> commandBuffer = new CommandBufferImpl();
-            SLANG_RETURN_ON_FAIL(commandBuffer->init(
-                m_renderer, m_commandPools[m_poolIndex], &m_descSetAllocators[m_poolIndex]));
-            *result = commandBuffer.detach();
-            return SLANG_OK;
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL
             executeCommandBuffers(
             uint32_t count,
             ICommandBuffer* const* commandBuffers) override
         {
+            if (count == 0)
+                return;
+
             auto& vkAPI = m_renderer->m_api;
             m_submitCommandBuffers.clear();
             for (uint32_t i = 0; i < count; i++)
             {
                 auto cmdBufImpl = static_cast<CommandBufferImpl*>(commandBuffers[i]);
-                if (cmdBufImpl->m_preCommandBuffer != VK_NULL_HANDLE)
+                if (!cmdBufImpl->m_isPreCommandBufferEmpty)
                     m_submitCommandBuffers.add(cmdBufImpl->m_preCommandBuffer);
                 auto vkCmdBuf = cmdBufImpl->m_commandBuffer;
                 m_submitCommandBuffers.add(vkCmdBuf);
             }
             VkSemaphore waitSemaphore = m_pendingWaitSemaphore;
-            VkSemaphore signalSemaphore = m_semaphores[m_poolIndex];
+            VkSemaphore signalSemaphore = m_semaphores[m_currentSemaphoreIndex];
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             VkPipelineStageFlags stageFlag = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -3358,11 +3334,50 @@ public:
             }
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores = &signalSemaphore;
-            vkAPI.vkResetFences(vkAPI.m_device, 1, &m_fences[m_poolIndex]);
-            vkAPI.vkQueueSubmit(m_queue, 1, &submitInfo, m_fences[m_poolIndex]);
+
+            auto fence = static_cast<CommandBufferImpl*>(commandBuffers[0])->m_fence;
+            vkAPI.vkResetFences(vkAPI.m_device, 1, &fence);
+            vkAPI.vkQueueSubmit(m_queue, 1, &submitInfo, fence);
             m_pendingWaitSemaphore = signalSemaphore;
-            swapPools();
+
+            m_currentSemaphoreIndex++;
+            m_currentSemaphoreIndex = m_currentSemaphoreIndex % kSemaphoreCount;
         }
+    };
+
+    class TransientResourceHeapImpl
+        : public ITransientResourceHeap
+        , public RefObject
+    {
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        ITransientResourceHeap* getInterface(const Slang::Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
+                return static_cast<ITransientResourceHeap*>(this);
+            return nullptr;
+        }
+
+    public:
+        VkCommandPool m_commandPool;
+        DescriptorSetAllocator m_descSetAllocator;
+        VkFence m_fence;
+        List<RefPtr<CommandBufferImpl>> m_commandBufferPool;
+        uint32_t m_commandBufferAllocId = 0;
+        RefPtr<BufferResourceImpl> m_constantBuffer;
+        RefPtr<VKDevice> m_device;
+
+        Result init(const ITransientResourceHeap::Desc& desc, VKDevice* device);
+        ~TransientResourceHeapImpl()
+        {
+            m_device->m_api.vkDestroyCommandPool(m_device->m_api.m_device, m_commandPool, nullptr);
+            m_device->m_api.vkDestroyFence(m_device->m_api.m_device, m_fence, nullptr);
+            m_descSetAllocator.close();
+        }
+    public:
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
+        virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
     };
 
     class SwapchainImpl
@@ -3742,6 +3757,15 @@ public:
 
     void _transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout);
 
+    uint32_t getQueueFamilyIndex(ICommandQueue::QueueType queueType)
+    {
+        switch (queueType)
+        {
+        case ICommandQueue::QueueType::Graphics:
+        default:
+            return m_queueFamilyIndex;
+        }
+    }
 public:
     // VKDevice members.
 
@@ -4282,6 +4306,71 @@ void VKDevice::waitForGpu()
     m_deviceQueue.flushAndWait();
 }
 
+Result VKDevice::TransientResourceHeapImpl::init(
+    const ITransientResourceHeap::Desc& desc,
+    VKDevice* device)
+{
+    m_device = device;
+    m_descSetAllocator.m_api = &device->m_api;
+
+    VkCommandPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolCreateInfo.queueFamilyIndex =
+        device->getQueueFamilyIndex(ICommandQueue::QueueType::Graphics);
+    device->m_api.vkCreateCommandPool(
+        device->m_api.m_device, &poolCreateInfo, nullptr, &m_commandPool);
+
+    VkFenceCreateInfo fenceCreateInfo = {};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    device->m_api.vkCreateFence(device->m_api.m_device, &fenceCreateInfo, nullptr, &m_fence);
+    return SLANG_OK;
+}
+
+Result VKDevice::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer** outCmdBuffer)
+{
+    if (m_commandBufferAllocId < (uint32_t)m_commandBufferPool.getCount())
+    {
+        auto result = m_commandBufferPool[m_commandBufferAllocId];
+        result->beginCommandBuffer();
+        m_commandBufferAllocId++;
+        *outCmdBuffer = result.detach();
+        return SLANG_OK;
+    }
+
+    RefPtr<CommandBufferImpl> commandBuffer = new CommandBufferImpl();
+    SLANG_RETURN_ON_FAIL(commandBuffer->init(
+        m_device, m_commandPool, m_fence, &m_descSetAllocator));
+    m_commandBufferPool.add(commandBuffer);
+    m_commandBufferAllocId++;
+    *outCmdBuffer = commandBuffer.detach();
+    return SLANG_OK;
+}
+
+Result VKDevice::TransientResourceHeapImpl::synchronizeAndReset()
+{
+    m_commandBufferAllocId = 0;
+    auto& api = m_device->m_api;
+    if (api.vkWaitForFences(api.m_device, 1, &m_fence, 1, UINT64_MAX) != VK_SUCCESS)
+    {
+        return SLANG_FAIL;
+    }
+    api.vkResetCommandPool(api.m_device, m_commandPool, 0);
+    m_descSetAllocator.reset();
+    return SLANG_OK;
+}
+
+Result VKDevice::createTransientResourceHeap(
+    const ITransientResourceHeap::Desc& desc,
+    ITransientResourceHeap** outHeap)
+{
+    RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
+    *outHeap = result.detach();
+    return SLANG_OK;
+}
+
 Result VKDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue)
 {
     // Only support one queue for now.
@@ -4428,23 +4517,6 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(int bindFlags)
         bindFlags &= ~lsb;
     }
     return VkBufferUsageFlagBits(dstFlags);
-}
-
-static VkBufferUsageFlags _calcBufferUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
-{
-    VkBufferUsageFlags usage = _calcBufferUsageFlags(bindFlags);
-
-    if (cpuAccessFlags & IResource::AccessFlag::Read)
-    {
-        // If it can be read from, set this
-        usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    }
-    if ((cpuAccessFlags & IResource::AccessFlag::Write) || initData)
-    {
-        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    }
-
-    return usage;
 }
 
 static VkImageUsageFlagBits _calcImageUsageFlags(IResource::BindFlag::Enum bind)
@@ -4890,7 +4962,8 @@ Result VKDevice::createBufferResource(IResource::Usage initialUsage, const IBuff
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
-    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.bindFlags) |
+                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
     switch (initialUsage)
     {

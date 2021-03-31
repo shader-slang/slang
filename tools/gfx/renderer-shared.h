@@ -10,10 +10,8 @@ namespace gfx
 struct GfxGUID
 {
     static const Slang::Guid IID_ISlangUnknown;
-    static const Slang::Guid IID_IDescriptorSetLayout;
-    static const Slang::Guid IID_IDescriptorSet;
     static const Slang::Guid IID_IShaderProgram;
-    static const Slang::Guid IID_IPipelineLayout;
+    static const Slang::Guid IID_ITransientResourceHeap;
     static const Slang::Guid IID_IPipelineState;
     static const Slang::Guid IID_IResourceView;
     static const Slang::Guid IID_IFramebuffer;

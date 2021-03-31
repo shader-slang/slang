@@ -37,6 +37,7 @@
 #include "tools/platform/window.h"
 #include "slang-com-ptr.h"
 #include "source/core/slang-basic.h"
+#include "examples/example-base/example-base.h"
 
 using namespace gfx;
 using namespace Slang;
@@ -62,7 +63,7 @@ static const Vertex kVertexData[kVertexCount] =
 // The example application will be implemented as a `struct`, so that
 // we can scope the resources it allocates without using global variables.
 //
-struct HelloWorld
+struct HelloWorld : public WindowedAppBase
 {
 
 // Many Slang API functions return detailed diagnostic information
@@ -197,12 +198,6 @@ gfx::Result loadShaderProgram(
 // we have just defined.
 //
 
-// We will hard-code the size of our rendering window.
-//
-int gWindowWidth = 1024;
-int gWindowHeight = 768;
-const uint32_t kSwapchainImageCount = 2;
-
 // We will define global variables for the various platform and
 // graphics API objects that our application needs:
 //
@@ -210,16 +205,9 @@ const uint32_t kSwapchainImageCount = 2;
 // of them come from the utility library we are using to simplify
 // building an example program.
 //
-RefPtr<platform::Window> gWindow;
-Slang::ComPtr<gfx::IDevice>       gDevice;
-
 ComPtr<gfx::IPipelineState> gPipelineState;
 ComPtr<gfx::IShaderObject> gRootObject;
-ComPtr<gfx::ISwapchain> gSwapchain;
-List<ComPtr<gfx::IFramebuffer>> gFramebuffers;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
-ComPtr<gfx::IRenderPassLayout> gRenderPass;
-ComPtr<gfx::ICommandQueue> gQueue;
 
 // Now that we've covered the function that actually loads and
 // compiles our Slang shade code, we can go through the rest
@@ -229,29 +217,9 @@ Slang::Result initialize()
 {
     // Create a window for our application to render into.
     //
-    platform::WindowDesc windowDesc;
-    windowDesc.title = "Hello, World!";
-    windowDesc.width = gWindowWidth;
-    windowDesc.height = gWindowHeight;
-    windowDesc.style = platform::WindowStyle::FixedSize;
-    gWindow = platform::Application::createWindow(windowDesc);
-    gWindow->events.mainLoop = [this]() { renderFrame(); };
-    // Initialize the rendering layer.
-    //
-    // Note: for now we are hard-coding logic to use the
-    // Direct3D11 back-end for the graphics API abstraction.
-    // A future version of this example may support multiple
-    // platforms/APIs.
-    //
-    IDevice::Desc deviceDesc = {};
-    gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
-    if(SLANG_FAILED(res)) return res;
+    initializeBase("hello-world", 1024, 768);
 
-    ICommandQueue::Desc queueDesc = {};
-    queueDesc.type = ICommandQueue::QueueType::Graphics;
-    gQueue = gDevice->createCommandQueue(queueDesc);
-
-    // Now we will create objects needed to configur the "input assembler"
+    // We will create objects needed to configur the "input assembler"
     // (IA) stage of the D3D pipeline.
     //
     // First, we create an input layout:
@@ -315,94 +283,18 @@ Slang::Result initialize()
     SLANG_RETURN_ON_FAIL(gDevice->createRootShaderObject(shaderProgram, rootObject.writeRef()));
     gRootObject = rootObject;
 
-    // Create swapchain and framebuffers.
-    gfx::ISwapchain::Desc swapchainDesc = {};
-    swapchainDesc.format = gfx::Format::RGBA_Unorm_UInt8;
-    swapchainDesc.width = gWindowWidth;
-    swapchainDesc.height = gWindowHeight;
-    swapchainDesc.imageCount = kSwapchainImageCount;
-    swapchainDesc.queue = gQueue;
-    gfx::WindowHandle windowHandle = gWindow->getNativeHandle().convert<gfx::WindowHandle>();
-    gSwapchain = gDevice->createSwapchain(swapchainDesc, windowHandle);
-
-    IFramebufferLayout::AttachmentLayout renderTargetLayout = {gSwapchain->getDesc().format, 1};
-    IFramebufferLayout::AttachmentLayout depthLayout = {gfx::Format::D_Float32, 1};
-    IFramebufferLayout::Desc framebufferLayoutDesc;
-    framebufferLayoutDesc.renderTargetCount = 1;
-    framebufferLayoutDesc.renderTargets = &renderTargetLayout;
-    framebufferLayoutDesc.depthStencil = &depthLayout;
-    ComPtr<IFramebufferLayout> framebufferLayout;
-    SLANG_RETURN_ON_FAIL(
-        gDevice->createFramebufferLayout(framebufferLayoutDesc, framebufferLayout.writeRef()));
-
-    for (uint32_t i = 0; i < kSwapchainImageCount; i++)
-    {
-        gfx::ITextureResource::Desc depthBufferDesc = {};
-        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
-        depthBufferDesc.init2D(
-            gfx::IResource::Type::Texture2D,
-            gfx::Format::D_Float32,
-            gSwapchain->getDesc().width,
-            gSwapchain->getDesc().height,
-            0);
-        
-        ComPtr<gfx::ITextureResource> depthBufferResource = gDevice->createTextureResource(
-            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
-        ComPtr<gfx::ITextureResource> colorBuffer;
-        gSwapchain->getImage(i, colorBuffer.writeRef());
-
-        gfx::IResourceView::Desc colorBufferViewDesc = {};
-        colorBufferViewDesc.format = gSwapchain->getDesc().format;
-        colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
-        ComPtr<gfx::IResourceView> rtv =
-            gDevice->createTextureView(colorBuffer.get(), colorBufferViewDesc);
-
-        gfx::IResourceView::Desc depthBufferViewDesc = {};
-        depthBufferViewDesc.format = gfx::Format::D_Float32;
-        depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
-        depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
-        ComPtr<gfx::IResourceView> dsv =
-            gDevice->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
-
-        gfx::IFramebuffer::Desc framebufferDesc = {};
-        framebufferDesc.renderTargetCount = 1;
-        framebufferDesc.depthStencilView = dsv.get();
-        framebufferDesc.renderTargetViews = rtv.readRef();
-        framebufferDesc.layout = framebufferLayout;
-        ComPtr<gfx::IFramebuffer> frameBuffer = gDevice->createFramebuffer(framebufferDesc);
-        gFramebuffers.add(frameBuffer);
-    }
-
     // Following the D3D12/Vulkan style of API, we need a pipeline state object
     // (PSO) to encapsulate the configuration of the overall graphics pipeline.
     //
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
-    desc.framebufferLayout = framebufferLayout;
+    desc.framebufferLayout = gFramebufferLayout;
     auto pipelineState = gDevice->createGraphicsPipelineState(desc);
     if (!pipelineState)
         return SLANG_FAIL;
 
     gPipelineState = pipelineState;
-
-    gfx::IRenderPassLayout::Desc renderPassDesc = {};
-    renderPassDesc.framebufferLayout = framebufferLayout;
-    renderPassDesc.renderTargetCount = 1;
-    IRenderPassLayout::AttachmentAccessDesc renderTargetAccess = {};
-    IRenderPassLayout::AttachmentAccessDesc depthStencilAccess = {};
-    renderTargetAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    renderTargetAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
-    renderTargetAccess.initialState = ResourceState::Undefined;
-    renderTargetAccess.finalState = ResourceState::Present;
-    depthStencilAccess.loadOp = IRenderPassLayout::AttachmentLoadOp::Clear;
-    depthStencilAccess.storeOp = IRenderPassLayout::AttachmentStoreOp::Store;
-    depthStencilAccess.initialState = ResourceState::Undefined;
-    depthStencilAccess.finalState = ResourceState::DepthWrite;
-    renderPassDesc.renderTargetAccess = &renderTargetAccess;
-    renderPassDesc.depthStencilAccess = &depthStencilAccess;
-    gRenderPass = gDevice->createRenderPassLayout(renderPassDesc);
 
     return SLANG_OK;
 }
@@ -412,17 +304,15 @@ Slang::Result initialize()
 // nothing really Slang-specific here, so the commentary doesn't need
 // to be very detailed.
 //
-void renderFrame()
+virtual void renderFrame(int frameBufferIndex) override
 {
-    uint32_t frameBufferIndex = gSwapchain->acquireNextImage();
-
-    ComPtr<ICommandBuffer> commandBuffer = gQueue->createCommandBuffer();
+    ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
     auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
 
     gfx::Viewport viewport = {};
     viewport.maxZ = 1.0f;
-    viewport.extentX = (float)gWindowWidth;
-    viewport.extentY = (float)gWindowHeight;
+    viewport.extentX = (float)windowWidth;
+    viewport.extentY = (float)windowHeight;
     renderEncoder->setViewportAndScissor(viewport);
 
     // We will update the model-view-projection matrix that is passed
@@ -510,39 +400,8 @@ void renderFrame()
     gSwapchain->present();
 }
 
-void finalize()
-{
-    gQueue->wait();
-    gSwapchain = nullptr;
-}
-
 };
 
-// This "inner" main function is used by the platform abstraction
-// layer to deal with differences in how an entry point needs
-// to be defined for different platforms.
-//
-int innerMain()
-{
-    // We construct an instance of our example application
-    // `struct` type, and then walk through the lifecyle
-    // of the application.
-
-    HelloWorld app;
-
-    if (SLANG_FAILED(app.initialize()))
-    {
-        return -1;
-    }
-
-    platform::Application::run(app.gWindow);
-
-    app.finalize();
-
-    return 0;
-}
-
 // This macro instantiates an appropriate main function to
-// invoke the `innerMain` above.
-//
-PLATFORM_UI_MAIN(innerMain)
+// run the application defined above.
+PLATFORM_UI_MAIN(innerMain<HelloWorld>)

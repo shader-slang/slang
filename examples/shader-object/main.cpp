@@ -136,7 +136,14 @@ int main()
     // interacting with the graphics API.
     Slang::ComPtr<gfx::IDevice> device;
     IDevice::Desc deviceDesc = {};
+    deviceDesc.deviceType = DeviceType::Vulkan;
     SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, device.writeRef()));
+
+    Slang::ComPtr<gfx::ITransientResourceHeap> transientHeap;
+    ITransientResourceHeap::Desc transientHeapDesc = {};
+    transientHeapDesc.constantBufferSize = 4096;
+    SLANG_RETURN_ON_FAIL(
+        device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
 
     // Now we can load the shader code.
     // A `gfx::IShaderProgram` object for use in the `gfx` layer.
@@ -212,7 +219,8 @@ int main()
     {
         ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
         auto queue = device->createCommandQueue(queueDesc);
-        auto commandBuffer = queue->createCommandBuffer();
+
+        auto commandBuffer = transientHeap->createCommandBuffer();
         auto encoder = commandBuffer->encodeComputeCommands();
         encoder->setPipelineState(pipelineState);
         encoder->bindRootShaderObject(rootObject);

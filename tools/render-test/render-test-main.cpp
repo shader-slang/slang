@@ -119,6 +119,7 @@ protected:
 
     ComPtr<IDevice> m_device;
     ComPtr<ICommandQueue> m_queue;
+    ComPtr<ITransientResourceHeap> m_transientHeap;
     ComPtr<IRenderPassLayout> m_renderPass;
     ComPtr<IInputLayout> m_inputLayout;
     ComPtr<IBufferResource> m_vertexBuffer;
@@ -530,9 +531,13 @@ Result RenderTestApp::_initializeShaders(
 
 void RenderTestApp::_initializeRenderPass()
 {
+    ITransientResourceHeap::Desc transientHeapDesc = {};
+    transientHeapDesc.constantBufferSize = 4096 * 1024;
+    m_transientHeap = m_device->createTransientResourceHeap(transientHeapDesc);
+
     ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
     m_queue = m_device->createCommandQueue(queueDesc);
-
+    
     gfx::ITextureResource::Desc depthBufferDesc;
     depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
     depthBufferDesc.init2D(
@@ -695,7 +700,8 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
                 SLANG_RETURN_ON_FAIL(m_device->createBufferResource(IResource::Usage::CopyDest, stagingBufferDesc, nullptr, stagingBuffer.writeRef()));
 
                 ComPtr<ICommandBuffer> commandBuffer;
-                SLANG_RETURN_ON_FAIL(m_queue->createCommandBuffer(commandBuffer.writeRef()));
+                SLANG_RETURN_ON_FAIL(
+                    m_transientHeap->createCommandBuffer(commandBuffer.writeRef()));
 
                 ComPtr<IResourceCommandEncoder> encoder;
                 commandBuffer->encodeResourceCommands(encoder.writeRef());
@@ -704,7 +710,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
 
                 commandBuffer->close();
                 m_queue->executeCommandBuffer(commandBuffer);
-                m_queue->wait();
+                m_transientHeap->synchronizeAndReset();
 
                 m_device->readBufferResource(stagingBuffer, 0, bufferSize, blob.writeRef());
             }
@@ -743,7 +749,7 @@ Result RenderTestApp::writeScreen(const char* filename)
 
 Result RenderTestApp::update()
 {
-    auto commandBuffer = m_queue->createCommandBuffer();
+    auto commandBuffer = m_transientHeap->createCommandBuffer();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
         auto encoder = commandBuffer->encodeComputeCommands();

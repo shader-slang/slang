@@ -12,6 +12,7 @@
 #include "slang-com-helper.h"
 #include "../command-writer.h"
 #include "../renderer-shared.h"
+#include "../simple-transient-resource-heap.h"
 #include "../slang-context.h"
 
 #   ifdef RENDER_TEST_OPTIX
@@ -989,6 +990,7 @@ public:
             return nullptr;
         }
     public:
+        void init(CUDADevice* device) { SLANG_UNUSED(device); }
         virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
             IRenderPassLayout* renderPass,
             IFramebuffer* framebuffer,
@@ -1146,13 +1148,6 @@ public:
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override
         {
             return m_desc;
-        }
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            createCommandBuffer(ICommandBuffer** outCommandBuffer) override
-        {
-            RefPtr<CommandBufferImpl> result = new CommandBufferImpl();
-            *outCommandBuffer = result.detach();
-            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1319,6 +1314,8 @@ public:
             }
         }
     };
+
+    using TransientResourceHeapImpl = SimpleTransientResourceHeap<CUDADevice, CommandBufferImpl>;
 
 public:
     ~CUDADevice()
@@ -1921,6 +1918,16 @@ public:
     }
 
 public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc,
+        ITransientResourceHeap** outHeap) override
+    {
+        RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
+        SLANG_RETURN_ON_FAIL(result->init(this, desc));
+        *outHeap = result.detach();
+        return SLANG_OK;
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override
     {
