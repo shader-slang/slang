@@ -553,7 +553,7 @@ function exampleLibrary(name)
     baseSlangProject(name, "examples/"..name)
     kind "StaticLib"
     includedirs { ".", "tools" }
-    links { "slang", "core", "gfx", "gfx-util", "platform" }
+    links { "gfx", "slang", "platform", "gfx-util", "core"}
     addCUDAIfEnabled(); 
 end
 
@@ -590,7 +590,7 @@ function example(name)
     -- and the `gfx` abstraction layer (which in turn
     -- depends on the `core` library). We specify all of that here,
     -- rather than in each example.
-    links { "slang", "core", "gfx", "gfx-util", "platform", "example-base" }
+    links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
 
     if isTargetWindows then
     else
