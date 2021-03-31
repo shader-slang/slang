@@ -1186,7 +1186,7 @@ static ISlangWriter* _getDefaultWriter(WriterChannel chan)
 void EndToEndCompileRequest::setWriter(WriterChannel chan, ISlangWriter* writer)
 {
     // If the user passed in null, we will use the default writer on that channel
-    m_writers[int(chan)] = writer ? writer : _getDefaultWriter(chan);
+    m_writers->setWriter(SlangWriterChannel(chan), writer ? writer : _getDefaultWriter(chan));
 
     // For diagnostic output, if the user passes in nullptr, we set on mSink.writer as that enables buffering on DiagnosticSink
     if (chan == WriterChannel::Diagnostic)
@@ -1307,8 +1307,10 @@ CompileRequestBase::CompileRequestBase(
 
 FrontEndCompileRequest::FrontEndCompileRequest(
     Linkage*        linkage,
+    StdWriters*     writers, 
     DiagnosticSink* sink)
     : CompileRequestBase(linkage, sink)
+    , m_writers(writers)
 {
 }
 
@@ -1540,6 +1542,26 @@ static void _outputIncludesRec(SourceView* sourceView, Index depth, ViewInitiati
     }
 }
 
+static void _outputPreprocessorTokens(const TokenList& toks, ISlangWriter* writer)
+{
+    if (writer == nullptr)
+    {
+        return;
+    }
+
+    StringBuilder buf;
+    for (const auto& tok : toks)
+    {
+        buf << tok.getContent();
+        // We'll separate tokens with space for now
+        buf.appendChar(' ');
+    }
+
+    buf.appendChar('\n');
+
+    writer->write(buf.getBuffer(), buf.getLength());
+}
+
 static void _outputIncludes(const List<SourceFile*>& sourceFiles, SourceManager* sourceManager, DiagnosticSink* sink)
 {
     // Set up the hierarchy to know how all the source views relate. This could be argued as overkill, but makes recursive
@@ -1649,6 +1671,16 @@ void FrontEndCompileRequest::parseTranslationUnit(
         if (outputIncludes)
         {
             _outputIncludes(translationUnit->getSourceFiles(), getSink()->getSourceManager(), getSink());
+        }
+
+        if (outputPreprocessor)
+        {
+            if (m_writers)
+            {
+                _outputPreprocessorTokens(tokens, m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+            }
+            // If we output the preprocessor output then we are done doing anything else
+            return;
         }
 
         parseSourceFile(
@@ -1828,6 +1860,12 @@ SlangResult FrontEndCompileRequest::executeActionsInner()
         parseTranslationUnit(translationUnit.Ptr());
     }
 
+    if (outputPreprocessor)
+    {
+        // If doing pre-processor output, then we are done
+        return SLANG_OK;
+    }
+
     if (getSink()->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1954,13 +1992,15 @@ void EndToEndCompileRequest::init()
 {
     m_sink.setSourceManager(m_linkage->getSourceManager());
 
+    m_writers = new StdWriters;
+
     // Set all the default writers
     for (int i = 0; i < int(WriterChannel::CountOf); ++i)
     {
         setWriter(WriterChannel(i), nullptr);
     }
 
-    m_frontEndReq = new FrontEndCompileRequest(getLinkage(), getSink());
+    m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
 
     m_backEndReq = new BackEndCompileRequest(getLinkage(), getSink());
 }
@@ -1997,6 +2037,11 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
     if (m_passThrough == PassThroughMode::None)
     {
         SLANG_RETURN_ON_FAIL(getFrontEndReq()->executeActionsInner());
+    }
+
+    if (getFrontEndReq()->outputPreprocessor)
+    {
+        return SLANG_OK;
     }
 
     // If command line specifies to skip codegen, we exit here.
@@ -2288,7 +2333,7 @@ RefPtr<Module> Linkage::loadModule(
     SourceLoc const&    srcLoc,
     DiagnosticSink*     sink)
 {
-    RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, sink);
+    RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
 
     RefPtr<TranslationUnitRequest> translationUnit = new TranslationUnitRequest(frontEndReq);
     translationUnit->compileRequest = frontEndReq;
@@ -3674,6 +3719,7 @@ void Session::addBuiltinSource(
     DiagnosticSink sink(sourceManager, Lexer::sourceLocationLexer);
     RefPtr<FrontEndCompileRequest> compileRequest = new FrontEndCompileRequest(
         m_builtinLinkage,
+        nullptr, 
         &sink);
     compileRequest->m_isStandardLibraryCode = true;
 

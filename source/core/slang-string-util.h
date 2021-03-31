@@ -97,6 +97,9 @@ struct StringUtil
         /// Convert in to int. Returns SLANG_FAIL on error
     static SlangResult parseInt(const UnownedStringSlice& in, Int& outValue);
 
+        /// Takes slice and adds C++/C type escaping for special characters (like '\', '"' and if not ascii will write out as hex sequence)
+        /// Does not append double quotes around the output
+    static void appendEscaped(const UnownedStringSlice& slice, StringBuilder& out);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */

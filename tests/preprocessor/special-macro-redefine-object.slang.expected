@@ -1,0 +1,9 @@
+result code = 0
+standard error = {
+tests/preprocessor/special-macro-redefine-object.slang(7): warning 15404: Redefinition of builtin macro '__LINE__'
+#define __LINE__ "Hello"
+        ^~~~~~~~
+}
+standard output = {
+"Hello" __LINE__ 
+}

@@ -184,6 +184,7 @@ DIAGNOSTIC(15302, Error, noUniqueIdentity, "`#include` handler didn't generate a
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
 DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
 DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro parameters")
+DIAGNOSTIC(15404, Warning, builtinMacroRedefinition, "Redefinition of builtin macro '$0'")
 
 // 155xx - macro expansion
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")

@@ -40,6 +40,11 @@ static const CharUtil::CharFlagMap _calcCharFlagsMap()
         map.flags[size_t('\t')] |= Flag::HorizontalWhitespace;
     }
 
+    {
+        map.flags[size_t('\n')] |= Flag::VerticalWhitespace;
+        map.flags[size_t('\r')] |= Flag::VerticalWhitespace;
+    }
+
     return map;
 }
 

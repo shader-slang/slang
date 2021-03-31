@@ -66,9 +66,9 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
         case Type::FromString:
         case Type::FoundPath:
         {
-            // TODO(JS): We might want to escape the path here if necessary
+            
             out.appendChar('"');
-            out << foundPath;
+            StringUtil::appendEscaped(foundPath.getUnownedSlice(), out);    
             out.appendChar('"');
             break;
         }
