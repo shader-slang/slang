@@ -1,5 +1,3 @@
-//
-
 // The file is meant to be included multiple times, to produce different
 // pieces of declaration/definition code related to diagnostic messages
 //
@@ -17,12 +15,6 @@
 #error Need to #define DIAGNOSTIC(...) before including 
 #define DIAGNOSTIC(id, severity, name, messageFormat) /* */
 #endif
-
-//
-// -1 - Notes that decorate another diagnostic.
-//
-
-DIAGNOSTIC(-1, Note, seeTokenPasteLocation, "see token pasted location")
 
 //
 // 1xxxx - Lexical analysis

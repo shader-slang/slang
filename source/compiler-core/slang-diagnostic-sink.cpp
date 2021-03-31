@@ -336,7 +336,7 @@ static void formatDiagnostic(
                     break;
                 }
 
-                const DiagnosticInfo& diagnosticInfo = CoreDiagnostics::seeTokenPasteLocation;
+                const DiagnosticInfo& diagnosticInfo = MiscDiagnostics::seeTokenPasteLocation;
 
                 // Turn the message format into a message. For the moment it assumes no parameters.
                 StringBuilder msg;
@@ -500,8 +500,21 @@ Index DiagnosticsLookup::add(const DiagnosticInfo* info)
     return index;
 }
 
+void DiagnosticsLookup::add(const DiagnosticInfo*const* infos, Index infosCount)
+{
+    for (Index i = 0; i < infosCount; ++i)
+    {
+        add(infos[i]);
+    }
+}
+
+DiagnosticsLookup::DiagnosticsLookup():
+    m_arena(kArenaInitialSize)
+{
+}
+
 DiagnosticsLookup::DiagnosticsLookup(const DiagnosticInfo*const* diagnostics, Index diagnosticsCount) :
-    m_arena(2048)
+    m_arena(kArenaInitialSize)
 {
     m_diagnostics.addRange(diagnostics, diagnosticsCount);
 

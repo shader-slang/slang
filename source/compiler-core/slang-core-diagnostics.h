@@ -15,11 +15,16 @@ namespace Slang
 
 DiagnosticsLookup* getCoreDiagnosticsLookup();
 
-namespace CoreDiagnostics
+namespace MiscDiagnostics
 {
-
 #define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
-#include "slang-core-diagnostic-defs.h"
+#include "slang-misc-diagnostic-defs.h"
+}
+
+namespace LexerDiagnostics
+{
+#define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
+#include "slang-lexer-diagnostic-defs.h"
 }
 
 }

@@ -275,6 +275,8 @@ private:
 class DiagnosticsLookup : public RefObject
 {
 public:
+    static const Index kArenaInitialSize = 2048;
+
     const DiagnosticInfo* findDiagostic(const UnownedStringSlice& slice) const
     {
         const Index* indexPtr = m_map.TryGetValue(slice);
@@ -286,7 +288,9 @@ public:
         return indexPtr ? *indexPtr : 0;
     }
 
+        /// info must stay in scope
     Index add(const DiagnosticInfo* info);
+    void add(const DiagnosticInfo*const* infos, Index infosCount);
 
     void addAlias(const char* name, const char* diagnosticName);
 
@@ -295,6 +299,7 @@ public:
 
         /// NOTE! diagnostics must stay in scope for lifetime of lookup
     DiagnosticsLookup(const DiagnosticInfo*const* diagnostics, Index diagnosticsCount);
+    DiagnosticsLookup();
 
 protected:  
     void _add(const char* name, Index index);

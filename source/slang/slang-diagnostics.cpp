@@ -18,16 +18,16 @@ namespace Diagnostics
 #undef DIAGNOSTIC
 }
 
-static const DiagnosticInfo* const kAllDiagnostics[] =
+static const DiagnosticInfo* const kCompilerDiagnostics[] =
 {
 #define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name, 
 #include "slang-diagnostic-defs.h"
 #undef DIAGNOSTIC
 };
 
-static DiagnosticsLookup* _createLookup()
+static DiagnosticsLookup* _newDiagnosticsLookup()
 {
-    DiagnosticsLookup* lookup = new DiagnosticsLookup(kAllDiagnostics, SLANG_COUNT_OF(kAllDiagnostics));
+    DiagnosticsLookup* lookup = new DiagnosticsLookup(kCompilerDiagnostics, SLANG_COUNT_OF(kCompilerDiagnostics));
 
     // Add all the diagnostics in 'core'
     DiagnosticsLookup* coreLookup = getCoreDiagnosticsLookup();
@@ -46,7 +46,7 @@ static DiagnosticsLookup* _createLookup()
 
 static DiagnosticsLookup* _getDiagnosticLookupSingleton()
 {
-    static RefPtr<DiagnosticsLookup> s_lookup = _createLookup();
+    static RefPtr<DiagnosticsLookup> s_lookup = _newDiagnosticsLookup();
     return s_lookup;
 }
 

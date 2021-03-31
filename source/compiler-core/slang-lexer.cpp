@@ -363,7 +363,7 @@ namespace Slang
             if(digitVal >= base)
             {
                 char buffer[] = { (char) c, 0 };
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), CoreDiagnostics::invalidDigitForBase, buffer, base);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::invalidDigitForBase, buffer, base);
             }
 
             _advance(lexer);
@@ -680,11 +680,11 @@ namespace Slang
             switch(c)
             {
             case kEOF:
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), CoreDiagnostics::endOfFileInLiteral);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
                 return;
 
             case '\n': case '\r':
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), CoreDiagnostics::newlineInLiteral);
+                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
                 return;
 
             case '\\':
@@ -981,7 +981,7 @@ namespace Slang
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
-                    lexer->m_sink->diagnose(loc, CoreDiagnostics::octalLiteral);
+                    lexer->m_sink->diagnose(loc, LexerDiagnostics::octalLiteral);
                     return _lexNumber(lexer, 8);
                 }
             }
@@ -1195,12 +1195,12 @@ namespace Slang
                 if(c >= 0x20 && c <=  0x7E)
                 {
                     char buffer[] = { (char) c, 0 };
-                    sink->diagnose(loc, CoreDiagnostics::illegalCharacterPrint, buffer);
+                    sink->diagnose(loc, LexerDiagnostics::illegalCharacterPrint, buffer);
                 }
                 else
                 {
                     // Fallback: print as hexadecimal
-                    sink->diagnose(loc, CoreDiagnostics::illegalCharacterHex, String((unsigned char)c, 16));
+                    sink->diagnose(loc, LexerDiagnostics::illegalCharacterHex, String((unsigned char)c, 16));
                 }
             }
 
