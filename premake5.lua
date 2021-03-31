@@ -1064,7 +1064,7 @@ if enableEmbedStdLib then
     standardProject("slangc-bootstrap", "source/slangc")
         uuid "6339BF31-AC99-4819-B719-679B63451EF0"
         kind "ConsoleApp"
-        links { "core", "miniz", "lz4" }
+        links { "core", "compiler-core", "miniz", "lz4" }
         
         -- We need to run all the generators to be able to build the main 
         -- slang source in source/slang
