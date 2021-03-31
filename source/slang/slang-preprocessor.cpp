@@ -159,13 +159,13 @@ enum class PreprocessorMacroFlavor
     ObjectLike,
     FunctionArg,
     FunctionLike,
-    Line,                   /// builtin macro __LINE__
-    File,                   /// builtin macro __FILE__
+    BuiltinLine,                   /// builtin macro __LINE__
+    BuiltinFile,                   /// builtin macro __FILE__
 };
 
 SLANG_FORCE_INLINE bool isBuiltinMacro(PreprocessorMacroFlavor flavor)
 {
-    return flavor == PreprocessorMacroFlavor::Line || flavor == PreprocessorMacroFlavor::File;
+    return flavor == PreprocessorMacroFlavor::BuiltinLine || flavor == PreprocessorMacroFlavor::BuiltinFile;
 }
 
 // In the current design (which we may want to re-consider),
@@ -1020,8 +1020,8 @@ static void MaybeBeginMacroExpansion(
                 pushMacroExpansion(preprocessor, expansion, token.loc);
                 break;
             }
-            case PreprocessorMacroFlavor::Line:
-            case PreprocessorMacroFlavor::File:
+            case PreprocessorMacroFlavor::BuiltinLine:
+            case PreprocessorMacroFlavor::BuiltinFile:
             {
                 const SourceLoc loc = _isInMacroExpansion(preprocessor) ? preprocessor->initiatingMacroSourceLoc : token.loc;
 
@@ -1041,7 +1041,7 @@ static void MaybeBeginMacroExpansion(
                 Token newToken;
 
                 StringBuilder buf;
-                if (macro->flavor == PreprocessorMacroFlavor::Line)
+                if (macro->flavor == PreprocessorMacroFlavor::BuiltinLine)
                 {
                     newToken.type = TokenType::IntegerLiteral;
                     buf << humaneSourceLoc.line;
@@ -2643,7 +2643,7 @@ TokenList preprocessSource(
         auto namePool = desc.namePool;
 
         const char*const builtinNames[] = { "__FILE__", "__LINE__" };
-        const PreprocessorMacroFlavor builtinFlavors[] = { PreprocessorMacroFlavor::File, PreprocessorMacroFlavor::Line };
+        const PreprocessorMacroFlavor builtinFlavors[] = { PreprocessorMacroFlavor::BuiltinFile, PreprocessorMacroFlavor::BuiltinLine };
 
         for (Index i = 0; i < SLANG_COUNT_OF(builtinNames); i++)
         {
