@@ -3,13 +3,12 @@
 
 #include "slang-name.h"
 #include "slang-core-diagnostics.h"
+#include "slang-name-convention-util.h"
 
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-char-util.h"
-#include "../core/slang-name-convention-util.h"
-
 
 namespace Slang {
 

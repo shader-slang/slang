@@ -13,9 +13,9 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-string-slice-pool.h"
 #include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-name-convention-util.h"
 #include "../../source/core/slang-file-system.h"
 
+#include "../../source/compiler-core/slang-name-convention-util.h"
 #include "../../source/compiler-core/slang-source-loc.h"
 #include "../../source/compiler-core/slang-lexer.h"
 #include "../../source/compiler-core/slang-diagnostic-sink.h"

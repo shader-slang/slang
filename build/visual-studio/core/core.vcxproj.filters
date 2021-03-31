@@ -84,9 +84,6 @@
     <ClInclude Include="..\..\..\source\core\slang-memory-arena.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\core\slang-name-convention-util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -198,9 +195,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\core\slang-name-convention-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp">
