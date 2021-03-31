@@ -1242,19 +1242,6 @@ public:
     };
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
-    // User must finish recording a command buffer before creating another command buffer.
-    // Command buffers are one-time use. Once it is submitted to the queue via `executeCommandBuffers`
-    // a command buffer is no longer valid to be used any more.
-    // Command buffers must be closed before submission.
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createCommandBuffer(ICommandBuffer** outCommandBuffer) = 0;
-    inline ComPtr<ICommandBuffer> createCommandBuffer()
-    {
-        ComPtr<ICommandBuffer> result;
-        SLANG_RETURN_NULL_ON_FAIL(createCommandBuffer(result.writeRef()));
-        return result;
-    }
-
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) = 0;
     inline void executeCommandBuffer(ICommandBuffer* commandBuffer)
@@ -1266,6 +1253,34 @@ public:
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
         0x14e2bed0, 0xad0, 0x4dc8, { 0xb3, 0x41, 0x6, 0x3f, 0xe7, 0x2d, 0xbf, 0xe } \
+    }
+
+class ITransientResourceHeap : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        size_t constantBufferSize;
+    };
+    virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() = 0;
+
+    // Command buffers are one-time use. Once it is submitted to the queue via
+    // `executeCommandBuffers` a command buffer is no longer valid to be used any more. Command
+    // buffers must be closed before submission. The current D3D12 implementation has a limitation
+    // that only one command buffer maybe recorded at a time. User must finish recording a command
+    // buffer before creating another command buffer.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createCommandBuffer(ICommandBuffer** outCommandBuffer) = 0;
+    inline ComPtr<ICommandBuffer> createCommandBuffer()
+    {
+        ComPtr<ICommandBuffer> result;
+        SLANG_RETURN_NULL_ON_FAIL(createCommandBuffer(result.writeRef()));
+        return result;
+    }
+};
+#define SLANG_UUID_ITransientResourceHeap                                             \
+    {                                                                                 \
+        0xcd48bd29, 0xee72, 0x41b8, { 0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb } \
     }
 
 class ISwapchain : public ISlangUnknown
@@ -1364,6 +1379,18 @@ public:
         getSlangSession(result.writeRef());
         return result;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc,
+        ITransientResourceHeap** outHeap) = 0;
+    inline ComPtr<ITransientResourceHeap> createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc)
+    {
+        ComPtr<ITransientResourceHeap> result;
+        createTransientResourceHeap(desc, result.writeRef());
+        return result;
+    }
+
         /// Create a texture resource.
         ///
         /// If `initData` is non-null, then it must point to an array of

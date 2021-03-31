@@ -9,6 +9,7 @@
 
 #include "../command-writer.h"
 #include "../renderer-shared.h"
+#include "../simple-transient-resource-heap.h"
 #include "../slang-context.h"
 
 #define SLANG_PRELUDE_NAMESPACE slang_prelude
@@ -1119,6 +1120,10 @@ private:
             return nullptr;
         }
     public:
+        void init(CPUDevice* device)
+        {
+            SLANG_UNUSED(device);
+        }
         virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
             IRenderPassLayout* renderPass,
             IFramebuffer* framebuffer,
@@ -1273,13 +1278,6 @@ private:
         {
             return m_desc;
         }
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            createCommandBuffer(ICommandBuffer** outCommandBuffer) override
-        {
-            RefPtr<CommandBufferImpl> result = new CommandBufferImpl();
-            *outCommandBuffer = result.detach();
-            return SLANG_OK;
-        }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
             executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
@@ -1399,6 +1397,8 @@ private:
             }
         }
     };
+
+    using TransientResourceHeapImpl = SimpleTransientResourceHeap<CPUDevice, CommandBufferImpl>;
 
 public:
     ~CPUDevice()
@@ -1557,6 +1557,15 @@ public:
         RefPtr<CommandQueueImpl> queue = new CommandQueueImpl();
         queue->init(this);
         *outQueue = queue.detach();
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
+        const ITransientResourceHeap::Desc& desc,
+        ITransientResourceHeap** outHeap) override
+    {
+        RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
+        SLANG_RETURN_ON_FAIL(result->init(this, desc));
+        *outHeap = result.detach();
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(

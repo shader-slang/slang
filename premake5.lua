@@ -548,6 +548,17 @@ function toolSharedLibrary(name)
     kind "SharedLib"
 end
 
+function exampleLibrary(name)
+    group "examples"
+    baseSlangProject(name, "examples/"..name)
+    kind "StaticLib"
+    includedirs { ".", "tools" }
+    links { "gfx", "slang", "platform", "gfx-util", "core"}
+    addCUDAIfEnabled(); 
+end
+
+exampleLibrary "example-base"
+
 -- Finally we have the example programs that show how to use Slang.
 --
 function example(name)
@@ -579,7 +590,7 @@ function example(name)
     -- and the `gfx` abstraction layer (which in turn
     -- depends on the `core` library). We specify all of that here,
     -- rather than in each example.
-    links { "slang", "core", "gfx", "gfx-util", "platform" }
+    links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
 
     if isTargetWindows then
     else

@@ -1,5 +1,6 @@
 #include "immediate-renderer-base.h"
 #include "simple-render-pass-layout.h"
+#include "simple-transient-resource-heap.h"
 #include "command-writer.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -402,15 +403,6 @@ public:
 
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createCommandBuffer(ICommandBuffer** outCommandBuffer) override
-    {
-        RefPtr<CommandBufferImpl> newCmdBuffer = new CommandBufferImpl();
-        newCmdBuffer->init(m_renderer);
-        *outCommandBuffer = newCmdBuffer.detach();
-        return SLANG_OK;
-    }
-
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
     {
@@ -425,10 +417,24 @@ public:
         m_renderer->waitForGpu();
     }
 };
+
+using TransientResourceHeapImpl =
+    SimpleTransientResourceHeap<ImmediateRendererBase, CommandBufferImpl>;
+
 }
 
 ImmediateRendererBase::ImmediateRendererBase() {
     m_queue = new CommandQueueImpl(this);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createTransientResourceHeap(
+    const ITransientResourceHeap::Desc& desc,
+    ITransientResourceHeap** outHeap)
+{
+    RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
+    SLANG_RETURN_ON_FAIL(result->init(this, desc));
+    *outHeap = result.detach();
+    return SLANG_OK;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL ImmediateRendererBase::createCommandQueue(

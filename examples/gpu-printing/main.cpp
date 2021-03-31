@@ -113,9 +113,13 @@ Result execute()
     printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;
     auto printBufferView = gDevice->createBufferView(printBuffer, printBufferViewDesc);
 
+    ITransientResourceHeap::Desc transientResourceHeapDesc = {};
+    transientResourceHeapDesc.constantBufferSize = 256;
+    auto transientHeap = gDevice->createTransientResourceHeap(transientResourceHeapDesc);
+
     ICommandQueue::Desc queueDesc = {ICommandQueue::QueueType::Graphics};
     auto queue = gDevice->createCommandQueue(queueDesc);
-    auto commandBuffer = queue->createCommandBuffer();
+    auto commandBuffer = transientHeap->createCommandBuffer();
     auto encoder = commandBuffer->encodeComputeCommands();
     auto rootShaderObject = gDevice->createRootShaderObject(gProgram);
     encoder->setPipelineState(gPipelineState);
