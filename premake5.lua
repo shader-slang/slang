@@ -687,6 +687,8 @@ standardProject("compiler-core", "source/compiler-core")
     -- We need the compiler-core library to be relocatable to be able to link with slang.so
     pic "On"
 
+    links { "core" }
+
     -- For our core implementation, we want to use the most
     -- aggressive warning level supported by the target, and
     -- to treat every warning as an error to make sure we
@@ -1265,7 +1267,7 @@ if enableProfile then
         addSourceDir "source/slang"
 
         includedirs { "." }
-        links { "core", "miniz", "lz4"}
+        links { "core", "compiler-core", "miniz", "lz4"}
         
         filter { "system:linux" }
             linkoptions{  "-pg" }
