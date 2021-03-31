@@ -1,12 +1,9 @@
 // slang-token.cpp
 #include "slang-token.h"
 
-#include <assert.h>
+//#include <assert.h>
 
 namespace Slang {
-
-
-
 
 char const* TokenTypeToString(TokenType type)
 {

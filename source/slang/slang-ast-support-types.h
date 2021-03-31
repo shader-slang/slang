@@ -2,7 +2,10 @@
 #define SLANG_AST_SUPPORT_TYPES_H
 
 #include "../core/slang-basic.h"
-#include "slang-lexer.h"
+
+#include "../compiler-core/slang-lexer.h"
+#include "../compiler-core/slang-name.h"
+
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "../../slang.h"
@@ -16,7 +19,6 @@
 #include "slang-ast-reflect.h"
 #include "slang-ref-object-reflect.h"
 
-#include "slang-name.h"
 
 #include <assert.h>
 

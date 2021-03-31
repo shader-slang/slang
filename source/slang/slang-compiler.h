@@ -7,11 +7,13 @@
 #include "../core/slang-downstream-compiler.h"
 #include "../core/slang-archive-file-system.h"
 
+#include "../compiler-core/slang-name.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"
-#include "slang-name.h"
+
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"

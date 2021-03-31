@@ -10,7 +10,9 @@
 
 #include "slang-check.h"
 #include "slang-compiler.h"
-#include "slang-lexer.h"
+
+#include "../compiler-core/slang-lexer.h"
+
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-parameter-binding.h"

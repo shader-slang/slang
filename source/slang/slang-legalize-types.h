@@ -27,7 +27,8 @@
 #include "slang-ir-insts.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
-#include "slang-name.h"
+
+#include "../compiler-core/slang-name.h"
 
 namespace Slang
 {

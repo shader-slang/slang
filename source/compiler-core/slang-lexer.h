@@ -2,7 +2,7 @@
 #define SLANG_LEXER_H
 
 #include "../core/slang-basic.h"
-#include "slang-diagnostics.h"
+#include "slang-diagnostic-sink.h"
 
 namespace Slang
 {

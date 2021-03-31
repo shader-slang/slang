@@ -1,6 +1,6 @@
 #include "slang-mangle.h"
 
-#include "slang-name.h"
+#include "../compiler-core/slang-name.h"
 #include "slang-syntax.h"
 
 namespace Slang

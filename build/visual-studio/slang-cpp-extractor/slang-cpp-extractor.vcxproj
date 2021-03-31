@@ -162,20 +162,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
     <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lexer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-name.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-file-system.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lexer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-name.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-token.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp" />
   </ItemGroup>

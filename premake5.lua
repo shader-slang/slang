@@ -695,16 +695,8 @@ tool "slang-cpp-extractor"
     includedirs { "." }
     
     files { 
-        "source/slang/slang-lexer.cpp",
-        "source/slang/slang-lexer.h",
         "source/slang/slang-file-system.cpp",
         "source/slang/slang-file-system.h",
-        "source/slang/slang-diagnostics.cpp",
-        "source/slang/slang-diagnostics.h",
-        "source/slang/slang-name.cpp",
-        "source/slang/slang-name.h",
-        "source/slang/slang-token.cpp",
-        "source/slang/slang-token.h",
     }
     
     links { "core", "compiler-core" }

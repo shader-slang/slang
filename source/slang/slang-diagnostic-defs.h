@@ -43,7 +43,6 @@ DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to mak
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
-DIAGNOSTIC(-1, Note, seeTokenPasteLocation, "see token pasted location")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")
 
 //
@@ -128,21 +127,6 @@ DIAGNOSTIC(    88, Error, unknownArchiveType, "archive type '%0' is unknown")
 
 DIAGNOSTIC(  100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
 DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
-
-
-//
-// 1xxxx - Lexical analysis
-//
-
-DIAGNOSTIC(10000, Error, illegalCharacterPrint, "illegal character '$0'")
-DIAGNOSTIC(10000, Error, illegalCharacterHex, "illegal character (0x$0)")
-DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "illegal character literal")
-
-DIAGNOSTIC(10002, Warning, octalLiteral, "'0' prefix indicates octal literal")
-DIAGNOSTIC(10003, Error, invalidDigitForBase, "invalid digit for base-$1 literal: '$0'")
-
-DIAGNOSTIC(10004, Error, endOfFileInLiteral, "end of file in literal")
-DIAGNOSTIC(10005, Error, newlineInLiteral, "newline in literal")
 
 //
 // 15xxx - Preprocessing
