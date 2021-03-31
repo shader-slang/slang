@@ -9,6 +9,8 @@
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-name.h"
 
+#include "../core/slang-std-writers.h"
+
 #include "../../slang-com-ptr.h"
 
 #include "slang-capability.h"
@@ -1548,6 +1550,8 @@ namespace Slang
         bool shouldDumpAST = false;
         bool shouldDocument = false;
 
+        bool outputPreprocessor = false;
+
             /// If true will after lexical analysis output the hierarchy of includes to stdout
         bool outputIncludes = false;
 
@@ -1565,8 +1569,11 @@ namespace Slang
     class FrontEndCompileRequest : public CompileRequestBase
     {
     public:
+            /// Note that writers can be parsed as nullptr to disable output,
+            /// and individual channels set to null to disable them
         FrontEndCompileRequest(
             Linkage*        linkage,
+            StdWriters*     writers, 
             DiagnosticSink* sink);
 
         int addEntryPoint(
@@ -1682,6 +1689,8 @@ namespace Slang
         RefPtr<ComponentType> m_globalAndEntryPointsComponentType;
 
         List<RefPtr<ComponentType>> m_unspecializedEntryPoints;
+
+        RefPtr<StdWriters> m_writers;
     };
 
         /// A visitor for use with `ComponentType`s, allowing dispatch over the concrete subclasses.
@@ -2024,7 +2033,7 @@ namespace Slang
             List<String> const &    genericTypeNames);
 
         void setWriter(WriterChannel chan, ISlangWriter* writer);
-        ISlangWriter* getWriter(WriterChannel chan) const { return m_writers[int(chan)]; }
+        ISlangWriter* getWriter(WriterChannel chan) const { return m_writers->getWriter(SlangWriterChannel(chan)); }
 
             /// The end to end request can be passed as nullptr, if not driven by one
         SlangResult executeActionsInner();
@@ -2067,7 +2076,8 @@ namespace Slang
         RefPtr<BackEndCompileRequest>   m_backEndReq;
 
         // For output
-        ComPtr<ISlangWriter> m_writers[SLANG_WRITER_CHANNEL_COUNT_OF];
+
+        RefPtr<StdWriters> m_writers;
     };
 
     void generateOutput(
