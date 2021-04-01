@@ -1,17 +1,17 @@
 // slang-nvrtc-compiler.cpp
 #include "slang-nvrtc-compiler.h"
 
-#include "slang-common.h"
+#include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
 
 #include "../core/slang-blob.h"
 
-#include "slang-string-util.h"
-#include "slang-string-slice-pool.h"
+#include "../core/slang-string-util.h"
+#include "../core/slang-string-slice-pool.h"
 
-#include "slang-io.h"
-#include "slang-shared-library.h"
-#include "slang-semantic-version.h"
+#include "../core/slang-io.h"
+#include "../core/slang-shared-library.h"
+#include "../core/slang-semantic-version.h"
 
 
 namespace nvrtc

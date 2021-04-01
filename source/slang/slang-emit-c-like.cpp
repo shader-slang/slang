@@ -2,6 +2,8 @@
 #include "slang-emit-c-like.h"
 
 #include "../core/slang-writer.h"
+#include "../compiler-core/slang-name.h"
+
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-entry-point-uniforms.h"
@@ -17,7 +19,7 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-name.h"
+
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"

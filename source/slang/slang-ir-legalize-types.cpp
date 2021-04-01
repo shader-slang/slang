@@ -10,12 +10,13 @@
 // fully specialized (no more generics/interfaces), so
 // that the concrete type of everything is known.
 
+#include "../compiler-core/slang-name.h"
+
 #include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
-#include "slang-name.h"
 
 namespace Slang
 {

@@ -46,53 +46,6 @@ protected:
 	D3D12_RESOURCE_BARRIER m_barriers[MAX_BARRIERS];
 };
 
-/*! \brief A class to simplify using Dx12 fences.
-
-A fence is a mechanism to track GPU work. This is achieved by having a counter that the CPU holds
-called the current value. Calling nextSignal will increase the CPU counter, and add a fence
-with that value to the commandQueue. When the GPU has completed all the work before the fence it will
-update the completed value. This is typically used when
-the CPU needs to know the GPU has finished some piece of work has completed. To do this the CPU
-can check the completed value, and when it is greater or equal to the value returned by nextSignal the
-CPU will know that all the work prior to when the nextSignal was added to the queue will have completed.
-
-NOTE! This cannot be used across threads, as for amongst other reasons SetEventOnCompletion
-only works with a single value.
-
-Signal on the CommandQueue updates the fence on the GPU side. Signal on the fence object changes
-the value on the CPU side (not used here).
-
-Useful article describing how Dx12 synchronization works:
-https://msdn.microsoft.com/en-us/library/windows/desktop/dn899217%28v=vs.85%29.aspx
-*/
-class D3D12CounterFence
-{
-public:
-		/// Must be called before used
-	SlangResult init(ID3D12Device* device, uint64_t initialValue = 0);
-		/// Increases the counter, signals the queue and waits for the signal to be hit
-	void nextSignalAndWait(ID3D12CommandQueue* queue);
-		/// Signals with next counter value. Returns the value the signal was called on
-	uint64_t nextSignal(ID3D12CommandQueue* commandQueue);
-		/// Get the current value
-	SLANG_FORCE_INLINE uint64_t getCurrentValue() const { return m_currentValue; }
-		/// Get the completed value
-	SLANG_FORCE_INLINE uint64_t getCompletedValue() const { return m_fence->GetCompletedValue(); }
-
-		/// Waits for the the specified value
-	void waitUntilCompleted(uint64_t completedValue);
-
-		/// Ctor
-	D3D12CounterFence() :m_event(nullptr), m_currentValue(0) {}
-		/// Dtor
-	~D3D12CounterFence();
-
-protected:
-	HANDLE m_event;
-	Slang::ComPtr<ID3D12Fence> m_fence;
-	UINT64 m_currentValue;
-};
-
 /** The base class for resource types allows for tracking of state. It does not allow for setting of the resource though, such that
 an interface can return a D3D12ResourceBase, and a client cant manipulate it's state, but it cannot replace/change the actual resource */
 struct D3D12ResourceBase

@@ -4,7 +4,7 @@
 
 #include "slang-serialize-type-info.h"
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 #include "slang-compiler.h"
 
 namespace Slang {

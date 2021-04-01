@@ -2,10 +2,8 @@
 
 namespace Slang {
 
-static const CharUtil::CharFlagMap _calcCharFlagsMap()
+/* static */CharUtil::CharFlagMap CharUtil::makeCharFlagMap()
 {
-    typedef CharUtil::Flag Flag;
-
     CharUtil::CharFlagMap map;
     memset(&map, 0, sizeof(map));
 
@@ -40,9 +38,19 @@ static const CharUtil::CharFlagMap _calcCharFlagsMap()
         map.flags[size_t('\t')] |= Flag::HorizontalWhitespace;
     }
 
+    {
+        map.flags[size_t('\n')] |= Flag::VerticalWhitespace;
+        map.flags[size_t('\r')] |= Flag::VerticalWhitespace;
+    }
+
     return map;
 }
 
-/* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = _calcCharFlagsMap();
+/* static */int CharUtil::_ensureLink()
+{
+    return makeCharFlagMap().flags[0];
+}
+
+/* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = makeCharFlagMap();
 
 } // namespace Slang

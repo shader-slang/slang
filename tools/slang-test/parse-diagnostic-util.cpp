@@ -11,7 +11,7 @@
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
 
-#include "../../source/core/slang-downstream-compiler.h"
+#include "../../source/compiler-core/slang-downstream-compiler.h"
 
 using namespace Slang;
 
@@ -384,8 +384,27 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     return nullptr;
 }
 
+static bool _isWhitespace(const UnownedStringSlice& slice)
+{
+    for (const char c : slice)
+    {
+        if (!CharUtil::isWhitespace(c))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* static */SlangResult ParseDiagnosticUtil::parseDiagnostics(const UnownedStringSlice& inText, List<DownstreamDiagnostic>& outDiagnostics)
 {
+    if (_isWhitespace(inText))
+    {
+        // If it's empty, then there are no diagnostics to add.
+        outDiagnostics.clear();
+        return SLANG_OK;
+    }
+
     // TODO(JS):
     // As it stands output of downstream compilers isn't standardized. This can be improved upon - and if so
     // we should have a function that will parse the standardized output

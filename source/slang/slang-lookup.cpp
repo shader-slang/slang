@@ -1,6 +1,7 @@
 // slang-lookup.cpp
 #include "slang-lookup.h"
-#include "slang-name.h"
+
+#include "../compiler-core/slang-name.h"
 
 namespace Slang {
 

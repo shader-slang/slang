@@ -1,12 +1,12 @@
 // slang-gcc-compiler-util.cpp
 #include "slang-gcc-compiler-util.h"
 
-#include "slang-common.h"
+#include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
-#include "slang-string-util.h"
+#include "../core/slang-string-util.h"
 
-#include "slang-io.h"
-#include "slang-shared-library.h"
+#include "../core/slang-io.h"
+#include "../core/slang-shared-library.h"
 
 namespace Slang
 {

@@ -1,7 +1,8 @@
 #ifndef SLANG_PARSER_H
 #define SLANG_PARSER_H
 
-#include "slang-lexer.h"
+#include "../compiler-core/slang-lexer.h"
+
 #include "slang-compiler.h"
 #include "slang-syntax.h"
 

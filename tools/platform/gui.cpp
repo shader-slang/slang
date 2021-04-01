@@ -188,7 +188,7 @@ void GUI::beginFrame()
     ImGui::NewFrame();
 }
 
-void GUI::endFrame(IFramebuffer* framebuffer)
+void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuffer)
 {
     ImGui::Render();
 
@@ -217,7 +217,7 @@ void GUI::endFrame(IFramebuffer* framebuffer)
     auto indexBuffer = device->createBufferResource(
         IResource::Usage::IndexBuffer,
         indexBufferDesc);
-    auto cmdBuf = queue->createCommandBuffer();
+    auto cmdBuf = transientHeap->createCommandBuffer();
     auto encoder = cmdBuf->encodeResourceCommands();
     {
         for(int ii = 0; ii < commandListCount; ++ii)

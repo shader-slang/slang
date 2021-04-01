@@ -10,11 +10,10 @@
 #include "slang-compiler.h"
 #include "slang-profile.h"
 
-#include "slang-file-system.h"
-
 #include "slang-repro.h"
 #include "slang-serialize-ir.h"
 
+#include "../core/slang-file-system.h"
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-hex-dump-util.h"
 
@@ -528,6 +527,10 @@ struct OptionsParser
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
+                }
+                else if (argStr == "-E" || argStr == "-output-preprocessor")
+                {
+                    requestImpl->getFrontEndReq()->outputPreprocessor = true;
                 }
                 else if (argStr == "-dump-ast")
                 {

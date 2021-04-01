@@ -217,7 +217,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-emit-precedence.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-source-writer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
@@ -275,12 +274,10 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-legalize-types.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lexer.h" />
     <ClInclude Include="..\..\..\source\slang\slang-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-lower-to-ir.h" />
     <ClInclude Include="..\..\..\source\slang\slang-mangle.h" />
     <ClInclude Include="..\..\..\source\slang\slang-mangled-lexer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-name.h" />
     <ClInclude Include="..\..\..\source\slang\slang-options.h" />
     <ClInclude Include="..\..\..\source\slang\slang-parameter-binding.h" />
     <ClInclude Include="..\..\..\source\slang\slang-parser.h" />
@@ -302,10 +299,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-serialize-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-serialize-value-type-info.h" />
     <ClInclude Include="..\..\..\source\slang\slang-serialize.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-source-loc.h" />
     <ClInclude Include="..\..\..\source\slang\slang-syntax.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token.h" />
     <ClInclude Include="..\..\..\source\slang\slang-type-layout.h" />
     <ClInclude Include="..\..\..\source\slang\slang-type-system-shared.h" />
     <ClInclude Include="..\..\..\source\slang\slang-value-reflect.h" />
@@ -350,7 +344,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-emit-source-writer.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-spirv.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-file-system.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-include-system.cpp" />
@@ -407,12 +400,10 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-wrap-structured-buffers.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-legalize-types.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lexer.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-lower-to-ir.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangle.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-mangled-lexer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-options.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-parameter-binding.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-parser.cpp" />
@@ -430,11 +421,9 @@
     <ClCompile Include="..\..\..\source\slang\slang-serialize-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-serialize.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-source-loc.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib-api.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-stdlib.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-syntax.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-token.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-type-layout.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-type-system-shared.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-value-reflect.cpp" />
@@ -451,6 +440,9 @@
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">
+      <Project>{12C1E89D-F5D0-41D3-8E8D-FB3F358F8126}</Project>
     </ProjectReference>
     <ProjectReference Include="..\miniz\miniz.vcxproj">
       <Project>{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}</Project>

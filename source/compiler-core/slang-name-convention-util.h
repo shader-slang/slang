@@ -1,8 +1,8 @@
-#ifndef SLANG_CORE_NAME_CONVENTION_UTIL_H
-#define SLANG_CORE_NAME_CONVENTION_UTIL_H
+#ifndef SLANG_COMPILER_CORE_NAME_CONVENTION_UTIL_H
+#define SLANG_COMPILER_CORE_NAME_CONVENTION_UTIL_H
 
-#include "slang-string.h"
-#include "slang-list.h"
+#include "../core/slang-string.h"
+#include "../core/slang-list.h"
 
 namespace Slang
 {

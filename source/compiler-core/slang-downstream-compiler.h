@@ -1,15 +1,15 @@
 #ifndef SLANG_DOWNSTREAM_COMPILER_H
 #define SLANG_DOWNSTREAM_COMPILER_H
 
-#include "slang-common.h"
-#include "slang-string.h"
+#include "../core/slang-common.h"
+#include "../core/slang-string.h"
 
-#include "slang-process-util.h"
+#include "../core/slang-process-util.h"
 
-#include "slang-platform.h"
-#include "slang-semantic-version.h"
+#include "../core/slang-platform.h"
+#include "../core/slang-semantic-version.h"
 
-#include "slang-io.h"
+#include "../core/slang-io.h"
 
 #include "../../slang-com-ptr.h"
 
