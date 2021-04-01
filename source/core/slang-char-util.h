@@ -41,11 +41,18 @@ struct CharUtil
         /// Given a character return the upper case equivalent
     SLANG_FORCE_INLINE static char toUpper(char c) { return (c >= 'a' && c <= 'z') ? (c -'a' + 'A') : c; }
 
-    
+
     struct CharFlagMap
     {
         Flags flags[0x100];
     };
+
+    static CharFlagMap makeCharFlagMap();
+
+        // HACK!
+        // JS: Many of the inlined functions of CharUtil just access a global map. That referencing this global is *NOT* enough to
+        // link correctly with CharUtil on linux for a shared library. Caling this function can force linkage.
+    static int _ensureLink();
 
     static const CharFlagMap g_charFlagMap;
 };

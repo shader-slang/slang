@@ -11,7 +11,7 @@
 
 #include "slang-serialize-types.h"
 
-#include "slang-name.h"
+#include "../compiler-core/slang-name.h"
 
 namespace Slang
 {

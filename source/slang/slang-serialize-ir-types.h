@@ -9,8 +9,8 @@
 #include "slang-serialize-types.h"
 #include "slang-serialize-source-loc.h"
 
-#include "slang-name.h"
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-name.h"
+#include "../compiler-core/slang-source-loc.h"
 
 #include "slang-ir.h"
 

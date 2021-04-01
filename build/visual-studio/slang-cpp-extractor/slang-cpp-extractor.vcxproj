@@ -162,28 +162,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-file-system.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-lexer.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-name.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-source-loc.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-token.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-file-system.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-lexer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-name.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-source-loc.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-token.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">
+      <Project>{12C1E89D-F5D0-41D3-8E8D-FB3F358F8126}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

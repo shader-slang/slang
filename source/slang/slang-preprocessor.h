@@ -4,7 +4,7 @@
 
 #include "../core/slang-basic.h"
 
-#include "slang-lexer.h"
+#include "../compiler-core/slang-lexer.h"
 
 #include "slang-include-system.h"
 

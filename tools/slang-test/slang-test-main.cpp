@@ -11,22 +11,18 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
-
-using namespace Slang;
+#include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-render-api-util.h"
 
 #include "directory-util.h"
-#include "../../source/core/slang-render-api-util.h"
 #include "test-context.h"
 #include "test-reporter.h"
 #include "options.h"
 #include "slangc-tool.h"
 #include "parse-diagnostic-util.h"
 
-#include "../../source/core/slang-downstream-compiler.h"
-
-#include "../../source/core/slang-nvrtc-compiler.h"
-
-#include "../../source/core/slang-process-util.h"
+#include "../../source/compiler-core/slang-downstream-compiler.h"
+#include "../../source/compiler-core/slang-nvrtc-compiler.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "external/stb/stb_image.h"
@@ -38,6 +34,8 @@ using namespace Slang;
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
+
+using namespace Slang;
 
 // Options for a particular test
 struct TestOptions

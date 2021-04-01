@@ -10,7 +10,7 @@
 
 #include "slang-options.h"
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 
 namespace Slang {
 

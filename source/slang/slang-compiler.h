@@ -3,9 +3,11 @@
 
 #include "../core/slang-basic.h"
 #include "../core/slang-shared-library.h"
-
-#include "../core/slang-downstream-compiler.h"
 #include "../core/slang-archive-file-system.h"
+#include "../core/slang-file-system.h"
+
+#include "../compiler-core/slang-downstream-compiler.h"
+#include "../compiler-core/slang-name.h"
 
 #include "../core/slang-std-writers.h"
 
@@ -13,12 +15,11 @@
 
 #include "slang-capability.h"
 #include "slang-diagnostics.h"
-#include "slang-name.h"
+
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
 
-#include "slang-file-system.h"
 
 #include "slang-include-system.h"
 

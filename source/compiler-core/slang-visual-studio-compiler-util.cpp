@@ -1,16 +1,16 @@
 // slang-visual-studio-compiler-util.cpp
 #include "slang-visual-studio-compiler-util.h"
 
-#include "slang-common.h"
+#include "../core/slang-common.h"
 #include "../../slang-com-helper.h"
-#include "slang-string-util.h"
+#include "../core/slang-string-util.h"
 
 // if Visual Studio import the visual studio platform specific header
 #if SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"
 #endif
 
-#include "slang-io.h"
+#include "../core/slang-io.h"
 
 namespace Slang
 {

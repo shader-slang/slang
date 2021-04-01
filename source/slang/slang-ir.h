@@ -8,10 +8,9 @@
 //
 
 #include "../core/slang-basic.h"
-
-#include "slang-source-loc.h"
-
 #include "../core/slang-memory-arena.h"
+
+#include "../compiler-core/slang-source-loc.h"
 
 #include "slang-type-system-shared.h"
 

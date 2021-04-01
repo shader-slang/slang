@@ -4,8 +4,9 @@
 #define PARSE_DIAGNOSTIC_UTIL_H
 
 #include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-downstream-compiler.h"
 #include "../../source/core/slang-string.h"
+
+#include "../../source/compiler-core/slang-downstream-compiler.h"
 
 #include "../../slang-com-ptr.h"
 

@@ -3,7 +3,7 @@
 
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
-#include "slang-lexer.h"
+#include "../compiler-core/slang-lexer.h"
 // Needed so that we can construct modifier syntax to represent GLSL directives
 #include "slang-syntax.h"
 

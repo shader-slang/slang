@@ -1,8 +1,8 @@
 #include "slang-win-visual-studio-util.h"
 
-#include "../slang-common.h"
-#include "../slang-process-util.h"
-#include "../slang-string-util.h"
+#include "../../core/slang-common.h"
+#include "../../core/slang-process-util.h"
+#include "../../core/slang-string-util.h"
 
 #include "../slang-visual-studio-compiler-util.h"
 

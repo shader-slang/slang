@@ -2,7 +2,7 @@
 #ifndef SLANG_SERIALIZE_REFLECTION_H
 #define SLANG_SERIALIZE_REFLECTION_H
 
-#include "slang-name.h"
+#include "../compiler-core/slang-name.h"
 
 namespace Slang
 {

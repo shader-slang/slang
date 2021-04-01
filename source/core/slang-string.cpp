@@ -5,6 +5,12 @@
 
 namespace Slang
 {
+    // HACK!
+    // JS: Many of the inlined functions of CharUtil just access a global map. That referencing this global is *NOT* enough to
+    // link correctly with CharUtil on linux for a shared library. The following call exists to try and force linkage of CharUtil
+    // for anything that uses core
+    static const auto s_charUtilLink = CharUtil::_ensureLink();
+
     // TODO: this belongs in a different file:
 
     SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)

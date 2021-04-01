@@ -2,7 +2,7 @@
 #define SLANG_INCLUDE_SYSTEM_H
 // slang-include-system.h
 
-#include "slang-source-loc.h"
+#include "../compiler-core/slang-source-loc.h"
 
 namespace Slang
 {
