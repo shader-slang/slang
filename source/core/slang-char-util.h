@@ -49,6 +49,11 @@ struct CharUtil
 
     static CharFlagMap makeCharFlagMap();
 
+        // HACK!
+        // JS: Many of the inlined functions of CharUtil just access a global map. That referencing this global is *NOT* enough to
+        // link correctly with CharUtil on linux for a shared library. Caling this function can force linkage.
+    static int _ensureLink();
+
     static const CharFlagMap g_charFlagMap;
 };
     

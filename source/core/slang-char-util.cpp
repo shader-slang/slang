@@ -4,8 +4,6 @@ namespace Slang {
 
 /* static */CharUtil::CharFlagMap CharUtil::makeCharFlagMap()
 {
-    typedef CharUtil::Flag Flag;
-
     CharUtil::CharFlagMap map;
     memset(&map, 0, sizeof(map));
 
@@ -46,6 +44,11 @@ namespace Slang {
     }
 
     return map;
+}
+
+/* static */int CharUtil::_ensureLink()
+{
+    return makeCharFlagMap().flags[0];
 }
 
 /* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = makeCharFlagMap();
