@@ -16,12 +16,6 @@
 namespace Slang
 {
 
-// Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
-static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
-static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
-
 RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
     m_compressionSystem(compressionSystem)
 {
@@ -29,7 +23,7 @@ RiffFileSystem::RiffFileSystem(ICompressionSystem* compressionSystem):
 
 ISlangMutableFileSystem* RiffFileSystem::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() || guid == ISlangMutableFileSystem::getTypeGuid()) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
 SlangResult RiffFileSystem::_calcCanonicalPath(const char* path, StringBuilder& out)

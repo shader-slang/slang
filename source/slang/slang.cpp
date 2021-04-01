@@ -108,20 +108,6 @@ namespace Slang {
     }
 }
 
-// Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_IComponentType    = SLANG_UUID_IComponentType;
-static const Guid IID_IEntryPoint       = SLANG_UUID_IEntryPoint;
-static const Guid IID_IGlobalSession    = SLANG_UUID_IGlobalSession;
-static const Guid IID_IModule           = SLANG_UUID_IModule;
-static const Guid IID_ISession          = SLANG_UUID_ISession;
-static const Guid IID_ISlangBlob        = SLANG_UUID_ISlangBlob;
-static const Guid IID_ISlangUnknown     = SLANG_UUID_ISlangUnknown;
-
-static const Guid IID_ICompileRequest   = SLANG_UUID_ICompileRequest;
-
-// Available to other modules so not static
-const Guid IID_EndToEndCompileRequest   = SLANG_UUID_EndToEndCompileRequest;
-
 const char* getBuildTagString()
 {
     return SLANG_TAG_VERSION;
@@ -447,7 +433,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
 
 ISlangUnknown* Session::getInterface(const Guid& guid)
 {
-    if(guid == IID_ISlangUnknown || guid == IID_IGlobalSession)
+    if(guid == ISlangUnknown::getTypeGuid() || guid == IGlobalSession::getTypeGuid())
         return asExternal(this);
     return nullptr;
 }
@@ -750,7 +736,7 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
 
 ISlangUnknown* Linkage::getInterface(const Guid& guid)
 {
-    if(guid == IID_ISlangUnknown || guid == IID_ISession)
+    if(guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
         return asExternal(this);
 
     return nullptr;
@@ -1969,7 +1955,7 @@ EndToEndCompileRequest::EndToEndCompileRequest(
 
 SLANG_NO_THROW SlangResult SLANG_MCALL EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == IID_EndToEndCompileRequest)
+    if (uuid == EndToEndCompileRequest::getTypeGuid())
     {
         // Special case to cast directly into internal type
         // NOTE! No addref(!)
@@ -1977,7 +1963,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL EndToEndCompileRequest::queryInterface(Sl
         return SLANG_OK;
     }
 
-    if (uuid == IID_ISlangUnknown && uuid == IID_ICompileRequest)
+    if (uuid == ISlangUnknown::getTypeGuid() && uuid == ICompileRequest::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::ICompileRequest*>(this);
@@ -2566,7 +2552,7 @@ Module::Module(Linkage* linkage, ASTBuilder* astBuilder)
 
 ISlangUnknown* Module::getInterface(const Guid& guid)
 {
-    if(guid == IID_IModule)
+    if(guid == IModule::getTypeGuid())
         return asExternal(this);
     return Super::getInterface(guid);
 }
@@ -2711,14 +2697,14 @@ ComponentType* asInternal(slang::IComponentType* inComponentType)
     // (without even `addRef`-ing it).
     //
     ComPtr<slang::IComponentType> componentType;
-    inComponentType->queryInterface(IID_IComponentType, (void**) componentType.writeRef());
+    inComponentType->queryInterface(slang::IComponentType::getTypeGuid(), (void**) componentType.writeRef());
     return static_cast<ComponentType*>(componentType.get());
 }
 
 ISlangUnknown* ComponentType::getInterface(Guid const& guid)
 {
-    if(guid == IID_ISlangUnknown
-        || guid == IID_IComponentType)
+    if(guid == ISlangUnknown::getTypeGuid()
+        || guid == slang::IComponentType::getTypeGuid())
     {
         return static_cast<slang::IComponentType*>(this);
     }
@@ -3632,9 +3618,6 @@ Session* CompileRequestBase::getSession()
     return getLinkage()->getSessionImpl();
 }
 
-static const Slang::Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
-static const Slang::Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
-
 void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 {
     // Set the fileSystem
@@ -3653,7 +3636,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     else
     {
         CacheFileSystem* cacheFileSystemPtr = nullptr;   
-        inFileSystem->queryInterface(IID_SlangCacheFileSystem, (void**)&cacheFileSystemPtr);
+        inFileSystem->queryInterface(CacheFileSystem::getTypeGuid(), (void**)&cacheFileSystemPtr);
         if (cacheFileSystemPtr)
         {
             m_cacheFileSystem = cacheFileSystemPtr;
@@ -3669,7 +3652,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
             else
             {
                 // See if we have the full ISlangFileSystemExt interface, if we do just use it
-                inFileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+                inFileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
 
                 // If not wrap with CacheFileSystem that emulates ISlangFileSystemExt from the ISlangFileSystem interface
                 if (!m_fileSystemExt)
