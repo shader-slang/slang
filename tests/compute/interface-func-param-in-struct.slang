@@ -1,7 +1,7 @@
 // Tests specializing a function with existential-struct-typed param.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 [anyValueSize(8)]
 interface IInterface
@@ -30,8 +30,6 @@ void compute(uint tid, Params p)
 {
     gOutputBuffer[tid] = p.obj[0].eval();
 }
-
-//TEST_INPUT: entryPointExistentialType Impl
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID,

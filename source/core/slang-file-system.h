@@ -70,8 +70,6 @@ private:
     static OSFileSystem g_mutable;
 };
 
- #define SLANG_UUID_CacheFileSystem { 0x2f4d1d03, 0xa0d1, 0x434b, { 0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b } };
-
 /* Wraps an underlying ISlangFileSystem or ISlangFileSystemExt and provides caching, 
 as well as emulation of methods if only has ISlangFileSystem interface. Will query capabilities
 of the interface on the constructor.
@@ -83,6 +81,7 @@ NOTE! That this behavior is the same as previously in that....
 class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 {
     public:
+    SLANG_CLASS_GUID(0x2f4d1d03, 0xa0d1, 0x434b, { 0x87, 0x7a, 0x65, 0x5, 0xa4, 0xa0, 0x9a, 0x3b })
 
     enum class PathStyle
     {

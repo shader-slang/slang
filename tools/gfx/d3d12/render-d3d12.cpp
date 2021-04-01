@@ -1059,83 +1059,88 @@ public:
                 }
             }
 
+                /// Stores offset information to apply to the reflected register/space for a descriptor range.
+                ///
             struct BindingRegisterOffset
             {
-                // The index to the physical descriptor set that stores the binding.
-                uint32_t descriptorSetIndex;
+                uint32_t spaceOffset = 0; // The `space` index as specified in shader.
 
-                uint32_t spaceOffset; // The `space` index as specified in shader.
-                uint32_t textureOffset; // `t` registers
-                uint32_t samplerOffset; // `s` registers
-                uint32_t constantBufferOffset; // `b` registers
-                uint32_t uavOffset; // `u` registers
-                void set(D3D12_DESCRIPTOR_RANGE_TYPE type, uint32_t value)
+                    /// An offset to apply for each D3D12 register class, as given
+                    /// by a `D3D12_DESCRIPTOR_RANGE_TYPE`.
+                    ///
+                    /// Note that the `D3D12_DESCRIPTOR_RANGE_TYPE` enumeration has
+                    /// values between 0 and 3, inclusive.
+                    ///
+                uint32_t offsetForRangeType[4] = {0, 0, 0, 0};
+
+                uint32_t& operator[](D3D12_DESCRIPTOR_RANGE_TYPE type)
                 {
-                    switch (type)
-                    {
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-                        constantBufferOffset = value;
-                        return;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-                        uavOffset = value;
-                        return;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-                        textureOffset = value;
-                        return;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
-                        samplerOffset = value;
-                        return;
-                    default:
-                        break;
-                    }
+                    return offsetForRangeType[int(type)];
                 }
-                uint32_t get(D3D12_DESCRIPTOR_RANGE_TYPE type)
+
+                uint32_t operator[](D3D12_DESCRIPTOR_RANGE_TYPE type) const
                 {
-                    switch (type)
-                    {
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-                        return constantBufferOffset;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-                        return uavOffset;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-                        return textureOffset;
-                    case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
-                        return samplerOffset;
-                    default:
-                        return 0;
-                    }
+                    return offsetForRangeType[int(type)];
                 }
             };
 
-            void addDescriptorRange(
-                slang::TypeLayoutReflection* typeLayout,
-                D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
-                Index bindingRangeIndex,
-                BindingRegisterOffset* offset,
-                BindingRegisterOffset* newOffset)
+                /// Add a new descriptor set to the layout being computed.
+                ///
+                /// Note that a "descriptor set" in the layout may amount to
+                /// zero, one, or two different descriptor *tables* in the
+                /// final D3D12 root signature. Each descriptor set may
+                /// contain zero or more view ranges (CBV/SRV/UAV) and zero
+                /// or more sampler ranges. It maps to a view descriptor table
+                /// if the number of view ranges is non-zero and to a sampler
+                /// descriptor table if the number of sampler ranges is non-zero.
+                ///
+            uint32_t addDescriptorSet()
             {
+                auto result = (uint32_t) m_descriptorSets.getCount();
+                m_descriptorSets.add(DescriptorSetLayout{});
+                return result;
+            }
+
+                /// Add one descriptor range as specified in Slang reflection information to the layout.
+                ///
+                /// The layout information is taken from `typeLayout` for the descriptor
+                /// range with the given `descriptorRangeIndex` within the logical
+                /// descriptor set (reflected by Slang) with the given `logicalDescriptorSetIndex`.
+                ///
+                /// The `physicalDescriptorSetIndex` is the index in the `m_descriptorSets` array of
+                /// the descriptor set that the range should be added to.
+                ///
+                /// The `offset` encodes information about space and/or register offsets that
+                /// should be applied to descrptor ranges.
+                ///
+                /// This operation can fail if the given descriptor range encodes a range that
+                /// doesn't map to anything directly supported by D3D12. Higher-level routines
+                /// will often want to ignore such failures.
+                ///
+            Result addDescriptorRange(
+                slang::TypeLayoutReflection*    typeLayout,
+                Index                           physicalDescriptorSetIndex,
+                BindingRegisterOffset const&    offset,
+                Index                           logicalDescriptorSetIndex,
+                Index                           descriptorRangeIndex)
+            {
+                auto& descriptorSet = m_descriptorSets[physicalDescriptorSetIndex];
+
+                auto bindingType = typeLayout->getDescriptorSetDescriptorRangeType(logicalDescriptorSetIndex, descriptorRangeIndex);
+                auto count = typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(logicalDescriptorSetIndex, descriptorRangeIndex);
+                auto index = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(logicalDescriptorSetIndex, descriptorRangeIndex);
+                auto space = typeLayout->getDescriptorSetSpaceOffset(logicalDescriptorSetIndex);
+
+                D3D12_DESCRIPTOR_RANGE_TYPE rangeType;
+                SLANG_RETURN_ON_FAIL(translateDescriptorRangeType(bindingType, &rangeType));
+
                 D3D12_DESCRIPTOR_RANGE range = {};
                 range.RangeType = rangeType;
-                auto descriptorRangeIndex =
-                    typeLayout->getBindingRangeFirstDescriptorRangeIndex(bindingRangeIndex);
-                auto relativeSpaceIndex =
-                    (uint32_t)typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
-                auto space = offset->spaceOffset + relativeSpaceIndex;
-                // Update descriptor range descs in current descriptor set.
-                auto& descriptorSet = m_descriptorSets[offset->descriptorSetIndex];
-                range.NumDescriptors =
-                    (UINT)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
-                        relativeSpaceIndex, descriptorRangeIndex);
-                range.BaseShaderRegister =
-                    (UINT)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(
-                        relativeSpaceIndex, descriptorRangeIndex) +
-                    offset->get(range.RangeType);
-                newOffset->set(
-                    range.RangeType,
-                    Math::Max(range.BaseShaderRegister + 1, newOffset->get(range.RangeType)));
+                range.NumDescriptors = (UINT) count;
+                range.BaseShaderRegister = (UINT) index + offset[rangeType];
+                range.RegisterSpace = (UINT) space;
                 range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-                range.RegisterSpace = space;
                 if (range.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
                 {
                     descriptorSet.m_samplerRanges.add(range);
@@ -1146,110 +1151,204 @@ public:
                     descriptorSet.m_resourceRanges.add(range);
                     descriptorSet.m_resourceCount += range.NumDescriptors;
                 }
+
+                return SLANG_OK;
             }
 
-            void addObject(slang::TypeLayoutReflection* typeLayout, BindingRegisterOffset* offset)
+                /// Add one binding range to the computed layout.
+                ///
+                /// The layout information is taken from `typeLayout` for the binding
+                /// range with the given `bindingRangeIndex`.
+                ///
+                /// The `physicalDescriptorSetIndex` is the index in the `m_descriptorSets` array of
+                /// the descriptor set that the range should be added to.
+                ///
+                /// The `offset` encodes information about space and/or register offsets that
+                /// should be applied to descrptor ranges.
+                ///
+                /// Note that a single binding range may encompass zero or more descriptor ranges.
+                ///
+            void addBindingRange(
+                slang::TypeLayoutReflection*    typeLayout,
+                Index                           physicalDescriptorSetIndex,
+                BindingRegisterOffset const&    offset,
+                Index                           bindingRangeIndex)
             {
-                typeLayout = _unwrapParameterGroups(typeLayout);
-                SlangInt bindingRangeCount = typeLayout->getBindingRangeCount();
-                // `register` and `space` index offset of future sub-objects.
-                BindingRegisterOffset subObjectOffset = *offset;
-                for (SlangInt i = 0; i < bindingRangeCount; i++)
+                auto logicalDescriptorSetIndex  = typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
+                auto firstDescriptorRangeIndex  = typeLayout->getBindingRangeFirstDescriptorRangeIndex(bindingRangeIndex);
+                Index descriptorRangeCount      = typeLayout->getBindingRangeDescriptorRangeCount(bindingRangeIndex);
+                for( Index i = 0; i < descriptorRangeCount; ++i )
                 {
-                    auto bindingType = typeLayout->getBindingRangeType(i);
-                    D3D12_DESCRIPTOR_RANGE_TYPE rangeType;
-                    if (translateDescriptorRangeType(bindingType, &rangeType) != SLANG_OK)
-                    {
-                        // Ignore all descriptor ranges that does not map directly into a
-                        // d3d descriptor.
-                        continue;
-                    }
-                    // The CBV descriptor range, along with any additional descriptor ranges associated
-                    // with the constant buffer binding range, will be appended to the end of this object's
-                    // descriptor table, so we skip them now.
-                    if (bindingType == slang::BindingType::ConstantBuffer)
-                        continue;
-                    addDescriptorRange(typeLayout, rangeType, i, offset, &subObjectOffset);
+                    auto descriptorRangeIndex = firstDescriptorRangeIndex + i;
+
+                    // Note: we ignore the `Result` returned by `addDescriptorRange()` because we
+                    // want to silently skip any ranges that represent kinds of bindings that
+                    // don't actually exist in D3D12.
+                    //
+                    addDescriptorRange(typeLayout, physicalDescriptorSetIndex, offset, logicalDescriptorSetIndex, descriptorRangeIndex);
                 }
-                auto subObjectCount = typeLayout->getSubObjectRangeCount();
-                for (SlangInt i = 0; i < subObjectCount; i++)
+            }
+
+                /// Add binding ranges and parameter blocks to the root signature.
+                ///
+                /// The layout information is taken from `varLayout` which should
+                /// be a layout for either a program or an entry point.
+                ///
+                /// The `physicalDescriptorSetIndex` is the index in the `m_descriptorSets` array of
+                /// the descriptor set that binding ranges not belonging to nested
+                /// parameter blocks should be added to.
+                ///
+                /// This routine will use absolute offset information computed from `varLayout`
+                /// to apply appropriate space/register offsets to the bindings and parameter
+                ///  blocks inside the layout.
+                ///
+            void addBindingRangesAndParameterBlocks(
+                slang::VariableLayoutReflection*    varLayout,
+                Index                               physicalDescriptorSetIndex)
+            {
+                BindingRegisterOffset offset;
+                offset.spaceOffset                          = (UINT) varLayout->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
+                offset[D3D12_DESCRIPTOR_RANGE_TYPE_CBV]     = (UINT) varLayout->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+                offset[D3D12_DESCRIPTOR_RANGE_TYPE_SRV]     = (UINT) varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE);
+                offset[D3D12_DESCRIPTOR_RANGE_TYPE_UAV]     = (UINT) varLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS);
+                offset[D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER] = (UINT) varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SAMPLER_STATE);
+
+                addBindingRangesAndParameterBlocks(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset);
+            }
+
+                /// Add binding ranges and parameter blocks to the root signature.
+                ///
+                /// The layout information is taken from `typeLayout` which should
+                /// be a layout for either a program or an entry point.
+                ///
+                /// The `physicalDescriptorSetIndex` is the index in the `m_descriptorSets` array of
+                /// the descriptor set that binding ranges not belonging to nested
+                /// parameter blocks should be added to.
+                ///
+                /// The `offset` encodes information about space and/or register offsets that
+                /// should be applied to descrptor ranges.
+                ///
+            void addBindingRangesAndParameterBlocks(
+                slang::TypeLayoutReflection*        typeLayout,
+                Index                               physicalDescriptorSetIndex,
+                BindingRegisterOffset const&        offset)
+            {
+                // Our first task is to add the binding ranges for stuff that is
+                // directly contained in `typeLayout` rather than via sub-objects.
+                //
+                // Our goal is to have the descriptors for directly-contained views/samplers
+                // always be contiguous in CPU and GPU memory, so that we can write
+                // to them easily with a single operaiton.
+                //
+                Index bindingRangeCount = typeLayout->getBindingRangeCount();
+                for (Index bindingRangeIndex = 0; bindingRangeIndex < bindingRangeCount; bindingRangeIndex++)
                 {
-                    auto rangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(i);
-                    switch (typeLayout->getBindingRangeType(rangeIndex))
+                    // We will look at the type of each binding range and intentionally
+                    // skip those that represent sub-objects.
+                    //
+                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
+                    switch(bindingType)
+                    {
+                    case slang::BindingType::ConstantBuffer:
+                    case slang::BindingType::ParameterBlock:
+                    case slang::BindingType::ExistentialValue:
+                        continue;
+
+                    default:
+                        break;
+                    }
+
+                    // For binding ranges that don't represent sub-objects, we will add
+                    // all of the descriptor ranges they encompass to the root signature.
+                    //
+                    addBindingRange(typeLayout, physicalDescriptorSetIndex, offset, bindingRangeIndex);
+                }
+
+                // Next we need to recurse on the various sub-objects that the type might contain.
+                // 
+                Index subObjectCount = typeLayout->getSubObjectRangeCount();
+                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectCount; subObjectRangeIndex++)
+                {
+                    // There are a few different concerns being tackled at once here, which depend on
+                    // the type of each sub-object range.
+                    //
+                    auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
+                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
+                    switch (bindingType)
                     {
                     case slang::BindingType::ConstantBuffer:
                         {
-                            auto subObjectType = typeLayout->getBindingRangeLeafTypeLayout(rangeIndex);
-                            auto subObjectElementType = _unwrapParameterGroups(subObjectType);
-                            if (subObjectElementType->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
-                            {
-                                addDescriptorRange(
-                                    typeLayout,
-                                    D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-                                    rangeIndex,
-                                    offset,
-                                    &subObjectOffset);
-                            }
-                            addObject(subObjectType, &subObjectOffset);
+                            // Constant buffer ranges (for `ConstantBuffer<ConcreteType>`) will "leak" their
+                            // binding ranges into the surrounding type, so we can add them here like any other
+                            // binding range.
+                            //
+                            // Note: It would be valid to allow `slang::BindingType::ConstantBuffer` to be handled
+                            // in the earlier loop, but that would mean that descriptor ranges coming directly
+                            // from the fields of `typeLayout` could be broken up with ranges coming from constant-buffer
+                            // sub-objects. By moving the handling of constant buffers to this later loop, we
+                            // guarantee that the descritpors used by non-sub-object binding ranges are all
+                            // contiguous.
+                            //
+                            addBindingRange(typeLayout, physicalDescriptorSetIndex, offset, bindingRangeIndex);
                         }
                         break;
+
                     case slang::BindingType::ParameterBlock:
                         {
-                            BindingRegisterOffset newOffset = {};
-                            newOffset.descriptorSetIndex = (uint32_t)m_descriptorSets.getCount();
-                            m_descriptorSets.add(DescriptorSetLayout{});
-                            newOffset.spaceOffset =
-                                offset->spaceOffset +
-                                (uint32_t)typeLayout->getBindingRangeDescriptorSetIndex(rangeIndex);
-                            auto subObjectType =
-                                typeLayout->getBindingRangeLeafTypeLayout(rangeIndex);
-                            addObject(subObjectType, &newOffset);
+                            // A parameter block (`ParameterBlock<ConcreteType>`) will always map to a distinct
+                            // descriptor set, and its contained view/sampler binding ranges will be bound
+                            // through that set.
+                            //
+                            auto blockPhysicalDescriptorSetIndex = addDescriptorSet();
+
+                            // We will need to recursively add the binding ranges implied by the type of
+                            // the parameter block.
+                            //
+                            auto blockTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+
+                            // One important detail is that the `blockTypeLayout` does not know the base register
+                            // space that the contents of the block should use. All descriptor ranges stored in
+                            // that layout will by default use a space offset of zero.
+                            //
+                            // We need to compute the space offset to apply when recursing into that block type
+                            // based on the binding range we are processing here.
+                            //
+                            auto blockLogicalDescriptorSetIndex = typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
+                            auto blockSpaceOffset = typeLayout->getDescriptorSetSpaceOffset(blockLogicalDescriptorSetIndex);
+
+                            // The space offset for this binding range should be added to any additional space
+                            // offset that was being passed down from above this layer.
+                            //
+                            // Any other offset information (register offsets) should be ignored at this point,
+                            // because `register` offsets from outside of the block don't affect layout within
+                            // the block.
+                            //
+                            BindingRegisterOffset blockOffset;
+                            blockOffset.spaceOffset = offset.spaceOffset + (uint32_t) blockSpaceOffset;
+
+                            // Once we have all the details worked out, we can write the binding ranges for the
+                            // block's type into the newly-allocated descriptor set.
+                            //
+                            // Note: there is an important subtlety going on here. We are passing in the type
+                            // `blockTypeLayout` which corresponds to `ParameterBlock<ConcreteType>` and *not* to
+                            // `ConcreteType` alone. Because of that detail, the binding/descriptor ranges will
+                            // include any "default constant buffer" range that needed to be allocated based
+                            // on `ConcreteType`.
+                            //
+                            // TODO: validate that this logic is right.
+                            //
+                            addBindingRangesAndParameterBlocks(blockTypeLayout, blockPhysicalDescriptorSetIndex, blockOffset);
                         }
+                        break;
+
+                    case slang::BindingType::ExistentialValue:
+                        // TODO: Need to handle this case here.
+                        break;
+
+                    default:
                         break;
                     }
                 }
-                *offset = subObjectOffset;
-            }
-
-            static BindingRegisterOffset getOffsetFromVarLayout(
-                slang::VariableLayoutReflection* varLayout)
-            {
-                BindingRegisterOffset offset;
-                offset.descriptorSetIndex = 0;
-                offset.spaceOffset =
-                    (uint32_t)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_REGISTER_SPACE);
-                offset.samplerOffset =
-                    (uint32_t)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SAMPLER_STATE);
-                offset.textureOffset =
-                    (uint32_t)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE);
-                offset.constantBufferOffset =
-                    (uint32_t)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
-                offset.uavOffset =
-                    (uint32_t)varLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS);
-                return offset;
-            }
-
-            void addObject(
-                slang::TypeLayoutReflection* typeLayout,
-                slang::VariableLayoutReflection* varLayout)
-            {
-                auto offset = getOffsetFromVarLayout(varLayout);
-                addObject(typeLayout, &offset);
-            }
-
-            void addEntryPoint(slang::EntryPointReflection* entryPoint)
-            {
-                BindingRegisterOffset offset = getOffsetFromVarLayout(entryPoint->getVarLayout());
-                if (entryPoint->hasDefaultConstantBuffer())
-                {
-                    addDescriptorRange(
-                        entryPoint->getTypeLayout(),
-                        D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-                        0,
-                        &offset,
-                        &offset);
-                }
-                addObject(entryPoint->getTypeLayout(), &offset);
             }
 
             D3D12_ROOT_SIGNATURE_DESC& build(
@@ -1307,19 +1406,46 @@ public:
             ID3D12RootSignature** outRootSignature,
             List<DescriptorSetInfo>& outRootDescriptorSetInfos)
         {
+            // We are going to build up the root signature by adding
+            // binding/descritpor ranges and nested parameter blocks
+            // based on the computed layout information for `program`.
+            //
             RootSignatureDescBuilder builder;
-            builder.m_descriptorSets.add(DescriptorSetLayout{});
-
             auto layout = program->getLayout();
-            auto globalParamLayout = layout->getGlobalParamsTypeLayout();
-            auto globalVarLayout = layout->getGlobalParamsVarLayout();
 
-            builder.addObject(globalParamLayout, globalVarLayout);
+            // The layout information computed by Slang breaks up shader
+            // parameters into what we can think of as "logical" descriptor
+            // sets based on whether or not parameters have the same `space`.
+            //
+            // We want to basically ignore that decomposition and generate a
+            // single descriptor set to hold all top-level parameters, and only
+            // generate distinct descriptor sets when the shader has opted in
+            // via explicit parameter blocks.
+            //
+            // To achieve this goal, we will manually allocate a default descriptor
+            // set for root parameters in our signature, and then recursively
+            // add all the binding/descriptor ranges implied by the global-scope
+            // parameters.
+            //
+            auto rootDescriptorSetIndex = builder.addDescriptorSet();
+            builder.addBindingRangesAndParameterBlocks(layout->getGlobalParamsVarLayout(), rootDescriptorSetIndex);
 
             for (SlangUInt i = 0; i < layout->getEntryPointCount(); i++)
             {
+                // Entry-point parameters should also be added to the default root
+                // descriptor set.
+                //
+                // We add the parameters using the "variable layout" for the entry point
+                // and not just its type layout, to ensure that any offset information is
+                // applied correctly to the `register` and `space` information for entry-point
+                // parameters.
+                //
+                // Note: When we start to support DXR we will need to handle entry-point parameters
+                // differently because they will need to map to local root signatures rather than
+                // being included in the global root signature as is being done here.
+                //
                 auto entryPoint = layout->getEntryPointByIndex(i);
-                builder.addEntryPoint(entryPoint);
+                builder.addBindingRangesAndParameterBlocks(entryPoint->getVarLayout(), rootDescriptorSetIndex);
             }
 
             auto& rootSignatureDesc = builder.build(outRootDescriptorSetInfos);
@@ -2034,21 +2160,13 @@ public:
             SLANG_RETURN_ON_FAIL(_writeOrdinaryData(
                 encoder, m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize, specializedLayout));
 
-            return SLANG_OK;
-        }
-
-        /// Bind the buffer for ordinary/uniform data, if needed
-        Result _bindOrdinaryDataBufferIfNeeded(PipelineCommandEncoder* encoder)
-        {
-            // We start by ensuring that the buffer is created, if it is needed.
-            //
-            SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded(encoder));
-
-            // If we did indeed need/create a buffer, then we must bind it
-            // into root binding state.
-            //
-            if (m_ordinaryDataBuffer)
             {
+                // We also create and store a descriptor for our root constant buffer
+                // into the descriptor table allocation that was reserved for them.
+                //
+                // We always know that the ordinary data buffer will be the first descriptor
+                // in the table of resource views.
+                //
                 auto descriptorTable = m_descriptorSet.m_resourceTable;
                 D3D12_CONSTANT_BUFFER_VIEW_DESC viewDesc = {};
                 viewDesc.BufferLocation =
@@ -2067,7 +2185,7 @@ public:
         virtual Result bindObject(PipelineCommandEncoder* encoder, RootBindingState* bindingState)
         {
             ShaderObjectLayoutImpl* layout = getLayout();
-            SLANG_RETURN_ON_FAIL(_bindOrdinaryDataBufferIfNeeded(encoder));
+            SLANG_RETURN_ON_FAIL(_ensureOrdinaryDataBufferCreatedIfNeeded(encoder));
             uint32_t descTableIndex = bindingState->rootParamIndex;
             auto& descSet = m_descriptorSet;
             if (descSet.m_resourceCount)
@@ -2677,7 +2795,10 @@ public:
                 // Submit - setting for graphics
                 {
                     GraphicsSubmitter submitter(m_d3dCmdList);
-                    _bindRenderState(&submitter);
+                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    {
+                        assert(!"Failed to bind render state");
+                    }
                 }
 
                 m_d3dCmdList->IASetPrimitiveTopology(m_primitiveTopology);
@@ -2844,7 +2965,10 @@ public:
                 // Submit binding for compute
                 {
                     ComputeSubmitter submitter(m_d3dCmdList);
-                    _bindRenderState(&submitter);
+                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    {
+                        assert(!"Failed to bind render state");
+                    }
                 }
                 m_d3dCmdList->Dispatch(x, y, z);
             }
@@ -3238,7 +3362,7 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     ShortList<DescriptorTable, kMaxDescriptorSetCount> descriptorTables;
     RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
-    rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef());
+    SLANG_RETURN_ON_FAIL(rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef()));
     RootShaderObjectLayoutImpl* rootLayoutImpl =
         static_cast<RootShaderObjectLayoutImpl*>(specializedRootLayout.Ptr());
     for (auto& descSet : rootLayoutImpl->m_gpuDescriptorSetInfos)

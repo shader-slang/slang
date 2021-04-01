@@ -9,15 +9,53 @@ Test that don't work with shader objects in render-test
 The following tests were disabled because they had been running on non `-shaderobj` code paths that have since been removed.
 These tests will need to be re-enabled together with changes to the shader object implementation, or removed entirely if they no longer test useful functionality.
 
+### `ConstantBuffer<ISomething>`
+
+These tests rely on details of how a `ConstantBuffer<ISomething>` or `ParameterBlock<ISomething>` gets laid out.
+We need to fix the compiler and shader object implementation to agree that a `ConstantBuffer<ISomething>`
+should compile as `exists T : ISomething . ConstantBuffer<T>` and *not* `ConstantBuffer<exists T : ISomething . T>`
+like it currently does.
+(The reason for this choice is that we want a shader object created from `SomeConcreteType`, where `SomeConcreteType : ISomething`, to be directly usable for a `ConstantBuffer<ISomething>` parameter with its existing buffer allocation.)
+
 * compute/dynamic-dispatch-12.slang
+
+### `StructuredBuffer<ISomething>`
+
+These tests require support for structured buffers where the element type either is an interface type or transitively contains one.
+
 * compute/dynamic-dispatch-13.slang
 * compute/dynamic-dispatch-14.slang
 * compute/dynamic-dispatch-bindless-texture.slang
-* compute/global-type-param2.slang
+* compute/interface-func-param-in-struct.slang
+* compute/interface-assoc-type-param.slang
+
+### Generic Specialization Parameters
+
+These tests make use of generic specialization parameters in ways that don't easily align with the implementation approach that is more focused on existential parameters.
+They should either be ported to use existentials directly (at which point we potentially get rid of support for generic specialization at global or entry-point scope?) or we should refine the implementation of generic specialization to be consistent with existential specialization.
+
 * compute/global-type-param-array.slang
 * compute/global-type-param1.slang
+* compute/global-type-param2.slang
+* bugs/gh-357.slang
+* compute/assoctype-generic-arg.slang
+* compute/global-generic-value-param.slang
+* compute/global-type-param-in-entrypoint.slang
+* compute/global-type-param.slang
+* compute/int-generic.slang
+
+### Static Specialization
+
+These tests rely on the ability of the static specialization path to provide locations for data that doesn't "fit" into the fixed-size payload of an existential-type field/value.
+They will need to wait until the shader object implementation(s) are updated to support that case.
+
 * compute/interface-shader-param-in-struct.slang
 * compute/interface-shader-param-legalization.slang
+
+### Uncategorized
+
+These tests need to be binned according to what features they need.
+
 * compute/interface-shader-param.slang
 * compute/performance-profile.slang
 * compute/rewriter-parameter-block-complex.hlsl
@@ -40,4 +78,3 @@ These tests will need to be re-enabled together with changes to the shader objec
 * render/tess.hlsl
 * render/unused-discard.hlsl
 * compute/interface-param-partial-specialize.slang
-* compute/array-existential-parameter.slang

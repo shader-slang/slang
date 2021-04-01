@@ -3,11 +3,11 @@
 // Test using interface tops as top-level shader parameters
 // (whether global, or on an entry point).
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
-//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 
 // First we will define some fake interfaces for testing.
 // Let's pretend we are doing some kind of random number
@@ -70,43 +70,27 @@ int test(
     return modifiedVal;
 }
 
-// The global-scope parameters for this example include
-// some `uniform` parameters, and that will trigger
-// the allocation of a global-scope constant buffer to
-// hold them. Slang's layout rules mean that the buffer
-// will be allocated before any other global-scope parameters.
-//
-// In this example, the buffer will not be needed after specialization,
-// but we need to declare/allocate it here so that the application
-// creates a descriptor table/set that matches what the shader
-// signature expects.
-//
-//TEST_INPUT:cbuffer(data=[0], stride=4):name=gStrategy
-
-
-
 // Now we'll define a shader entry point that will use
 // these interfaces to define its behavior.
 //
 // We'll start with the buffer for writing the test output.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
+//TEST_INPUT:set gOutputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> gOutputBuffer;
 
 // Now we'll define a global shader parameter for the
 // random number generation strategy.
 //
-//__disabled__TEST_INPUT:object(type=MyStrategy):name=gStrategy
+//TEST_INPUT:set gStrategy = new MyStrategy{}
 uniform IRandomNumberGenerationStrategy gStrategy;
 
 // The other parameter (for the modifier) will be attached
 // the entry point instead, so that we are testing both
 // cases.
 //
-//__disabled__TEST_INPUT:object(type=MyModifier):name=modifier
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:root_constants(data=[0], stride=4):
+//TEST_INPUT:set modifier = new MyModifier{}
     uniform IModifier   modifier,
             uint3       dispatchThreadID : SV_DispatchThreadID)
 {
@@ -150,6 +134,3 @@ struct MyModifier : IModifier
         return val * 16;
     }
 }
-
-//TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT: entryPointExistentialType MyModifier

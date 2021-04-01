@@ -274,19 +274,25 @@ struct AssignValsFromLayoutContext
 
             if(field.name.getLength() == 0)
             {
-                StdWriters::getError().print("error: entries in `ShaderInputLayout` must include a name\n");
-                return SLANG_E_INVALID_ARG;
+                // If no name was given, assume by-indexing matching is requested
+                auto fieldCursor = dstCursor.getElement(fieldIndex);
+                if(!fieldCursor.isValid())
+                {
+                    StdWriters::getError().print("error: could not find shader parameter at index %d\n", (int)fieldIndex);
+                    return SLANG_E_INVALID_ARG;
+                }
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
             }
-
-            auto fieldCursor = dstCursor.getPath(field.name.getBuffer());
-
-            if(!fieldCursor.isValid())
+            else
             {
-                StdWriters::getError().print("error: could not find shader parameter matching '%s'\n", field.name.begin());
-                return SLANG_E_INVALID_ARG;
+                auto fieldCursor = dstCursor.getPath(field.name.getBuffer());
+                if(!fieldCursor.isValid())
+                {
+                    StdWriters::getError().print("error: could not find shader parameter matching '%s'\n", field.name.begin());
+                    return SLANG_E_INVALID_ARG;
+                }
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
             }
-
-            assign(fieldCursor, field.val);
         }
         return SLANG_OK;
     }
@@ -329,7 +335,7 @@ struct AssignValsFromLayoutContext
 
         ComPtr<IShaderObject> shaderObject = device->createShaderObject(slangType);
 
-        assign(ShaderCursor(shaderObject), srcVal->contentVal);
+        SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
 
         dstCursor.setObject(shaderObject);
         return SLANG_OK;
