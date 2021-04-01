@@ -41,11 +41,13 @@ struct CharUtil
         /// Given a character return the upper case equivalent
     SLANG_FORCE_INLINE static char toUpper(char c) { return (c >= 'a' && c <= 'z') ? (c -'a' + 'A') : c; }
 
-    
+
     struct CharFlagMap
     {
         Flags flags[0x100];
     };
+
+    static CharFlagMap makeCharFlagMap();
 
     static const CharFlagMap g_charFlagMap;
 };

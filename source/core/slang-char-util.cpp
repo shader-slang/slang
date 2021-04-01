@@ -2,7 +2,7 @@
 
 namespace Slang {
 
-static const CharUtil::CharFlagMap _calcCharFlagsMap()
+/* static */CharUtil::CharFlagMap CharUtil::makeCharFlagMap()
 {
     typedef CharUtil::Flag Flag;
 
@@ -48,6 +48,6 @@ static const CharUtil::CharFlagMap _calcCharFlagsMap()
     return map;
 }
 
-/* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = _calcCharFlagsMap();
+/* static */const CharUtil::CharFlagMap CharUtil::g_charFlagMap = makeCharFlagMap();
 
 } // namespace Slang
