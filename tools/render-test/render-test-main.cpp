@@ -23,7 +23,7 @@
 
 #include "../../source/core/slang-test-tool-util.h"
 
-#define ENABLE_RENDERDOC_INTEGRATION 0
+#define ENABLE_RENDERDOC_INTEGRATION 1
 
 #if ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
@@ -97,8 +97,8 @@ public:
     void renderFrame(IRenderCommandEncoder* encoder);
     void finalize();
 
-    void applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
-    void setProjectionMatrix(IResourceCommandEncoder* encoder);
+    Result applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
+    void setProjectionMatrix(IShaderObject* rootObject);
     Result writeBindingOutput(const char* fileName);
 
     Result writeScreen(const char* filename);
@@ -135,7 +135,6 @@ protected:
 
     Options m_options;
 
-    ComPtr<IShaderObject> m_programVars;
     ShaderOutputPlan m_outputPlan;
 };
 
@@ -400,8 +399,11 @@ SlangResult _assignVarsFromLayout(
     return context.assign(rootCursor, layout.rootVal);
 }
 
-void RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
+Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* encoder)
 {
+    auto slangReflection = (slang::ProgramLayout*)spGetReflection(
+        m_compilationOutput.output.getRequestForReflection());
+
     switch (pipelineType)
     {
     case PipelineType::Compute:
@@ -409,7 +411,9 @@ void RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* enc
             ComPtr<IComputeCommandEncoder> computeEncoder;
             encoder->queryInterface(
                 SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
-            computeEncoder->bindRootShaderObject(m_programVars);
+            auto rootObject = computeEncoder->bindPipeline(m_pipelineState);
+            SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
+                m_device, rootObject, m_compilationOutput.layout, m_outputPlan, slangReflection));
         }
         break;
     case PipelineType::Graphics:
@@ -417,12 +421,16 @@ void RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* enc
             ComPtr<IRenderCommandEncoder> renderEncoder;
             encoder->queryInterface(
                 SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
-            renderEncoder->bindRootShaderObject(m_programVars);
+            auto rootObject = renderEncoder->bindPipeline(m_pipelineState);
+            SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
+                m_device, rootObject, m_compilationOutput.layout, m_outputPlan, slangReflection));
+            setProjectionMatrix(rootObject);
         }
         break;
     default:
         throw "unknown pipeline type";
     }
+    return SLANG_OK;
 }
 
 SlangResult RenderTestApp::initialize(
@@ -442,22 +450,6 @@ SlangResult RenderTestApp::initialize(
     //
     SLANG_RETURN_ON_FAIL(
         device->createProgram(m_compilationOutput.output.desc, m_shaderProgram.writeRef()));
-
-    // If we are doing a non-pass-through compilation, then we will rely on
-    // Slang's reflection API to tell us what the parameters of the program are.
-    //
-    auto slangReflection = (slang::ProgramLayout*) spGetReflection(m_compilationOutput.output.getRequestForReflection());
-
-    // Once we have determined the layout of all the parameters we need to bind,
-    // we will create a shader object to use for storing and binding those parameters.
-    //
-    m_programVars = device->createRootShaderObject(m_shaderProgram);
-
-    // Now we need to assign from the input parameter data that was parsed into
-    // the program vars we allocated.
-    //
-    SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
-        device, m_programVars, m_compilationOutput.layout, m_outputPlan, slangReflection));
 
 	m_device = device;
 
@@ -616,11 +608,10 @@ void RenderTestApp::_initializeRenderPass()
     m_device->createRenderPassLayout(renderPassDesc, m_renderPass.writeRef());
 }
 
-void RenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
+void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 {
-    SLANG_UNUSED(encoder);
     auto info = m_device->getDeviceInfo();
-    ShaderCursor(m_programVars)
+    ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()
         .setData(info.identityProjectionMatrix, sizeof(float) * 16);
@@ -629,8 +620,6 @@ void RenderTestApp::setProjectionMatrix(IResourceCommandEncoder* encoder)
 void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
-
-    encoder->setPipelineState(m_pipelineState);
 
 	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
@@ -643,7 +632,6 @@ void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Compute;
-    encoder->setPipelineState(m_pipelineState);
     applyBinding(pipelineType, encoder);
 	encoder->dispatchCompute(
         m_options.computeDispatchSize[0],
@@ -653,7 +641,6 @@ void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 
 void RenderTestApp::finalize()
 {
-    m_programVars = nullptr;
     m_inputLayout = nullptr;
     m_vertexBuffer = nullptr;
     m_shaderProgram = nullptr;
@@ -764,10 +751,6 @@ Result RenderTestApp::update()
     }
     else
     {
-        auto resEncoder = commandBuffer->encodeResourceCommands();
-        setProjectionMatrix(resEncoder);
-        resEncoder->endEncoding();
-
         auto encoder = commandBuffer->encodeRenderCommands(m_renderPass, m_framebuffer);
         gfx::Viewport viewport = {};
         viewport.maxZ = 1.0f;

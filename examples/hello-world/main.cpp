@@ -206,7 +206,6 @@ gfx::Result loadShaderProgram(
 // building an example program.
 //
 ComPtr<gfx::IPipelineState> gPipelineState;
-ComPtr<gfx::IShaderObject> gRootObject;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
 
 // Now that we've covered the function that actually loads and
@@ -251,38 +250,6 @@ Slang::Result initialize()
     ComPtr<IShaderProgram> shaderProgram;
     SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, shaderProgram.writeRef()));
 
-    // In order to bind shader parameters to the pipeline, we need
-    // to know how those parameters were assigned to locations/bindings/registers
-    // for the target graphics API.
-    //
-    // The Slang compiler assigns locations to parameters in a deterministic
-    // fashion, so it is possible for a programmer to hard-code locations
-    // into their application code that will match up with their shaders.
-    //
-    // Hard-coding of locations can become intractable as an application needs
-    // to support more different target platforms and graphics APIs, as well
-    // as more shaders with different specialized variants.
-    //
-    // Rather than rely on hard-coded locations, our examples will make use of
-    // reflection information provided by the Slang compiler (see `programLayout`
-    // above), and our example graphics API layer will translate that reflection
-    // information into a layout for a "root shader object."
-    //
-    // The root object will store values/bindings for all of the parameters in
-    // the `shaderProgram`. At a conceptual level we can think of `rootObject` as
-    // representing the "global scope" of the shader program that was loaded;
-    // it has entries for each global shader parameter that was declared.
-    //
-    // Multiple root objects can be created from the same program, and will have
-    // separate storage for parameter values.
-    //
-    // Readers who are familiar with D3D12 or Vulkan might think of this root
-    // layout as being similar in spirit to a "root signature" or "pipeline layout."
-    //
-    ComPtr<IShaderObject> rootObject;
-    SLANG_RETURN_ON_FAIL(gDevice->createRootShaderObject(shaderProgram, rootObject.writeRef()));
-    gRootObject = rootObject;
-
     // Following the D3D12/Vulkan style of API, we need a pipeline state object
     // (PSO) to encapsulate the configuration of the overall graphics pipeline.
     //
@@ -315,6 +282,38 @@ virtual void renderFrame(int frameBufferIndex) override
     viewport.extentY = (float)windowHeight;
     renderEncoder->setViewportAndScissor(viewport);
 
+    // In order to bind shader parameters to the pipeline, we need
+    // to know how those parameters were assigned to locations/bindings/registers
+    // for the target graphics API.
+    //
+    // The Slang compiler assigns locations to parameters in a deterministic
+    // fashion, so it is possible for a programmer to hard-code locations
+    // into their application code that will match up with their shaders.
+    //
+    // Hard-coding of locations can become intractable as an application needs
+    // to support more different target platforms and graphics APIs, as well
+    // as more shaders with different specialized variants.
+    //
+    // Rather than rely on hard-coded locations, our examples will make use of
+    // reflection information provided by the Slang compiler (see `programLayout`
+    // above), and our example graphics API layer will translate that reflection
+    // information into a layout for a "root shader object."
+    //
+    // The root object will store values/bindings for all of the parameters in
+    // the `IShaderProgram` used to create the pipeline state. At a conceptual
+    // level we can think of `rootObject` as representing the "global scope" of
+    // the shader program that was loaded; it has entries for each global shader
+    // parameter that was declared.
+    //
+    // Readers who are familiar with D3D12 or Vulkan might think of this root
+    // layout as being similar in spirit to a "root signature" or "pipeline layout."
+    //
+    // We start parameter binding by binding the pipeline state in command encoder.
+    // This method will return a transient root shader object for us to write our
+    // shader parameters into.
+    //
+    auto rootObject = renderEncoder->bindPipeline(gPipelineState);
+
     // We will update the model-view-projection matrix that is passed
     // into the shader code via the `Uniforms` buffer on a per-frame
     // basis, even though the data that is loaded does not change
@@ -322,8 +321,7 @@ virtual void renderFrame(int frameBufferIndex) override
     //
     auto deviceInfo = gDevice->getDeviceInfo();
 
-    //
-    // We know that `gRootObject` is a root shader object created
+    // We know that `rootObject` is a root shader object created
     // from our program, and that it is set up to hold values for
     // all the parameter of that program. In order to actually
     // set values, we need to be able to look up the location
@@ -341,7 +339,7 @@ virtual void renderFrame(int frameBufferIndex) override
     // a diretory path of `/` for the root directory in a file
     // system.
     //
-    ShaderCursor rootCursor(gRootObject);
+    ShaderCursor rootCursor(rootObject);
     //
     // Next, we use a convenience overload of `operator[]` to
     // navigate from the root cursor down to the parameter we
@@ -374,13 +372,6 @@ virtual void renderFrame(int frameBufferIndex) override
     //   the target platform and graphics API, and can thus be
     //   hard-coded even in cross-platform code.
     //
-
-    // Now we configure our graphics pipeline state by setting the
-    // PSO, binding our root shader object to it (which references
-    // the `Uniforms` buffer that will filled in above).
-    //
-    renderEncoder->setPipelineState(gPipelineState);
-    renderEncoder->bindRootShaderObject(gRootObject);
 
     // We also need to set up a few pieces of fixed-function pipeline
     // state that are not bound by the pipeline state above.

@@ -3,6 +3,7 @@
 
 //WORKING:#include "options.h"
 #include "../renderer-shared.h"
+#include "../transient-resource-heap-base.h"
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -93,8 +94,6 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -155,7 +154,7 @@ public:
     };
 
     class InputLayoutImpl : public IInputLayout, public RefObject
-	{
+    {
     public:
         SLANG_REF_OBJECT_IUNKNOWN_ALL
         IInputLayout* getInterface(const Guid& guid)
@@ -1365,8 +1364,6 @@ public:
         }
         VulkanApi* m_api;
 
-        RefPtr<ShaderObjectBase> m_rootShaderObject;
-
         void init(CommandBufferImpl* commandBuffer);
 
         void endEncodingImpl()
@@ -1413,20 +1410,28 @@ public:
                 m_vkPreCommandBuffer, static_cast<BufferResourceImpl*>(buffer), offset, size, data);
         }
 
-        Result bindRootShaderObjectImpl(PipelineType pipelineType, IShaderObject* object);
+        Result bindRootShaderObjectImpl(VkPipelineBindPoint bindPoint);
 
-        void setPipelineStateImpl(IPipelineState* state)
+        Result setPipelineStateImpl(IPipelineState* state, IShaderObject** outRootObject)
         {
             m_currentPipeline = static_cast<PipelineStateImpl*>(state);
+            SLANG_RETURN_ON_FAIL(m_commandBuffer->m_rootObject.init(
+                m_commandBuffer->m_renderer,
+                m_currentPipeline->getProgram<ShaderProgramImpl>()->m_rootObjectLayout));
+            *outRootObject = &m_commandBuffer->m_rootObject;
+            return SLANG_OK;
         }
 
         void flushBindingState(VkPipelineBindPoint pipelineBindPoint)
         {
             auto& api = *m_api;
+            bindRootShaderObjectImpl(pipelineBindPoint);
+
             // Get specialized pipeline state and bind it.
             //
             RefPtr<PipelineStateBase> newPipeline;
-            m_device->maybeSpecializePipeline(m_currentPipeline, m_rootShaderObject, newPipeline);
+            m_device->maybeSpecializePipeline(
+                m_currentPipeline, &m_commandBuffer->m_rootObject, newPipeline);
             PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
             auto pipelineBindPointId = getBindPointIndex(pipelineBindPoint);
             if (m_boundPipelines[pipelineBindPointId] != newPipelineImpl->m_pipeline)
@@ -1788,6 +1793,8 @@ public:
         {
             m_layout = layout;
 
+            m_upToDateConstantBufferHeapVersion = 0;
+
             // If the layout tells us that there is any uniform data,
             // then we will allocate a CPU memory buffer to hold that data
             // while it is being set from the host.
@@ -2046,7 +2053,9 @@ public:
             RootBindingState* bindingState,
             BindingOffset offset,
             VkDescriptorType descriptorType,
-            BufferResourceImpl* buffer)
+            BufferResourceImpl* buffer,
+            size_t bufferOffset,
+            size_t bufferSize)
         {
             auto descriptorSet = bindingState->descriptorSets[offset.descriptorSetIndexOffset];
             VkWriteDescriptorSet write = {};
@@ -2059,9 +2068,19 @@ public:
             auto& bufferInfo = bindingState->descriptorInfos.reserveRange(1)->bufferInfo;
             write.pBufferInfo = &bufferInfo;
             bufferInfo.buffer = buffer->m_buffer.m_buffer;
-            bufferInfo.offset = 0;
-            bufferInfo.range = buffer->getDesc()->sizeInBytes;
+            bufferInfo.offset = bufferOffset;
+            bufferInfo.range = bufferSize;
             bindingState->descriptorSetWrites.add(write);
+        }
+
+        static void writeBufferDescriptor(
+            RootBindingState* bindingState,
+            BindingOffset offset,
+            VkDescriptorType descriptorType,
+            BufferResourceImpl* buffer)
+        {
+            writeBufferDescriptor(
+                bindingState, offset, descriptorType, buffer, 0, buffer->getDesc()->sizeInBytes);
         }
 
         static void writePlainBufferDescriptor(
@@ -2198,8 +2217,11 @@ public:
             // operations on a shader object once an operation has requested this buffer
             // be created. We need to enforce that rule if we want to rely on it.
             //
-            if (m_ordinaryDataBuffer)
+            if (m_upToDateConstantBufferHeapVersion ==
+                encoder->m_commandBuffer->m_transientHeap->getVersion())
+            {
                 return SLANG_OK;
+            }
 
             // Computing the size of the ordinary data buffer is *not* just as simple
             // as using the size of the `m_ordinayData` array that we store. The reason
@@ -2216,22 +2238,19 @@ public:
             RefPtr<ShaderObjectLayoutImpl> specializedLayout;
             SLANG_RETURN_ON_FAIL(_getSpecializedLayout(specializedLayout.writeRef()));
 
-            auto specializedOrdinaryDataSize = specializedLayout->getElementTypeLayout()->getSize();
-            if (specializedOrdinaryDataSize == 0)
+            m_constantBufferSize = specializedLayout->getElementTypeLayout()->getSize();
+            if (m_constantBufferSize == 0)
+            {
+                m_upToDateConstantBufferHeapVersion =
+                    encoder->m_commandBuffer->m_transientHeap->getVersion();
                 return SLANG_OK;
+            }
 
             // Once we have computed how large the buffer should be, we can allocate
-            // it using the existing public `IDevice` API.
+            // it from the transient resource heap.
             //
-            IDevice* device = getRenderer();
-            IBufferResource::Desc bufferDesc;
-            bufferDesc.init(specializedOrdinaryDataSize);
-            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                IResource::Usage::ConstantBuffer,
-                bufferDesc,
-                nullptr,
-                m_ordinaryDataBuffer.writeRef()));
+            SLANG_RETURN_ON_FAIL(encoder->m_commandBuffer->m_transientHeap->allocateConstantBuffer(
+                m_constantBufferSize, m_constantBuffer, m_constantBufferOffset));
 
             // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
             //
@@ -2240,7 +2259,16 @@ public:
             // don't need or want to inline it into this call site.
             //
             SLANG_RETURN_ON_FAIL(_writeOrdinaryData(
-                encoder, m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize, specializedLayout));
+                encoder,
+                m_constantBuffer,
+                m_constantBufferOffset,
+                m_constantBufferSize,
+                specializedLayout));
+
+            // Update version tracker so that we don't redundantly alloc and fill in
+            // constant buffers for the same transient heap.
+            m_upToDateConstantBufferHeapVersion =
+                encoder->m_commandBuffer->m_transientHeap->getVersion();
             return SLANG_OK;
         }
 
@@ -2264,11 +2292,16 @@ public:
             // the given `descriptorSet` and update the base range index for
             // subsequent binding operations to account for it.
             //
-            if (m_ordinaryDataBuffer)
+            if (m_constantBuffer)
             {
-                auto bufferImpl = static_cast<BufferResourceImpl*>(m_ordinaryDataBuffer.get());
+                auto bufferImpl = static_cast<BufferResourceImpl*>(m_constantBuffer);
                 writeBufferDescriptor(
-                    bindingState, offset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, bufferImpl);
+                    bindingState,
+                    offset,
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    bufferImpl,
+                    m_constantBufferOffset,
+                    m_constantBufferSize);
                 offset.descriptorRangeOffset++;
             }
 
@@ -2434,11 +2467,15 @@ public:
 
         List<RefPtr<ShaderObjectImpl>> m_objects;
 
-        /// A constant buffer used to stored ordinary data for this object
-        /// and existential-type sub-objects.
-        ///
-        /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
-        ComPtr<IBufferResource> m_ordinaryDataBuffer;
+        // The version number of the transient resource heap that contains up-to-date
+        // constant buffer content for this shader object.
+        uint64_t m_upToDateConstantBufferHeapVersion;
+        // The transient constant buffer that holds the GPU copy of the constant data,
+        // weak referenced.
+        IBufferResource* m_constantBuffer = nullptr;
+        // The offset into the transient constant buffer where the constant data starts.
+        uint32_t m_constantBufferOffset = 0;
+        uint32_t m_constantBufferSize = 0;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///
@@ -2531,20 +2568,12 @@ public:
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
         typedef ShaderObjectImpl Super;
-
     public:
-        static Result create(
-            IDevice* device,
-            RootShaderObjectLayout* layout,
-            RootShaderObjectImpl** outShaderObject)
-        {
-            RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();
-            SLANG_RETURN_ON_FAIL(object->init(device, layout));
-
-            *outShaderObject = object.detach();
-            return SLANG_OK;
-        }
-
+        // Override default reference counting behavior to disable lifetime management.
+        // Root objects are managed by command buffer and does not need to be freed by the user.
+        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+    public:
         RootShaderObjectLayout* getLayout()
         {
             return static_cast<RootShaderObjectLayout*>(m_layout.Ptr());
@@ -2596,11 +2625,12 @@ public:
             return SLANG_OK;
         }
 
-    protected:
+    public:
         Result init(IDevice* device, RootShaderObjectLayout* layout)
         {
             SLANG_RETURN_ON_FAIL(Super::init(device, layout));
-
+            m_specializedLayout = nullptr;
+            m_entryPoints.clear();
             for (auto entryPointInfo : layout->getEntryPoints())
             {
                 RefPtr<EntryPointShaderObject> entryPoint;
@@ -2612,6 +2642,7 @@ public:
             return SLANG_OK;
         }
 
+    protected:
         Result _createSpecializedLayout(ShaderObjectLayoutImpl** outLayout) SLANG_OVERRIDE
         {
             ExtendedShaderObjectTypeList specializationArgs;
@@ -2699,6 +2730,8 @@ public:
         List<RefPtr<EntryPointShaderObject>> m_entryPoints;
     };
 
+    class TransientResourceHeapImpl;
+
     class CommandBufferImpl
         : public ICommandBuffer
         , public RefObject
@@ -2718,8 +2751,9 @@ public:
         VkCommandPool m_pool;
         VkFence m_fence;
         VKDevice* m_renderer;
-        DescriptorSetAllocator* m_transientDescSetAllocator;
+        TransientResourceHeapImpl* m_transientHeap;
         bool m_isPreCommandBufferEmpty = true;
+        RootShaderObjectImpl m_rootObject;
         // Command buffers are deallocated by its command pool,
         // so no need to free individually.
         ~CommandBufferImpl() = default;
@@ -2728,10 +2762,10 @@ public:
             VKDevice* renderer,
             VkCommandPool pool,
             VkFence fence,
-            DescriptorSetAllocator* transientDescSetAllocator)
+            TransientResourceHeapImpl* transientHeap)
         {
             m_renderer = renderer;
-            m_transientDescSetAllocator = transientDescSetAllocator;
+            m_transientHeap = transientHeap;
             m_pool = pool;
             m_fence = fence;
 
@@ -2843,16 +2877,10 @@ public:
                 endEncodingImpl();
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                setPipelineState(IPipelineState* pipelineState) override
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipeline(IPipelineState* pipelineState, IShaderObject** outRootObject) override
             {
-                setPipelineStateImpl(pipelineState);
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(IShaderObject* object) override
-            {
-                bindRootShaderObjectImpl(PipelineType::Graphics, object);
+                return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -3070,16 +3098,10 @@ public:
                 endEncodingImpl();
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                setPipelineState(IPipelineState* pipelineState) override
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipeline(IPipelineState* pipelineState, IShaderObject** outRootObject) override
             {
-                setPipelineStateImpl(pipelineState);
-            }
-
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(IShaderObject* object) override
-            {
-                bindRootShaderObjectImpl(PipelineType::Compute, object);
+                return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -3346,17 +3368,10 @@ public:
     };
 
     class TransientResourceHeapImpl
-        : public ITransientResourceHeap
-        , public RefObject
+        : public TransientResourceHeapBase<VKDevice, BufferResourceImpl>
     {
-    public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
-        ITransientResourceHeap* getInterface(const Slang::Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
-                return static_cast<ITransientResourceHeap*>(this);
-            return nullptr;
-        }
+    private:
+        typedef TransientResourceHeapBase<VKDevice, BufferResourceImpl> Super;
 
     public:
         VkCommandPool m_commandPool;
@@ -3364,8 +3379,6 @@ public:
         VkFence m_fence;
         List<RefPtr<CommandBufferImpl>> m_commandBufferPool;
         uint32_t m_commandBufferAllocId = 0;
-        RefPtr<BufferResourceImpl> m_constantBuffer;
-        RefPtr<VKDevice> m_device;
 
         Result init(const ITransientResourceHeap::Desc& desc, VKDevice* device);
         ~TransientResourceHeapImpl()
@@ -3798,12 +3811,10 @@ void VKDevice::PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
 }
 
 Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
-    PipelineType pipelineType,
-    IShaderObject* object)
+    VkPipelineBindPoint bindPoint)
 {
     // Obtain specialized root layout.
-    auto rootObjectImpl = static_cast<RootShaderObjectImpl*>(object);
-    m_rootShaderObject = rootObjectImpl;
+    auto rootObjectImpl = &m_commandBuffer->m_rootObject;
 
     auto specializedLayout = rootObjectImpl->getSpecializedLayout();
     if (!specializedLayout)
@@ -3813,7 +3824,7 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
     bindState.pushConstantRanges = specializedLayout->m_pushConstantRanges.getView();
     bindState.pipelineLayout = specializedLayout->m_pipelineLayout;
     bindState.device = m_device;
-    bindState.descriptorSetAllocator = m_commandBuffer->m_transientDescSetAllocator;
+    bindState.descriptorSetAllocator = &m_commandBuffer->m_transientHeap->m_descSetAllocator;
 
     // Write bindings into descriptor sets. This step allocate descriptor sets and collects
     // all `VkWriteDescriptorSet` operations in `bindState.descriptorSetWrites`.
@@ -3831,7 +3842,7 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
     // Bind descriptor sets.
     m_device->m_api.vkCmdBindDescriptorSets(
         m_commandBuffer->m_commandBuffer,
-        VulkanUtil::getPipelineBindPoint(pipelineType),
+        bindPoint,
         specializedLayout->m_pipelineLayout,
         0,
         (uint32_t)bindState.descriptorSets.getCount(),
@@ -3991,7 +4002,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
     applicationInfo.pApplicationName = "slang-render-test";
     applicationInfo.pEngineName = "slang-render-test";
-    applicationInfo.apiVersion = VK_API_VERSION_1_0;
+    applicationInfo.apiVersion = VK_API_VERSION_1_1;
     applicationInfo.engineVersion = 1;
     applicationInfo.applicationVersion = 1;
     const char* instanceExtensions[] =
@@ -4067,7 +4078,17 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             instanceCreateInfo.ppEnabledLayerNames = layerNames;
         }
     }
-    SLANG_RETURN_ON_FAIL(m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance));
+    uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
+    for (auto apiVersion : apiVersionsToTry)
+    {
+        applicationInfo.apiVersion = apiVersion;
+        if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
+        {
+            break;
+        }
+    }
+    if (!instance)
+        return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
     if (useValidationLayer)
@@ -4163,6 +4184,10 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
     // Extended dynamic state features
     VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT };
+    // Subgroup extended type features
+    VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures shaderSubgroupExtendedTypeFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES};
+
     // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
     if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
         m_api.vkGetPhysicalDeviceProperties2 &&
@@ -4171,6 +4196,10 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
         // Get device features
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+        // Subgroup features
+        shaderSubgroupExtendedTypeFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &shaderSubgroupExtendedTypeFeatures;
 
         // Extended dynamic states
         extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
@@ -4248,6 +4277,14 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             deviceExtensions.add(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
             m_features.add("extended-dynamic-states");
         }
+
+        if (shaderSubgroupExtendedTypeFeatures.shaderSubgroupExtendedTypes)
+        {
+            shaderSubgroupExtendedTypeFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &shaderSubgroupExtendedTypeFeatures;
+            deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
+            m_features.add("shader-subgroup-extended-types");
+        }
     }
 
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
@@ -4263,7 +4300,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
-
+ 
     if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
@@ -4310,7 +4347,8 @@ Result VKDevice::TransientResourceHeapImpl::init(
     const ITransientResourceHeap::Desc& desc,
     VKDevice* device)
 {
-    m_device = device;
+    Super::init(desc, device);
+
     m_descSetAllocator.m_api = &device->m_api;
 
     VkCommandPoolCreateInfo poolCreateInfo = {};
@@ -4325,6 +4363,7 @@ Result VKDevice::TransientResourceHeapImpl::init(
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     device->m_api.vkCreateFence(device->m_api.m_device, &fenceCreateInfo, nullptr, &m_fence);
+
     return SLANG_OK;
 }
 
@@ -4341,7 +4380,7 @@ Result VKDevice::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer**
 
     RefPtr<CommandBufferImpl> commandBuffer = new CommandBufferImpl();
     SLANG_RETURN_ON_FAIL(commandBuffer->init(
-        m_device, m_commandPool, m_fence, &m_descSetAllocator));
+        m_device, m_commandPool, m_fence, this));
     m_commandBufferPool.add(commandBuffer);
     m_commandBufferAllocId++;
     *outCmdBuffer = commandBuffer.detach();
@@ -4358,6 +4397,7 @@ Result VKDevice::TransientResourceHeapImpl::synchronizeAndReset()
     }
     api.vkResetCommandPool(api.m_device, m_commandPool, 0);
     m_descSetAllocator.reset();
+    Super::reset();
     return SLANG_OK;
 }
 
@@ -5424,17 +5464,6 @@ Result VKDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObjec
     RefPtr<ShaderObjectImpl> shaderObject;
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
         this, static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
-    return SLANG_OK;
-}
-
-Result SLANG_MCALL
-    VKDevice::createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
-{
-    auto programImpl = dynamic_cast<ShaderProgramImpl*>(program);
-    RefPtr<RootShaderObjectImpl> shaderObject;
-    SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
-        this, programImpl->m_rootObjectLayout, shaderObject.writeRef()));
     *outObject = shaderObject.detach();
     return SLANG_OK;
 }

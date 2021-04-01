@@ -95,16 +95,17 @@ class GLDevice : public ImmediateRendererBase
 {
 public:
     // Renderer    implementation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL clearFrame(uint32_t mask, bool clearDepth, bool clearStencil) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual void clearFrame(uint32_t mask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
         const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createFramebuffer(
+        const IFramebuffer::Desc& desc,
+        IFramebuffer** outFramebuffer) override;
+    virtual void setFramebuffer(IFramebuffer* frameBuffer) override;
+    virtual void setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -133,9 +134,8 @@ public:
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
-    virtual void bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject) override;
+    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
+    virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -144,7 +144,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+    virtual void copyBuffer(
         IBufferResource* dst,
         size_t dstOffset,
         IBufferResource* src,
@@ -155,28 +155,23 @@ public:
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(IBufferResource* buffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPrimitiveTopology(PrimitiveTopology topology) override;
+    virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
+    virtual void setVertexBuffers(
         UInt startSlot,
         UInt slotCount,
         IBufferResource* const* buffers,
         const UInt* strides,
         const UInt* offsets) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setViewports(UInt count, Viewport const* viewports) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
-    virtual void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override {}
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
+    virtual void setViewports(UInt count, Viewport const* viewports) override;
+    virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
+    virtual void setPipelineState(IPipelineState* state) override;
+    virtual void draw(UInt vertexCount, UInt startVertex) override;
+    virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
+    virtual void dispatchCompute(int x, int y, int z) override;
+    virtual void submitGpuWork() override {}
+    virtual void waitForGpu() override {}
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -2216,8 +2211,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL
-    GLDevice::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
+void GLDevice::clearFrame(uint32_t mask, bool clearDepth, bool clearStencil)
 {
     uint32_t clearMask = 0;
     if (clearDepth)
@@ -2332,7 +2326,7 @@ SLANG_NO_THROW Result SLANG_MCALL
     return SLANG_OK;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setFramebuffer(IFramebuffer* frameBuffer)
+void GLDevice::setFramebuffer(IFramebuffer* frameBuffer)
 {
     m_currentFramebuffer = static_cast<FramebufferImpl*>(frameBuffer);
 }
@@ -2745,7 +2739,7 @@ void GLDevice::unmap(IBufferResource* bufferIn)
     glUnmapBuffer(buffer->m_target);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
+void GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
 {
     GLenum glTopology = 0;
     switch (topology)
@@ -2759,7 +2753,7 @@ SLANG_NO_THROW void SLANG_MCALL GLDevice::setPrimitiveTopology(PrimitiveTopology
     m_boundPrimitiveTopology = glTopology;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setVertexBuffers(
+void GLDevice::setVertexBuffers(
     UInt startSlot,
     UInt slotCount,
     IBufferResource* const* buffers,
@@ -2779,8 +2773,7 @@ SLANG_NO_THROW void SLANG_MCALL GLDevice::setVertexBuffers(
     }
 }
 
-SLANG_NO_THROW void SLANG_MCALL
-    GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
+void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
 {
     auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
     m_boundIndexBuffer = bufferImpl->m_handle;
@@ -2788,7 +2781,7 @@ SLANG_NO_THROW void SLANG_MCALL
     m_boundIndexBufferSize = bufferImpl->m_size;
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setViewports(UInt count, Viewport const* viewports)
+void GLDevice::setViewports(UInt count, Viewport const* viewports)
 {
     assert(count == 1);
     auto viewport = viewports[0];
@@ -2800,7 +2793,7 @@ SLANG_NO_THROW void SLANG_MCALL GLDevice::setViewports(UInt count, Viewport cons
     glDepthRange(viewport.minZ, viewport.maxZ);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setScissorRects(UInt count, ScissorRect const* rects)
+void GLDevice::setScissorRects(UInt count, ScissorRect const* rects)
 {
     assert(count <= 1);
     if( count )
@@ -2828,7 +2821,7 @@ SLANG_NO_THROW void SLANG_MCALL GLDevice::setScissorRects(UInt count, ScissorRec
     }
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::setPipelineState(IPipelineState* state)
+void GLDevice::setPipelineState(IPipelineState* state)
 {
     auto pipelineStateImpl = static_cast<PipelineStateImpl*>(state);
 
@@ -2839,15 +2832,14 @@ SLANG_NO_THROW void SLANG_MCALL GLDevice::setPipelineState(IPipelineState* state
     glUseProgram(programID);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::draw(UInt vertexCount, UInt startVertex = 0)
+void GLDevice::draw(UInt vertexCount, UInt startVertex = 0)
 {
     flushStateForDraw();
 
     glDrawArrays(m_boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
 }
 
-SLANG_NO_THROW void SLANG_MCALL
-    GLDevice::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+void GLDevice::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
 {
     flushStateForDraw();
 
@@ -2859,7 +2851,7 @@ SLANG_NO_THROW void SLANG_MCALL
         (GLint)baseVertex);
 }
 
-SLANG_NO_THROW void SLANG_MCALL GLDevice::dispatchCompute(int x, int y, int z)
+void GLDevice::dispatchCompute(int x, int y, int z)
 {
     glDispatchCompute(x, y, z);
 }
@@ -3005,7 +2997,7 @@ Result GLDevice::createRootShaderObject(IShaderProgram* program, IShaderObject**
     return SLANG_OK;
 }
 
-void GLDevice::bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject)
+void GLDevice::bindRootShaderObject(IShaderObject* shaderObject)
 {
     RootShaderObjectImpl* rootShaderObjectImpl = static_cast<RootShaderObjectImpl*>(shaderObject);
     RefPtr<PipelineStateBase> specializedPipeline;
