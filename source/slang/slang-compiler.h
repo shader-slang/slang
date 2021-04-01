@@ -37,8 +37,6 @@ namespace Slang
     class TargetRequest;
     class TypeLayout;
 
-    extern const Guid IID_EndToEndCompileRequest;
-
     enum class CompilerMode
     {
         ProduceLibrary,
@@ -1872,9 +1870,6 @@ namespace Slang
         RefPtr<ComponentType> m_program;
     };
 
-    // UUID to identify EndToEndCompileRequest from an interface
-    #define SLANG_UUID_EndToEndCompileRequest { 0xce6d2383, 0xee1b, 0x4fd7, { 0xa0, 0xf, 0xb8, 0xb6, 0x33, 0x12, 0x95, 0xc8 } };
-
         /// A compile request that spans the front and back ends of the compiler
         ///
         /// This is what the command-line `slangc` uses, as well as the legacy
@@ -1886,6 +1881,8 @@ namespace Slang
     class EndToEndCompileRequest : public RefObject, public slang::ICompileRequest
     {
     public:
+        SLANG_CLASS_GUID(0xce6d2383, 0xee1b, 0x4fd7, { 0xa0, 0xf, 0xb8, 0xb6, 0x33, 0x12, 0x95, 0xc8 })
+
         // ISlangUnknown
         SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
         SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
@@ -2402,7 +2399,7 @@ SLANG_FORCE_INLINE EndToEndCompileRequest* asInternal(SlangCompileRequest* reque
     SLANG_ASSERT(request);
     EndToEndCompileRequest* endToEndRequest = nullptr;
     // NOTE! We aren't using to access an interface, so *doesn't* return with a refcount
-    request->queryInterface(IID_EndToEndCompileRequest, (void**)&endToEndRequest);
+    request->queryInterface(EndToEndCompileRequest::getTypeGuid(), (void**)&endToEndRequest);
     SLANG_ASSERT(endToEndRequest);
     return endToEndRequest;
 }
