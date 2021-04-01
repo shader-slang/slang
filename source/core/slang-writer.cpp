@@ -18,8 +18,6 @@
 
 namespace Slang
 {
-static const Guid IID_ISlangWriter = SLANG_UUID_ISlangWriter;
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! WriterHelper !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -66,7 +64,7 @@ SlangResult WriterHelper::put(const UnownedStringSlice& text)
 
 ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangWriter) ? static_cast<ISlangWriter*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangWriter::getTypeGuid()) ? static_cast<ISlangWriter*>(this) : nullptr;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! AppendBufferWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/

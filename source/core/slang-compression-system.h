@@ -29,7 +29,7 @@ enum class CompressionSystemType
 
 class ICompressionSystem : public ISlangUnknown
 {
-public:
+    SLANG_COM_INTERFACE(0xcc935840, 0xe059, 0x4bb8, { 0xa2, 0x2d, 0x92, 0x7b, 0x3c, 0x73, 0x8f, 0x85 })
 
         /** Get the compression system type
         @return The compression system type */
@@ -50,8 +50,6 @@ public:
         @return SLANG_OK if successful */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL decompress(const void* compressed, size_t compressedSizeInBytes, size_t decompressedSizeInBytes, void* outDecompressed) = 0;
 };
-
-#define SLANG_UUID_ICompressionSystem { 0xcc935840, 0xe059, 0x4bb8, { 0xa2, 0x2d, 0x92, 0x7b, 0x3c, 0x73, 0x8f, 0x85 } };
 
 }
 

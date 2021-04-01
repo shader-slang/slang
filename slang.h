@@ -844,6 +844,27 @@ extern "C"
         uint8_t  data4[8];
     };
 
+// Place at the start of an interface with the guid.
+// Guid should be specified as SLANG_COM_INTERFACE(0x00000000, 0x0000, 0x0000, { 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 })
+// NOTE: it's the typical guid struct definition, without the surrounding {}
+// It is not necessary to use the multiple parameters (we can wrap in parens), but this is simple.
+#define SLANG_COM_INTERFACE(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
+    public: \
+    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    { \
+        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
+        return guid; \
+    }
+
+// Sometimes it's useful to associate a guid with a class to identify it. This macro can used for this,
+// and the guid extracted via the getTypeGuid() function defined in the type
+#define SLANG_CLASS_GUID(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7) \
+    SLANG_FORCE_INLINE static const SlangUUID& getTypeGuid() \
+    { \
+        static const SlangUUID guid = { a, b, c, d0, d1, d2, d3, d4, d5, d6, d7 }; \
+        return guid; \
+    }
+
     /** Base interface for components exchanged through the API.
 
     This interface definition is compatible with the COM `IUnknown`,
@@ -852,7 +873,8 @@ extern "C"
     */
     struct ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE(0x00000000, 0x0000, 0x0000, { 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 })
+
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) = 0;
         virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() = 0;
         virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() = 0;
@@ -865,7 +887,7 @@ extern "C"
         uint32_t AddRef() { return addRef(); }
         uint32_t Release() { return release(); }
     };
-    #define SLANG_UUID_ISlangUnknown { 0x00000000, 0x0000, 0x0000, { 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 } }
+    #define SLANG_UUID_ISlangUnknown ISlangUnknown::getTypeGuid()
 
     /** A "blob" of binary data.
 
@@ -873,11 +895,12 @@ extern "C"
     */
     struct ISlangBlob : public ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE(0x8BA5FB08, 0x5195, 0x40e2, { 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 })
+
         virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() = 0;
         virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() = 0;
     };
-    #define SLANG_UUID_ISlangBlob { 0x8BA5FB08, 0x5195, 0x40e2, { 0xAC, 0x58, 0x0D, 0x98, 0x9C, 0x3A, 0x01, 0x02 } }
+    #define SLANG_UUID_ISlangBlob ISlangBlob::getTypeGuid()
 
     /** A (real or virtual) file system.
 
@@ -892,7 +915,8 @@ extern "C"
 
     struct ISlangFileSystem : public ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE(0x003A09FC, 0x3A4D, 0x4BA0, { 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB })
+
         /** Load a file from `path` and return a blob of its contents
         @param path The path to load from, as a null-terminated UTF-8 string.
         @param outBlob A destination pointer to receive the blob of the file contents.
@@ -910,7 +934,7 @@ extern "C"
             char const*     path,
             ISlangBlob** outBlob) = 0;
     };
-    #define SLANG_UUID_ISlangFileSystem { 0x003A09FC, 0x3A4D, 0x4BA0, { 0xAD, 0x60, 0x1F, 0xD8, 0x63, 0xA9, 0x15, 0xAB } }
+    #define SLANG_UUID_ISlangFileSystem ISlangFileSystem::getTypeGuid()
 
 
     typedef void(*SlangFuncPtr)(void);
@@ -920,7 +944,8 @@ extern "C"
     */
     struct ISlangSharedLibrary: public ISlangUnknown
     {
-        public: 
+        SLANG_COM_INTERFACE( 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 })
+
             /** Get a function by name. If the library is unloaded will only return nullptr. 
             @param name The name of the function 
             @return The function pointer related to the name or nullptr if not found 
@@ -935,11 +960,12 @@ extern "C"
             */
         virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) = 0;
     };
-    #define SLANG_UUID_ISlangSharedLibrary { 0x9c9d5bc5, 0xeb61, 0x496f,{ 0x80, 0xd7, 0xd1, 0x47, 0xc4, 0xa2, 0x37, 0x30 } };
+    #define SLANG_UUID_ISlangSharedLibrary ISlangSharedLibrary::getTypeGuid()
 
     struct ISlangSharedLibraryLoader: public ISlangUnknown
     {
-        public:
+        SLANG_COM_INTERFACE(0x6264ab2b, 0xa3e8, 0x4a06, { 0x97, 0xf1, 0x49, 0xbc, 0x2d, 0x2a, 0xb1, 0x4d })
+
             /** Load a shared library. In typical usage the library name should *not* contain any platform
             specific elements. For example on windows a dll name should *not* be passed with a '.dll' extension,
             and similarly on linux a shared library should *not* be passed with the 'lib' prefix and '.so' extension
@@ -949,7 +975,7 @@ extern "C"
             const char*     path,
             ISlangSharedLibrary** sharedLibraryOut) = 0;
     };
-    #define SLANG_UUID_ISlangSharedLibraryLoader { 0x6264ab2b, 0xa3e8, 0x4a06, { 0x97, 0xf1, 0x49, 0xbc, 0x2d, 0x2a, 0xb1, 0x4d } };
+    #define SLANG_UUID_ISlangSharedLibraryLoader ISlangSharedLibraryLoader::getTypeGuid()
     
     /* Type that identifies how a path should be interpreted */
     typedef unsigned int SlangPathType;
@@ -973,7 +999,8 @@ extern "C"
     */
     struct ISlangFileSystemExt : public ISlangFileSystem
     {
-    public:
+        SLANG_COM_INTERFACE(0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 })
+
         /** Get a uniqueIdentity which uniquely identifies an object of the file system.
            
         Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same file on the file system.
@@ -1075,10 +1102,12 @@ extern "C"
             void* userData) = 0;
     };
 
-    #define SLANG_UUID_ISlangFileSystemExt { 0x5fb632d2, 0x979d, 0x4481, { 0x9f, 0xee, 0x66, 0x3c, 0x3f, 0x14, 0x49, 0xe1 } }
+    #define SLANG_UUID_ISlangFileSystemExt ISlangFileSystemExt::getTypeGuid()
 
     struct ISlangMutableFileSystem : public ISlangFileSystemExt
     {
+        SLANG_COM_INTERFACE(0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 })
+
         /** Write the data specified with data and size to the specified path.
 
         @param path The path for data to be saved to
@@ -1111,7 +1140,7 @@ extern "C"
             const char* path) = 0;
     };
 
-    #define SLANG_UUID_ISlangMutableFileSystem  { 0xa058675c, 0x1d65, 0x452a, { 0x84, 0x58, 0xcc, 0xde, 0xd1, 0x42, 0x71, 0x5 } }
+    #define SLANG_UUID_ISlangMutableFileSystem ISlangMutableFileSystem::getTypeGuid()
 
     /* Identifies different types of writer target*/
     typedef unsigned int SlangWriterChannel;
@@ -1134,7 +1163,8 @@ extern "C"
     */
     struct ISlangWriter : public ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE(0xec457f0e, 0x9add, 0x4e6b,{ 0x85, 0x1c, 0xd7, 0xfa, 0x71, 0x6d, 0x15, 0xfd })
+
             /** Begin an append buffer.
             NOTE! Only one append buffer can be active at any time.
             @param maxNumChars The maximum of chars that will be appended
@@ -1162,7 +1192,7 @@ extern "C"
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL setMode(SlangWriterMode mode) = 0;
     };
     
-    #define SLANG_UUID_ISlangWriter { 0xec457f0e, 0x9add, 0x4e6b,{ 0x85, 0x1c, 0xd7, 0xfa, 0x71, 0x6d, 0x15, 0xfd } };
+    #define SLANG_UUID_ISlangWriter ISlangWriter::getTypeGuid()
 
     namespace slang {
     struct IGlobalSession;
@@ -2991,7 +3021,8 @@ namespace slang
         */
     struct IGlobalSession : public ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE(0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c })
+
             /** Create a new session for loading and compiling code.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL createSession(
@@ -3164,15 +3195,15 @@ namespace slang
             char const*     name) = 0;
     };
 
-    #define SLANG_UUID_IGlobalSession { 0xc140b5fd, 0xc78, 0x452e, { 0xba, 0x7c, 0x1a, 0x1e, 0x70, 0xc7, 0xf7, 0x1c } };
+    #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
 
     /*!
     @brief A request for one or more compilation actions to be performed.
     */
     struct ICompileRequest : public ISlangUnknown
     {
-    public:
-
+        SLANG_COM_INTERFACE( 0x96d33993, 0x317c, 0x4db5, { 0xaf, 0xd8, 0x66, 0x6e, 0xe7, 0x72, 0x48, 0xe2 } )
+   
             /** Set the filesystem hook to use for a compile request
 
             The provided `fileSystem` will be used to load any files that
@@ -3716,7 +3747,7 @@ namespace slang
 
     };
 
-    #define SLANG_UUID_ICompileRequest { 0x96d33993, 0x317c, 0x4db5, { 0xaf, 0xd8, 0x66, 0x6e, 0xe7, 0x72, 0x48, 0xe2 } };
+    #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
 
         /** Description of a code generation target.
         */
@@ -3816,7 +3847,8 @@ namespace slang
         */
     struct ISession : public ISlangUnknown
     {
-    public:
+        SLANG_COM_INTERFACE( 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } )
+
             /** Get the global session thas was used to create this session.
             */
         virtual SLANG_NO_THROW IGlobalSession* SLANG_MCALL getGlobalSession() = 0;
@@ -3905,7 +3937,7 @@ namespace slang
             SlangCompileRequest**   outCompileRequest) = 0;
     };
 
-    #define SLANG_UUID_ISession { 0x67618701, 0xd116, 0x468f, { 0xab, 0x3b, 0x47, 0x4b, 0xed, 0xce, 0xe, 0x3d } }
+    #define SLANG_UUID_ISession ISession::getTypeGuid()
 
         /** A component type is a unit of shader code layout, reflection, and linking.
 
@@ -3970,6 +4002,8 @@ namespace slang
         */
     struct IComponentType : public ISlangUnknown
     {
+        SLANG_COM_INTERFACE(0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f })
+
             /** Get the runtime session that this component type belongs to.
             */
         virtual SLANG_NO_THROW ISession* SLANG_MCALL getSession() = 0;
@@ -4073,14 +4107,14 @@ namespace slang
                 ISlangSharedLibrary**   outSharedLibrary,
                 slang::IBlob**          outDiagnostics = 0) = 0;
     };
-    #define SLANG_UUID_IComponentType { 0x5bc42be8, 0x5c50, 0x4929, { 0x9e, 0x5e, 0xd1, 0x5e, 0x7c, 0x24, 0x1, 0x5f } };
+    #define SLANG_UUID_IComponentType IComponentType::getTypeGuid()
 
     struct IEntryPoint : public IComponentType
     {
-    public:
+        SLANG_COM_INTERFACE(0x8f241361, 0xf5bd, 0x4ca0, { 0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8 })
     };
 
-    #define SLANG_UUID_IEntryPoint { 0x8f241361, 0xf5bd, 0x4ca0, { 0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8 } }
+    #define SLANG_UUID_IEntryPoint IEntryPoint::getTypeGuid()
 
         /** A module is the granularity of shader code compilation and loading.
 
@@ -4097,13 +4131,14 @@ namespace slang
         */
     struct IModule : public IComponentType
     {
-    public:
+        SLANG_COM_INTERFACE(0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 })
+
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL findEntryPointByName(
             char const*     name,
             IEntryPoint**   outEntryPoint) = 0;
     };
     
-    #define SLANG_UUID_IModule { 0xc720e64, 0x8722, 0x4d31, { 0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79 } }
+    #define SLANG_UUID_IModule IModule::getTypeGuid()
 
         /** Argument used for specialization to types/values.
         */
