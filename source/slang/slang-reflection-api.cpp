@@ -1326,6 +1326,7 @@ namespace Slang
                 Index bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
                 SlangBindingType bindingType = SLANG_BINDING_TYPE_CONSTANT_BUFFER;
                 Index spaceOffset = -1;
+                bool usesIndirectAllocation = false;
                 LayoutResourceKind kind = LayoutResourceKind::None;
 
                 // TODO: It is unclear if this should be looking at the resource
@@ -1333,12 +1334,25 @@ namespace Slang
                 //
                 for(auto& resInfo : parameterGroupTypeLayout->resourceInfos)
                 {
+                    if( spaceOffset == -1 )
+                    {
+                        spaceOffset = _calcSpaceOffset(path, kind);
+                    }
+
                     kind = resInfo.kind;
                     switch(kind)
                     {
                     default:
                         continue;
 
+                    case LayoutResourceKind::ConstantBuffer:
+                    case LayoutResourceKind::PushConstantBuffer:
+                    case LayoutResourceKind::DescriptorTableSlot:
+                        break;
+
+                        // Certain cases indicate a parameter block that
+                        // actually involves indirection.
+                        //
                         // Note: the only case where a parameter group should
                         // reflect as consuming `Uniform` storage is on CPU/CUDA,
                         // where that will be the only resource it contains.
@@ -1346,17 +1360,18 @@ namespace Slang
                         // TODO: If we ever support targets that don't have
                         // constant buffers at all, this logic would be questionable.
                         //
-                    case LayoutResourceKind::ConstantBuffer:
-                    case LayoutResourceKind::PushConstantBuffer:
                     case LayoutResourceKind::RegisterSpace:
-                    case LayoutResourceKind::DescriptorTableSlot:
                     case LayoutResourceKind::Uniform:
+                        usesIndirectAllocation = true;
                         break;
                     }
 
                     bindingType = _calcBindingType(typeLayout, kind);
-                    spaceOffset = _calcSpaceOffset(path, kind);
                     break;
+                }
+                if(spaceOffset == -1)
+                {
+                    spaceOffset = 0;
                 }
 
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
@@ -1419,7 +1434,7 @@ namespace Slang
                 // because the physical storage for `C.a` is provided by the
                 // memory allocation for `C` itself.
 
-                if( spaceOffset != -1 )
+                if( !usesIndirectAllocation )
                 {
                     // The logic here assumes that when a parameter group consumes
                     // resources that must "leak" into the outer scope (including
@@ -1846,6 +1861,19 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeFirstDescriptorRangeInd
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
     return bindingRange.firstDescriptorRangeIndex;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeDescriptorRangeCount(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+    if(index < 0) return 0;
+    if(index >= extTypeLayout->m_bindingRanges.getCount()) return 0;
+    auto& bindingRange = extTypeLayout->m_bindingRanges[index];
+
+    return bindingRange.descriptorRangeCount;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetCount(SlangReflectionTypeLayout* inTypeLayout)

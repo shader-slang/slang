@@ -135,6 +135,10 @@ void ShaderCompilerUtil::Output::reset()
     {
         spSetPassThrough(slangRequest, input.passThrough);
     }
+    else
+    {
+        spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CODEGEN);
+    }
 
     // Process any additional command-line options specified for Slang using
     // the `-xslang <arg>` option to `render-test`.

@@ -1,6 +1,6 @@
 // global-generic-value-param.slang
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//DISABLED_TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // This is a basic test of support for global generic
 // value parameters: explicit named parameters at global

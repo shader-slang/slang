@@ -4,7 +4,6 @@
 // inside of structure types to make sure that works
 
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute
-
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 
@@ -42,7 +41,7 @@ int test(
 }
 
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out
+//TEST_INPUT:set gOutputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
 RWStructuredBuffer<int> gOutputBuffer;
 
 // Note: even though `C` doesn't include any
@@ -52,7 +51,8 @@ RWStructuredBuffer<int> gOutputBuffer;
 // that it *will* contain uniform/ordinary data
 // after specialization.
 //
-//TEST_INPUT:cbuffer(data=[0 0 0 0 0 0 0 0]):
+//TEST_INPUT:set C = new{ new MyStrategy{ ubuffer(data=[1 2 4 8], stride=4) } }
+//TEST_INPUT: globalExistentialType MyStrategy
 cbuffer C
 {
    IRandomNumberGenerationStrategy gStrategy;
@@ -64,23 +64,10 @@ struct Stuff
     int extra;
 }
 
-// Note: the data for global-scope existential parameters
-// is being introduced *before* the entry point declaration,
-// because the default policy used by `slangc` (which the
-// render test also uses) is to specialize the parameters at
-// the global scope (producing a new layout) and then compose
-// that specialized global scope with the entry point.
-//
-// (The net result is that data related to global-scope
-// specialization always precedes the data for entry point
-// parameters in these tests today)
-//
-//TEST_INPUT: globalExistentialType MyStrategy
-//TEST_INPUT:ubuffer(data=[1 2 4 8], stride=4):
-
 [numthreads(4, 1, 1)]
 void computeMain(
-//TEST_INPUT:root_constants(data=[0 0 0 0 0 0 0 0 256]):
+//TEST_INPUT:set stuff = { new MyModifier{ ubuffer(data=[16 32 64 128], stride=4) }, 256 }
+//TEST_INPUT: entryPointExistentialType MyModifier
     uniform Stuff stuff,
 
     uint3       dispatchThreadID : SV_DispatchThreadID)
@@ -129,6 +116,3 @@ struct MyModifier : IModifier
         return val ^ localModifiers[val & 3];
     }
 }
-
-//TEST_INPUT: entryPointExistentialType MyModifier
-//TEST_INPUT:ubuffer(data=[16 32 64 128], stride=4):

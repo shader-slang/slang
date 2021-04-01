@@ -2832,7 +2832,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     auto specializationParamCount = getSpecializationParamCount();
     if( specializationArgCount != specializationParamCount )
     {
-        // TODO: diagnose
+        sink.diagnose(SourceLoc(), Diagnostics::mismatchSpecializationArguments,
+            specializationParamCount,
+            specializationArgCount);
         sink.getBlobIfNeeded(outDiagnostics);
         return SLANG_FAIL;
     }
