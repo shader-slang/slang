@@ -19,12 +19,6 @@
 namespace Slang
 {
 
-// Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
-static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
-static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
-
 class ZipFileSystemImpl : public ArchiveFileSystem 
 {
 public:
@@ -108,7 +102,7 @@ protected:
 
 ISlangMutableFileSystem* ZipFileSystemImpl::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem || guid == IID_ISlangFileSystemExt || guid == IID_ISlangMutableFileSystem) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() || guid == ISlangMutableFileSystem::getTypeGuid()) ? static_cast<ISlangMutableFileSystem*>(this) : nullptr;
 }
 
 // This is a very awkward hack to make it so we can get a read func, without having to implement all of the tracking etc.

@@ -11,8 +11,6 @@ namespace Slang
 {
 
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Guid IID_ICompressionSystem = SLANG_UUID_ICompressionSystem;
 
 class LZ4CompressionSystemImpl : public RefObject, public ICompressionSystem 
 {
@@ -35,7 +33,7 @@ protected:
 
 ICompressionSystem* LZ4CompressionSystemImpl::getInterface(const Guid& guid)
 {
-    return (guid == IID_ISlangUnknown || guid == IID_ICompressionSystem) ? static_cast<ICompressionSystem*>(this) : nullptr;
+    return (guid == ISlangUnknown::getTypeGuid() || guid == ICompressionSystem::getTypeGuid()) ? static_cast<ICompressionSystem*>(this) : nullptr;
 }
 
 SlangResult LZ4CompressionSystemImpl::compress(const CompressionStyle* style, const void* src, size_t srcSizeInBytes, ISlangBlob** outBlob)

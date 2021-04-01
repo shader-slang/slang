@@ -8,27 +8,21 @@ namespace Slang
 {
 
 // Allocate static const storage for the various interface IDs that the Slang API needs to expose
-static const Guid IID_ISlangUnknown = SLANG_UUID_ISlangUnknown;
-static const Guid IID_ISlangFileSystem = SLANG_UUID_ISlangFileSystem;
-static const Guid IID_ISlangFileSystemExt = SLANG_UUID_ISlangFileSystemExt;
-static const Guid IID_ISlangMutableFileSystem = SLANG_UUID_ISlangMutableFileSystem;
-
-static const Guid IID_SlangCacheFileSystem = SLANG_UUID_CacheFileSystem;
 
 SLANG_FORCE_INLINE static SlangResult _checkExt(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Ext) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 SLANG_FORCE_INLINE static SlangResult _checkMutable(FileSystemStyle style) { return Index(style) >= Index(FileSystemStyle::Mutable) ? SLANG_OK : SLANG_E_NOT_IMPLEMENTED; }
 
 SLANG_FORCE_INLINE static bool _canCast(FileSystemStyle style, const Guid& guid)
 {
-    if (guid == IID_ISlangUnknown || guid == IID_ISlangFileSystem)
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid())
     {
         return true;
     }
-    else if (guid == IID_ISlangFileSystemExt)
+    else if (guid == ISlangFileSystemExt::getTypeGuid())
     {
         return Index(style) >= Index(FileSystemStyle::Ext);
     }
-    else if (guid == IID_ISlangMutableFileSystem)
+    else if (guid == ISlangMutableFileSystem::getTypeGuid())
     {
         return Index(style) >= Index(FileSystemStyle::Mutable);
     }
@@ -41,11 +35,11 @@ static FileSystemStyle _getFileSystemStyle(ISlangFileSystem* system, ComPtr<ISla
 
     FileSystemStyle style = FileSystemStyle::Load;
 
-    if (SLANG_SUCCEEDED(system->queryInterface(IID_ISlangMutableFileSystem, (void**)out.writeRef())))
+    if (SLANG_SUCCEEDED(system->queryInterface(ISlangMutableFileSystem::getTypeGuid(), (void**)out.writeRef())))
     {
         style = FileSystemStyle::Mutable; 
     }
-    else if (SLANG_SUCCEEDED(system->queryInterface(IID_ISlangFileSystemExt, (void**)out.writeRef())))
+    else if (SLANG_SUCCEEDED(system->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)out.writeRef())))
     {
         style = FileSystemStyle::Ext;
     }
@@ -269,7 +263,7 @@ SlangResult OSFileSystem::createDirectory(const char* path)
 
 SLANG_NO_THROW SlangResult SLANG_MCALL CacheFileSystem::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (uuid == IID_SlangCacheFileSystem)
+    if (uuid == CacheFileSystem::getTypeGuid())
     {
         *outObject = this;
         return SLANG_OK;
@@ -310,7 +304,7 @@ void CacheFileSystem::setInnerFileSystem(ISlangFileSystem* fileSystem, UniqueIde
     if (fileSystem)
     {
         // Try to get the more sophisticated interface
-        fileSystem->queryInterface(IID_ISlangFileSystemExt, (void**)m_fileSystemExt.writeRef());
+        fileSystem->queryInterface(ISlangFileSystemExt::getTypeGuid(), (void**)m_fileSystemExt.writeRef());
     }
 
     switch (m_uniqueIdentityMode)

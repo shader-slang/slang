@@ -48,8 +48,7 @@ namespace Slang
     // IDxcIncludeHandler
     // 7f61fc7d-950d-467f-b3e3-3c02fb49187c
     static const Guid IID_IDxcIncludeHandler = { 0x7f61fc7d, 0x950d, 0x467f, { 0x3c, 0x02, 0xfb, 0x49, 0x18, 0x7c } };
-    static const Guid IID_IUnknown = SLANG_UUID_ISlangUnknown;
-
+    
     class DxcIncludeHandler : public IDxcIncludeHandler
     {
     public:
@@ -109,7 +108,7 @@ namespace Slang
         // Used by QueryInterface for casting
         ISlangUnknown* getInterface(const Guid& guid)
         {
-            if (guid == IID_IUnknown || guid == IID_IDxcIncludeHandler)
+            if (guid == ISlangUnknown::getTypeGuid() || guid == IID_IDxcIncludeHandler)
             {
                 return (ISlangUnknown*)(static_cast<IDxcIncludeHandler*>(this));
             }
