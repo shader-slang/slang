@@ -332,6 +332,22 @@ static bool _isStorable(const PathInfo::Type type)
     }
 }
 
+static String _scrubName(const String& in)
+{
+    StringBuilder builder;
+    for (auto c : in)
+    {
+        switch (c)
+        {
+            case ':': c = '_'; break;
+            default:break;
+        }
+        builder.appendChar(c);
+    }
+
+    return builder.ProduceString();
+}
+
 /* static */SlangResult ReproUtil::store(EndToEndCompileRequest* request, OffsetContainer& inOutContainer, Offset32Ptr<RequestState>& outRequest)
 {
     StoreContext context(&inOutContainer);
@@ -570,8 +586,8 @@ static bool _isStorable(const PathInfo::Type type)
                 path = builder;
             }
 
-            String filename = Path::getFileNameWithoutExt(path);
-            String ext = Path::getPathExt(path);
+            String filename = _scrubName(Path::getFileNameWithoutExt(path));
+            String ext = _scrubName(Path::getPathExt(path));
 
             StringBuilder uniqueName;
             for (Index j = 0; j < 0x10000; j++)
@@ -736,6 +752,11 @@ struct LoadContext
 
     CacheFileSystem::PathInfo* addPathInfo(const PathInfoState* srcInfo)
     {
+        if (!srcInfo)
+        {
+            return nullptr;
+        }
+
         CacheFileSystem::PathInfo* pathInfo;
         if (m_pathInfoMap.TryGetValue(srcInfo, pathInfo))
         {
@@ -1019,7 +1040,9 @@ struct LoadContext
             for (const auto& pairOffset : requestState->pathInfoMap)
             {
                 const auto& pair = base.asRaw(pairOffset);
-                CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(base.asRaw(pair.pathInfo));
+                auto srcPathInfo = base.asRaw(pair.pathInfo);
+
+                CacheFileSystem::PathInfo* pathInfo = context.addPathInfo(srcPathInfo);
                 dstPathMap.Add(base.asRaw(pair.path)->getSlice(), pathInfo);
             }
         }
@@ -1444,48 +1467,55 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
 
         const auto pathInfo = base.asRaw(path.pathInfo);
 
-        if (pathInfo->file)
+        if (pathInfo)
         {
-            builder << base.asRaw(base.asRaw(pathInfo->file)->uniqueName)->getSlice();
+            if (pathInfo->file)
+            {
+                builder << base.asRaw(base.asRaw(pathInfo->file)->uniqueName)->getSlice();
+            }
+            else
+            {
+                typedef CacheFileSystem::CompressedResult CompressedResult;
+                if (pathInfo->getPathTypeResult == CompressedResult::Ok)
+                {
+                    switch (pathInfo->pathType)
+                    {
+                        case SLANG_PATH_TYPE_FILE: builder << "file "; break;
+                        case SLANG_PATH_TYPE_DIRECTORY: builder << "directory "; break;
+                        default: builder << "?"; break;
+                    }
+                }
+
+                CompressedResult curRes =  pathInfo->getCanonicalPathResult;
+                CompressedResult results[] =
+                {
+                    pathInfo->getPathTypeResult,
+                    pathInfo->loadFileResult,
+                };
+
+                for (auto compRes : results)
+                {
+                    if (int(compRes) > int(curRes))
+                    {
+                        curRes = compRes;
+                    }
+                }
+
+                switch (curRes)
+                {
+                    default:
+                    case CompressedResult::Uninitialized: break;
+                    case CompressedResult::Ok: break;
+                
+                    case CompressedResult::NotFound:    builder << "[not found]"; break;
+                    case CompressedResult::CannotOpen:  builder << "[cannot open]"; break;
+                    case CompressedResult::Fail:        builder << "[fail]"; break;
+                }
+            }
         }
         else
         {
-            typedef CacheFileSystem::CompressedResult CompressedResult;
-            if (pathInfo->getPathTypeResult == CompressedResult::Ok)
-            {
-                switch (pathInfo->pathType)
-                {
-                    case SLANG_PATH_TYPE_FILE: builder << "file "; break;
-                    case SLANG_PATH_TYPE_DIRECTORY: builder << "directory "; break;
-                    default: builder << "?"; break;
-                }
-            }
-
-            CompressedResult curRes =  pathInfo->getCanonicalPathResult;
-            CompressedResult results[] =
-            {
-                pathInfo->getPathTypeResult,
-                pathInfo->loadFileResult,
-            };
-
-            for (auto compRes : results)
-            {
-                if (int(compRes) > int(curRes))
-                {
-                    curRes = compRes;
-                }
-            }
-
-            switch (curRes)
-            {
-                default:
-                case CompressedResult::Uninitialized: break;
-                case CompressedResult::Ok: break;
-                
-                case CompressedResult::NotFound:    builder << " [not found]"; break;
-                case CompressedResult::CannotOpen:  builder << "[cannot open]"; break;
-                case CompressedResult::Fail:        builder << "[fail]"; break;
-            }
+            builder << "[not loaded]";
         }
 
         builder << "\n";
