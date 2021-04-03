@@ -2474,8 +2474,8 @@ public:
         // weak referenced.
         IBufferResource* m_constantBuffer = nullptr;
         // The offset into the transient constant buffer where the constant data starts.
-        uint32_t m_constantBufferOffset = 0;
-        uint32_t m_constantBufferSize = 0;
+        size_t m_constantBufferOffset = 0;
+        size_t m_constantBufferSize = 0;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///

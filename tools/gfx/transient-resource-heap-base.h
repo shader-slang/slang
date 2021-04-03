@@ -55,7 +55,7 @@ public:
     Result allocateConstantBuffer(
         size_t size,
         IBufferResource*& outBufferWeakPtr,
-        uint32_t& outOffset)
+        size_t& outOffset)
     {
         size_t bufferAllocOffset = m_constantBufferOffsetAllocCounter;
         Slang::Index bufferId = -1;
