@@ -23,7 +23,7 @@
 
 #include "../../source/core/slang-test-tool-util.h"
 
-#define ENABLE_RENDERDOC_INTEGRATION 1
+#define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
