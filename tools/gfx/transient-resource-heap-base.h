@@ -36,7 +36,7 @@ public:
 
         if (desc.constantBufferSize)
         {
-            ComPtr<IBufferResource> bufferPtr;
+            Slang::ComPtr<IBufferResource> bufferPtr;
             IBufferResource::Desc bufferDesc;
             bufferDesc.type = IResource::Type::Buffer;
             bufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
@@ -58,10 +58,10 @@ public:
         uint32_t& outOffset)
     {
         size_t bufferAllocOffset = m_constantBufferOffsetAllocCounter;
-        Index bufferId = -1;
+        Slang::Index bufferId = -1;
         // Find first constant buffer from `m_constantBufferAllocCounter` that has enough space
         // for this allocation.
-        for (Index i = m_constantBufferAllocCounter; i < m_constantBuffers.getCount(); i++)
+        for (Slang::Index i = m_constantBufferAllocCounter; i < m_constantBuffers.getCount(); i++)
         {
             auto cb = m_constantBuffers[i].Ptr();
             if (bufferAllocOffset + size <= cb->getDesc()->sizeInBytes)
@@ -75,7 +75,7 @@ public:
         // create a new constant buffer.
         if (bufferId == -1)
         {
-            ComPtr<IBufferResource> bufferPtr;
+            Slang::ComPtr<IBufferResource> bufferPtr;
             IBufferResource::Desc bufferDesc;
             bufferDesc.type = IResource::Type::Buffer;
             bufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
@@ -85,8 +85,8 @@ public:
             {
                 lastConstantBufferSize = m_constantBuffers.getLast()->getDesc()->sizeInBytes;
             }
-            bufferDesc.init(
-                Math::Max(lastConstantBufferSize * 2, Math::Max(size, size_t(4 << 20))));
+            bufferDesc.init(Slang::Math::Max(
+                lastConstantBufferSize * 2, Slang::Math::Max(size, size_t(4 << 20))));
             SLANG_RETURN_ON_FAIL(m_device->createBufferResource(
                 IResource::Usage::ConstantBuffer, bufferDesc, nullptr, bufferPtr.writeRef()));
             bufferId = m_constantBuffers.getCount();

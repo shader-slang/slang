@@ -1320,15 +1320,15 @@ public:
         return SLANG_OK;
     }
 
-    virtual void submitGpuWork() {}
-    virtual void waitForGpu() {}
-    virtual void* map(IBufferResource* buffer, MapFlavor flavor)
+    virtual void submitGpuWork() override {}
+    virtual void waitForGpu() override {}
+    virtual void* map(IBufferResource* buffer, MapFlavor flavor) override
     {
         SLANG_UNUSED(flavor);
         auto bufferImpl = static_cast<CPUBufferResource*>(buffer);
         return bufferImpl->m_data;
     }
-    virtual void unmap(IBufferResource* buffer) { SLANG_UNUSED(buffer); }
+    virtual void unmap(IBufferResource* buffer) override { SLANG_UNUSED(buffer); }
 };
 
 SlangResult CPUShaderObject::init(IDevice* device, CPUShaderObjectLayout* typeLayout)
