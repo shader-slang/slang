@@ -44,8 +44,10 @@ namespace Slang
         {
             if (auto elemCount = as<ConstantIntVal>(vectorType->elementCount))
             {
-                auto elemBasicType = as<BasicExpressionType>(vectorType->elementType);
-                return makeBasicTypeKey(elemBasicType->baseType, elemCount->value);
+                if( auto elemBasicType = as<BasicExpressionType>(vectorType->elementType) )
+                {
+                    return makeBasicTypeKey(elemBasicType->baseType, elemCount->value);
+                }
             }
         }
         else if (auto matrixType = as<MatrixExpressionType>(typeIn))
@@ -54,8 +56,10 @@ namespace Slang
             {
                 if (auto elemCount2 = as<ConstantIntVal>(matrixType->getColumnCount()))
                 {
-                    auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType());
-                    return makeBasicTypeKey(elemBasicType->baseType, elemCount1->value, elemCount2->value);
+                    if( auto elemBasicType = as<BasicExpressionType>(matrixType->getElementType()) )
+                    {
+                        return makeBasicTypeKey(elemBasicType->baseType, elemCount1->value, elemCount2->value);
+                    }
                 }
             }
         }
