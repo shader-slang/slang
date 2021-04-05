@@ -273,7 +273,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     auto renderEncoder = cmdBuf->encodeRenderCommands(renderPass, framebuffer);
     renderEncoder->setViewportAndScissor(viewport);
 
-    renderEncoder->setPipelineState(pipelineState);
+    renderEncoder->bindPipeline(pipelineState);
 
     renderEncoder->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
     renderEncoder->setIndexBuffer(

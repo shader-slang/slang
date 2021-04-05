@@ -198,6 +198,7 @@
     <ClInclude Include="..\..\..\tools\gfx\simple-render-pass-layout.h" />
     <ClInclude Include="..\..\..\tools\gfx\simple-transient-resource-heap.h" />
     <ClInclude Include="..\..\..\tools\gfx\slang-context.h" />
+    <ClInclude Include="..\..\..\tools\gfx\transient-resource-heap-base.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-api.h" />
     <ClInclude Include="..\..\..\tools\gfx\vulkan\vk-descriptor-allocator.h" />
