@@ -286,7 +286,6 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
 }
 
 ComPtr<IShaderProgram> gShaderProgram;
-ComPtr<gfx::IShaderObject> gRootObject[kSwapchainImageCount];
 ComPtr<gfx::IPipelineState> gPipelineState;
 ComPtr<gfx::IBufferResource> gVertexBuffer;
 
@@ -371,10 +370,7 @@ virtual void renderFrame(int frameIndex) override
         uniforms.iResolution[1] = float(windowHeight);
 
     }
-    gRootObject[frameIndex] = gDevice->createRootShaderObject(gShaderProgram);
-    auto constantBuffer = gRootObject[frameIndex]->getObject(ShaderOffset());
-    constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
-
+    
     // Encode render commands.
     auto encoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
 
@@ -383,8 +379,10 @@ virtual void renderFrame(int frameIndex) override
     viewport.extentX = (float)windowWidth;
     viewport.extentY = (float)windowHeight;
     encoder->setViewportAndScissor(viewport);
-    encoder->setPipelineState(gPipelineState);
-    encoder->bindRootShaderObject(gRootObject[frameIndex]);
+    auto rootObject = encoder->bindPipeline(gPipelineState);
+    auto constantBuffer = rootObject->getObject(ShaderOffset());
+    constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
+
     encoder->setVertexBuffer(0, gVertexBuffer, sizeof(FullScreenTriangle::Vertex));
     encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->draw(3);

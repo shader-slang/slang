@@ -66,6 +66,9 @@
     <ClInclude Include="..\..\..\tools\gfx\slang-context.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\gfx\transient-resource-heap-base.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\gfx\vulkan\render-vk.h">
       <Filter>Header Files</Filter>
     </ClInclude>

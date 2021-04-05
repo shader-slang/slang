@@ -63,17 +63,16 @@ public:
     ~D3D11Device() {}
 
     // Renderer    implementation
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual void clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
         const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
         const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setFramebuffer(IFramebuffer* frameBuffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
+    virtual void setFramebuffer(IFramebuffer* frameBuffer) override;
+    virtual void setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         IResource::Usage initialUsage,
@@ -89,9 +88,14 @@ public:
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
-        ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override;
+        ITextureResource* texture,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
+        IBufferResource* buffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         const InputElementDesc* inputElements,
@@ -101,10 +105,11 @@ public:
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
-    virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
-    virtual void bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject) override;
+    virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+        override;
+    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+        override;
+    virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -115,7 +120,7 @@ public:
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(IBufferResource* buffer) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
+    virtual void copyBuffer(
         IBufferResource* dst,
         size_t dstOffset,
         IBufferResource* src,
@@ -124,28 +129,23 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setPrimitiveTopology(PrimitiveTopology topology) override;
+    virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
+    virtual void setVertexBuffers(
         UInt startSlot,
         UInt slotCount,
         IBufferResource* const* buffers,
         const UInt* strides,
         const UInt* offsets) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setViewports(UInt count, Viewport const* viewports) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        setScissorRects(UInt count, ScissorRect const* rects) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL submitGpuWork() override {}
-    virtual SLANG_NO_THROW void SLANG_MCALL waitForGpu() override {}
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
+    virtual void setViewports(UInt count, Viewport const* viewports) override;
+    virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
+    virtual void setPipelineState(IPipelineState* state) override;
+    virtual void draw(UInt vertexCount, UInt startVertex) override;
+    virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
+    virtual void dispatchCompute(int x, int y, int z) override;
+    virtual void submitGpuWork() override {}
+    virtual void waitForGpu() override {}
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -2966,19 +2966,19 @@ Result D3D11Device::createRootShaderObject(IShaderProgram* program, IShaderObjec
     return SLANG_OK;
 }
 
-void D3D11Device::bindRootShaderObject(PipelineType pipelineType, IShaderObject* shaderObject)
+void D3D11Device::bindRootShaderObject(IShaderObject* shaderObject)
 {
     RootShaderObjectImpl* rootShaderObjectImpl = static_cast<RootShaderObjectImpl*>(shaderObject);
     RefPtr<PipelineStateBase> specializedPipeline;
     maybeSpecializePipeline(m_currentPipelineState, rootShaderObjectImpl, specializedPipeline);
     setPipelineState(specializedPipeline.Ptr());
-
+    
     m_rootBindingState.samplerBindings.clear();
     m_rootBindingState.srvBindings.clear();
     m_rootBindingState.uavBindings.clear();
     m_rootBindingState.constantBuffers.clear();
     static_cast<ShaderObjectImpl*>(shaderObject)->bindObject(this, &m_rootBindingState);
-    switch (pipelineType)
+    switch (m_currentPipelineState->desc.type)
     {
     case PipelineType::Compute:
         m_immediateContext->CSSetShaderResources(0, (UINT)m_rootBindingState.srvBindings.getCount(), m_rootBindingState.srvBindings.getBuffer());

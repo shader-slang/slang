@@ -1110,9 +1110,19 @@ public:
 class IRenderCommandEncoder : public ICommandEncoder
 {
 public:
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        bindRootShaderObject(IShaderObject* object) = 0;
+    // Sets the current pipeline state. This method returns a transient shader object for
+    // writing shader parameters. This shader object will not retain any resources or
+    // sub-shader-objects bound to it. The user must be responsible for ensuring that any
+    // resources or shader objects that is set into `outRooShaderObject` stays alive during
+    // the execution of the command buffer.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) = 0;
+    inline IShaderObject* bindPipeline(IPipelineState* state)
+    {
+        IShaderObject* rootObject = nullptr;
+        SLANG_RETURN_NULL_ON_FAIL(bindPipeline(state, &rootObject));
+        return rootObject;
+    }
 
     virtual SLANG_NO_THROW void
         SLANG_MCALL setViewports(uint32_t count, const Viewport* viewports) = 0;
@@ -1156,10 +1166,19 @@ public:
 class IComputeCommandEncoder : public ICommandEncoder
 {
 public:
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        bindRootShaderObject(IShaderObject* object) = 0;
-
-    virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) = 0;
+    // Sets the current pipeline state. This method returns a transient shader object for
+    // writing shader parameters. This shader object will not retain any resources or
+    // sub-shader-objects bound to it. The user must be responsible for ensuring that any
+    // resources or shader objects that is set into `outRooShaderObject` stays alive during
+    // the execution of the command buffer.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) = 0;
+    inline IShaderObject* bindPipeline(IPipelineState* state)
+    {
+        IShaderObject* rootObject = nullptr;
+        SLANG_RETURN_NULL_ON_FAIL(bindPipeline(state, &rootObject));
+        return rootObject;
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
 };
 #define SLANG_UUID_IComputeCommandEncoder                                              \
@@ -1531,15 +1550,6 @@ public:
     {
         ComPtr<IShaderObject> object;
         SLANG_RETURN_NULL_ON_FAIL(createShaderObject(type, object.writeRef()));
-        return object;
-    }
-
-    virtual SLANG_NO_THROW Result SLANG_MCALL createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) = 0;
-
-    inline ComPtr<IShaderObject> createRootShaderObject(IShaderProgram* program)
-    {
-        ComPtr<IShaderObject> object;
-        SLANG_RETURN_NULL_ON_FAIL(createRootShaderObject(program, object.writeRef()));
         return object;
     }
 

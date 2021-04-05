@@ -121,9 +121,7 @@ Result execute()
     auto queue = gDevice->createCommandQueue(queueDesc);
     auto commandBuffer = transientHeap->createCommandBuffer();
     auto encoder = commandBuffer->encodeComputeCommands();
-    auto rootShaderObject = gDevice->createRootShaderObject(gProgram);
-    encoder->setPipelineState(gPipelineState);
-    encoder->bindRootShaderObject(rootShaderObject);
+    auto rootShaderObject = encoder->bindPipeline(gPipelineState);
     encoder->dispatchCompute(1, 1, 1);
     encoder->endEncoding();
     commandBuffer->close();
