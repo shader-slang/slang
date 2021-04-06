@@ -33,6 +33,7 @@ public:
 public:
     CommandWriter m_writer;
     ImmediateRendererBase* m_renderer;
+    RefPtr<ShaderObjectBase> m_rootShaderObject;
 
     void init(ImmediateRendererBase* renderer)
     {
@@ -40,7 +41,8 @@ public:
     }
 
     void reset()
-    { m_writer.clear();
+    {
+        m_writer.clear();
     }
 
     class RenderCommandEncoderImpl
@@ -63,11 +65,13 @@ public:
 
     public:
         CommandWriter* m_writer;
+        CommandBufferImpl* m_commandBuffer;
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
 
         void init(CommandBufferImpl* cmdBuffer, SimpleRenderPassLayout* renderPass, IFramebuffer* framebuffer)
         {
             m_writer = &cmdBuffer->m_writer;
+            m_commandBuffer = cmdBuffer;
 
             // Encode clear commands.
             m_writer->setFramebuffer(framebuffer);
@@ -100,15 +104,15 @@ public:
             m_writer->clearFrame(clearMask, clearDepth, clearStencil);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
         {
             m_writer->setPipelineState(state);
-        }
-
-        virtual SLANG_NO_THROW void SLANG_MCALL
-            bindRootShaderObject(IShaderObject* object) override
-        {
-            m_writer->bindRootShaderObject(PipelineType::Graphics, object);
+            auto stateImpl = static_cast<PipelineStateBase*>(state);
+            SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
+                stateImpl->m_program, outRootObject));
+            *m_commandBuffer->m_rootShaderObject.writeRef() = static_cast<ShaderObjectBase*>(*outRootObject);
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
@@ -143,12 +147,14 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override
         {
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->draw(vertexCount, startVertex);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
             drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override
         {
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
         }
 
@@ -191,6 +197,7 @@ public:
 
     public:
         CommandWriter* m_writer;
+        CommandBufferImpl* m_commandBuffer;
 
         virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
         {
@@ -199,20 +206,23 @@ public:
         void init(CommandBufferImpl* cmdBuffer)
         {
             m_writer = &cmdBuffer->m_writer;
+            m_commandBuffer = cmdBuffer;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
         {
             m_writer->setPipelineState(state);
-        }
-        virtual SLANG_NO_THROW void SLANG_MCALL
-            bindRootShaderObject(IShaderObject* object) override
-        {
-            m_writer->bindRootShaderObject(PipelineType::Compute, object);
+            auto stateImpl = static_cast<PipelineStateBase*>(state);
+            SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
+                stateImpl->m_program, outRootObject));
+            *m_commandBuffer->m_rootShaderObject.writeRef() = static_cast<ShaderObjectBase*>(*outRootObject);
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
         {
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->dispatchCompute(x, y, z);
         }
     };
@@ -291,9 +301,7 @@ public:
                 m_renderer->setPipelineState(m_writer.getObject<IPipelineState>(cmd.operands[0]));
                 break;
             case CommandName::BindRootShaderObject:
-                m_renderer->bindRootShaderObject(
-                    (PipelineType)cmd.operands[0],
-                    m_writer.getObject<IShaderObject>(cmd.operands[1]));
+                m_renderer->bindRootShaderObject(m_writer.getObject<IShaderObject>(cmd.operands[0]));
                 break;
             case CommandName::SetFramebuffer:
                 m_renderer->setFramebuffer(m_writer.getObject<IFramebuffer>(cmd.operands[0]));

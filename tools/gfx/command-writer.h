@@ -127,12 +127,10 @@ public:
         m_commands.add(Command(CommandName::SetPipelineState, offset));
     }
 
-    void bindRootShaderObject(PipelineType pipelineType, IShaderObject* object)
+    void bindRootShaderObject(IShaderObject* object)
     {
         auto rootOffset = encodeObject(object);
-        m_commands.add(Command(
-            CommandName::BindRootShaderObject,
-            (uint32_t)pipelineType, rootOffset));
+        m_commands.add(Command(CommandName::BindRootShaderObject, rootOffset));
     }
 
     void uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data)

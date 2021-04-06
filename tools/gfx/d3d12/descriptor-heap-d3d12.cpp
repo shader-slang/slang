@@ -13,6 +13,8 @@ D3D12DescriptorHeap::D3D12DescriptorHeap():
 
 Result D3D12DescriptorHeap::init(ID3D12Device* device, int size, D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_DESCRIPTOR_HEAP_FLAGS flags)
 {
+    m_device = device;
+
     D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
     srvHeapDesc.NumDescriptors = size;
     srvHeapDesc.Flags = flags;
@@ -21,7 +23,6 @@ Result D3D12DescriptorHeap::init(ID3D12Device* device, int size, D3D12_DESCRIPTO
 
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(type);
     m_totalSize = size;
-
     return SLANG_OK;
 }
 

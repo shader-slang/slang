@@ -271,6 +271,10 @@ public:
     // pipeline cannot be used directly and must be specialized first.
     bool isSpecializable = false;
     ComPtr<IShaderProgram> m_program;
+    template <typename TProgram> TProgram* getProgram()
+    {
+        return static_cast<TProgram*>(m_program.get());
+    }
 
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);

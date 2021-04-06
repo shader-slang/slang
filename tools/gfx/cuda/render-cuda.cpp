@@ -990,7 +990,9 @@ public:
             return nullptr;
         }
     public:
-        void init(CUDADevice* device) { SLANG_UNUSED(device); }
+        CUDADevice* m_device;
+
+        void init(CUDADevice* device) { m_device = device; }
         virtual SLANG_NO_THROW void SLANG_MCALL encodeRenderCommands(
             IRenderPassLayout* renderPass,
             IFramebuffer* framebuffer,
@@ -1022,25 +1024,29 @@ public:
 
         public:
             CommandWriter* m_writer;
-
+            CommandBufferImpl* m_commandBuffer;
+            ComPtr<IShaderObject> m_rootObject;
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override {}
             void init(CommandBufferImpl* cmdBuffer)
             {
                 m_writer = cmdBuffer;
+                m_commandBuffer = cmdBuffer;
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL setPipelineState(IPipelineState* state) override
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override
             {
                 m_writer->setPipelineState(state);
-            }
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                bindRootShaderObject(IShaderObject* object) override
-            {
-                m_writer->bindRootShaderObject(PipelineType::Compute, object);
+                PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
+                SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
+                    pipelineImpl->m_program, outRootObject));
+                m_rootObject = *outRootObject;
+                return SLANG_OK;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
+                m_writer->bindRootShaderObject(m_rootObject);
                 m_writer->dispatchCompute(x, y, z);
             }
         };
@@ -1831,8 +1837,7 @@ public:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override
+    Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
     {
         auto cudaProgram = dynamic_cast<CUDAShaderProgram*>(program);
         auto cudaLayout = cudaProgram->layout;
