@@ -13,8 +13,12 @@ protected:
 
 public:
     ComObject() = default;
-    ComObject(const ComObject&) {}
-    ComObject& operator=(const ComObject&){};
+    ComObject(const ComObject&) : comRefCount(0) {}
+    ComObject& operator=(const ComObject&)
+    {
+        comRefCount = 0;
+        return *this;
+    };
     virtual void comFree() {}
 
     uint32_t addRefImpl()
