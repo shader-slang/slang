@@ -9,10 +9,12 @@ namespace Slang
 class ComObject : public RefObject
 {
 protected:
-    std::atomic<uint32_t> comRefCount = 0;
+    std::atomic<uint32_t> comRefCount;
 
 public:
-    ComObject() = default;
+    ComObject()
+        : comRefCount(0)
+    {}
     ComObject(const ComObject&) : comRefCount(0) {}
     ComObject& operator=(const ComObject&)
     {
