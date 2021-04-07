@@ -117,7 +117,7 @@ protected:
     // variables for state to be used for rendering...
     uintptr_t m_constantBufferSize;
 
-    ComPtr<IDevice> m_device;
+    IDevice* m_device;
     ComPtr<ICommandQueue> m_queue;
     ComPtr<ITransientResourceHeap> m_transientHeap;
     ComPtr<IRenderPassLayout> m_renderPass;
@@ -641,16 +641,6 @@ void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 
 void RenderTestApp::finalize()
 {
-    m_inputLayout = nullptr;
-    m_vertexBuffer = nullptr;
-    m_shaderProgram = nullptr;
-    m_pipelineState = nullptr;
-    m_renderPass = nullptr;
-    m_framebuffer = nullptr;
-    m_framebufferLayout = nullptr;
-    m_colorBuffer = nullptr;
-    m_queue = nullptr;
-    m_device = nullptr;
 }
 
 Result RenderTestApp::writeBindingOutput(const char* fileName)
@@ -840,7 +830,11 @@ static SlangResult _setSessionPrelude(const Options& options, const char* exePat
         SLANG_RETURN_ON_FAIL(TestToolUtil::getRootPath(exePath, rootPath));
 
         String includePath;
-        SLANG_RETURN_ON_FAIL(TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath));
+        if (TestToolUtil::getIncludePath(rootPath, "external/nvapi/nvHLSLExtns.h", includePath) !=
+            SLANG_OK)
+        {
+            return SLANG_FAIL;
+        }
 
         StringBuilder buf;
         // We have to choose a slot that NVAPI will use. 
@@ -1129,8 +1123,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         app.update();
         renderDocEndFrame();
         app.finalize();
-        return SLANG_OK;
 	}
+    return SLANG_OK;
 }
 
 SLANG_TEST_TOOL_API SlangResult innerMain(Slang::StdWriters* stdWriters, SlangSession* sharedSession, int inArgc, const char*const* inArgv)

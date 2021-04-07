@@ -244,7 +244,7 @@ public:
 #        define GFX_DUMP_LEAK
 #    endif
 #    define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
-        int __stdcall WinMain(                  \
+        int __stdcall wWinMain(                 \
             void* /*instance*/,                 \
             void* /* prevInstance */,           \
             void* /* commandLine */,            \

@@ -97,7 +97,7 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -115,7 +115,7 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -179,6 +179,7 @@
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
+    <ClInclude Include="..\..\..\source\core\slang-com-object.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
