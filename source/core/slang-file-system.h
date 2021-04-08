@@ -116,7 +116,6 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
         PathInfo(const String& uniqueIdentity)
         {
             m_uniqueIdentity = new StringBlob(uniqueIdentity);
-            m_uniqueIdentity->addRef();
 
             m_loadFileResult = CompressedResult::Uninitialized;
             m_getPathTypeResult = CompressedResult::Uninitialized;
