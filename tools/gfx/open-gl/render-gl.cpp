@@ -523,8 +523,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             getImage(uint32_t index, ITextureResource** outResource) override
         {
-            m_images[index]->addRef();
-            *outResource = m_images[index].Ptr();
+            returnComPtr(outResource, m_images[index]);
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL present() override

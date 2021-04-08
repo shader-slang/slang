@@ -525,8 +525,7 @@ public:
             *object = nullptr;
             return SLANG_OK;
         }
-        objects[subObjectIndex]->addRef();
-        *object = objects[subObjectIndex].Ptr();
+        returnComPtr(object, objects[subObjectIndex]);
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL

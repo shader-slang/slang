@@ -2527,8 +2527,8 @@ public:
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             RefPtr<RenderPassLayoutImpl> m_renderPass;
             RefPtr<FramebufferImpl> m_framebuffer;

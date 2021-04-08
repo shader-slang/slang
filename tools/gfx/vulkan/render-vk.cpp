@@ -3114,8 +3114,8 @@ public:
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -3178,8 +3178,8 @@ public:
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
                 IBufferResource* dst,

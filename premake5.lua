@@ -258,13 +258,11 @@ workspace "slang"
     -- optimization off, make sure debug symbols are output,
     -- and add the same preprocessor definition that VS
     -- would add by default.
-    -- We also use dynamic CRT in debug configuration to help
-    -- detect any memory leaks across DLL boundaries.
     filter { "configurations:debug" }
         optimize "Off"
         symbols "On"
         defines { "_DEBUG" }
-        staticruntime "Off"
+        -- staticruntime "Off"
     -- For the release configuration we will turn optimizations on
     -- (we do not yet micro-manage the optimization settings)
     -- and set the preprocessor definition that VS would add by default.
