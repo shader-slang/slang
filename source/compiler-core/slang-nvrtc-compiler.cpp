@@ -17,6 +17,11 @@
 namespace nvrtc
 {
 
+// On Windows and Linux CUDA is only available on 64 bit operating systems
+#if (SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY) && SLANG_PTR_IS_32
+SLANG_COMPILE_TIME_ASSERT(!"NVRTC is only supported on 64-bit operating systems");
+#endif
+
 typedef enum {
   NVRTC_SUCCESS = 0,
   NVRTC_ERROR_OUT_OF_MEMORY = 1,
