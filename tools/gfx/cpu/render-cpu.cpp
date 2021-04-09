@@ -191,6 +191,7 @@ public:
     {}
     ~CPUTextureResource()
     {
+        free(m_data);
     }
 
     Result init(ITextureResource::SubresourceData const* initData)
@@ -341,7 +342,7 @@ public:
     void*           m_data = nullptr;
 };
 
-class CPUResourceView : public IResourceView, public RefObject
+class CPUResourceView : public IResourceView, public ComObject
 {
 public:
     enum class Kind
@@ -350,7 +351,7 @@ public:
         Texture,
     };
 
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
     IResourceView* getInterface(const Guid& guid)
     {
         if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
@@ -799,9 +800,9 @@ public:
 
         auto& bindingRange = layout->m_bindingRanges[bindingRangeIndex];
         auto subObjectIndex = bindingRange.baseIndex + offset.bindingArrayIndex;
-        CPUShaderObject* subObject = m_objects[subObjectIndex];
+        auto& subObject = m_objects[subObjectIndex];
 
-        *outObject = ComPtr<IShaderObject>(subObject).detach();
+        returnComPtr(outObject, subObject);
 
         return SLANG_OK;
     }
@@ -1044,6 +1045,12 @@ public:
 class CPURootShaderObject : public CPUShaderObject
 {
 public:
+    // Override default reference counting behavior to disable lifetime management via ComPtr.
+    // Root objects are managed by command buffer and does not need to be freed by the user.
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
+public:
     SlangResult init(IDevice* device, CPUProgramLayout* programLayout);
 
     CPUProgramLayout* getLayout() { return static_cast<CPUProgramLayout*>(m_layout.Ptr()); }
@@ -1056,7 +1063,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getEntryPoint(UInt index, IShaderObject** outEntryPoint) override
     {
-        *outEntryPoint = ComPtr<IShaderObject>(m_entryPoints[index]).detach();
+        returnComPtr(outEntryPoint, m_entryPoints[index]);
         return SLANG_OK;
     }
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
@@ -1083,7 +1090,7 @@ public:
 class CPUPipelineState : public PipelineStateBase
 {
 public:
-    CPUShaderProgram* getProgram() { return static_cast<CPUShaderProgram*>(m_program.get()); }
+    CPUShaderProgram* getProgram() { return static_cast<CPUShaderProgram*>(m_program.Ptr()); }
 
     void init(const ComputePipelineStateDesc& inDesc)
     {
@@ -1194,11 +1201,14 @@ public:
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override
     {
-        RefPtr<CPUTextureResource> texture = new CPUTextureResource(desc);
+        TextureResource::Desc srcDesc(desc);
+        srcDesc.setDefaults(initialUsage);
+
+        RefPtr<CPUTextureResource> texture = new CPUTextureResource(srcDesc);
 
         SLANG_RETURN_ON_FAIL(texture->init(initData));
 
-        *outResource = texture.detach();
+        returnComPtr(outResource, texture);
         return SLANG_OK;
     }
 
@@ -1214,7 +1224,7 @@ public:
         {
             SLANG_RETURN_ON_FAIL(resource->setData(0, desc.sizeInBytes, initData));
         }
-        *outResource = resource.detach();
+        returnComPtr(outResource, resource);
         return SLANG_OK;
     }
 
@@ -1223,7 +1233,7 @@ public:
     {
         auto texture = static_cast<CPUTextureResource*>(inTexture);
         RefPtr<CPUTextureView> view = new CPUTextureView(desc, texture);
-        *outView = view.detach();
+        returnComPtr(outView, view);
         return SLANG_OK;
     }
 
@@ -1232,7 +1242,7 @@ public:
     {
         auto buffer = static_cast<CPUBufferResource*>(inBuffer);
         RefPtr<CPUBufferView> view = new CPUBufferView(desc, buffer);
-        *outView = view.detach();
+        returnComPtr(outView, view);
         return SLANG_OK;
     }
 
@@ -1241,7 +1251,7 @@ public:
         ShaderObjectLayoutBase**        outLayout) override
     {
         RefPtr<CPUShaderObjectLayout> cpuLayout = new CPUShaderObjectLayout(this, typeLayout);
-        *outLayout = cpuLayout.detach();
+        returnRefPtrMove(outLayout, cpuLayout);
 
         return SLANG_OK;
     }
@@ -1254,19 +1264,19 @@ public:
 
         RefPtr<CPUShaderObject> result = new CPUShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, cpuLayout));
-        *outObject = result.detach();
+        returnComPtr(outObject, result);
 
         return SLANG_OK;
     }
 
-    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override
+    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override
     {
         auto cpuProgram = static_cast<CPUShaderProgram*>(program);
         auto cpuProgramLayout = cpuProgram->layout;
 
         RefPtr<CPURootShaderObject> result = new CPURootShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, cpuProgramLayout));
-        *outObject = result.detach();
+        returnRefPtrMove(outObject, result);
         return SLANG_OK;
     }
 
@@ -1292,7 +1302,7 @@ public:
             cpuProgram->layout = cpuProgramLayout;
         }
 
-        *outProgram = cpuProgram.detach();
+        returnComPtr(outProgram, cpuProgram);
         return SLANG_OK;
     }
 
@@ -1301,7 +1311,7 @@ public:
     {
         RefPtr<CPUPipelineState> state = new CPUPipelineState();
         state->init(desc);
-        *outState = state.detach();
+        returnComPtr(outState, state);
         return Result();
     }
 
@@ -1410,7 +1420,7 @@ SlangResult SLANG_MCALL createCPUDevice(const IDevice::Desc* desc, IDevice** out
 {
     RefPtr<CPUDevice> result = new CPUDevice();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    *outDevice = result.detach();
+    returnComPtr(outDevice, result);
     return SLANG_OK;
 }
 
