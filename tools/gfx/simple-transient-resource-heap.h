@@ -11,10 +11,10 @@ namespace gfx
 template<typename TDevice, typename TCommandBuffer>
 class SimpleTransientResourceHeap
     : public ITransientResourceHeap
-    , public Slang::RefObject
+    , public Slang::ComObject
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
     ITransientResourceHeap* getInterface(const Slang::Guid& guid)
     {
         if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
@@ -23,8 +23,8 @@ public:
     }
 
 public:
-    TDevice* m_device;
-    ComPtr<IBufferResource> m_constantBuffer;
+    Slang::RefPtr<TDevice> m_device;
+    Slang::ComPtr<IBufferResource> m_constantBuffer;
 
 public:
     Result init(TDevice* device, const ITransientResourceHeap::Desc& desc)
@@ -43,7 +43,7 @@ public:
     {
         Slang::RefPtr<TCommandBuffer> newCmdBuffer = new TCommandBuffer();
         newCmdBuffer->init(m_device);
-        *outCommandBuffer = newCmdBuffer.detach();
+        returnComPtr(outCommandBuffer, newCmdBuffer);
         return SLANG_OK;
     }
 

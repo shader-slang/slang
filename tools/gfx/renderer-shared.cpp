@@ -300,7 +300,7 @@ ShaderComponentID ShaderCache::getComponentId(ComponentKey key)
     return resultId;
 }
 
-void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::ComPtr<IPipelineState> specializedPipeline)
+void ShaderCache::addSpecializedPipeline(PipelineKey key, Slang::RefPtr<PipelineStateBase> specializedPipeline)
 {
     specializedPipelines[key] = specializedPipeline;
 }
@@ -363,7 +363,7 @@ Result RendererBase::maybeSpecializePipeline(
         pipelineKey.specializationArgs.addRange(specializationArgs.componentIDs);
         pipelineKey.updateHash();
 
-        ComPtr<IPipelineState> specializedPipelineState = shaderCache.getSpecializedPipelineState(pipelineKey);
+        RefPtr<PipelineStateBase> specializedPipelineState = shaderCache.getSpecializedPipelineState(pipelineKey);
         // Try to find specialized pipeline from shader cache.
         if (!specializedPipelineState)
         {
@@ -393,30 +393,34 @@ Result RendererBase::maybeSpecializePipeline(
             SLANG_RETURN_ON_FAIL(createProgram(specializedProgramDesc, specializedProgram.writeRef()));
 
             // Create specialized pipeline state.
+            ComPtr<IPipelineState> specializedPipelineComPtr;
             switch (pipelineType)
             {
             case PipelineType::Compute:
             {
                 auto pipelineDesc = currentPipeline->desc.compute;
                 pipelineDesc.program = specializedProgram;
-                SLANG_RETURN_ON_FAIL(createComputePipelineState(pipelineDesc, specializedPipelineState.writeRef()));
+                SLANG_RETURN_ON_FAIL(
+                    createComputePipelineState(pipelineDesc, specializedPipelineComPtr.writeRef()));
                 break;
             }
             case PipelineType::Graphics:
             {
                 auto pipelineDesc = currentPipeline->desc.graphics;
                 pipelineDesc.program = specializedProgram;
-                SLANG_RETURN_ON_FAIL(createGraphicsPipelineState(pipelineDesc, specializedPipelineState.writeRef()));
+                SLANG_RETURN_ON_FAIL(createGraphicsPipelineState(
+                    pipelineDesc, specializedPipelineComPtr.writeRef()));
                 break;
             }
             default:
                 break;
             }
-            auto specializedPipelineStateBase = static_cast<PipelineStateBase*>(specializedPipelineState.get());
-            specializedPipelineStateBase->unspecializedPipelineState = currentPipeline;
+            specializedPipelineState =
+                static_cast<PipelineStateBase*>(specializedPipelineComPtr.get());
+            specializedPipelineState->unspecializedPipelineState = currentPipeline;
             shaderCache.addSpecializedPipeline(pipelineKey, specializedPipelineState);
         }
-        outNewPipeline = static_cast<PipelineStateBase*>(specializedPipelineState.get());
+        outNewPipeline = static_cast<PipelineStateBase*>(specializedPipelineState.Ptr());
     }
     return SLANG_OK;
 }

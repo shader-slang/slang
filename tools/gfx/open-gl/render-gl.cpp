@@ -134,7 +134,7 @@ public:
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
+    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -201,17 +201,17 @@ public:
         GLsizei                 offset;
     };
 
-    class InputLayoutImpl: public IInputLayout, public RefObject
+    class InputLayoutImpl: public IInputLayout, public ComObject
 	{
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IInputLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
                 return static_cast<IInputLayout*>(this);
             return nullptr;
         }
-		public:
+    public:
         VertexAttributeDesc m_attributes[kMaxVertexStreams];
         UInt m_attributeCount = 0;
     };
@@ -238,7 +238,7 @@ public:
 		}
 
         Usage m_initialUsage;
-		RefPtr<WeakSink<GLDevice> > m_renderer;
+		RefPtr<WeakSink<GLDevice>> m_renderer;
 		GLuint m_handle;
         GLenum m_target;
         UInt m_size;
@@ -267,15 +267,15 @@ public:
          }
 
         Usage m_initialUsage;
-        RefPtr<WeakSink<GLDevice> > m_renderer;
+        RefPtr<WeakSink<GLDevice>> m_renderer;
         GLenum m_target;
         GLuint m_handle;
     };
 
-    class SamplerStateImpl : public ISamplerState, public RefObject
+    class SamplerStateImpl : public ISamplerState, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ISamplerState* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
@@ -286,10 +286,10 @@ public:
         GLuint m_samplerID;
     };
 
-    class ResourceViewImpl : public IResourceView, public RefObject
+    class ResourceViewImpl : public IResourceView, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IResourceView* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
@@ -331,10 +331,10 @@ public:
 
     class FramebufferLayoutImpl
         : public IFramebufferLayout
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebufferLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
@@ -350,10 +350,10 @@ public:
 
     class FramebufferImpl
         : public IFramebuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
@@ -364,7 +364,7 @@ public:
     public:
         GLuint m_framebuffer;
         ShortList<GLenum> m_drawBuffers;
-        WeakSink<GLDevice>* m_renderer;
+        RefPtr<WeakSink<GLDevice>> m_renderer;
         ShortList<RefPtr<TextureViewImpl>> renderTargetViews;
         RefPtr<TextureViewImpl> depthStencilView;
         ShortList<ColorClearValue> m_colorClearValues;
@@ -428,10 +428,10 @@ public:
 
     class SwapchainImpl
         : public ISwapchain
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ISwapchain* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
@@ -523,8 +523,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             getImage(uint32_t index, ITextureResource** outResource) override
         {
-            m_images[index]->addRef();
-            *outResource = m_images[index].Ptr();
+            returnComPtr(outResource, m_images[index]);
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL present() override
@@ -570,7 +569,7 @@ public:
         }
 
     public:
-        WeakSink<GLDevice>* m_renderer = nullptr;
+        RefPtr<WeakSink<GLDevice>> m_renderer = nullptr;
         GLuint m_framebuffer;
         GLuint m_backBuffer;
         HGLRC m_glrc;
@@ -600,7 +599,7 @@ public:
 		}
 
 		GLuint m_id;
-		RefPtr<WeakSink<GLDevice> > m_renderer;
+		RefPtr<WeakSink<GLDevice>> m_renderer;
 	};
 
     class PipelineStateImpl : public PipelineStateBase
@@ -770,7 +769,7 @@ public:
                     RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
         };
@@ -858,7 +857,7 @@ public:
                 RefPtr<RootShaderObjectLayoutImpl> layout = new RootShaderObjectLayoutImpl();
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
 
@@ -937,10 +936,10 @@ public:
             ShaderObjectLayoutImpl* layout,
             ShaderObjectImpl** outShaderObject)
         {
-            auto object = ComPtr<ShaderObjectImpl>(new ShaderObjectImpl());
+            auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -1523,7 +1522,7 @@ public:
             {
                 SLANG_RETURN_ON_FAIL(_createSpecializedLayout(m_specializedLayout.writeRef()));
             }
-            *outLayout = RefPtr<ShaderObjectLayoutImpl>(m_specializedLayout).detach();
+            returnRefPtr(outLayout, m_specializedLayout);
             return SLANG_OK;
         }
 
@@ -1537,10 +1536,11 @@ public:
             SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
 
             auto renderer = getRenderer();
-            RefPtr<ShaderObjectLayoutBase> layout;
-            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+            RefPtr<ShaderObjectLayoutImpl> layout;
+            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(
+                extendedType.slangType, (ShaderObjectLayoutBase**)layout.writeRef()));
 
-            *outLayout = static_cast<ShaderObjectLayoutImpl*>(layout.detach());
+            returnRefPtrMove(outLayout, layout);
             return SLANG_OK;
         }
 
@@ -1552,12 +1552,18 @@ public:
         typedef ShaderObjectImpl Super;
 
     public:
+        // Override default reference counting behavior to disable lifetime management via ComPtr.
+        // Root objects are managed by command buffer and does not need to be freed by the user.
+        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
+    public:
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
         {
             RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -1686,7 +1692,7 @@ public:
                 entryPointVars->m_specializedLayout = entryPointInfo.layout;
             }
 
-            *outLayout = specializedLayout.detach();
+            returnRefPtrMove(outLayout, specializedLayout);
             return SLANG_OK;
         }
 
@@ -1737,7 +1743,7 @@ public:
     GLuint m_vao;
     RefPtr<PipelineStateImpl> m_currentPipelineState;
     RefPtr<FramebufferImpl> m_currentFramebuffer;
-    RefPtr<WeakSink<GLDevice> > m_weakRenderer;
+    RefPtr<WeakSink<GLDevice>> m_weakRenderer;
 
     RootBindingState m_rootBindingState;
 
@@ -1792,7 +1798,7 @@ SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outR
 {
     RefPtr<GLDevice> result = new GLDevice();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    *outRenderer = result.detach();
+    returnComPtr(outRenderer, result);
     return SLANG_OK;
 }
 
@@ -2282,7 +2288,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createSwapchain(
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
-    *outSwapchain = swapchain.detach();
+    returnComPtr(outSwapchain, swapchain);
     wglMakeCurrent(m_hdc, m_glContext);
     return SLANG_OK;
 }
@@ -2306,7 +2312,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createFramebufferLayout(
     {
         layout->m_hasDepthStencil = false;
     }
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -2322,7 +2328,7 @@ SLANG_NO_THROW Result SLANG_MCALL
     }
     framebuffer->depthStencilView = static_cast<TextureViewImpl*>(desc.depthStencilView);
     framebuffer->createGLFramebuffer();
-    *outFramebuffer = framebuffer.detach();
+    returnComPtr(outFramebuffer, framebuffer);
     return SLANG_OK;
 }
 
@@ -2380,7 +2386,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
         }
     }
 
-    *outBlob = blob.detach();
+    returnComPtr(outBlob, blob);
 
     return SLANG_OK;
 }
@@ -2584,7 +2590,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
 
     texture->m_target = target;
 
-    *outResource = texture.detach();
+    returnComPtr(outResource, texture);
     return SLANG_OK;
 }
 
@@ -2628,7 +2634,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferResource(
     glBufferData(target, descIn.sizeInBytes, initData, usage);
 
     RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(initialUsage, desc, m_weakRenderer, bufferID, target);
-    *outResource = resourceImpl.detach();
+    returnComPtr(outResource, resourceImpl);
     return SLANG_OK;
 }
 
@@ -2640,7 +2646,7 @@ SLANG_NO_THROW Result SLANG_MCALL
 
     RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
     samplerImpl->m_samplerID = samplerID;
-    *outSampler = samplerImpl.detach();
+    returnComPtr(outSampler, samplerImpl);
     return SLANG_OK;
 }
 
@@ -2671,7 +2677,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureView(
     viewImpl->layered = GL_TRUE;
     viewImpl->level = 0;
     viewImpl->layer = 0;
-    *outView = viewImpl.detach();
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 
@@ -2686,7 +2692,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
     viewImpl->type = ResourceViewImpl::Type::Buffer;
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_bufferID = resourceImpl->m_handle;
-    *outView = viewImpl.detach();
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 
@@ -2706,7 +2712,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createInputLayout(
         glAttr.offset = (GLsizei)inputAttr.offset;
     }
 
-    *outLayout = inputLayout.detach();
+    returnComPtr(outLayout, inputLayout);
     return SLANG_OK;
 }
 
@@ -2827,7 +2833,7 @@ void GLDevice::setPipelineState(IPipelineState* state)
 
     m_currentPipelineState = pipelineStateImpl;
 
-    auto program = static_cast<ShaderProgramImpl*>(pipelineStateImpl->m_program.get());
+    auto program = static_cast<ShaderProgramImpl*>(pipelineStateImpl->m_program.Ptr());
     GLuint programID = program ? program->m_id : 0;
     glUseProgram(programID);
 }
@@ -2863,7 +2869,7 @@ Result GLDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
         // For a specializable program, we don't invoke any actual slang compilation yet.
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(m_weakRenderer, 0);
         shaderProgram->slangProgram = desc.slangProgram;
-        *outProgram = shaderProgram.detach();
+        returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
 
@@ -2933,7 +2939,7 @@ Result GLDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
 
     RefPtr<ShaderProgramImpl> program = new ShaderProgramImpl(m_weakRenderer, programID);
     program->slangProgram = desc.slangProgram;
-    *outProgram = program.detach();
+    returnComPtr(outProgram, program);
     return SLANG_OK;
 }
 
@@ -2947,7 +2953,7 @@ Result GLDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_inputLayout = inputLayoutImpl;
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
@@ -2960,7 +2966,7 @@ Result GLDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_program = programImpl;
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
@@ -2971,7 +2977,7 @@ Result GLDevice::createShaderObjectLayout(
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
         this, typeLayout, layout.writeRef()));
-    *outLayout = layout.detach();
+    returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -2980,11 +2986,11 @@ Result GLDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObjec
     RefPtr<ShaderObjectImpl> shaderObject;
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
         static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
-Result GLDevice::createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+Result GLDevice::createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
 {
     auto programImpl = static_cast<ShaderProgramImpl*>(program);
     RefPtr<RootShaderObjectImpl> shaderObject;
@@ -2993,7 +2999,7 @@ Result GLDevice::createRootShaderObject(IShaderProgram* program, IShaderObject**
         this, programImpl->slangProgram, programImpl->slangProgram->getLayout(), rootLayout.writeRef()));
     SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
         this, rootLayout.Ptr(), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnRefPtrMove(outObject, shaderObject);
     return SLANG_OK;
 }
 

@@ -217,10 +217,11 @@ public:
         D3D12_RESOURCE_STATES m_defaultState;
     };
 
-    class SamplerStateImpl : public ISamplerState, public RefObject
+    class SamplerStateImpl : public ISamplerState, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+
         ISamplerState* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
@@ -229,17 +230,17 @@ public:
         }
     public:
         D3D12Descriptor m_descriptor;
-        D3D12Device* m_renderer;
+        Slang::RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
         ~SamplerStateImpl()
         {
-            m_renderer->m_cpuSamplerHeap.free(m_descriptor);
+            m_allocator->free(m_descriptor);
         }
     };
 
-    class ResourceViewImpl : public IResourceView, public RefObject
+    class ResourceViewImpl : public IResourceView, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IResourceView* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
@@ -247,9 +248,9 @@ public:
             return nullptr;
         }
     public:
-        RefPtr<Resource>            m_resource;
-        D3D12Descriptor  m_descriptor;
-        D3D12GeneralDescriptorHeap* m_allocator;
+        RefPtr<Resource> m_resource;
+        D3D12Descriptor m_descriptor;
+        RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
         ~ResourceViewImpl()
         {
             m_allocator->free(m_descriptor);
@@ -258,10 +259,10 @@ public:
 
     class FramebufferLayoutImpl
         : public IFramebufferLayout
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebufferLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
@@ -277,10 +278,10 @@ public:
 
     class FramebufferImpl
         : public IFramebuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
@@ -289,8 +290,8 @@ public:
         }
 
     public:
-        ShortList<ComPtr<IResourceView>> renderTargetViews;
-        ComPtr<IResourceView> depthStencilView;
+        ShortList<RefPtr<ResourceViewImpl>> renderTargetViews;
+        RefPtr<ResourceViewImpl> depthStencilView;
         ShortList<D3D12_CPU_DESCRIPTOR_HANDLE> renderTargetDescriptors;
         struct Color4f
         {
@@ -312,10 +313,10 @@ public:
         }
     };
 
-    class InputLayoutImpl: public IInputLayout, public RefObject
+    class InputLayoutImpl: public IInputLayout, public ComObject
 	{
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IInputLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
@@ -476,7 +477,7 @@ public:
     public:
         ComPtr<ID3D12CommandAllocator> m_commandAllocator;
         List<ComPtr<ID3D12GraphicsCommandList>> m_d3dCommandListPool;
-        List<ComPtr<ICommandBuffer>> m_commandBufferPool;
+        List<RefPtr<RefObject>> m_commandBufferPool;
         uint32_t m_commandListAllocId = 0;
         // Wait values for each command queue.
         struct QueueWaitInfo
@@ -834,7 +835,7 @@ public:
                 auto layout = RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
         };
@@ -921,7 +922,7 @@ public:
                 RefPtr<RootShaderObjectLayoutImpl> layout = new RootShaderObjectLayoutImpl();
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
 
@@ -1487,11 +1488,10 @@ public:
             ShaderObjectLayoutImpl* layout,
             ShaderObjectImpl** outShaderObject)
         {
-            auto object = ComPtr<ShaderObjectImpl>(new ShaderObjectImpl());
+            auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
             SLANG_RETURN_ON_FAIL(
-                object->init(device, layout, &device->m_cpuViewHeap, &device->m_cpuSamplerHeap));
-
-            *outShaderObject = object.detach();
+                object->init(device, layout, device->m_cpuViewHeap.Ptr(), device->m_cpuSamplerHeap.Ptr()));
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -1510,7 +1510,7 @@ public:
             }
         }
 
-        RendererBase* getDevice() { return m_layout->getDevice(); }
+        RendererBase* getDevice() { return m_device.get(); }
 
         SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
@@ -1683,9 +1683,7 @@ public:
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
-            auto object = m_objects[bindingRange.binding.index + offset.bindingArrayIndex].Ptr();
-            object->addRef();
-            *outObject = object;
+            returnComPtr(outObject, m_objects[bindingRange.binding.index + offset.bindingArrayIndex]);
             return SLANG_OK;
         }
 
@@ -1842,6 +1840,8 @@ public:
             DescriptorHeapReference viewHeap,
             DescriptorHeapReference samplerHeap)
         {
+            m_device = device;
+
             m_layout = layout;
 
             m_upToDateConstantBufferHeapVersion = 0;
@@ -2261,7 +2261,7 @@ public:
             {
                 SLANG_RETURN_ON_FAIL(_createSpecializedLayout(m_specializedLayout.writeRef()));
             }
-            *outLayout = RefPtr<ShaderObjectLayoutImpl>(m_specializedLayout).detach();
+            returnRefPtr(outLayout, m_specializedLayout);
             return SLANG_OK;
         }
 
@@ -2275,11 +2275,11 @@ public:
             SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
 
             auto renderer = getRenderer();
-            RefPtr<ShaderObjectLayoutBase> layout;
-            SLANG_RETURN_ON_FAIL(
-                renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+            RefPtr<ShaderObjectLayoutImpl> layout;
+            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(
+                extendedType.slangType, (ShaderObjectLayoutBase**)layout.writeRef()));
 
-            *outLayout = static_cast<ShaderObjectLayoutImpl*>(layout.detach());
+            returnRefPtrMove(outLayout, layout);
             return SLANG_OK;
         }
 
@@ -2291,7 +2291,7 @@ public:
         typedef ShaderObjectImpl Super;
 
     public:
-        // Override default reference counting behavior to disable lifetime management.
+        // Override default reference counting behavior to disable lifetime management via ComPtr.
         // Root objects are managed by command buffer and does not need to be freed by the user.
         SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
         SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
@@ -2308,8 +2308,7 @@ public:
         SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
             SLANG_OVERRIDE
         {
-            *outEntryPoint = m_entryPoints[index];
-            m_entryPoints[index]->addRef();
+            returnComPtr(outEntryPoint, m_entryPoints[index]);
             return SLANG_OK;
         }
 
@@ -2456,7 +2455,7 @@ public:
                 entryPointVars->m_specializedLayout = entryPointInfo.layout;
             }
 
-            *outLayout = specializedLayout.detach();
+            returnRefPtrMove(outLayout, specializedLayout);
             return SLANG_OK;
         }
 
@@ -2471,19 +2470,26 @@ public:
 
     class CommandBufferImpl
         : public ICommandBuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        // There are a pair of cyclic references between a `TransientResourceHeap` and
+        // a `CommandBuffer` created from the heap. We need to break the cycle upon
+        // the public reference count of a command buffer dropping to 0.
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+
         ICommandBuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
                 return static_cast<ICommandBuffer*>(this);
             return nullptr;
         }
+        virtual void comFree() override { m_transientHeap.breakStrongReference(); }
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
-        TransientResourceHeapImpl* m_transientHeap;
+        BreakableReference<TransientResourceHeapImpl> m_transientHeap;
+        // Weak reference is fine here since `m_transientHeap` already holds strong reference to
+        // device.
         D3D12Device* m_renderer;
         RootShaderObjectImpl m_rootShaderObject;
 
@@ -2512,17 +2518,17 @@ public:
             virtual SLANG_NO_THROW SlangResult SLANG_MCALL
                 queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IRenderCommandEncoder)
                 {
-                    *outObject = static_cast<IRenderCommandEncoder*>(this);
+                    returnComPtr(outObject, static_cast<IRenderCommandEncoder*>(this));
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
                 return SLANG_E_NO_INTERFACE;
             }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             RefPtr<RenderPassLayoutImpl> m_renderPass;
             RefPtr<FramebufferImpl> m_framebuffer;
@@ -2576,8 +2582,7 @@ public:
                     // Transit resource states.
                     {
                         D3D12BarrierSubmitter submitter(m_d3dCmdList);
-                        auto resourceViewImpl =
-                            static_cast<ResourceViewImpl*>(framebuffer->renderTargetViews[i].get());
+                        auto resourceViewImpl = framebuffer->renderTargetViews[i].Ptr();
                         auto textureResource =
                             static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                         D3D12_RESOURCE_STATES initialState;
@@ -2610,8 +2615,7 @@ public:
                     // Transit resource states.
                     {
                         D3D12BarrierSubmitter submitter(m_d3dCmdList);
-                        auto resourceViewImpl =
-                            static_cast<ResourceViewImpl*>(framebuffer->depthStencilView.get());
+                        auto resourceViewImpl = framebuffer->depthStencilView.Ptr();
                         auto textureResource =
                             static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                         D3D12_RESOURCE_STATES initialState;
@@ -2840,8 +2844,7 @@ public:
                     // Transit resource states.
                     {
                         D3D12BarrierSubmitter submitter(m_d3dCmdList);
-                        auto resourceViewImpl = static_cast<ResourceViewImpl*>(
-                            m_framebuffer->renderTargetViews[i].get());
+                        auto resourceViewImpl = m_framebuffer->renderTargetViews[i].Ptr();
                         auto textureResource =
                             static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                         textureResource->m_resource.transition(
@@ -2855,8 +2858,7 @@ public:
                 {
                     // Transit resource states.
                     D3D12BarrierSubmitter submitter(m_d3dCmdList);
-                    auto resourceViewImpl =
-                        static_cast<ResourceViewImpl*>(m_framebuffer->depthStencilView.get());
+                    auto resourceViewImpl = m_framebuffer->depthStencilView.Ptr();
                     auto textureResource =
                         static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                     textureResource->m_resource.transition(
@@ -2898,10 +2900,10 @@ public:
             virtual SLANG_NO_THROW SlangResult SLANG_MCALL
                 queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IComputeCommandEncoder)
                 {
-                    *outObject = static_cast<IComputeCommandEncoder*>(this);
+                    returnComPtr(outObject, static_cast<IComputeCommandEncoder*>(this));
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
@@ -2961,7 +2963,7 @@ public:
             virtual SLANG_NO_THROW SlangResult SLANG_MCALL
                 queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (uuid == GfxGUID::IID_ISlangUnknown ||
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IResourceCommandEncoder)
                 {
                     *outObject = static_cast<IResourceCommandEncoder*>(this);
@@ -3026,19 +3028,20 @@ public:
 
     class CommandQueueImpl
         : public ICommandQueue
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ICommandQueue* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandQueue)
                 return static_cast<ICommandQueue*>(this);
             return nullptr;
         }
+        void breakStrongReferenceToDevice() { m_renderer.breakStrongReference(); }
 
     public:
-        D3D12Device* m_renderer;
+        BreakableReference<D3D12Device> m_renderer;
         ComPtr<ID3D12Device> m_device;
         ComPtr<ID3D12CommandQueue> m_d3dQueue;
         ComPtr<ID3D12Fence> m_fence;
@@ -3160,9 +3163,7 @@ public:
                 RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
                 image->m_resource.setResource(d3dResource.get());
                 image->m_defaultState = D3D12_RESOURCE_STATE_PRESENT;
-                ComPtr<ITextureResource> imageResourcePtr;
-                imageResourcePtr = image.Ptr();
-                m_images.add(imageResourcePtr);
+                m_images.add(image);
             }
             for (auto evt : m_frameEvents)
                 SetEvent(evt);
@@ -3255,14 +3256,14 @@ public:
     RefPtr<CommandQueueImpl> m_resourceCommandQueue;
     RefPtr<TransientResourceHeapImpl> m_resourceCommandTransientHeap;
 
-    D3D12GeneralDescriptorHeap m_rtvAllocator;
-    D3D12GeneralDescriptorHeap m_dsvAllocator;
+    RefPtr<D3D12GeneralDescriptorHeap> m_rtvAllocator;
+    RefPtr<D3D12GeneralDescriptorHeap> m_dsvAllocator;
     // Space in the GPU-visible heaps is precious, so we will also keep
     // around CPU-visible heaps for storing descriptors in a format
     // that is ready for copying into the GPU-visible heaps as needed.
     //
-    D3D12GeneralDescriptorHeap m_cpuViewHeap; ///< Cbv, Srv, Uav
-    D3D12GeneralDescriptorHeap m_cpuSamplerHeap; ///< Heap for samplers
+    RefPtr<D3D12GeneralDescriptorHeap> m_cpuViewHeap; ///< Cbv, Srv, Uav
+    RefPtr<D3D12GeneralDescriptorHeap> m_cpuSamplerHeap; ///< Heap for samplers
 
     // Dll entry points
     PFN_D3D12_GET_DEBUG_INTERFACE m_D3D12GetDebugInterface = nullptr;
@@ -3294,12 +3295,11 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
     if ((Index)m_commandListAllocId < m_commandBufferPool.getCount())
     {
         auto result = static_cast<D3D12Device::CommandBufferImpl*>(
-            m_commandBufferPool[m_commandListAllocId].get());
+            m_commandBufferPool[m_commandListAllocId].Ptr());
         m_d3dCommandListPool[m_commandListAllocId]->Reset(m_commandAllocator, nullptr);
         result->init(m_device, m_d3dCommandListPool[m_commandListAllocId], this);
         ++m_commandListAllocId;
-        result->addRef();
-        *outCmdBuffer = result;
+        returnComPtr(outCmdBuffer, result);
         return SLANG_OK;
     }
     ComPtr<ID3D12GraphicsCommandList> cmdList;
@@ -3313,11 +3313,9 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
     m_d3dCommandListPool.add(cmdList);
     RefPtr<CommandBufferImpl> cmdBuffer = new CommandBufferImpl();
     cmdBuffer->init(m_device, cmdList, this);
-    ComPtr<ICommandBuffer> cmdBufferPtr;
-    *cmdBufferPtr.writeRef() = cmdBuffer.detach();
-    m_commandBufferPool.add(cmdBufferPtr);
+    m_commandBufferPool.add(cmdBuffer);
     ++m_commandListAllocId;
-    *outCmdBuffer = cmdBufferPtr.detach();
+    returnComPtr(outCmdBuffer, cmdBuffer);
     return SLANG_OK;
 }
 
@@ -3329,7 +3327,7 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
     PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
-    auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.get());
+    auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
     commandList->SetPipelineState(newPipelineImpl->m_pipelineState);
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
@@ -3382,7 +3380,7 @@ Result D3D12Device::createTransientResourceHeapImpl(
     ITransientResourceHeap::Desc desc = {};
     desc.constantBufferSize = constantBufferSize;
     SLANG_RETURN_ON_FAIL(result->init(desc, this, viewDescriptors, samplerDescriptors));
-    *outHeap = result.detach();
+    returnRefPtrMove(outHeap, result);
     return SLANG_OK;
 }
 
@@ -3395,7 +3393,7 @@ Result D3D12Device::createCommandQueueImpl(D3D12Device::CommandQueueImpl** outQu
 
     RefPtr<D3D12Device::CommandQueueImpl> queue = new D3D12Device::CommandQueueImpl();
     SLANG_RETURN_ON_FAIL(queue->init(this, (uint32_t)queueIndex));
-    *outQueue = queue.detach();
+    returnRefPtrMove(outQueue, queue);
     return SLANG_OK;
 }
 
@@ -3403,7 +3401,7 @@ SlangResult SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** o
 {
     RefPtr<D3D12Device> result = new D3D12Device();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    *outDevice = result.detach();
+    returnComPtr(outDevice, result);
     return SLANG_OK;
 }
 
@@ -3418,9 +3416,7 @@ SlangResult SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** o
     return proc;
 }
 
-D3D12Device::~D3D12Device()
-{
-}
+D3D12Device::~D3D12Device() { m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)(); }
 
 static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
@@ -3628,7 +3624,7 @@ Result D3D12Device::captureTextureToSurface(
         resultBlob->m_data.setCount(bufferSize);
         memcpy(resultBlob->m_data.getBuffer(), data, bufferSize);
         dxResource->Unmap(0, nullptr);
-        *outBlob = resultBlob.detach();
+        returnComPtr(outBlob, resultBlob);
         return SLANG_OK;
     }
 }
@@ -3905,16 +3901,27 @@ Result D3D12Device::initialize(const Desc& desc)
 
     // Create a command queue for internal resource transfer operations.
     SLANG_RETURN_ON_FAIL(createCommandQueueImpl(m_resourceCommandQueue.writeRef()));
-    SLANG_RETURN_ON_FAIL(createTransientResourceHeapImpl(0, 8, 4, m_resourceCommandTransientHeap.writeRef()));
+    // `CommandQueueImpl` holds a back reference to `D3D12Device`, make it a weak reference here
+    // since this object is already owned by `D3D12Device`.
+    m_resourceCommandQueue->breakStrongReferenceToDevice();
 
-    SLANG_RETURN_ON_FAIL(m_cpuViewHeap.init(
+    SLANG_RETURN_ON_FAIL(createTransientResourceHeapImpl(0, 8, 4, m_resourceCommandTransientHeap.writeRef()));
+    // `TransientResourceHeap` holds a back reference to `D3D12Device`, make it a weak reference here
+    // since this object is already owned by `D3D12Device`.
+    m_resourceCommandTransientHeap->breakStrongReferenceToDevice();
+
+    m_cpuViewHeap = new D3D12GeneralDescriptorHeap();
+    SLANG_RETURN_ON_FAIL(m_cpuViewHeap->init(
         m_device, 8192, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-    SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap.init(
+    m_cpuSamplerHeap = new D3D12GeneralDescriptorHeap();
+    SLANG_RETURN_ON_FAIL(m_cpuSamplerHeap->init(
         m_device, 1024, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
 
-    SLANG_RETURN_ON_FAIL(m_rtvAllocator.init(
+    m_rtvAllocator = new D3D12GeneralDescriptorHeap();
+    SLANG_RETURN_ON_FAIL(m_rtvAllocator->init(
         m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
-    SLANG_RETURN_ON_FAIL(m_dsvAllocator.init(
+    m_dsvAllocator = new D3D12GeneralDescriptorHeap();
+    SLANG_RETURN_ON_FAIL(m_dsvAllocator->init(
         m_device, 16, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, D3D12_DESCRIPTOR_HEAP_FLAG_NONE));
 
     ComPtr<IDXGIDevice> dxgiDevice;
@@ -3937,7 +3944,7 @@ Result D3D12Device::createTransientResourceHeap(
     RefPtr<TransientResourceHeapImpl> heap;
     SLANG_RETURN_ON_FAIL(
         createTransientResourceHeapImpl(desc.constantBufferSize, 8192, 1024, heap.writeRef()));
-    *outHeap = heap.detach();
+    returnComPtr(outHeap, heap);
     return SLANG_OK;
 }
 
@@ -3945,7 +3952,7 @@ Result D3D12Device::createCommandQueue(const ICommandQueue::Desc& desc, ICommand
 {
     RefPtr<CommandQueueImpl> queue;
     SLANG_RETURN_ON_FAIL(createCommandQueueImpl(queue.writeRef()));
-    *outQueue = queue.detach();
+    returnComPtr(outQueue, queue);
     return SLANG_OK;
 }
 
@@ -3954,7 +3961,7 @@ SLANG_NO_THROW Result SLANG_MCALL D3D12Device::createSwapchain(
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
-    *outSwapchain = swapchain.detach();
+    returnComPtr(outSwapchain, swapchain);
     return SLANG_OK;
 }
 
@@ -4262,7 +4269,7 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
         submitResourceCommandsAndWait(encodeInfo);
     }
 
-    *outResource = texture.detach();
+    returnComPtr(outResource, texture);
     return SLANG_OK;
 }
 
@@ -4287,7 +4294,7 @@ Result D3D12Device::createBufferResource(IResource::Usage initialUsage, const IB
     const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
     SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
 
-    *outResource = buffer.detach();
+    returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
 
@@ -4400,7 +4407,7 @@ Result D3D12Device::createSamplerState(ISamplerState::Desc const& desc, ISampler
     dxDesc.MinLOD = desc.minLOD;
     dxDesc.MaxLOD = desc.maxLOD;
 
-    auto samplerHeap = &m_cpuSamplerHeap;
+    auto& samplerHeap = m_cpuSamplerHeap;
 
     D3D12Descriptor cpuDescriptor;
     samplerHeap->allocate(&cpuDescriptor);
@@ -4411,9 +4418,9 @@ Result D3D12Device::createSamplerState(ISamplerState::Desc const& desc, ISampler
     // when we are done with a sampler we simply add it to the free list.
     //
     RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
-    samplerImpl->m_renderer = this;
+    samplerImpl->m_allocator = samplerHeap;
     samplerImpl->m_descriptor = cpuDescriptor;
-    *outSampler = samplerImpl.detach();
+    returnComPtr(outSampler, samplerImpl);
     return SLANG_OK;
 }
 
@@ -4431,8 +4438,8 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
 
     case IResourceView::Type::RenderTarget:
         {
-            SLANG_RETURN_ON_FAIL(m_rtvAllocator.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_rtvAllocator;
+            SLANG_RETURN_ON_FAIL(m_rtvAllocator->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_rtvAllocator;
             D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
             rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
             switch (desc.renderTarget.shape)
@@ -4462,8 +4469,8 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
 
     case IResourceView::Type::DepthStencil:
         {
-            SLANG_RETURN_ON_FAIL(m_dsvAllocator.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_dsvAllocator;
+            SLANG_RETURN_ON_FAIL(m_dsvAllocator->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_dsvAllocator;
             D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
             dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
             switch (desc.renderTarget.shape)
@@ -4489,16 +4496,16 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             // TODO: need to support the separate "counter resource" for the case
             // of append/consume buffers with attached counters.
 
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_cpuViewHeap;
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
             m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, nullptr, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
     case IResourceView::Type::ShaderResource:
         {
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_cpuViewHeap;
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
 
             // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube is not accessed
             // appropriately (rather than just passing nullptr to CreateShaderResourceView)
@@ -4513,7 +4520,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
         break;
     }
 
-    *outView = viewImpl.detach();
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 
@@ -4557,8 +4564,8 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             // TODO: need to support the separate "counter resource" for the case
             // of append/consume buffers with attached counters.
 
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_cpuViewHeap;
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
             m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, &uavDesc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
@@ -4587,14 +4594,14 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
                 srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / gfxGetFormatSize(desc.format));
             }
 
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap.allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = &m_cpuViewHeap;
+            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+            viewImpl->m_allocator = m_cpuViewHeap;
             m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
     }
 
-    *outView = viewImpl.detach();
+    returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }
 
@@ -4606,9 +4613,9 @@ Result D3D12Device::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
     framebuffer->renderTargetClearValues.setCount(desc.renderTargetCount);
     for (uint32_t i = 0; i < desc.renderTargetCount; i++)
     {
-        framebuffer->renderTargetViews[i] = desc.renderTargetViews[i];
+        framebuffer->renderTargetViews[i] = static_cast<ResourceViewImpl*>(desc.renderTargetViews[i]);
         framebuffer->renderTargetDescriptors[i] =
-            static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_descriptor.cpuHandle;
+            framebuffer->renderTargetViews[i]->m_descriptor.cpuHandle;
         auto clearValue =
             static_cast<TextureResourceImpl*>(
                 static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
@@ -4616,7 +4623,7 @@ Result D3D12Device::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
                 ->optimalClearValue.color;
         memcpy(&framebuffer->renderTargetClearValues[i], &clearValue, sizeof(ColorClearValue));
     }
-    framebuffer->depthStencilView = desc.depthStencilView;
+    framebuffer->depthStencilView = static_cast<ResourceViewImpl*>(desc.depthStencilView);
     if (desc.depthStencilView)
     {
         framebuffer->depthStencilClearValue =
@@ -4631,7 +4638,7 @@ Result D3D12Device::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
     {
         framebuffer->depthStencilDescriptor.ptr = 0;
     }
-    *outFb = framebuffer.detach();
+    returnComPtr(outFb, framebuffer);
     return SLANG_OK;
 }
 
@@ -4654,7 +4661,7 @@ Result D3D12Device::createFramebufferLayout(
     {
         layout->m_hasDepthStencil = false;
     }
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -4664,7 +4671,7 @@ Result D3D12Device::createRenderPassLayout(
 {
     RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl();
     result->init(desc);
-    *outRenderPassLayout = result.detach();
+    returnComPtr(outRenderPassLayout, result);
     return SLANG_OK;
 }
 
@@ -4711,7 +4718,7 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
         dstEle.InstanceDataStepRate = 0;
     }
 
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -4765,7 +4772,7 @@ Result D3D12Device::readBufferResource(
 
         stageBuf.getResource()->Unmap(0, nullptr);
     }
-    *outBlob = blob.detach();
+    returnComPtr(outBlob, blob);
     return SLANG_OK;
 }
 
@@ -4782,7 +4789,7 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
     if (desc.slangProgram->getSpecializationParamCount() != 0)
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
-        *outProgram = shaderProgram.detach();
+        returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
     // For a fully specialized program, read and store its kernel code in `shaderProgram`.
@@ -4820,7 +4827,7 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
             reinterpret_cast<const uint8_t*>(kernelCode->getBufferPointer()),
             (Index)kernelCode->getBufferSize());
     }
-    *outProgram = shaderProgram.detach();
+    returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }
 
@@ -4832,7 +4839,7 @@ Result D3D12Device::createShaderObjectLayout(
     SLANG_RETURN_ON_FAIL(
         ShaderObjectLayoutImpl::createForElementType(
         this, typeLayout, layout.writeRef()));
-    *outLayout = layout.detach();
+    returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -4844,7 +4851,7 @@ Result D3D12Device::createShaderObject(
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
         this, reinterpret_cast<ShaderObjectLayoutImpl*>(layout),
         shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
@@ -4857,7 +4864,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
     {
         RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
         pipelineStateImpl->init(desc);
-        *outState = pipelineStateImpl.detach();
+        returnComPtr(outState, pipelineStateImpl);
         return SLANG_OK;
     }
 
@@ -4956,7 +4963,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_pipelineState = pipelineState;
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
@@ -4969,7 +4976,7 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
     {
         RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
         pipelineStateImpl->init(desc);
-        *outState = pipelineStateImpl.detach();
+        returnComPtr(outState, pipelineStateImpl);
         return SLANG_OK;
     }
 
@@ -5024,7 +5031,7 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
     RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl();
     pipelineStateImpl->m_pipelineState = pipelineState;
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
