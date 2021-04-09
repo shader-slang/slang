@@ -2,9 +2,7 @@
 
 // NOTE! This test should *fail*, if preprocessor is working correctly!
 
-// If a macro can take a single parameter, it is valid to pass in 'nothing'.
-// Slang outputs an error about the wrong amount of parameters
-// Correct output: a b
+// Macro parameters must have unique names
 
 #define A(x, x) a x b x c
 
