@@ -262,7 +262,7 @@ workspace "slang"
         optimize "Off"
         symbols "On"
         defines { "_DEBUG" }
-
+        -- staticruntime "Off"
     -- For the release configuration we will turn optimizations on
     -- (we do not yet micro-manage the optimization settings)
     -- and set the preprocessor definition that VS would add by default.

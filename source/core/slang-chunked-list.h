@@ -165,7 +165,7 @@ public:
 
     T* add(T&& obj)
     {
-        auto chunk = _maybeReserveForAdd();
+        auto chunk = _maybeReserveForAdd(1);
         auto result = chunk->begin() + chunk->size;
         chunk->begin()[chunk->size] = static_cast<T&&>(obj);
         chunk->size++;
@@ -175,7 +175,7 @@ public:
 
     T* add(const T& obj)
     {
-        auto chunk = _maybeReserveForAdd();
+        auto chunk = _maybeReserveForAdd(1);
         auto result = chunk->begin() + chunk->size;
         chunk->begin()[chunk->size] = obj;
         chunk->size++;
@@ -226,6 +226,8 @@ public:
     {
         _deallocateBuffer();
         m_count = 0;
+        for (auto& item : m_firstChunk.elements)
+            item = T();
     }
 
 private:
