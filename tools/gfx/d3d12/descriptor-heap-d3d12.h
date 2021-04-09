@@ -5,6 +5,7 @@
 #include <d3d12.h>
 
 #include "slang-com-ptr.h"
+#include "core/slang-smart-pointer.h"
 #include "core/slang-list.h"
 #include "core/slang-virtual-object-pool.h"
 
@@ -79,7 +80,7 @@ struct D3D12Descriptor
 /// Unlike the `D3D12DescriptorHeap` type, this class allows for both
 /// allocation and freeing of descriptors, by maintaining a free list.
 ///
-class D3D12GeneralDescriptorHeap
+class D3D12GeneralDescriptorHeap : public Slang::RefObject
 {
     ID3D12Device*                           m_device;
     int                                     m_chunkSize;

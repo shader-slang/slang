@@ -1,10 +1,11 @@
-﻿#ifndef SLANG_COM_HELPER_H
+#ifndef SLANG_COM_HELPER_H
 #define SLANG_COM_HELPER_H
 
 /** \file slang-com-helper.h
 */
 
 #include "slang.h"
+#include <atomic>
 
 /* !!!!!!!!!!!!!!!!!!!!! Macros to help checking SlangResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -110,7 +111,7 @@ SLANG_NO_THROW uint32_t SLANG_MCALL release() \
 #define SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE \
 SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE \
 { \
-    ISlangUnknown* intf = getInterface(uuid); \
+    void* intf = getInterface(uuid); \
     if (intf) \
     { \
         addReference(); \
@@ -123,10 +124,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, voi
 #define SLANG_REF_OBJECT_IUNKNOWN_ADD_REF SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return (uint32_t)addReference(); }
 #define SLANG_REF_OBJECT_IUNKNOWN_RELEASE SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return (uint32_t)releaseReference(); }
 
-#define SLANG_REF_OBJECT_IUNKNOWN_ALL \
-    SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE \
-    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF \
-    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
+#    define SLANG_REF_OBJECT_IUNKNOWN_ALL         \
+        SLANG_REF_OBJECT_IUNKNOWN_QUERY_INTERFACE \
+        SLANG_REF_OBJECT_IUNKNOWN_ADD_REF         \
+        SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
 #endif // defined(__cplusplus)
 

@@ -1,4 +1,4 @@
-#include "slang-gfx.h"
+#include "renderer-shared.h"
 #include "source/core/slang-basic.h"
 
 namespace gfx
@@ -6,19 +6,20 @@ namespace gfx
 template <typename TDevice, typename TBufferResource>
 class TransientResourceHeapBase
     : public ITransientResourceHeap
-    , public Slang::RefObject
+    , public Slang::ComObject
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
     ITransientResourceHeap* getInterface(const Slang::Guid& guid)
     {
         if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
             return static_cast<ITransientResourceHeap*>(this);
         return nullptr;
     }
+    void breakStrongReferenceToDevice() { m_device.breakStrongReference(); }
 
 public:
-    TDevice* m_device;
+    BreakableReference<TDevice> m_device;
     Slang::List<Slang::RefPtr<TBufferResource>> m_constantBuffers;
     Slang::Index m_constantBufferAllocCounter = 0;
     size_t m_constantBufferOffsetAllocCounter = 0;

@@ -6,7 +6,7 @@
 // concept.
 
 #include "slang-gfx.h"
-#include "slang-com-helper.h"
+#include "core/slang-com-object.h"
 #include "core/slang-basic.h"
 
 namespace gfx
@@ -14,10 +14,10 @@ namespace gfx
 
 class SimpleRenderPassLayout
     : public IRenderPassLayout
-    , public Slang::RefObject
+    , public Slang::ComObject
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
     IRenderPassLayout* getInterface(const Slang::Guid& guid);
 
 public:

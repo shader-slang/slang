@@ -107,7 +107,7 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
-    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+    virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
         override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
@@ -203,10 +203,10 @@ protected:
 
     };
 
-    class SamplerStateImpl : public ISamplerState, public RefObject
+    class SamplerStateImpl : public ISamplerState, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ISamplerState* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
@@ -218,10 +218,10 @@ protected:
     };
 
 
-    class ResourceViewImpl : public IResourceView, public RefObject
+    class ResourceViewImpl : public IResourceView, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IResourceView* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
@@ -267,10 +267,10 @@ protected:
 
     class FramebufferLayoutImpl
         : public IFramebufferLayout
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebufferLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
@@ -286,10 +286,10 @@ protected:
 
     class FramebufferImpl
         : public IFramebuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
@@ -309,7 +309,7 @@ protected:
     public:
         ComPtr<ID3D11Device> m_device;
         ComPtr<IDXGIFactory> m_dxgiFactory;
-        D3D11Device* m_renderer;
+        RefPtr<D3D11Device> m_renderer;
         Result init(D3D11Device* renderer, const ISwapchain::Desc& swapchainDesc, WindowHandle window)
         {
             m_renderer = renderer;
@@ -330,11 +330,9 @@ protected:
             RefPtr<TextureResourceImpl> image =
                 new TextureResourceImpl(imageDesc, IResource::Usage::RenderTarget);
             image->m_resource = d3dResource;
-            ComPtr<ITextureResource> imageResourcePtr;
-            imageResourcePtr = image.Ptr();
             for (uint32_t i = 0; i < m_desc.imageCount; i++)
             {
-                m_images.add(imageResourcePtr);
+                m_images.add(image);
             }
         }
         virtual IDXGIFactory* getDXGIFactory() override { return m_dxgiFactory; }
@@ -347,10 +345,10 @@ protected:
         }
     };
 
-    class InputLayoutImpl: public IInputLayout, public RefObject
+    class InputLayoutImpl: public IInputLayout, public ComObject
 	{
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IInputLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
@@ -561,7 +559,7 @@ protected:
                     RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
         };
@@ -654,7 +652,7 @@ protected:
                 RefPtr<RootShaderObjectLayoutImpl> layout = new RootShaderObjectLayoutImpl();
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
 
@@ -733,10 +731,10 @@ protected:
             ShaderObjectLayoutImpl* layout,
             ShaderObjectImpl** outShaderObject)
         {
-            auto object = ComPtr<ShaderObjectImpl>(new ShaderObjectImpl());
+            auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -908,9 +906,7 @@ protected:
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
-            auto object = m_objects[bindingRange.baseIndex + offset.bindingArrayIndex].Ptr();
-            object->addRef();
-            *outObject = object;
+            returnComPtr(outObject, m_objects[bindingRange.baseIndex + offset.bindingArrayIndex]);
             return SLANG_OK;
         }
 
@@ -1310,7 +1306,7 @@ protected:
             {
                 SLANG_RETURN_ON_FAIL(_createSpecializedLayout(m_specializedLayout.writeRef()));
             }
-            *outLayout = RefPtr<ShaderObjectLayoutImpl>(m_specializedLayout).detach();
+            returnRefPtr(outLayout, m_specializedLayout);
             return SLANG_OK;
         }
 
@@ -1324,10 +1320,11 @@ protected:
             SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
 
             auto renderer = getRenderer();
-            RefPtr<ShaderObjectLayoutBase> layout;
-            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+            RefPtr<ShaderObjectLayoutImpl> layout;
+            SLANG_RETURN_ON_FAIL(renderer->getShaderObjectLayout(
+                extendedType.slangType, (ShaderObjectLayoutBase**)layout.writeRef()));
 
-            *outLayout = static_cast<ShaderObjectLayoutImpl*>(layout.detach());
+            returnRefPtrMove(outLayout, layout);
             return SLANG_OK;
         }
 
@@ -1339,12 +1336,17 @@ protected:
         typedef ShaderObjectImpl Super;
 
     public:
+        // Override default reference counting behavior to disable lifetime management via ComPtr.
+        // Root objects are managed by command buffer and does not need to be freed by the user.
+        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+    public:
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
         {
             RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -1353,8 +1355,7 @@ protected:
         UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return (UInt)m_entryPoints.getCount(); }
         SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
-            *outEntryPoint = m_entryPoints[index];
-            m_entryPoints[index]->addRef();
+            returnComPtr(outEntryPoint, m_entryPoints[index]);
             return SLANG_OK;
         }
 
@@ -1473,7 +1474,7 @@ protected:
                 entryPointVars->m_specializedLayout = entryPointInfo.layout;
             }
 
-            *outLayout = specializedLayout.detach();
+            returnRefPtrMove(outLayout, specializedLayout);
             return SLANG_OK;
         }
 
@@ -1496,7 +1497,7 @@ protected:
 
     RefPtr<FramebufferImpl> m_currentFramebuffer;
 
-    ComPtr<PipelineStateImpl> m_currentPipelineState;
+    RefPtr<PipelineStateImpl> m_currentPipelineState;
 
     RootBindingState m_rootBindingState;
 
@@ -1517,7 +1518,7 @@ SlangResult SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** o
 {
     RefPtr<D3D11Device> result = new D3D11Device();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    *outDevice = result.detach();
+    returnComPtr(outDevice, result);
     return SLANG_OK;
 }
 
@@ -1782,7 +1783,7 @@ Result D3D11Device::createSwapchain(
 {
     RefPtr<SwapchainImpl> swapchain = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(swapchain->init(this, desc, window));
-    *outSwapchain = swapchain.detach();
+    returnComPtr(outSwapchain, swapchain);
     return SLANG_OK;
 }
 
@@ -1805,7 +1806,7 @@ Result D3D11Device::createFramebufferLayout(
     {
         layout->m_hasDepthStencil = false;
     }
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -1822,7 +1823,7 @@ Result D3D11Device::createFramebuffer(
     }
     framebuffer->depthStencilView = static_cast<DepthStencilViewImpl*>(desc.depthStencilView);
     framebuffer->d3dDepthStencilView = framebuffer->depthStencilView->m_dsv;
-    *outFramebuffer = framebuffer.detach();
+    returnComPtr(outFramebuffer, framebuffer);
     return SLANG_OK;
 }
 
@@ -1909,7 +1910,7 @@ SlangResult D3D11Device::readTextureResource(
         }
         // Make sure to unmap
         m_immediateContext->Unmap(stagingTexture, 0);
-        *outBlob = blob.detach();
+        returnComPtr(outBlob, blob);
         return SLANG_OK;
     }
 }
@@ -2076,7 +2077,7 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
             return SLANG_FAIL;
     }
 
-    *outResource = texture.detach();
+    returnComPtr(outResource, texture);
     return SLANG_OK;
 }
 
@@ -2167,7 +2168,7 @@ Result D3D11Device::createBufferResource(IResource::Usage initialUsage, const IB
         SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufDesc, nullptr, buffer->m_staging.writeRef()));
     }
 
-    *outResource = buffer.detach();
+    returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
 
@@ -2287,7 +2288,7 @@ Result D3D11Device::createSamplerState(ISamplerState::Desc const& desc, ISampler
 
     RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl();
     samplerImpl->m_sampler = sampler;
-    *outSampler = samplerImpl.detach();
+    returnComPtr(outSampler, samplerImpl);
     return SLANG_OK;
 }
 
@@ -2312,7 +2313,7 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
                 viewImpl->m_clearValue,
                 &resourceImpl->getDesc()->optimalClearValue.color,
                 sizeof(float) * 4);
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2326,7 +2327,7 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             viewImpl->m_type = ResourceViewImpl::Type::DSV;
             viewImpl->m_dsv = dsv;
             viewImpl->m_clearValue = resourceImpl->getDesc()->optimalClearValue.depthStencil;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2339,7 +2340,7 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::UAV;
             viewImpl->m_uav = uav;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2352,7 +2353,7 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::SRV;
             viewImpl->m_srv = srv;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2397,7 +2398,7 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::UAV;
             viewImpl->m_uav = uav;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2442,7 +2443,7 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::SRV;
             viewImpl->m_srv = srv;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -2512,7 +2513,7 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
     RefPtr<InputLayoutImpl> impl = new InputLayoutImpl;
     impl->m_layout.swap(inputLayout);
 
-    *outLayout = impl.detach();
+    returnComPtr(outLayout, impl);
     return SLANG_OK;
 }
 
@@ -2661,7 +2662,7 @@ void D3D11Device::setPipelineState(IPipelineState* state)
     case PipelineType::Graphics:
         {
             auto stateImpl = (GraphicsPipelineStateImpl*) state;
-            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.get());
+            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.Ptr());
 
             // TODO: We could conceivably do some lightweight state
             // differencing here (e.g., check if `programImpl` is the
@@ -2705,7 +2706,7 @@ void D3D11Device::setPipelineState(IPipelineState* state)
     case PipelineType::Compute:
         {
             auto stateImpl = (ComputePipelineStateImpl*) state;
-            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.get());
+            auto programImpl = static_cast<ShaderProgramImpl*>(stateImpl->m_program.Ptr());
 
             // CS
 
@@ -2739,7 +2740,7 @@ Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
         // For a specializable program, we don't invoke any actual slang compilation yet.
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
         shaderProgram->slangProgram = desc.slangProgram;
-        *outProgram = shaderProgram.detach();
+        returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
 
@@ -2802,7 +2803,7 @@ Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
             SLANG_ASSERT(!"pipeline stage not implemented");
         }
     }
-    *outProgram = shaderProgram.detach();
+    returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }
 
@@ -2940,7 +2941,7 @@ Result D3D11Device::createShaderObjectLayout(
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(
         this, typeLayout, layout.writeRef()));
-    *outLayout = layout.detach();
+    returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -2949,11 +2950,11 @@ Result D3D11Device::createShaderObject(ShaderObjectLayoutBase* layout, IShaderOb
     RefPtr<ShaderObjectImpl> shaderObject;
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
         static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
-Result D3D11Device::createRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+Result D3D11Device::createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
 {
     auto programImpl = static_cast<ShaderProgramImpl*>(program);
     RefPtr<RootShaderObjectImpl> shaderObject;
@@ -2962,7 +2963,7 @@ Result D3D11Device::createRootShaderObject(IShaderProgram* program, IShaderObjec
         this, programImpl->slangProgram, programImpl->slangProgram->getLayout(), rootLayout.writeRef()));
     SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
         this, rootLayout.Ptr(), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnRefPtrMove(outObject, shaderObject);
     return SLANG_OK;
 }
 
@@ -3123,7 +3124,7 @@ Result D3D11Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
     state->m_blendColor[3] = 0;
     state->m_sampleMask = 0xFFFFFFFF;
     state->init(desc);
-    *outState = state.detach();
+    returnComPtr(outState, state);
     return SLANG_OK;
 }
 
@@ -3133,7 +3134,7 @@ Result D3D11Device::createComputePipelineState(const ComputePipelineStateDesc& i
 
     RefPtr<ComputePipelineStateImpl> state = new ComputePipelineStateImpl();
     state->init(desc);
-    *outState = state.detach();
+    returnComPtr(outState, state);
     return SLANG_OK;
 }
 
@@ -3167,7 +3168,7 @@ void D3D11Device::_flushGraphicsState()
         m_framebufferBindingDirty = false;
         m_shaderBindingDirty = false;
 
-        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
+        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.Ptr());
         auto rtvCount = (UINT)m_currentFramebuffer->renderTargetViews.getCount();
         auto uavCount = (UINT)m_rootBindingState.uavBindings.getCount();
         m_immediateContext->OMSetRenderTargetsAndUnorderedAccessViews(
@@ -3182,7 +3183,7 @@ void D3D11Device::_flushGraphicsState()
     if (m_depthStencilStateDirty)
     {
         m_depthStencilStateDirty = false;
-        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.get());
+        auto pipelineState = static_cast<GraphicsPipelineStateImpl*>(m_currentPipelineState.Ptr());
         m_immediateContext->OMSetDepthStencilState(
             pipelineState->m_depthStencilState, m_stencilRef);
     }

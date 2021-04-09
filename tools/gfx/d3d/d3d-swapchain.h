@@ -10,10 +10,10 @@ namespace gfx
 {
 class D3DSwapchainBase
     : public ISwapchain
-    , public Slang::RefObject
+    , public Slang::ComObject
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
     ISwapchain* getInterface(const Slang::Guid& guid)
     {
         if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
@@ -82,8 +82,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getImage(uint32_t index, ITextureResource** outResource) override
     {
-        m_images[index]->addRef();
-        *outResource = m_images[index].get();
+        returnComPtr(outResource, m_images[index]);
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL present() override
@@ -148,7 +147,7 @@ public:
     ISwapchain::Desc m_desc;
     HANDLE m_swapChainWaitableObject = nullptr;
     ComPtr<IDXGISwapChain2> m_swapChain;
-    Slang::ShortList<ComPtr<ITextureResource>> m_images;
+    Slang::ShortList<Slang::RefPtr<TextureResource>> m_images;
 };
 
 }

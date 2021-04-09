@@ -153,10 +153,10 @@ public:
         const VulkanApi* m_api;
     };
 
-    class InputLayoutImpl : public IInputLayout, public RefObject
+    class InputLayoutImpl : public IInputLayout, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IInputLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
@@ -170,7 +170,7 @@ public:
 
     class BufferResourceImpl: public BufferResource
     {
-        public:
+    public:
         typedef BufferResource Parent;
 
         BufferResourceImpl(IResource::Usage initialUsage, const IBufferResource::Desc& desc, VKDevice* renderer):
@@ -182,7 +182,7 @@ public:
         }
 
         IResource::Usage m_initialUsage;
-        VKDevice* m_renderer;
+        RefPtr<VKDevice> m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
     };
@@ -192,24 +192,19 @@ public:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(const Desc& desc, Usage initialUsage, const VulkanApi* api) :
+        TextureResourceImpl(const Desc& desc, Usage initialUsage, VKDevice* device) :
             Parent(desc),
             m_initialUsage(initialUsage),
-            m_api(api)
+            m_device(device)
         {
         }
         ~TextureResourceImpl()
         {
-            if (m_api)
+            auto& vkAPI = m_device->m_api;
+            if (!m_isWeakImageReference)
             {
-                if (m_imageMemory != VK_NULL_HANDLE)
-                {
-                    m_api->vkFreeMemory(m_api->m_device, m_imageMemory, nullptr);
-                }
-                if (m_image != VK_NULL_HANDLE && !m_isWeakImageReference)
-                {
-                    m_api->vkDestroyImage(m_api->m_device, m_image, nullptr);
-                }
+                vkAPI.vkFreeMemory(vkAPI.m_device, m_imageMemory, nullptr);
+                vkAPI.vkDestroyImage(vkAPI.m_device, m_image, nullptr);
             }
         }
 
@@ -219,13 +214,13 @@ public:
         VkFormat m_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
         bool m_isWeakImageReference = false;
-        const VulkanApi* m_api;
+        RefPtr<VKDevice> m_device;
     };
 
-    class SamplerStateImpl : public ISamplerState, public RefObject
+    class SamplerStateImpl : public ISamplerState, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ISamplerState* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
@@ -234,20 +229,21 @@ public:
         }
     public:
         VkSampler m_sampler;
-        const VulkanApi* m_api;
-        SamplerStateImpl(const VulkanApi* api)
-            : m_api(api)
-        {}
+        RefPtr<VKDevice> m_device;
+        SamplerStateImpl(VKDevice* device)
+            : m_device(device)
+        {
+        }
         ~SamplerStateImpl()
         {
-            m_api->vkDestroySampler(m_api->m_device, m_sampler, nullptr);
+            m_device->m_api.vkDestroySampler(m_device->m_api.m_device, m_sampler, nullptr);
         }
     };
 
-    class ResourceViewImpl : public IResourceView, public RefObject
+    class ResourceViewImpl : public IResourceView, public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IResourceView* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
@@ -262,24 +258,25 @@ public:
             PlainBuffer,
         };
     public:
-        ResourceViewImpl(ViewType viewType, const VulkanApi* api)
-            : m_type(viewType), m_api(api)
+        ResourceViewImpl(ViewType viewType, VKDevice* device)
+            : m_type(viewType)
+            , m_device(device)
         {
         }
         ViewType            m_type;
-        const VulkanApi* m_api;
+        RefPtr<VKDevice> m_device;
     };
 
     class TextureResourceViewImpl : public ResourceViewImpl
     {
     public:
-        TextureResourceViewImpl(const VulkanApi* api)
-            : ResourceViewImpl(ViewType::Texture, api)
+        TextureResourceViewImpl(VKDevice* device)
+            : ResourceViewImpl(ViewType::Texture, device)
         {
         }
         ~TextureResourceViewImpl()
         {
-            m_api->vkDestroyImageView(m_api->m_device, m_view, nullptr);
+            m_device->m_api.vkDestroyImageView(m_device->m_api.m_device, m_view, nullptr);
         }
         RefPtr<TextureResourceImpl> m_texture;
         VkImageView                 m_view;
@@ -289,13 +286,13 @@ public:
     class TexelBufferResourceViewImpl : public ResourceViewImpl
     {
     public:
-        TexelBufferResourceViewImpl(const VulkanApi* api)
-            : ResourceViewImpl(ViewType::TexelBuffer, api)
+        TexelBufferResourceViewImpl(VKDevice* device)
+            : ResourceViewImpl(ViewType::TexelBuffer, device)
         {
         }
         ~TexelBufferResourceViewImpl()
         {
-            m_api->vkDestroyBufferView(m_api->m_device, m_view, nullptr);
+            m_device->m_api.vkDestroyBufferView(m_device->m_api.m_device, m_view, nullptr);
         }
         RefPtr<BufferResourceImpl>  m_buffer;
         VkBufferView m_view;
@@ -304,8 +301,8 @@ public:
     class PlainBufferResourceViewImpl : public ResourceViewImpl
     {
     public:
-        PlainBufferResourceViewImpl(const VulkanApi* api)
-            : ResourceViewImpl(ViewType::PlainBuffer, api)
+        PlainBufferResourceViewImpl(VKDevice* device)
+            : ResourceViewImpl(ViewType::PlainBuffer, device)
         {
         }
         RefPtr<BufferResourceImpl>  m_buffer;
@@ -315,10 +312,10 @@ public:
 
     class FramebufferLayoutImpl
         : public IFramebufferLayout
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebufferLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
@@ -328,12 +325,13 @@ public:
 
     public:
         VkRenderPass m_renderPass;
-        VKDevice* m_renderer;
+        RefPtr<VKDevice> m_renderer;
         Array<VkAttachmentDescription, kMaxAttachments> m_attachmentDescs;
         Array<VkAttachmentReference, kMaxRenderTargets> m_colorReferences;
         VkAttachmentReference m_depthReference;
         bool m_hasDepthStencilAttachment;
         uint32_t m_renderTargetCount;
+
     public:
         ~FramebufferLayoutImpl()
         {
@@ -428,10 +426,10 @@ public:
 
     class RenderPassLayoutImpl
         : public IRenderPassLayout
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IRenderPassLayout* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IRenderPassLayout)
@@ -441,8 +439,7 @@ public:
 
     public:
         VkRenderPass m_renderPass;
-        VKDevice* m_renderer;
-
+        RefPtr<VKDevice> m_renderer;
         ~RenderPassLayoutImpl()
         {
             m_renderer->m_api.vkDestroyRenderPass(
@@ -537,10 +534,10 @@ public:
 
     class FramebufferImpl
         : public IFramebuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         IFramebuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
@@ -554,7 +551,7 @@ public:
         ComPtr<IResourceView> depthStencilView;
         uint32_t m_width;
         uint32_t m_height;
-        VKDevice* m_renderer;
+        RefPtr<VKDevice> m_renderer;
         VkClearValue m_clearValues[kMaxAttachments];
         RefPtr<FramebufferLayoutImpl> m_layout;
     public:
@@ -644,17 +641,30 @@ public:
     class PipelineStateImpl : public PipelineStateBase
     {
     public:
-        PipelineStateImpl(const VulkanApi& api):
-            m_api(&api)
+        PipelineStateImpl(VKDevice* device)
         {
+            // Only weakly reference `device` at start.
+            // We make it a strong reference only when the pipeline state is exposed to the user.
+            // Note that `PipelineState`s may also be created via implicit specialization that
+            // happens behind the scenes, and the user will not have access to those specialized
+            // pipeline states. Only those pipeline states that are returned to the user needs to
+            // hold a strong reference to `device`.
+            m_device.setWeakReference(device);
         }
         ~PipelineStateImpl()
         {
             if (m_pipeline != VK_NULL_HANDLE)
             {
-                m_api->vkDestroyPipeline(m_api->m_device, m_pipeline, nullptr);
+                m_device->m_api.vkDestroyPipeline(m_device->m_api.m_device, m_pipeline, nullptr);
             }
         }
+
+        // Turns `m_device` into a strong reference.
+        // This method should be called before returning the pipeline state object to
+        // external users (i.e. via an `IPipelineState` pointer).
+        void establishStrongDeviceReference() { m_device.establishStrongReference(); }
+
+        virtual void comFree() override { m_device.breakStrongReference(); }
 
         void init(const GraphicsPipelineStateDesc& inDesc)
         {
@@ -671,9 +681,7 @@ public:
             initializeBase(pipelineDesc);
         }
 
-        const VulkanApi* m_api;
-
-        RefPtr<FramebufferLayoutImpl> m_framebufferLayout;
+        BreakableReference<VKDevice> m_device;
 
         VkPipeline m_pipeline = VK_NULL_HANDLE;
     };
@@ -835,15 +843,16 @@ public:
 
             Result setElementTypeLayout(slang::TypeLayoutReflection* typeLayout)
             {
-                typeLayout = _unwrapParameterGroups(typeLayout);
-
-                m_elementTypeLayout = typeLayout;
-
                 // First we will use the Slang layout information to allocate
                 // the descriptor set layout(s) required to store values
                 // of the given type.
                 //
                 SLANG_RETURN_ON_FAIL(_addDescriptorSets(typeLayout));
+
+                typeLayout = _unwrapParameterGroups(typeLayout);
+
+                m_elementTypeLayout = typeLayout;
+
 
                 // Next we will compute the binding ranges that are used to store
                 // the logical contents of the object in memory. These will relate
@@ -944,7 +953,7 @@ public:
                 auto layout = RefPtr<ShaderObjectLayoutImpl>(new ShaderObjectLayoutImpl());
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
         };
@@ -1053,7 +1062,7 @@ public:
                 RefPtr<EntryPointLayout> layout = new EntryPointLayout();
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
 
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
 
@@ -1125,7 +1134,7 @@ public:
             {
                 RefPtr<RootShaderObjectLayout> layout = new RootShaderObjectLayout();
                 SLANG_RETURN_ON_FAIL(layout->_init(this));
-                *outLayout = layout.detach();
+                returnRefPtrMove(outLayout, layout);
                 return SLANG_OK;
             }
 
@@ -1299,14 +1308,14 @@ public:
         VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
         Array<VkDescriptorSetLayout, kMaxDescriptorSets> m_vkDescriptorSetLayouts;
         Array<VkPushConstantRange, 8> m_pushConstantRanges;
-        RefPtr<VKDevice> m_renderer;
+        VKDevice* m_renderer = nullptr;
     };
     
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        ShaderProgramImpl(const VulkanApi& api, PipelineType pipelineType)
-            : m_api(&api)
+        ShaderProgramImpl(VKDevice* device, PipelineType pipelineType)
+            : m_device(device)
             , m_pipelineType(pipelineType)
         {
             for (auto& shaderModule : m_modules)
@@ -1319,12 +1328,18 @@ public:
             {
                 if (shaderModule != VK_NULL_HANDLE)
                 {
-                    m_api->vkDestroyShaderModule(m_api->m_device, shaderModule, nullptr);
+                    m_device->m_api.vkDestroyShaderModule(
+                        m_device->m_api.m_device, shaderModule, nullptr);
                 }
             }
         }
 
-        const VulkanApi* m_api;
+        virtual void comFree() override
+        {
+            m_device.breakStrongReference();
+        }
+
+        BreakableReference<VKDevice> m_device;
 
         PipelineType m_pipelineType;
 
@@ -1478,7 +1493,7 @@ public:
             auto object = RefPtr<ShaderObjectImpl>(new ShaderObjectImpl());
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -1641,7 +1656,7 @@ public:
                 }
             }
 
-            return SLANG_E_NOT_IMPLEMENTED;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -1656,8 +1671,7 @@ public:
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
             auto object = m_objects[bindingRange.baseIndex + offset.bindingArrayIndex].Ptr();
-            object->addRef();
-            *outObject = object;
+            returnComPtr(outObject, object);
 
             //        auto& subObjectRange =
             //        m_layout->getSubObjectRange(bindingRange.subObjectRangeIndex); *outObject =
@@ -2488,7 +2502,7 @@ public:
             {
                 SLANG_RETURN_ON_FAIL(_createSpecializedLayout(m_specializedLayout.writeRef()));
             }
-            *outLayout = RefPtr<ShaderObjectLayoutImpl>(m_specializedLayout).detach();
+            returnRefPtr(outLayout, m_specializedLayout);
             return SLANG_OK;
         }
 
@@ -2502,11 +2516,11 @@ public:
             SLANG_RETURN_ON_FAIL(getSpecializedShaderObjectType(&extendedType));
 
             auto device = getDevice();
-            RefPtr<ShaderObjectLayoutBase> layout;
-            SLANG_RETURN_ON_FAIL(
-                device->getShaderObjectLayout(extendedType.slangType, layout.writeRef()));
+            RefPtr<ShaderObjectLayoutImpl> layout;
+            SLANG_RETURN_ON_FAIL(device->getShaderObjectLayout(
+                extendedType.slangType, (ShaderObjectLayoutBase**)layout.writeRef()));
 
-            *outLayout = static_cast<ShaderObjectLayoutImpl*>(layout.detach());
+            returnRefPtrMove(outLayout, layout);
             return SLANG_OK;
         }
 
@@ -2526,7 +2540,7 @@ public:
             RefPtr<EntryPointShaderObject> object = new EntryPointShaderObject();
             SLANG_RETURN_ON_FAIL(object->init(device, layout));
 
-            *outShaderObject = object.detach();
+            returnRefPtrMove(outShaderObject, object);
             return SLANG_OK;
         }
 
@@ -2595,8 +2609,7 @@ public:
         SlangResult SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
             SLANG_OVERRIDE
         {
-            *outEntryPoint = m_entryPoints[index];
-            m_entryPoints[index]->addRef();
+            returnComPtr(outEntryPoint, m_entryPoints[index]);
             return SLANG_OK;
         }
 
@@ -2723,7 +2736,7 @@ public:
                 entryPointVars->m_specializedLayout = entryPointInfo.layout;
             }
 
-            *outLayout = specializedLayout.detach();
+            returnRefPtrMove(outLayout, specializedLayout);
             return SLANG_OK;
         }
 
@@ -2734,24 +2747,27 @@ public:
 
     class CommandBufferImpl
         : public ICommandBuffer
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        // There are a pair of cyclic references between a `TransientResourceHeap` and
+        // a `CommandBuffer` created from the heap. We need to break the cycle when
+        // the public reference count of a command buffer drops to 0.
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ICommandBuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
                 return static_cast<ICommandBuffer*>(this);
             return nullptr;
         }
-
+        virtual void comFree() override { m_transientHeap.breakStrongReference(); }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
         VkCommandPool m_pool;
         VkFence m_fence;
         VKDevice* m_renderer;
-        TransientResourceHeapImpl* m_transientHeap;
+        BreakableReference<TransientResourceHeapImpl> m_transientHeap;
         bool m_isPreCommandBufferEmpty = true;
         RootShaderObjectImpl m_rootObject;
         // Command buffers are deallocated by its command pool,
@@ -2838,15 +2854,20 @@ public:
             VkIndexType m_boundIndexFormat;
 
         public:
-            SLANG_REF_OBJECT_IUNKNOWN_ALL
-            IRenderCommandEncoder* getInterface(const Guid& guid)
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (guid == GfxGUID::IID_ISlangUnknown ||
-                    guid == GfxGUID::IID_IRenderCommandEncoder ||
-                    guid == GfxGUID::IID_ICommandEncoder)
-                    return static_cast<IRenderCommandEncoder*>(this);
-                return nullptr;
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
+                    uuid == GfxGUID::IID_IRenderCommandEncoder)
+                {
+                    *outObject = static_cast<IRenderCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
             }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
             {
@@ -3012,7 +3033,7 @@ public:
             void prepareDraw()
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-                if (!pipeline || static_cast<ShaderProgramImpl*>(pipeline->m_program.get())
+                if (!pipeline || static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())
                                          ->m_pipelineType != PipelineType::Graphics)
                 {
                     assert(!"Invalid render pipeline");
@@ -3074,7 +3095,6 @@ public:
             assert(!m_renderCommandEncoder->m_isOpen);
             m_renderCommandEncoder->beginPass(renderPass, framebuffer);
             *outEncoder = m_renderCommandEncoder.Ptr();
-            m_renderCommandEncoder->addRef();
         }
 
         class ComputeCommandEncoder
@@ -3082,16 +3102,20 @@ public:
             , public PipelineCommandEncoder
         {
         public:
-            SLANG_REF_OBJECT_IUNKNOWN_ALL
-            IComputeCommandEncoder* getInterface(const Guid& guid)
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (guid == GfxGUID::IID_ISlangUnknown ||
-                    guid == GfxGUID::IID_IComputeCommandEncoder ||
-                    guid == GfxGUID::IID_ICommandEncoder)
-                    return static_cast<IComputeCommandEncoder*>(this);
-                return nullptr;
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
+                    uuid == GfxGUID::IID_IComputeCommandEncoder)
+                {
+                    *outObject = static_cast<IComputeCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
             }
-
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -3108,7 +3132,7 @@ public:
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
                 if (!pipeline ||
-                    static_cast<ShaderProgramImpl*>(pipeline->m_program.get())->m_pipelineType !=
+                    static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())->m_pipelineType !=
                         PipelineType::Compute)
                 {
                     assert(!"Invalid compute pipeline");
@@ -3133,7 +3157,6 @@ public:
             }
             assert(!m_computeCommandEncoder->m_isOpen);
             *outEncoder = m_computeCommandEncoder.Ptr();
-            m_computeCommandEncoder->addRef();
         }
 
         class ResourceCommandEncoder
@@ -3143,16 +3166,20 @@ public:
         public:
             CommandBufferImpl* m_commandBuffer;
         public:
-            SLANG_REF_OBJECT_IUNKNOWN_ALL
-            IResourceCommandEncoder* getInterface(const Guid& guid)
+            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+                queryInterface(SlangUUID const& uuid, void** outObject) override
             {
-                if (guid == GfxGUID::IID_ISlangUnknown ||
-                    guid == GfxGUID::IID_IResourceCommandEncoder ||
-                    guid == GfxGUID::IID_ICommandEncoder)
-                    return static_cast<IResourceCommandEncoder*>(this);
-                return nullptr;
+                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
+                    uuid == GfxGUID::IID_IResourceCommandEncoder)
+                {
+                    *outObject = static_cast<IResourceCommandEncoder*>(this);
+                    return SLANG_OK;
+                }
+                *outObject = nullptr;
+                return SLANG_E_NO_INTERFACE;
             }
-
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
                 IBufferResource* dst,
@@ -3230,7 +3257,6 @@ public:
                 m_resourceCommandEncoder->init(this);
             }
             *outEncoder = m_resourceCommandEncoder.Ptr();
-            m_resourceCommandEncoder->addRef();
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override
@@ -3263,10 +3289,10 @@ public:
 
     class CommandQueueImpl
         : public ICommandQueue
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ICommandQueue* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandQueue)
@@ -3383,6 +3409,7 @@ public:
         Result init(const ITransientResourceHeap::Desc& desc, VKDevice* device);
         ~TransientResourceHeapImpl()
         {
+            m_commandBufferPool = decltype(m_commandBufferPool)();
             m_device->m_api.vkDestroyCommandPool(m_device->m_api.m_device, m_commandPool, nullptr);
             m_device->m_api.vkDestroyFence(m_device->m_api.m_device, m_fence, nullptr);
             m_descSetAllocator.close();
@@ -3395,10 +3422,10 @@ public:
 
     class SwapchainImpl
         : public ISwapchain
-        , public RefObject
+        , public ComObject
     {
     public:
-        SLANG_REF_OBJECT_IUNKNOWN_ALL
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
         ISwapchain* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISwapchain)
@@ -3576,7 +3603,7 @@ public:
                 imageDesc.init2D(
                     IResource::Type::Texture2D, m_desc.format, m_desc.width, m_desc.height, 1);
                 RefPtr<TextureResourceImpl> image = new TextureResourceImpl(
-                    imageDesc, gfx::IResource::Usage::RenderTarget, m_api);
+                    imageDesc, gfx::IResource::Usage::RenderTarget, m_renderer);
                 image->m_image = vkImages[i];
                 image->m_imageMemory = 0;
                 image->m_vkformat = m_vkformat;
@@ -3700,8 +3727,7 @@ public:
         {
             if (m_images.getCount() <= (Index)index)
                 return SLANG_FAIL;
-            *outResource = m_images[index];
-            m_images[index]->addRef();
+            returnComPtr(outResource, m_images[index]);
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
@@ -3800,6 +3826,18 @@ public:
     DescriptorSetAllocator descriptorSetAllocator;
 
     uint32_t m_queueAllocCount;
+
+    // A list to hold objects that may have a strong back reference to the device
+    // instance. Because of the pipeline cache in `RendererBase`, there could be a reference
+    // cycle among `VKDevice`->`PipelineStateImpl`->`ShaderProgramImpl`->`VkDevice`.
+    // Depending on whether a `PipelineState` objects gets stored in pipeline cache, there
+    // may or may not be such a reference cycle.
+    // We need to hold strong references to any objects that may become part of the reference
+    // cycle here, so that when objects like `ShaderProgramImpl` lost all public refernces, we
+    // can always safely break the strong reference in `ShaderProgramImpl::m_device` without
+    // worrying the `ShaderProgramImpl` object getting destroyed after the completion of
+    // `VKDevice::~VKDevice()'.
+    ChunkedList<RefPtr<RefObject>, 1024> m_deviceObjectsWithPotentialBackReferences;
 };
 
 void VKDevice::PipelineCommandEncoder::init(CommandBufferImpl* commandBuffer)
@@ -3894,7 +3932,7 @@ Result SLANG_MCALL createVKDevice(const IDevice::Desc* desc, IDevice** outRender
 {
     RefPtr<VKDevice> result = new VKDevice();
     SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    *outRenderer = result.detach();
+    returnComPtr(outRenderer, result);
     return SLANG_OK;
 }
 
@@ -3907,8 +3945,8 @@ VKDevice::~VKDevice()
     }
 
     m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)();
-
     shaderCache.free();
+    m_deviceObjectsWithPotentialBackReferences.clearAndDeallocate();
 
     // Same as clear but, also dtors all elements, which clear does not
     m_deviceQueue.destroy();
@@ -4374,7 +4412,7 @@ Result VKDevice::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer**
         auto result = m_commandBufferPool[m_commandBufferAllocId];
         result->beginCommandBuffer();
         m_commandBufferAllocId++;
-        *outCmdBuffer = result.detach();
+        returnComPtr(outCmdBuffer, result);
         return SLANG_OK;
     }
 
@@ -4383,7 +4421,7 @@ Result VKDevice::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer**
         m_device, m_commandPool, m_fence, this));
     m_commandBufferPool.add(commandBuffer);
     m_commandBufferAllocId++;
-    *outCmdBuffer = commandBuffer.detach();
+    returnComPtr(outCmdBuffer, commandBuffer);
     return SLANG_OK;
 }
 
@@ -4407,7 +4445,7 @@ Result VKDevice::createTransientResourceHeap(
 {
     RefPtr<TransientResourceHeapImpl> result = new TransientResourceHeapImpl();
     SLANG_RETURN_ON_FAIL(result->init(desc, this));
-    *outHeap = result.detach();
+    returnComPtr(outHeap, result);
     return SLANG_OK;
 }
 
@@ -4421,7 +4459,7 @@ Result VKDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommandQue
     m_api.vkGetDeviceQueue(m_api.m_device, queueFamilyIndex, 0, &vkQueue);
     RefPtr<CommandQueueImpl> result = new CommandQueueImpl();
     result->init(this, vkQueue, queueFamilyIndex);
-    *outQueue = result.detach();
+    returnComPtr(outQueue, result);
     m_queueAllocCount++;
     return SLANG_OK;
 }
@@ -4438,7 +4476,7 @@ Result VKDevice::createSwapchain(
 
     RefPtr<SwapchainImpl> sc = new SwapchainImpl();
     SLANG_RETURN_ON_FAIL(sc->init(this, desc, window));
-    *outSwapchain = sc.detach();
+    returnComPtr(outSwapchain, sc);
     return SLANG_OK;
 }
 
@@ -4446,7 +4484,7 @@ Result VKDevice::createFramebufferLayout(const IFramebufferLayout::Desc& desc, I
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -4456,7 +4494,7 @@ Result VKDevice::createRenderPassLayout(
 {
     RefPtr<RenderPassLayoutImpl> result = new RenderPassLayoutImpl();
     SLANG_RETURN_ON_FAIL(result->init(this, desc));
-    *outRenderPassLayout = result.detach();
+    returnComPtr(outRenderPassLayout, result);
     return SLANG_OK;
 }
 
@@ -4464,7 +4502,7 @@ Result VKDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer*
 {
     RefPtr<FramebufferImpl> fb = new FramebufferImpl();
     SLANG_RETURN_ON_FAIL(fb->init(this, desc));
-    *outFramebuffer = fb.detach();
+    returnComPtr(outFramebuffer, fb);
     return SLANG_OK;
 }
 
@@ -4520,7 +4558,7 @@ SlangResult VKDevice::readBufferResource(
     ::memcpy(blob->m_data.getBuffer(), mappedData, size);
     m_api.vkUnmapMemory(m_device, staging.m_memory);
 
-    *outBlob = blob.detach();
+    returnComPtr(outBlob, blob);
     return SLANG_OK;
 }
 
@@ -4760,7 +4798,7 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
 
     const int arraySize = desc.calcEffectiveArraySize();
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, initialUsage, &m_api));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, initialUsage, this));
     texture->m_vkformat = format;
     // Create the image
     {
@@ -4989,7 +5027,7 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
         }
     }
     m_deviceQueue.flushAndWait();
-    *outResource = texture.detach();
+    returnComPtr(outResource, texture);
     return SLANG_OK;
 }
 
@@ -5043,7 +5081,7 @@ Result VKDevice::createBufferResource(IResource::Usage initialUsage, const IBuff
         m_deviceQueue.flush();
     }
 
-    *outResource = buffer.detach();
+    returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
 
@@ -5187,16 +5225,16 @@ Result VKDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerSta
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
 
-    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl(&m_api);
+    RefPtr<SamplerStateImpl> samplerImpl = new SamplerStateImpl(this);
     samplerImpl->m_sampler = sampler;
-    *outSampler = samplerImpl.detach();
+    returnComPtr(outSampler, samplerImpl);
     return SLANG_OK;
 }
 
 Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = static_cast<TextureResourceImpl*>(texture);
-    RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(&m_api);
+    RefPtr<TextureResourceViewImpl> view = new TextureResourceViewImpl(this);
     view->m_texture = resourceImpl;
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -5266,7 +5304,7 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
         break;
     }
     m_api.vkCreateImageView(m_device, &createInfo, nullptr, &view->m_view);
-    *outView = view.detach();
+    returnComPtr(outView, view);
     return SLANG_OK;
 }
 
@@ -5310,11 +5348,11 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
         {
             // Buffer usage that doesn't involve formatting doesn't
             // require a view in Vulkan.
-            RefPtr<PlainBufferResourceViewImpl> viewImpl = new PlainBufferResourceViewImpl(&m_api);
+            RefPtr<PlainBufferResourceViewImpl> viewImpl = new PlainBufferResourceViewImpl(this);
             viewImpl->m_buffer = resourceImpl;
             viewImpl->offset = 0;
             viewImpl->size = size;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         //
@@ -5334,10 +5372,10 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
             VkBufferView view;
             SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));
 
-            RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl(&m_api);
+            RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl(this);
             viewImpl->m_buffer = resourceImpl;
             viewImpl->m_view = view;
-            *outView = viewImpl.detach();
+            returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
         break;
@@ -5377,7 +5415,7 @@ Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numEle
 
     // Work out the overall size
     layout->m_vertexSize = int(vertexSize);
-    *outLayout = layout.detach();
+    returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -5406,9 +5444,11 @@ static VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITe
 
 Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
-    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(m_api, desc.pipelineType);
+    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this, desc.pipelineType);
     shaderProgram->m_pipelineType = desc.pipelineType;
     shaderProgram->slangProgram = desc.slangProgram;
+    m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
+
     RootShaderObjectLayout::create(
         this,
         desc.slangProgram,
@@ -5417,7 +5457,7 @@ Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
     if (desc.slangProgram->getSpecializationParamCount() != 0)
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
-        *outProgram = shaderProgram.detach();
+        returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
 
@@ -5444,7 +5484,7 @@ Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
             shaderModule));
         shaderProgram->m_modules.add(shaderModule);
     }
-    *outProgram = shaderProgram.detach();
+    returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
 }
 
@@ -5455,7 +5495,7 @@ Result VKDevice::createShaderObjectLayout(
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(
         ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
-    *outLayout = layout.detach();
+    returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
 
@@ -5464,7 +5504,7 @@ Result VKDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObjec
     RefPtr<ShaderObjectImpl> shaderObject;
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
         this, static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
-    *outObject = shaderObject.detach();
+    returnComPtr(outObject, shaderObject);
     return SLANG_OK;
 }
 
@@ -5475,9 +5515,11 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
 
     if (!programImpl->m_rootObjectLayout->m_pipelineLayout)
     {
-        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(m_api);
+        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
         pipelineStateImpl->init(desc);
-        *outState = pipelineStateImpl.detach();
+        pipelineStateImpl->establishStrongDeviceReference();
+        m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+        returnComPtr(outState, pipelineStateImpl);
         return SLANG_OK;
     }
 
@@ -5628,12 +5670,12 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     VkPipeline pipeline = VK_NULL_HANDLE;
     SLANG_VK_CHECK(m_api.vkCreateGraphicsPipelines(m_device, pipelineCache, 1, &pipelineInfo, nullptr, &pipeline));
 
-    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(m_api);
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->m_pipeline = pipeline;
-    pipelineStateImpl->m_framebufferLayout =
-        static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    pipelineStateImpl->establishStrongDeviceReference();
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 
@@ -5643,9 +5685,11 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     auto programImpl = static_cast<ShaderProgramImpl*>(desc.program);
     if (!programImpl->m_rootObjectLayout->m_pipelineLayout)
     {
-        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(m_api);
+        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
         pipelineStateImpl->init(desc);
-        *outState = pipelineStateImpl.detach();
+        m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+        pipelineStateImpl->establishStrongDeviceReference();
+        returnComPtr(outState, pipelineStateImpl);
         return SLANG_OK;
     }
 
@@ -5660,10 +5704,12 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     SLANG_VK_CHECK(m_api.vkCreateComputePipelines(
         m_device, pipelineCache, 1, &computePipelineInfo, nullptr, &pipeline));
 
-    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(m_api);
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
     pipelineStateImpl->m_pipeline = pipeline;
     pipelineStateImpl->init(desc);
-    *outState = pipelineStateImpl.detach();
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+    pipelineStateImpl->establishStrongDeviceReference();
+    returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
 

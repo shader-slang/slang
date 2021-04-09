@@ -17,14 +17,36 @@ enum class MapFlavor
     WriteDiscard,
 };
 
-class ImmediateRendererBase : public RendererBase
+class ImmediateCommandQueueBase
+    : public ICommandQueue
+    , public Slang::ComObject
 {
-private:
-    ComPtr<IPipelineState> m_currentPipelineState;
+public:
+    // Immediate device also holds a strong reference to an instance of `ImmediateCommandQueue`,
+    // forming a cyclic reference. Therefore we need a free-op here to break the cycle when
+    // the public reference count of the queue drops to 0.
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    ICommandQueue* getInterface(const Slang::Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandQueue)
+            return static_cast<ICommandQueue*>(this);
+        return nullptr;
+    }
+    virtual void comFree() override { breakStrongReferenceToDevice(); }
 
 public:
+    BreakableReference<RendererBase> m_renderer;
+    void breakStrongReferenceToDevice() { m_renderer.breakStrongReference(); }
+    void establishStrongReferenceToDevice() { m_renderer.establishStrongReference(); }
+};
+
+class ImmediateRendererBase : public RendererBase
+{
+public:
     // Immediate commands to be implemented by each target.
-    virtual Result createRootShaderObject(IShaderProgram* program, IShaderObject** outObject) = 0;
+    virtual Result createRootShaderObject(
+        IShaderProgram* program,
+        ShaderObjectBase** outObject) = 0;
     virtual void bindRootShaderObject(IShaderObject* rootObject) = 0;
     virtual void setPipelineState(IPipelineState* state) = 0;
     virtual void setFramebuffer(IFramebuffer* frameBuffer) = 0;
@@ -55,7 +77,7 @@ public:
     virtual void unmap(IBufferResource* buffer) = 0;
 
 public:
-    Slang::ComPtr<ICommandQueue> m_queue;
+    Slang::RefPtr<ImmediateCommandQueueBase> m_queue;
     uint32_t m_queueCreateCount = 0;
 
     ImmediateRendererBase();
