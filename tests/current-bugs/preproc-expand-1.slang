@@ -2,6 +2,9 @@
 
 // NOTE! This test should *fail*, if preprocessor is working correctly!
 
+// Should produce: Hi
+// Slang produces: C ( Hi ) 
+
 #define OPEN (
 #define CLOSE )
 
