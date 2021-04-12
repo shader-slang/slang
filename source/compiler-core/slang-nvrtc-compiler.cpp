@@ -644,24 +644,9 @@ struct NVRTCPathVisitor : Path::Visitor
     List<Candidate> m_candidates;
 };
 
-
-// To stop warning of constant expression, move out into a function
-static bool _canFindNVRTC()
-{
-    // Currently (at least because of name searched for "nvrtc64_") _findAndLoadNVRTC can only work on windows anyway.
-    // Requires 64 bit for NVRTC on windows
-    return SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64;
-}
-
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
-    if (!_canFindNVRTC())
-    {
-        // NVRTC is only available on 64 bit windows!
-        // Would be nice if we could ouput a warning somewhere... but for now just return that it's not found.
-        return SLANG_E_NOT_FOUND;
-    }
-
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
     // We only need to search 64 bit versions on windows 
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
@@ -734,6 +719,11 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
             return SLANG_OK;
         }
     }
+#else
+    SLANG_UNUSED(loader);
+    SLANG_UNUSED(outLibrary);
+#endif
+
     // This is an official-ish list of versions is here:
     // https://developer.nvidia.com/cuda-toolkit-archive
     
