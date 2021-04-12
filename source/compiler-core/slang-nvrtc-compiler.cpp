@@ -644,9 +644,25 @@ struct NVRTCPathVisitor : Path::Visitor
     List<Candidate> m_candidates;
 };
 
+
+// To stop warning of constant expression, move out into a function
+static bool _canFindNVRTC()
+{
+    // Currently (at least because of name searched for "nvrtc64_") _findAndLoadNVRTC can only work on windows anyway.
+    // Requires 64 bit for NVRTC on windows
+    return SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64;
+}
+
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
-    // We only need to search 64 bit versions on windows
+    if (!_canFindNVRTC())
+    {
+        // NVRTC is only available on 64 bit windows!
+        // Would be nice if we could ouput a warning somewhere... but for now just return that it's not found.
+        return SLANG_E_NOT_FOUND;
+    }
+
+    // We only need to search 64 bit versions on windows 
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
     // First try the instance path (if supported on platform)
@@ -729,20 +745,10 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     return SLANG_E_NOT_FOUND;
 }
 
-// To stop warning of constant expression, move out into a function
-static bool _isNVRTCUnavailable()
-{
-    return ((SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY) && SLANG_PTR_IS_32);
-}
 
 /* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
-    // On Windows and Linux CUDA is only available on 64 bit operating systems
-    if (_isNVRTCUnavailable())
-    {
-        return SLANG_E_NOT_FOUND;
-    }
-
+    
     ComPtr<ISlangSharedLibrary> library;
 
     // If the user supplies a path to their preferred version of NVRTC,
