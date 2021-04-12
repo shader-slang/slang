@@ -17,10 +17,7 @@
 namespace nvrtc
 {
 
-// On Windows and Linux CUDA is only available on 64 bit operating systems
-#if (SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY) && SLANG_PTR_IS_32
-SLANG_COMPILE_TIME_ASSERT(!"NVRTC is only supported on 64-bit operating systems");
-#endif
+
 
 typedef enum {
   NVRTC_SUCCESS = 0,
@@ -649,7 +646,6 @@ struct NVRTCPathVisitor : Path::Visitor
 
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
-#if SLANG_WINDOWS_FAMILY
     // We only need to search 64 bit versions on windows
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
@@ -722,7 +718,6 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
             return SLANG_OK;
         }
     }
-#endif
     // This is an official-ish list of versions is here:
     // https://developer.nvidia.com/cuda-toolkit-archive
     
@@ -734,8 +729,20 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     return SLANG_E_NOT_FOUND;
 }
 
+// To stop warning of constant expression, move out into a function
+static bool _isNVRTCUnavailable()
+{
+    return ((SLANG_WINDOWS_FAMILY || SLANG_LINUX_FAMILY) && SLANG_PTR_IS_32);
+}
+
 /* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
+    // On Windows and Linux CUDA is only available on 64 bit operating systems
+    if (_isNVRTCUnavailable())
+    {
+        return SLANG_E_NOT_FOUND;
+    }
+
     ComPtr<ISlangSharedLibrary> library;
 
     // If the user supplies a path to their preferred version of NVRTC,
@@ -773,6 +780,5 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     set->addCompiler(compiler);
     return SLANG_OK;
 }
-
 
 }
