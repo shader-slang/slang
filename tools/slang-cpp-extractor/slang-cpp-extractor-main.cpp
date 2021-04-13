@@ -177,8 +177,10 @@ public:
     enum class Type
     {
         Invalid,
+
         StructType,
         ClassType,
+
         Namespace,
         AnonymousNamespace
     };
@@ -190,7 +192,7 @@ public:
 
     virtual void dump(int indent, StringBuilder& out) = 0;
 
-        /// Do depth first traversal of nodes
+        /// Do depth first traversal of nodes in scopes
     virtual void calcScopeDepthFirst(List<Node*>& outNodes);
 
         /// Calculate the absolute name for this namespace/type
@@ -204,7 +206,6 @@ public:
         
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
-
 
     typedef bool (*Filter)(Node* node);
 
@@ -228,8 +229,7 @@ public:
         m_type(type),
         m_parentScope(nullptr),
         m_reflectionType(ReflectionType::NotReflected),
-        m_origin(nullptr),
-        m_typeSet(nullptr)
+        m_origin(nullptr)
     {
     }
 
@@ -239,9 +239,6 @@ public:
     ReflectionType m_reflectionType;    /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
  
     Token m_name;                       ///< The name of this scope/type    
-    Token m_marker;                     ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
-
-    TypeSet* m_typeSet;                 ///< The typeset this type belongs to. 
 
     ScopeNode* m_parentScope;           ///< The scope this type/scope is defined in
 };
@@ -320,15 +317,19 @@ struct ClassLikeNode : public ScopeNode
 
     ClassLikeNode(Type type):
         Super(type),
+        m_typeSet(nullptr),
         m_superNode(nullptr)
     {
+        SLANG_ASSERT(type == Type::ClassType || type == Type::StructType);
     }
 
-        /// All of the types derived from this type
-    List<RefPtr<ClassLikeNode>> m_derivedTypes;
+    Token m_marker;                                     ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
 
-        /// All of the fields within a *type*
-    List<Field> m_fields;
+    List<RefPtr<ClassLikeNode>> m_derivedTypes;         ///< All of the types derived from this type
+
+    TypeSet* m_typeSet;                                 ///< The typeset this type belongs to. 
+        
+    List<Field> m_fields;                               /// All of the fields within a *type*
 
     Token m_super;                   ///< Super class name
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
@@ -2090,10 +2091,10 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(ScopeNode* inScopeNode)
         }
         else
         {
-            // Add the root nodes
-            if (inScopeNode->isReflected())
+            // Add to it's own typeset
+            if (classLikeNode->isReflected())
             {
-                inScopeNode->m_typeSet->m_baseTypes.add(classLikeNode);
+                classLikeNode->m_typeSet->m_baseTypes.add(classLikeNode);
             }
         }
     }
@@ -2245,7 +2246,7 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
         {
             ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(node);
 
-            if (node->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
+            if (classLikeNode->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
             {
                 out << "ABSTRACT_";
             }
