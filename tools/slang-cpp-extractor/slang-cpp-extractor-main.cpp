@@ -2835,6 +2835,11 @@ int main(int argc, const char*const* argv)
         DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
         sink.writer = writer;
 
+        // Set to true to see command line that initiated C++ extractor. Helpful when finding issues from solution building failing, and then so
+        // being able to repeat the issue
+        bool dumpCommandLine = false;
+
+        if (dumpCommandLine)
         {
             StringBuilder builder;
 
