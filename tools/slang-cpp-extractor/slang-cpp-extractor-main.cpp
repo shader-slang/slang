@@ -396,9 +396,9 @@ public:
     bool advanceIfStyle(IdentifierStyle style, Token* outToken = nullptr);
 
     SlangResult pushAnonymousNamespace();
-    SlangResult pushNode(Node* node);
+    SlangResult pushScope(ScopeNode* node);
     SlangResult consumeToClosingBrace(const Token* openBraceToken = nullptr);
-    SlangResult popBrace();
+    SlangResult popScope();
 
         /// Parse the contents of the source file
     SlangResult parse(SourceFile* sourceFile, const Options* options);
@@ -1060,51 +1060,64 @@ SlangResult CPPExtractor::pushAnonymousNamespace()
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::pushNode(Node* node)
+SlangResult CPPExtractor::pushScope(ScopeNode* scopeNode)
 {
     if (m_origin)
     {
-        m_origin->addNode(node);
+        m_origin->addNode(scopeNode);
     }
 
-    if (node->m_name.hasContent())
+    if (scopeNode->m_name.hasContent())
     {
         // For anonymous namespace, we should look if we already have one and just reopen that. Doing so will mean will
         // find anonymous namespace clashes
 
-        if (Node* foundNode = m_currentScope->findChild(node->m_name.getContent()))
+        if (Node* foundNode = m_currentScope->findChild(scopeNode->m_name.getContent()))
         {
-            if (node->isClassLike())
+            if (scopeNode->isClassLike())
             {
-                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.getContent());
-                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, node->m_name.getContent());
+                m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, scopeNode->m_name.getContent());
+                m_sink->diagnose(foundNode->m_name, CPPDiagnostics::seeDeclarationOf, scopeNode->m_name.getContent());
                 return SLANG_FAIL;
             }
             
             if (foundNode->m_type == Node::Type::Namespace)
             {
-                if (foundNode->m_type != node->m_type)
+                if (foundNode->m_type != scopeNode->m_type)
                 {
                     // Different types can't work
-                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, node->m_name.getContent());
+                    m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::typeAlreadyDeclared, scopeNode->m_name.getContent());
                     return SLANG_FAIL;
                 }
 
-                ScopeNode* scopeNode = dynamic_cast<ScopeNode*>(foundNode);
-
+                ScopeNode* foundScopeNode = dynamic_cast<ScopeNode*>(foundNode);
+                SLANG_ASSERT(foundScopeNode);
+                
                 // Make sure the node is empty, as we are *not* going to add it, we are just going to use
                 // the pre-existing namespace
-                SLANG_ASSERT(dynamic_cast<ScopeNode*>(node)->m_children.getCount() == 0);
+                SLANG_ASSERT(scopeNode->m_children.getCount() == 0);
 
                 // We can just use the pre-existing namespace
-                m_currentScope = scopeNode;
+                m_currentScope = foundScopeNode;
                 return SLANG_OK;
             }
         }
     }
 
-    m_currentScope->addChild(node);
-    m_currentScope = dynamic_cast<ScopeNode*>(node);
+    m_currentScope->addChild(scopeNode);
+    m_currentScope = scopeNode;
+    return SLANG_OK;
+}
+
+SlangResult CPPExtractor::popScope()
+{
+    if (m_currentScope->m_parentScope == nullptr)
+    {
+        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
+        return SLANG_FAIL;
+    }
+
+    m_currentScope = m_currentScope->m_parentScope;
     return SLANG_OK;
 }
 
@@ -1149,17 +1162,6 @@ SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
     }
 }
 
-SlangResult CPPExtractor::popBrace()
-{
-    if (m_currentScope->m_parentScope == nullptr)
-    {
-        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::scopeNotClosed);
-        return SLANG_FAIL;
-    }
-
-    m_currentScope = m_currentScope->m_parentScope;
-    return SLANG_OK;
-}
 
 SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
 {
@@ -1181,10 +1183,10 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             if (advanceIfToken(TokenType::LBrace))
             {
                 // Okay looks like we are opening a namespace
-                RefPtr<Node> node(new ScopeNode(Node::Type::Namespace));
+                RefPtr<ScopeNode> node(new ScopeNode(Node::Type::Namespace));
                 node->m_name = name;
                 // Push the node
-                return pushNode(node);
+                return pushScope(node);
             }
         }
 
@@ -1245,7 +1247,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             m_reader.advanceToken();
         }
 
-        return pushNode(node);
+        return pushScope(node);
     }
 
     Token braceToken = m_reader.advanceToken();
@@ -1269,14 +1271,14 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
             case TokenType::Identifier:  break;
             case TokenType::RBrace:
             {
-                SLANG_RETURN_ON_FAIL(pushNode(node));
-                SLANG_RETURN_ON_FAIL(popBrace());
+                SLANG_RETURN_ON_FAIL(pushScope(node));
+                SLANG_RETURN_ON_FAIL(popScope());
                 m_reader.advanceToken();
                 return SLANG_OK;
             }
             default:
             {
-                SLANG_RETURN_ON_FAIL(pushNode(node));
+                SLANG_RETURN_ON_FAIL(pushScope(node));
                 return SLANG_OK;
             }
         }
@@ -1288,7 +1290,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         }
 
         // We still need to add the node,
-        SLANG_RETURN_ON_FAIL(pushNode(node));
+        SLANG_RETURN_ON_FAIL(pushScope(node));
         return SLANG_OK;
     }
 
@@ -1329,7 +1331,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     }
     
     node->m_reflectionType = ReflectionType::Reflected;
-    return pushNode(node);
+    return pushScope(node);
 }
 
 SlangResult CPPExtractor::_consumeToSync()
@@ -1825,9 +1827,9 @@ SlangResult CPPExtractor::_parsePreDeclare()
             // Assume it is reflected
             node->m_reflectionType = ReflectionType::Reflected;
 
-            SLANG_RETURN_ON_FAIL(pushNode(node));
+            SLANG_RETURN_ON_FAIL(pushScope(node));
             // Pop out of the node
-            popBrace();
+            popScope();
             break;
         }
         default:
@@ -1976,7 +1978,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
             }
             case TokenType::RBrace:
             {
-                SLANG_RETURN_ON_FAIL(popBrace());
+                SLANG_RETURN_ON_FAIL(popScope());
                 m_reader.advanceToken();
                 break;
             }
