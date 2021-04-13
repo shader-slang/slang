@@ -158,6 +158,17 @@ enum class ReflectionType
 class TypeSet;
 class SourceOrigin;
 
+/*
+    class
+    struct
+    interface
+
+    namespace
+    anonymous namespace
+
+    enum    (Does it define a 'scope'?). Not in the sense it can contain other types
+*/
+
 class Node : public RefObject
 {
 public:
@@ -167,18 +178,10 @@ public:
         StructType,
         ClassType,
         Namespace,
-        AnonymousNamespace,
+        AnonymousNamespace
     };
 
-    struct Field
-    {
-        bool isReflected() const { return reflectionType == ReflectionType::Reflected; }
-
-        UnownedStringSlice type;
-        Token name;
-        ReflectionType reflectionType;
-    };
-
+    
     bool isClassLike() const { return m_type == Type::StructType || m_type == Type::ClassType; }
 
         /// Add a child node to this nodes scope
@@ -187,15 +190,11 @@ public:
         /// Find a child node in this scope with the specified name. Return nullptr if not found
     Node* findChild(const UnownedStringSlice& name) const;
 
-        /// Add a node that is derived from this
-    void addDerived(Node* derived);
-
         /// True if can accept fields (class like types can)
     bool acceptsFields() const { return isClassLike(); }
 
-    void dump(int indent, StringBuilder& out);
-    void dumpDerived(int indentCount, StringBuilder& out);
-
+    virtual void dump(int indent, StringBuilder& out);
+    
         /// Calculate the absolute name for this namespace/type
     void calcAbsoluteName(StringBuilder& outName) const;
 
@@ -205,32 +204,22 @@ public:
         /// Do depth first traversal of nodes
     void calcScopeDepthFirst(List<Node*>& outNodes);
 
-        /// Traverse the hierarchy of derived nodes, in depth first order
-    void calcDerivedDepthFirst(List<Node*>& outNodes);
-
+    
         /// Calculate the scope path to this node, from the root 
     void calcScopePath(List<Node*>& outPath) { calcScopePath(this, outPath); }
 
-        /// Calculates the derived depth 
-    Index calcDerivedDepth() const;
-
+    
         /// Gets the anonymous namespace associated with this scope
     Node* getAnonymousNamespace();
 
-        /// Find the last (reflected) derived type
-    Node* findLastDerived();
-
+    
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
 
         /// Gets the reflection for any contained types
     ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
 
-        /// True if has a derived type that is reflected
-    bool hasReflectedDerivedType() const;
-        /// Stores in out any reflected derived types
-    void getReflectedDerivedTypes(List<Node*>& out) const;
-
+    
     typedef bool (*Filter)(Node* node);
 
     static bool isClassLikeAndReflected(Node* node)
@@ -242,7 +231,10 @@ public:
         return node->isClassLike();
     }
 
-    static void filter(Filter filter, List<Node*>& io);
+    template <typename T>
+    static void filter(Filter filter, List<T*>& io) { const Node* _isNodeDerived = (T*)nullptr; SLANG_UNUSED(_isNodeDerived); filterImpl(filter, reinterpret_cast<List<Node*>&>(io)); }
+
+    static void filterImpl(Filter filter, List<Node*>& io);
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
@@ -251,7 +243,7 @@ public:
         m_parentScope(nullptr),
         m_reflectionType(ReflectionType::NotReflected),
         m_reflectionOverride(ReflectionType::Reflected),
-        m_superNode(nullptr),
+        
         m_origin(nullptr),
         m_typeSet(nullptr)
     {
@@ -264,14 +256,8 @@ public:
         /// All of the types and namespaces in this *scope*
     List<RefPtr<Node>> m_children;
 
-        /// All of the types derived from this type
-    List<RefPtr<Node>> m_derivedTypes;
-
         /// Map from a name (in this scope) to the Node
     Dictionary<UnownedStringSlice, Node*> m_childMap;
-
-        /// All of the fields within a *type*
-    List<Field> m_fields;
 
         /// There can only be one anonymousNamespace for a scope. If there is one it's held here
     Node* m_anonymousNamespace;
@@ -286,13 +272,62 @@ public:
     ReflectionType m_reflectionOverride;    
 
     Token m_name;           ///< The name of this scope/type
-    Token m_super;          ///< Super class name
+    
     Token m_marker;         ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
 
     TypeSet* m_typeSet;     ///< The typeset this type belongs to. 
 
     Node* m_parentScope;    ///< The scope this type/scope is defined in
-    Node* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
+    
+};
+
+struct ClassLikeNode : public Node
+{
+    typedef Node Super;
+
+    struct Field
+    {
+        bool isReflected() const { return reflectionType == ReflectionType::Reflected; }
+
+        UnownedStringSlice type;
+        Token name;
+        ReflectionType reflectionType;
+    };
+
+        /// Add a node that is derived from this
+    void addDerived(ClassLikeNode* derived);
+    void dumpDerived(int indentCount, StringBuilder& out);
+
+        /// Calculates the derived depth 
+    Index calcDerivedDepth() const;
+
+        /// Find the last (reflected) derived type
+    ClassLikeNode* findLastDerived();
+
+        /// Traverse the hierarchy of derived nodes, in depth first order
+    void calcDerivedDepthFirst(List<ClassLikeNode*>& outNodes);
+
+        /// True if has a derived type that is reflected
+    bool hasReflectedDerivedType() const;
+        /// Stores in out any reflected derived types
+    void getReflectedDerivedTypes(List<ClassLikeNode*>& out) const;
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    ClassLikeNode(Type type):
+        Super(type),
+        m_superNode(nullptr)
+    {
+    }
+
+        /// All of the types derived from this type
+    List<RefPtr<ClassLikeNode>> m_derivedTypes;
+
+        /// All of the fields within a *type*
+    List<Field> m_fields;
+
+    Token m_super;                   ///< Super class name
+    ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
 
 class SourceOrigin : public RefObject
@@ -341,7 +376,7 @@ public:
     String m_typeName;           ///< The enum type name associated with this type for AST it is ASTNode
     String m_fileMark;           ///< This 'mark' becomes of the output filename
 
-    List<Node*> m_baseTypes;    ///< The base types for this type set
+    List<ClassLikeNode*> m_baseTypes;    ///< The base types for this type set
 };
 
 struct Options;
@@ -476,13 +511,6 @@ Node* Node::findChild(const UnownedStringSlice& name) const
     return (nodePtr) ? *nodePtr : nullptr;
 }
 
-/// Add a node that is derived from this
-void Node::addDerived(Node* derived)
-{
-    SLANG_ASSERT(derived->m_superNode == nullptr);
-    derived->m_superNode = this;
-    m_derivedTypes.add(derived);
-}
 
 void Node::calcScopeDepthFirst(List<Node*>& outNodes)
 {
@@ -493,14 +521,6 @@ void Node::calcScopeDepthFirst(List<Node*>& outNodes)
     }
 }
 
-void Node::calcDerivedDepthFirst(List<Node*>& outNodes)
-{
-    outNodes.add(this);
-    for (Node* derivedType : m_derivedTypes)
-    {
-        derivedType->calcDerivedDepthFirst(outNodes);
-    }
-}
 
 static void _indent(Index indentCount, StringBuilder& out)
 {
@@ -510,19 +530,6 @@ static void _indent(Index indentCount, StringBuilder& out)
     }
 }
 
-void Node::dumpDerived(int indentCount, StringBuilder& out)
-{
-    if (isClassLike() && isReflected() && m_name.hasContent())
-    {
-        _indent(indentCount, out);
-        out << m_name.getContent() << "\n";
-    }
-
-    for (Node* derivedType : m_derivedTypes)
-    {
-        derivedType->dumpDerived(indentCount + 1, out);
-    }
-}
 
 void Node::dump(int indentCount, StringBuilder& out)
 {
@@ -546,45 +553,11 @@ void Node::dump(int indentCount, StringBuilder& out)
             }
             break;
         }
-        case Type::StructType:
-        case Type::ClassType:
-        {
-            const char* typeName = (m_type == Type::StructType) ? "struct" : "class";
-            
-            out << typeName << " ";
-
-            if (!isReflected())
-            {
-                out << " (";
-            }
-            out << m_name.getContent();
-            if (!isReflected())
-            {
-                out << ") ";
-            }
-
-            if (m_super.hasContent())
-            {
-                out << " : " << m_super.getContent(); 
-            }
-
-            out << " {\n";
-            break;
-        }
     }
 
     for (Node* child : m_children)
     {
         child->dump(indentCount + 1, out);
-    }
-
-    for (const Field& field : m_fields)
-    {
-        if (field.isReflected())
-        {
-            _indent(indentCount + 1, out);
-            out << field.type << " " << field.name.getContent() << "\n";
-        }
     }
 
     _indent(indentCount, out);
@@ -617,33 +590,6 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-Index Node::calcDerivedDepth() const
-{
-    const Node* node = this;
-    Index count = 0;
-
-    while (node)
-    {
-        count++;
-        node = node->m_superNode;
-    }
-
-    return count;
-}
-
-Node* Node::findLastDerived()
-{
-    for (Index i = m_derivedTypes.getCount() - 1; i >= 0; --i)
-    {
-        Node* derivedType = m_derivedTypes[i];
-        Node* found = derivedType->findLastDerived();
-        if (found)
-        {
-            return found;
-        }
-    }
-    return this;
-}
 
 /* static */void Node::calcScopePath(Node* node, List<Node*>& outPath)
 {
@@ -659,31 +605,7 @@ Node* Node::findLastDerived()
     outPath.reverse();
 }
 
-bool Node::hasReflectedDerivedType() const
-{
-    for (Node* type : m_derivedTypes)
-    {
-        if (type->isReflected())
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-void Node::getReflectedDerivedTypes(List<Node*>& out) const
-{
-    out.clear();
-    for (Node* type : m_derivedTypes)
-    {
-        if (type->isReflected())
-        {
-            out.add(type);
-        }
-    }
-}
-
-/* static */void Node::filter(Filter inFilter, List<Node*>& ioNodes)
+/* static */void Node::filterImpl(Filter inFilter, List<Node*>& ioNodes)
 {
     // Filter out all the unreflected nodes
     Index count = ioNodes.getCount();
@@ -701,6 +623,134 @@ void Node::getReflectedDerivedTypes(List<Node*>& out) const
             j++;
         }
     }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ClassLikeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+/// Add a node that is derived from this
+void ClassLikeNode::addDerived(ClassLikeNode* derived)
+{
+    SLANG_ASSERT(derived->m_superNode == nullptr);
+    derived->m_superNode = this;
+    m_derivedTypes.add(derived);
+}
+
+void ClassLikeNode::calcDerivedDepthFirst(List<ClassLikeNode*>& outNodes)
+{
+    outNodes.add(this);
+    for (ClassLikeNode* derivedType : m_derivedTypes)
+    {
+        derivedType->calcDerivedDepthFirst(outNodes);
+    }
+}
+
+void ClassLikeNode::dumpDerived(int indentCount, StringBuilder& out)
+{
+    if (isClassLike() && isReflected() && m_name.hasContent())
+    {
+        _indent(indentCount, out);
+        out << m_name.getContent() << "\n";
+    }
+
+    for (ClassLikeNode* derivedType : m_derivedTypes)
+    {
+        derivedType->dumpDerived(indentCount + 1, out);
+    }
+}
+
+Index ClassLikeNode::calcDerivedDepth() const
+{
+    const ClassLikeNode* node = this;
+    Index count = 0;
+
+    while (node)
+    {
+        count++;
+        node = node->m_superNode;
+    }
+
+    return count;
+}
+
+ClassLikeNode* ClassLikeNode::findLastDerived()
+{
+    for (Index i = m_derivedTypes.getCount() - 1; i >= 0; --i)
+    {
+        ClassLikeNode* derivedType = m_derivedTypes[i];
+        ClassLikeNode* found = derivedType->findLastDerived();
+        if (found)
+        {
+            return found;
+        }
+    }
+    return this;
+}
+
+bool ClassLikeNode::hasReflectedDerivedType() const
+{
+    for (ClassLikeNode* type : m_derivedTypes)
+    {
+        if (type->isReflected())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ClassLikeNode::getReflectedDerivedTypes(List<ClassLikeNode*>& out) const
+{
+    out.clear();
+    for (ClassLikeNode* type : m_derivedTypes)
+    {
+        if (type->isReflected())
+        {
+            out.add(type);
+        }
+    }
+}
+
+void ClassLikeNode::dump(int indentCount, StringBuilder& out)
+{
+    _indent(indentCount, out);
+
+    const char* typeName = (m_type == Type::StructType) ? "struct" : "class";
+
+    out << typeName << " ";
+
+    if (!isReflected())
+    {
+        out << " (";
+    }
+    out << m_name.getContent();
+    if (!isReflected())
+    {
+        out << ") ";
+    }
+
+    if (m_super.hasContent())
+    {
+        out << " : " << m_super.getContent();
+    }
+
+    out << " {\n";
+
+    for (Node* child : m_children)
+    {
+        child->dump(indentCount + 1, out);
+    }
+
+    for (const Field& field : m_fields)
+    {
+        if (field.isReflected())
+        {
+            _indent(indentCount + 1, out);
+            out << field.type << " " << field.name.getContent() << "\n";
+        }
+    }
+
+    _indent(indentCount, out);
+    out << "}\n";
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -729,7 +779,7 @@ struct Options
 
     String m_inputDirectory;        ///< The input directory that is by default used for reading m_inputPaths from. 
     String m_markPrefix;            ///< The prefix of the 'marker' used to identify a reflected type
-    String m_markSuffix;           ///< The postfix of the 'marker' used to identify a reflected type
+    String m_markSuffix;            ///< The postfix of the 'marker' used to identify a reflected type
     String m_stripFilePrefix;       ///< Used for the 'origin' information, this is stripped from the source filename, and the remainder of the filename (without extension) is 'macroized'
 };
 
@@ -1142,7 +1192,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
         return SLANG_OK;
     }
 
-    RefPtr<Node> node(new Node(type));
+    RefPtr<ClassLikeNode> node(new ClassLikeNode(type));
     node->m_name = name;
 
     // Defaults to not reflected
@@ -1400,7 +1450,7 @@ static bool _canRepeatTokenType(TokenType type)
     return true;
 }
 
-// Returns true if there needs to be a spave between the previous token type, and the current token
+// Returns true if there needs to be a space between the previous token type, and the current token
 // type for correct output. It is assumed that the token stream is appropriate.
 // The implementation might need more sophistication, but this at least avoids Blah const *  -> Blahconst* 
 static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
@@ -1602,7 +1652,8 @@ SlangResult CPPExtractor::_parseBalanced(DiagnosticSink* sink)
 
 SlangResult CPPExtractor::_maybeParseField()
 {
-    Node::Field field;
+    // Can only add a field if we are in a class
+    SLANG_ASSERT(m_currentNode->isClassLike());
 
     UnownedStringSlice typeName;
     if (SLANG_FAILED(_maybeParseType(typeName)))
@@ -1660,12 +1711,14 @@ SlangResult CPPExtractor::_maybeParseField()
         }
         case TokenType::Semicolon:
         {
-            Node::Field field;
+            ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(m_currentNode);
+
+            ClassLikeNode::Field field;
             field.type = typeName;
             field.name = fieldName;
             field.reflectionType = m_currentNode->getContainedReflectionType();
 
-            m_currentNode->m_fields.add(field);
+            classLikeNode->m_fields.add(field);
             break;
         }
         default: break;
@@ -1741,18 +1794,31 @@ SlangResult CPPExtractor::_parsePreDeclare()
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
 
-    RefPtr<Node> node(new Node(nodeType));
+    switch (nodeType)
+    {
+        case Node::Type::ClassType:
+        case Node::Type::StructType:
+        {
+            RefPtr<ClassLikeNode> node(new ClassLikeNode(nodeType));
 
-    node->m_name = name;
-    node->m_super = super;
-    node->m_typeSet = typeSet;
+            node->m_name = name;
+            node->m_super = super;
+            node->m_typeSet = typeSet;
 
-    // Assume it is reflected
-    node->m_reflectionType = ReflectionType::Reflected;
+            // Assume it is reflected
+            node->m_reflectionType = ReflectionType::Reflected;
 
-    SLANG_RETURN_ON_FAIL(pushNode(node));
-    // Pop out of the node
-    popBrace();
+            SLANG_RETURN_ON_FAIL(pushNode(node));
+            // Pop out of the node
+            popBrace();
+            break;
+        }
+        default:
+        {
+            return SLANG_FAIL;
+        }
+    }
+
     
     return SLANG_OK;
 }
@@ -1958,58 +2024,62 @@ Node* CPPExtractor::findNode(Node* scope, const UnownedStringSlice& name)
     return nullptr;
 }
 
-SlangResult CPPExtractor::_calcDerivedTypesRec(Node* node)
+SlangResult CPPExtractor::_calcDerivedTypesRec(Node* inNode)
 {
-    if (node->isClassLike())
+    if (inNode->isClassLike())
     {
-        if (node->m_super.hasContent())
+        ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(inNode);
+
+        if (classLikeNode->m_super.hasContent())
         {
-            Node* parentScope = node->m_parentScope;
+            Node* parentScope = classLikeNode->m_parentScope;
             if (parentScope == nullptr)
             {
                 m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
                 return SLANG_FAIL;
             }
 
-            Node* superType = findNode(parentScope, node->m_super.getContent());
+            Node* superNode = findNode(parentScope, classLikeNode->m_super.getContent());
 
-            if (!superType)
+            if (!superNode)
             {
-                if (node->isReflected())
+                if (classLikeNode->isReflected())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotFound, node->getAbsoluteName());
+                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotFound, classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
             }
             else
             {
-                if (!superType->isClassLike())
+                if (!superNode->isClassLike())
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::superTypeNotAType, node->getAbsoluteName());
+                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotAType, classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
 
-                if (superType->m_typeSet != node->m_typeSet)
+                ClassLikeNode* superType = static_cast<ClassLikeNode*>(superNode);
+
+                if (superType->m_typeSet != classLikeNode->m_typeSet)
                 {
-                    m_sink->diagnose(node->m_name, CPPDiagnostics::typeInDifferentTypeSet, node->m_name.getContent(), node->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
+                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::typeInDifferentTypeSet, classLikeNode->m_name.getContent(), classLikeNode->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
                     return SLANG_FAIL;
                 }
 
                 // The base class must be defined in same scope (as we didn't allow different scopes for base classes)
-                superType->addDerived(node);
+                superType->addDerived(classLikeNode);
             }
         }
         else
         {
             // Add the root nodes
-            if (node->isReflected())
+            if (inNode->isReflected())
             {
-                node->m_typeSet->m_baseTypes.add(node);
+                inNode->m_typeSet->m_baseTypes.add(classLikeNode);
             }
         }
     }
 
-    for (Node* child : node->m_children)
+    for (Node* child : inNode->m_children)
     {
         SLANG_RETURN_ON_FAIL(_calcDerivedTypesRec(child));
     }
@@ -2150,12 +2220,14 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
     {
         if (node->isClassLike() && node->isReflected())
         {
+            ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(node);
+
             if (node->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
             {
                 out << "ABSTRACT_";
             }
 
-            out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << node->m_super.getContent() << ")\n";
+            out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << classLikeNode->m_super.getContent() << ")\n";
             out << "END_SYNTAX_CLASS()\n\n";
         }
     }
@@ -2164,27 +2236,27 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
 
 SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
 {
-    const List<Node*>& baseTypes = typeSet->m_baseTypes;
+    const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
 
     out << "#pragma once\n\n";
     out << "// Do not edit this file is generated from slang-cpp-extractor tool\n\n";
 
-    List<Node*> nodes;
+    List<ClassLikeNode*> nodes;
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
-        Node* baseType = baseTypes[i];        
+        ClassLikeNode* baseType = baseTypes[i];        
         baseType->calcDerivedDepthFirst(nodes);
     }
 
-    Node::filter(Node::isClassLike, nodes);
+    //Node::filter(Node::isClassLike, nodes);
 
-    List<Node*> derivedTypes;
+    List<ClassLikeNode*> derivedTypes;
 
     out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHILDREN !!!!!!!!!!!!!!!!!!!!!!!!!!!! */ \n\n";
 
     // Now the children 
-    for (Node* node : nodes)
+    for (ClassLikeNode* node : nodes)
     {
         node->getReflectedDerivedTypes(derivedTypes);
 
@@ -2210,7 +2282,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet
 
     out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ALL !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
 
-    for (Node* node : nodes)
+    for (ClassLikeNode* node : nodes)
     {
         // Define the derived types
         out << "#define " << m_options.m_markPrefix << "ALL_" << reflectTypeName << "_" << node->m_name.getContent() << "(x, param) \\\n";
@@ -2231,7 +2303,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet
     {
         out << "\n\n /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! FIELDS !!!!!!!!!!!!!!!!!!!!!!!!!!!! */\n\n";
 
-        for (Node* node : nodes)
+        for (ClassLikeNode* node : nodes)
         {
             // Define the derived types
             out << "#define " << m_options.m_markPrefix << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
@@ -2298,7 +2370,7 @@ SlangResult CPPExtractorApp::calcOriginHeader(CPPExtractor& extractor, StringBui
 
 SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
 {
-    const List<Node*>& baseTypes = typeSet->m_baseTypes;
+    const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
 
     out << "#pragma once\n\n";
@@ -2325,10 +2397,10 @@ SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* ty
     }
 
     // Add all the base types, with in order traversals
-    List<Node*> nodes;
+    List<ClassLikeNode*> nodes;
     for (Index i = 0; i < baseTypes.getCount(); ++i)
     {
-        Node* baseType = baseTypes[i];
+        ClassLikeNode* baseType = baseTypes[i];
         baseType->calcDerivedDepthFirst(nodes);
     }
 
@@ -2341,7 +2413,7 @@ SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* ty
         out << "{\n";
 
         Index typeIndex = 0;
-        for (Node* node : nodes)
+        for (ClassLikeNode* node : nodes)
         {
             // Okay first we are going to output the enum values
             const Index depth = node->calcDerivedDepth() - 1;
@@ -2363,9 +2435,8 @@ SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* ty
     // Predeclare the classes
     {
         out << "// Predeclare\n\n";
-        for (Node* node : nodes)
+        for (ClassLikeNode* node : nodes)
         {
-            SLANG_ASSERT(node->isClassLike());
             // If it's not reflected we don't output, in the enum list
             if (node->isReflected())
             {
@@ -2390,7 +2461,7 @@ SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* ty
         out << "// param is a user defined parameter that can be parsed to the invoked x macro\n\n";
 
         // Output all of the definitions for each type
-        for (Node* node : nodes)
+        for (ClassLikeNode* node : nodes)
         {
             out << "#define " << m_options.m_markPrefix <<  reflectTypeName << "_" << node->m_name.getContent() << "(x, param) ";
 
@@ -2657,9 +2728,9 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 
         for (TypeSet* typeSet : extractor.getTypeSets())
         {
-            const List<Node*>& baseTypes = typeSet->m_baseTypes;
+            const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
 
-            for (Node* baseType : baseTypes)
+            for (ClassLikeNode* baseType : baseTypes)
             {
                 StringBuilder buf;
                 baseType->dumpDerived(0, buf);
