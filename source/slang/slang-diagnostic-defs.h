@@ -170,10 +170,17 @@ DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
 DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro parameters")
 DIAGNOSTIC(15404, Warning, builtinMacroRedefinition, "Redefinition of builtin macro '$0'")
 
+DIAGNOSTIC(15405, Error, tokenPasteAtStart, "'##' is not allowed at the start of a macro body")
+DIAGNOSTIC(15406, Error, tokenPasteAtEnd, "'##' is not allowed at the end of a macro body")
+DIAGNOSTIC(15407, Error, expectedMacroParameterAfterStringize, "'#' in macro body must be followed by the name of a macro parameter")
+DIAGNOSTIC(15408, Error, duplicateMacroParameterName, "redefinition of macro parameter '$0'")
+
 // 155xx - macro expansion
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
 DIAGNOSTIC(15501, Error, wrongNumberOfArgumentsToMacro, "wrong number of arguments to macro (expected $0, got $1)")
 DIAGNOSTIC(15502, Error, errorParsingToMacroInvocationArgument, "error parsing macro '$0' invocation argument to '$1'")
+
+DIAGNOSTIC(15503, Warning, invalidTokenPasteResult, "toking pasting with '##' resulted in the invalid token '$0'")
 
 // 156xx - pragmas
 DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")

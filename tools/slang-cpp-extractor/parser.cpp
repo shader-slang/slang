@@ -1219,7 +1219,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
     m_currentScope = m_nodeTree->m_rootNode;
 
     lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool, manager->getMemoryArena());
-    m_tokenList = lexer.lexAllTokens();
+    m_tokenList = lexer.lexAllSemanticTokens();
     // See if there were any errors
     if (m_sink->getErrorCount())
     {
@@ -1350,7 +1350,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 {
                     // We are just going to ignore all of these for now....
                     m_reader.advanceToken();
-                    while (m_reader.peekTokenType() != TokenType::EndOfDirective && m_reader.peekTokenType() != TokenType::EndOfFile)
+                    while (m_reader.peekTokenType() != TokenType::EndOfFile)
                     {
                         m_reader.advanceToken();
                     }
