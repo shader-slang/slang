@@ -182,7 +182,9 @@ public:
         ClassType,
 
         Namespace,
-        AnonymousNamespace
+        AnonymousNamespace,
+
+        Field,
     };
 
     static bool isScopeType(Type type) { return int(type) >= int(Type::StructType) && int(type) <= int(Type::AnonymousNamespace); }
@@ -290,20 +292,29 @@ struct ScopeNode : public Node
     ScopeNode* m_anonymousNamespace;
 };
 
+struct FieldNode : public Node
+{
+    typedef Node Super;
+
+    static bool isType(Type type) { return type == Type::Field; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    FieldNode():
+        Super(Type::Field)
+    {
+    }
+
+    UnownedStringSlice m_fieldType;
+
+    // We may want to add initializer tokens
+};
+
 struct ClassLikeNode : public ScopeNode
 {
     typedef ScopeNode Super;
 
     static bool isType(Type type) { return isClassLikeType(type); }
-
-    struct Field
-    {
-        bool isReflected() const { return reflectionType == ReflectionType::Reflected; }
-
-        UnownedStringSlice type;
-        Token name;
-        ReflectionType reflectionType;
-    };
 
         /// Add a node that is derived from this
     void addDerived(ClassLikeNode* derived);
@@ -341,9 +352,7 @@ struct ClassLikeNode : public ScopeNode
     List<RefPtr<ClassLikeNode>> m_derivedTypes;         ///< All of the types derived from this type
 
     TypeSet* m_typeSet;                                 ///< The typeset this type belongs to. 
-        
-    List<Field> m_fields;                               /// All of the fields within a *type*
-
+    
     Token m_super;                   ///< Super class name
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
@@ -644,6 +653,17 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
     out << "}\n";
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FieldNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void FieldNode::dump(int indent, StringBuilder& out)
+{
+    if (isReflected())
+    {
+        _indent(indent, out);
+        out << m_fieldType << " " << m_name.getContent() << "\n";
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ClassLikeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 /// Add a node that is derived from this
@@ -757,15 +777,6 @@ void ClassLikeNode::dump(int indentCount, StringBuilder& out)
     for (Node* child : m_children)
     {
         child->dump(indentCount + 1, out);
-    }
-
-    for (const Field& field : m_fields)
-    {
-        if (field.isReflected())
-        {
-            _indent(indentCount + 1, out);
-            out << field.type << " " << field.name.getContent() << "\n";
-        }
     }
 
     _indent(indentCount, out);
@@ -1741,14 +1752,13 @@ SlangResult CPPExtractor::_maybeParseField()
         }
         case TokenType::Semicolon:
         {
-            ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(m_currentScope);
+            FieldNode* fieldNode = new FieldNode;
 
-            ClassLikeNode::Field field;
-            field.type = typeName;
-            field.name = fieldName;
-            field.reflectionType = m_currentScope->getContainedReflectionType();
+            fieldNode->m_fieldType = typeName;
+            fieldNode->m_name = fieldName;
+            fieldNode->m_reflectionType = m_currentScope->getContainedReflectionType();
 
-            classLikeNode->m_fields.add(field);
+            m_currentScope->addChild(fieldNode);
             break;
         }
         default: break;
@@ -2343,17 +2353,26 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet
             // Define the derived types
             out << "#define " << m_options.m_markPrefix << "FIELDS_" << reflectTypeName << "_" << node->m_name.getContent() << "(_x_, _param_)";
 
-            if (node->m_fields.getCount() > 0)
+            List<FieldNode*> fields;
+            for (Node* node : node->m_children)
+            {
+                if (auto field = as<FieldNode>(node))
+                {
+                    fields.add(field);
+                }
+            }
+
+            if (fields.getCount() > 0)
             {
                 out << "\\\n";
 
-                const Index fieldsCount = node->m_fields.getCount();
+                const Index fieldsCount =fields.getCount();
                 bool previousField = false;
                 for (Index j = 0; j < fieldsCount; ++j) 
                 {
-                    const auto& field = node->m_fields[j];
+                    const FieldNode* field = fields[j];
                         
-                    if (field.isReflected())
+                    if (field->isReflected())
                     {
                         if (previousField)
                         {
@@ -2364,7 +2383,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet
 
                         // NOTE! We put the type field in brackets, such that there is no issue with templates containing a comma.
                         // If stringified
-                        out << "_x_(" << field.name.getContent() << ", (" << field.type << "), _param_)";
+                        out << "_x_(" << field->m_name.getContent() << ", (" << field->m_fieldType << "), _param_)";
                         previousField = true;
                     }
                 }
