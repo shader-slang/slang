@@ -160,17 +160,6 @@ class SourceOrigin;
 
 struct ScopeNode;
 
-/*
-    class
-    struct
-    interface
-
-    namespace
-    anonymous namespace
-
-    enum    (Does it define a 'scope'?). Not in the sense it can contain other types
-*/
-
 class Node : public RefObject
 {
 public:
