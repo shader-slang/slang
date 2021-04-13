@@ -184,11 +184,22 @@ public:
         Namespace,
         AnonymousNamespace
     };
-    
-    bool isClassLike() const { return m_type == Type::StructType || m_type == Type::ClassType; }
 
-        /// True if can accept fields (class like types can)
-    bool acceptsFields() const { return isClassLike(); }
+    static bool isScopeType(Type type) { return int(type) >= int(Type::StructType) && int(type) <= int(Type::AnonymousNamespace); }
+    static bool isClassLikeType(Type type) { return type == Type::StructType || type == Type::ClassType; }
+
+    enum class TypeRange
+    {
+        ScopeStart = int(Type::StructType),
+        ScopeEnd = int(Type::AnonymousNamespace),
+
+        ClassLikeStart = int(Type::StructType),
+        ClassLikeEnd = int(Type::ClassType),
+    };
+
+    static bool isType(Type type) { return true; }
+
+    bool isClassLike() const { return isClassLikeType(m_type); }
 
     virtual void dump(int indent, StringBuilder& out) = 0;
 
@@ -209,14 +220,8 @@ public:
 
     typedef bool (*Filter)(Node* node);
 
-    static bool isClassLikeAndReflected(Node* node)
-    {
-        return node->isClassLike() && node->isReflected();
-    }
-    static bool isClassLike(Node* node)
-    {
-        return node->isClassLike();
-    }
+    static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
+    static bool isClassLike(Node* node) { return isClassLikeType(node->m_type); }
 
     template <typename T>
     static void filter(Filter filter, List<T*>& io) { const Node* _isNodeDerived = (T*)nullptr; SLANG_UNUSED(_isNodeDerived); filterImpl(filter, reinterpret_cast<List<Node*>&>(io)); }
@@ -228,14 +233,12 @@ public:
     Node(Type type):
         m_type(type),
         m_parentScope(nullptr),
-        m_reflectionType(ReflectionType::NotReflected),
-        m_origin(nullptr)
+        m_reflectionType(ReflectionType::NotReflected)
     {
     }
 
     Type m_type;                        ///< The type of node this is
 
-    SourceOrigin* m_origin;             /// Defines where this was uniquely defined. For namespaces if it straddles multiple source files will be the first instance.
     ReflectionType m_reflectionType;    /// Classes can be traversed, but not reflected. To be reflected they have to contain the marker
  
     Token m_name;                       ///< The name of this scope/type    
@@ -247,8 +250,13 @@ struct ScopeNode : public Node
 {
     typedef Node Super;
 
+    static bool isType(Type type) { return isScopeType(type); }
+
     virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
     virtual void calcScopeDepthFirst(List<Node*>& outNodes) SLANG_OVERRIDE;
+
+        /// True if can accept fields (class like types can)
+    bool acceptsFields() const { return isClassLike(); }
 
         /// Gets the reflection for any contained types
     ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
@@ -264,8 +272,8 @@ struct ScopeNode : public Node
 
     ScopeNode(Type type) :
         Super(type),
-        m_anonymousNamespace(nullptr),
-        m_reflectionOverride(ReflectionType::Reflected)
+        m_reflectionOverride(ReflectionType::Reflected),
+        m_anonymousNamespace(nullptr)
     {
     }
 
@@ -285,6 +293,8 @@ struct ScopeNode : public Node
 struct ClassLikeNode : public ScopeNode
 {
     typedef ScopeNode Super;
+
+    static bool isType(Type type) { return isClassLikeType(type); }
 
     struct Field
     {
@@ -317,11 +327,14 @@ struct ClassLikeNode : public ScopeNode
 
     ClassLikeNode(Type type):
         Super(type),
+        m_origin(nullptr),
         m_typeSet(nullptr),
         m_superNode(nullptr)
     {
         SLANG_ASSERT(type == Type::ClassType || type == Type::StructType);
     }
+
+    SourceOrigin* m_origin;                             ///< Defines where this was uniquely defined. 
 
     Token m_marker;                                     ///< The marker associated with this scope (typically the marker is SLANG_CLASS etc, that is used to identify reflectedType)
 
@@ -335,24 +348,21 @@ struct ClassLikeNode : public ScopeNode
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
 
+template <typename T>
+T* as(Node* node) { return (node && T::isType(node->m_type)) ? static_cast<T*>(node) : nullptr; }
+
 class SourceOrigin : public RefObject
 {
 public:
 
     void addNode(Node* node)
     {
-        if (node->isClassLike())
+        if (auto classLike = as<ClassLikeNode>(node))
         {
-            SLANG_ASSERT(node->m_origin == nullptr);
-            node->m_origin = this;
+            SLANG_ASSERT(classLike->m_origin == nullptr);
+            classLike->m_origin = this;
         }
-        else
-        {
-            if (node->m_origin == nullptr)
-            {
-                node->m_origin = this;
-            }
-        }
+
         m_nodes.add(node);
     }
 
@@ -1091,7 +1101,7 @@ SlangResult CPPExtractor::pushScope(ScopeNode* scopeNode)
                     return SLANG_FAIL;
                 }
 
-                ScopeNode* foundScopeNode = dynamic_cast<ScopeNode*>(foundNode);
+                ScopeNode* foundScopeNode = as<ScopeNode>(foundNode);
                 SLANG_ASSERT(foundScopeNode);
                 
                 // Make sure the node is empty, as we are *not* going to add it, we are just going to use
@@ -2071,13 +2081,13 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(ScopeNode* inScopeNode)
             }
             else
             {
-                if (!superNode->isClassLike())
+                ClassLikeNode* superType = as<ClassLikeNode>(superNode);
+
+                if (!superType)
                 {
                     m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotAType, classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
-
-                ClassLikeNode* superType = static_cast<ClassLikeNode*>(superNode);
 
                 if (superType->m_typeSet != classLikeNode->m_typeSet)
                 {
@@ -2101,7 +2111,7 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(ScopeNode* inScopeNode)
 
     for (Node* child : inScopeNode->m_children)
     {
-        ScopeNode* childScope = dynamic_cast<ScopeNode*>(child);
+        ScopeNode* childScope = as<ScopeNode>(child);
         if (childScope)
         {
             SLANG_RETURN_ON_FAIL(_calcDerivedTypesRec(childScope));
@@ -2242,17 +2252,18 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
 
     for (Node* node : origin->m_nodes)
     {
-        if (node->isClassLike() && node->isReflected())
+        if (node->isReflected())
         {
-            ClassLikeNode* classLikeNode = static_cast<ClassLikeNode*>(node);
-
-            if (classLikeNode->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
+            if (auto classLikeNode = as<ClassLikeNode>(node))
             {
-                out << "ABSTRACT_";
-            }
+                if (classLikeNode->m_marker.getContent().indexOf(UnownedStringSlice::fromLiteral("ABSTRACT")) >= 0)
+                {
+                    out << "ABSTRACT_";
+                }
 
-            out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << classLikeNode->m_super.getContent() << ")\n";
-            out << "END_SYNTAX_CLASS()\n\n";
+                out << "SYNTAX_CLASS(" << node->m_name.getContent() << ", " << classLikeNode->m_super.getContent() << ")\n";
+                out << "END_SYNTAX_CLASS()\n\n";
+            }
         }
     }
     return SLANG_OK;
