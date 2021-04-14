@@ -609,7 +609,10 @@ extern "C"
            in the input source or specified via the `spAddEntryPoint` function in a
            single output module (library/source file).
         */
-        SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM = 1 << 8
+        SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM = 1 << 8,
+
+        /* When set, will dump out the IR between intermediate compilation steps.*/
+        SLANG_TARGET_FLAG_DUMP_IR = 1 << 9
     };
 
     /*!

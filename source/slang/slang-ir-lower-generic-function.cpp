@@ -26,7 +26,11 @@ namespace Slang
                 return genericValue;
             auto genericParent = as<IRGeneric>(genericValue);
             SLANG_ASSERT(genericParent);
+            SLANG_ASSERT(genericParent->getDataType());
             auto func = as<IRFunc>(findGenericReturnVal(genericParent));
+            // Do not lower intrinsic functions.
+            if (func->findDecoration<IRTargetIntrinsicDecoration>())
+                return genericValue;
             if (!func)
             {
                 // Nested generic functions are supposed to be flattened before entering
@@ -47,7 +51,10 @@ namespace Slang
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder.setInsertBefore(genericParent);
             auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
-            loweredFunc->setFullType(lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType())));
+            auto loweredGenericType =
+                lowerGenericFuncType(&builder, cast<IRGeneric>(genericParent->getFullType()));
+            SLANG_ASSERT(loweredGenericType);
+            loweredFunc->setFullType(loweredGenericType);
             List<IRInst*> clonedParams;
 
             for (auto genericChild : genericParent->getFirstBlock()->getChildren())
