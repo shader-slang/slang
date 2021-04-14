@@ -501,7 +501,7 @@ SlangResult App::writeDefs(Parser& extractor)
     return SLANG_OK;
 }
 
-SlangResult App::writeOutput(Parser& extractor)
+SlangResult App::writeOutput(Parser& parser)
 {
     String path;
     if (m_options.m_inputDirectory.getLength())
@@ -524,12 +524,12 @@ SlangResult App::writeOutput(Parser& extractor)
     // Strip the extension if set
     path = Path::getPathWithoutExt(path);
 
-    for (TypeSet* typeSet : extractor.getTypeSets())
+    for (TypeSet* typeSet : parser.getTypeSets())
     {
         {
             /// Calculate the header
             StringBuilder header;
-            SLANG_RETURN_ON_FAIL(calcTypeHeader(extractor, typeSet, header));
+            SLANG_RETURN_ON_FAIL(calcTypeHeader(parser, typeSet, header));
 
             // Write it out
 
@@ -540,7 +540,7 @@ SlangResult App::writeOutput(Parser& extractor)
 
         {
             StringBuilder childrenHeader;
-            SLANG_RETURN_ON_FAIL(calcChildrenHeader(extractor, typeSet, childrenHeader));
+            SLANG_RETURN_ON_FAIL(calcChildrenHeader(parser, typeSet, childrenHeader));
 
             StringBuilder headerPath;
             headerPath << path << "-" << typeSet->m_fileMark << "-macro." + ext;
@@ -603,7 +603,7 @@ SlangResult App::execute(const Options& options)
     IdentifierLookup identifierLookup;
     _initIdentifierLookup(options, identifierLookup);
 
-    Parser extractor(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
+    Parser parser(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
 
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
@@ -627,14 +627,14 @@ SlangResult App::execute(const Options& options)
 
         SourceFile* sourceFile = m_sourceManager->createSourceFileWithString(pathInfo, contents);
 
-        SLANG_RETURN_ON_FAIL(extractor.parse(sourceFile, &m_options));
+        SLANG_RETURN_ON_FAIL(parser.parse(sourceFile, &m_options));
     }
 
-    SLANG_RETURN_ON_FAIL(extractor.calcDerivedTypes());
+    SLANG_RETURN_ON_FAIL(parser.calcDerivedTypes());
 
     // Okay let's check out the typeSets
     {
-        for (TypeSet* typeSet : extractor.getTypeSets())
+        for (TypeSet* typeSet : parser.getTypeSets())
         {
             // The macro name is in upper snake, so split it 
             List<UnownedStringSlice> slices;
@@ -663,11 +663,11 @@ SlangResult App::execute(const Options& options)
     {
         {
             StringBuilder buf;
-            extractor.getRootNode()->dump(0, buf);
+            parser.getRootNode()->dump(0, buf);
             m_sink->writer->write(buf.getBuffer(), buf.getLength());
         }
 
-        for (TypeSet* typeSet : extractor.getTypeSets())
+        for (TypeSet* typeSet : parser.getTypeSets())
         {
             const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
 
@@ -682,12 +682,12 @@ SlangResult App::execute(const Options& options)
 
     if (options.m_defs)
     {
-        SLANG_RETURN_ON_FAIL(writeDefs(extractor));
+        SLANG_RETURN_ON_FAIL(writeDefs(parser));
     }
 
     if (options.m_outputPath.getLength())
     {
-        SLANG_RETURN_ON_FAIL(writeOutput(extractor));
+        SLANG_RETURN_ON_FAIL(writeOutput(parser));
     }
 
     return SLANG_OK;
