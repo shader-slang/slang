@@ -454,7 +454,7 @@ ${{{{
 
 static const char* kComponentNames[]{ "x", "y", "z", "w" };
 
-// The above extension was generic in the *type* of the vector,
+// The above extensions are generic in the *type* of the vector,
 // but explicit in the *size*. We will now declare an extension
 // for each builtin type that is generic in the size.
 //
