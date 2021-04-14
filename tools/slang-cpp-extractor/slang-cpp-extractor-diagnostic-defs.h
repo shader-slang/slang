@@ -20,6 +20,7 @@
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
+DIAGNOSTIC(-1, Note, commandLine, "Command line: $0")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 
