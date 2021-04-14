@@ -32,7 +32,7 @@ Some command lines:
 -d source/slang slang-ast-support-types.h slang-ast-base.h slang-ast-decl.h slang-ast-expr.h slang-ast-modifier.h slang-ast-stmt.h slang-ast-type.h slang-ast-val.h -strip-prefix slang- -o slang-generated -output-fields -mark-suffix _CLASS
 */
 
-namespace SlangExperimental
+namespace CppExtract
 {
 
 using namespace Slang;
@@ -47,7 +47,7 @@ static void _indent(Index indentCount, StringBuilder& out)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractorApp !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-class CPPExtractorApp
+class App
 {
 public:
     
@@ -60,21 +60,21 @@ public:
     SlangResult executeWithArgs(int argc, const char*const* argv);
 
         /// Write output
-    SlangResult writeOutput(CPPExtractor& extractor);
+    SlangResult writeOutput(Parser& extractor);
 
         /// Write def files
-    SlangResult writeDefs(CPPExtractor& extractor);
+    SlangResult writeDefs(Parser& extractor);
 
         /// Calculate the header 
-    SlangResult calcTypeHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out);
-    SlangResult calcChildrenHeader(CPPExtractor& exctractor, TypeSet* typeSet, StringBuilder& out);
-    SlangResult calcOriginHeader(CPPExtractor& extractor, StringBuilder& out);
+    SlangResult calcTypeHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcChildrenHeader(Parser& exctractor, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcOriginHeader(Parser& extractor, StringBuilder& out);
 
-    SlangResult calcDef(CPPExtractor& extractor, SourceOrigin* origin, StringBuilder& out);
+    SlangResult calcDef(Parser& extractor, SourceOrigin* origin, StringBuilder& out);
 
     const Options& getOptions() const { return m_options; }
 
-    CPPExtractorApp(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
+    App(DiagnosticSink* sink, SourceManager* sourceManager, RootNamePool* rootNamePool):
         m_sink(sink),
         m_sourceManager(sourceManager),
         m_slicePool(StringSlicePool::Style::Default)
@@ -96,7 +96,7 @@ protected:
     StringSlicePool m_slicePool;
 };
 
-SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& outRead)
+SlangResult App::readAllText(const Slang::String& fileName, String& outRead)
 {
     try
     {
@@ -117,7 +117,7 @@ SlangResult CPPExtractorApp::readAllText(const Slang::String& fileName, String& 
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, const UnownedStringSlice& text)
+SlangResult App::writeAllText(const Slang::String& fileName, const UnownedStringSlice& text)
 {
     try
     {
@@ -142,7 +142,7 @@ SlangResult CPPExtractorApp::writeAllText(const Slang::String& fileName, const U
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* origin, StringBuilder& out)
+SlangResult App::calcDef(Parser& extractor, SourceOrigin* origin, StringBuilder& out)
 {
     Node* currentScope = nullptr;
 
@@ -165,7 +165,7 @@ SlangResult CPPExtractorApp::calcDef(CPPExtractor& extractor, SourceOrigin* orig
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
+SlangResult App::calcChildrenHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out)
 {
     const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
@@ -283,7 +283,7 @@ SlangResult CPPExtractorApp::calcChildrenHeader(CPPExtractor& extractor, TypeSet
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcOriginHeader(CPPExtractor& extractor, StringBuilder& out)
+SlangResult App::calcOriginHeader(Parser& extractor, StringBuilder& out)
 {
     // Do macros by origin
 
@@ -309,7 +309,7 @@ SlangResult CPPExtractorApp::calcOriginHeader(CPPExtractor& extractor, StringBui
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* typeSet, StringBuilder& out)
+SlangResult App::calcTypeHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out)
 {
     const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
@@ -473,7 +473,7 @@ SlangResult CPPExtractorApp::calcTypeHeader(CPPExtractor& extractor, TypeSet* ty
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::writeDefs(CPPExtractor& extractor)
+SlangResult App::writeDefs(Parser& extractor)
 {
     const auto& origins = extractor.getSourceOrigins();
 
@@ -501,7 +501,7 @@ SlangResult CPPExtractorApp::writeDefs(CPPExtractor& extractor)
     return SLANG_OK;
 }
 
-SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
+SlangResult App::writeOutput(Parser& extractor)
 {
     String path;
     if (m_options.m_inputDirectory.getLength())
@@ -551,7 +551,7 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     return SLANG_OK;
 }
 
-/* static */void CPPExtractorApp::_initIdentifierLookup(const Options& options, IdentifierLookup& outLookup)
+/* static */void App::_initIdentifierLookup(const Options& options, IdentifierLookup& outLookup)
 {
     outLookup.reset();
 
@@ -596,14 +596,14 @@ SlangResult CPPExtractorApp::writeOutput(CPPExtractor& extractor)
     }
 }
 
-SlangResult CPPExtractorApp::execute(const Options& options)
+SlangResult App::execute(const Options& options)
 {
     m_options = options;
 
     IdentifierLookup identifierLookup;
     _initIdentifierLookup(options, identifierLookup);
 
-    CPPExtractor extractor(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
+    Parser extractor(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
 
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
@@ -694,7 +694,7 @@ SlangResult CPPExtractorApp::execute(const Options& options)
 }
 
 /// Execute
-SlangResult CPPExtractorApp::executeWithArgs(int argc, const char*const* argv)
+SlangResult App::executeWithArgs(int argc, const char*const* argv)
 {
     Options options;
     OptionsParser optionsParser;
@@ -703,13 +703,12 @@ SlangResult CPPExtractorApp::executeWithArgs(int argc, const char*const* argv)
     return SLANG_OK;
 }
 
-} // namespace SlangExperimental
+} // namespace CppExtract
 
 int main(int argc, const char*const* argv)
 {
-    using namespace SlangExperimental;
+    using namespace CppExtract;
     using namespace Slang;
-
 
     {
         ComPtr<ISlangWriter> writer(new FileWriter(stderr, WriterFlag::AutoFlush));
@@ -738,7 +737,7 @@ int main(int argc, const char*const* argv)
             sink.diagnose(SourceLoc(), CPPDiagnostics::commandLine, builder);
         }
 
-        CPPExtractorApp app(&sink, &sourceManager, &rootNamePool);
+        App app(&sink, &sourceManager, &rootNamePool);
 
         try
         {

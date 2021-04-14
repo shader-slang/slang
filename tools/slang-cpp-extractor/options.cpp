@@ -2,7 +2,7 @@
 
 #include "diagnostics.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 
 SlangResult OptionsParser::_parseArgFlag(const char* option, bool& outFlag)
 {
@@ -131,4 +131,4 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
     return SLANG_OK;
 }
 
-} // namespace SlangExperimental
+} // namespace CppExtract

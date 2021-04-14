@@ -7,7 +7,7 @@
 
 #include "../../source/compiler-core/slang-lexer.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 class TypeSet : public RefObject
@@ -56,7 +56,7 @@ public:
 struct Options;
 class IdentifierLookup;
 
-class CPPExtractor
+class Parser
 {
 public:
 
@@ -93,7 +93,7 @@ public:
     /// Get the root node
     Node* getRootNode() const { return m_rootNode; }
 
-    CPPExtractor(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup);
+    Parser(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup);
 
 protected:
     static Node::Type _toNodeType(IdentifierStyle style);
@@ -149,6 +149,6 @@ protected:
     StringSlicePool* m_typePool;                ///< Pool for just types
 };
 
-} // SlangExperimental
+} // CppExtract
 
 #endif

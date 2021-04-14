@@ -3,7 +3,7 @@
 
 #include "../../source/slang/slang-diagnostics.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 
@@ -55,6 +55,6 @@ struct OptionsParser
 };
 
 
-} // SlangExperimental
+} // CppExtract
 
 #endif

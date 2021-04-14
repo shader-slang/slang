@@ -7,12 +7,12 @@
 
 #include "../../source/core/slang-io.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup) :
+Parser::Parser(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup) :
     m_typePool(typePool),
     m_sink(sink),
     m_namePool(namePool),
@@ -23,7 +23,7 @@ CPPExtractor::CPPExtractor(StringSlicePool* typePool, NamePool* namePool, Diagno
     m_rootNode->m_reflectionType = ReflectionType::Reflected;
 }
 
-TypeSet* CPPExtractor::getTypeSet(const UnownedStringSlice& slice)
+TypeSet* Parser::getTypeSet(const UnownedStringSlice& slice)
 {
     Index index = m_typeSetPool.findIndex(slice);
     if (index < 0)
@@ -33,7 +33,7 @@ TypeSet* CPPExtractor::getTypeSet(const UnownedStringSlice& slice)
     return m_typeSets[index];
 }
 
-TypeSet* CPPExtractor::getOrAddTypeSet(const UnownedStringSlice& slice)
+TypeSet* Parser::getOrAddTypeSet(const UnownedStringSlice& slice)
 {
     const Index index = Index(m_typeSetPool.add(slice));
     if (index >= m_typeSets.getCount())
@@ -51,12 +51,12 @@ TypeSet* CPPExtractor::getOrAddTypeSet(const UnownedStringSlice& slice)
     }
 }
 
-bool CPPExtractor::_isMarker(const UnownedStringSlice& name)
+bool Parser::_isMarker(const UnownedStringSlice& name)
 {
     return name.startsWith(m_options->m_markPrefix.getUnownedSlice()) && name.endsWith(m_options->m_markSuffix.getUnownedSlice());
 }
 
-SlangResult CPPExtractor::expect(TokenType type, Token* outToken)
+SlangResult Parser::expect(TokenType type, Token* outToken)
 {
     if (m_reader.peekTokenType() != type)
     {
@@ -75,7 +75,7 @@ SlangResult CPPExtractor::expect(TokenType type, Token* outToken)
     return SLANG_OK;
 }
 
-bool CPPExtractor::advanceIfToken(TokenType type, Token* outToken)
+bool Parser::advanceIfToken(TokenType type, Token* outToken)
 {
     if (m_reader.peekTokenType() == type)
     {
@@ -89,7 +89,7 @@ bool CPPExtractor::advanceIfToken(TokenType type, Token* outToken)
     return false;
 }
 
-bool CPPExtractor::advanceIfMarker(Token* outToken)
+bool Parser::advanceIfMarker(Token* outToken)
 {
     const Token peekToken = m_reader.peekToken();
     if (peekToken.type == TokenType::Identifier && _isMarker(peekToken.getContent()))
@@ -104,7 +104,7 @@ bool CPPExtractor::advanceIfMarker(Token* outToken)
     return false;
 }
 
-bool CPPExtractor::advanceIfStyle(IdentifierStyle style, Token* outToken)
+bool Parser::advanceIfStyle(IdentifierStyle style, Token* outToken)
 {
     if (m_reader.peekTokenType() == TokenType::Identifier)
     {
@@ -123,7 +123,7 @@ bool CPPExtractor::advanceIfStyle(IdentifierStyle style, Token* outToken)
 }
 
 
-SlangResult CPPExtractor::pushAnonymousNamespace()
+SlangResult Parser::pushAnonymousNamespace()
 {
     m_currentScope = m_currentScope->getAnonymousNamespace();
 
@@ -135,7 +135,7 @@ SlangResult CPPExtractor::pushAnonymousNamespace()
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::pushScope(ScopeNode* scopeNode)
+SlangResult Parser::pushScope(ScopeNode* scopeNode)
 {
     if (m_origin)
     {
@@ -184,7 +184,7 @@ SlangResult CPPExtractor::pushScope(ScopeNode* scopeNode)
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::popScope()
+SlangResult Parser::popScope()
 {
     if (m_currentScope->m_parentScope == nullptr)
     {
@@ -196,7 +196,7 @@ SlangResult CPPExtractor::popScope()
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
+SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
 {
     Token openToken;
     if (inOpenBraceToken)
@@ -238,7 +238,7 @@ SlangResult CPPExtractor::consumeToClosingBrace(const Token* inOpenBraceToken)
 }
 
 
-SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
+SlangResult Parser::_maybeParseNode(Node::Type type)
 {
     // We are looking for
     // struct/class identifier [: [public|private|protected] Identifier ] { [public|private|proctected:]* marker ( identifier );
@@ -409,7 +409,7 @@ SlangResult CPPExtractor::_maybeParseNode(Node::Type type)
     return pushScope(node);
 }
 
-SlangResult CPPExtractor::_consumeToSync()
+SlangResult Parser::_consumeToSync()
 {
     while (true)
     {
@@ -435,7 +435,7 @@ SlangResult CPPExtractor::_consumeToSync()
     }
 }
 
-SlangResult CPPExtractor::_maybeParseTemplateArg(Index& ioTemplateDepth)
+SlangResult Parser::_maybeParseTemplateArg(Index& ioTemplateDepth)
 {
     switch (m_reader.peekTokenType())
     {
@@ -455,7 +455,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArg(Index& ioTemplateDepth)
     return SLANG_FAIL;
 }
 
-SlangResult CPPExtractor::_maybeParseTemplateArgs(Index& ioTemplateDepth)
+SlangResult Parser::_maybeParseTemplateArgs(Index& ioTemplateDepth)
 {
     if (!advanceIfToken(TokenType::OpLess))
     {
@@ -515,7 +515,7 @@ SlangResult CPPExtractor::_maybeParseTemplateArgs(Index& ioTemplateDepth)
     }
 }
 
-void CPPExtractor::_consumeTypeModifiers()
+void Parser::_consumeTypeModifiers()
 {
     while (advanceIfStyle(IdentifierStyle::TypeModifier));
 }
@@ -557,7 +557,7 @@ static bool _tokenConcatNeedsSpace(TokenType prev, TokenType cur)
     return false;
 }
 
-UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
+UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
 {
     auto endCursor = m_reader.getCursor();
     m_reader.setCursor(start);
@@ -582,7 +582,7 @@ UnownedStringSlice CPPExtractor::_concatTokens(TokenReader::ParsingCursor start)
 }
 
 
-SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
+SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
     auto startCursor = m_reader.getCursor();
 
@@ -640,7 +640,7 @@ SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType, Index& io
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::_maybeParseType(UnownedStringSlice& outType)
+SlangResult Parser::_maybeParseType(UnownedStringSlice& outType)
 {
     Index templateDepth = 0;
     SlangResult res = _maybeParseType(outType, templateDepth);
@@ -683,7 +683,7 @@ static TokenType _getBalancedClose(TokenType tokenType)
     }
 }
 
-SlangResult CPPExtractor::_parseBalanced(DiagnosticSink* sink)
+SlangResult Parser::_parseBalanced(DiagnosticSink* sink)
 {
     const TokenType openTokenType = m_reader.peekTokenType();
     if (!_isBalancedOpen(openTokenType))
@@ -744,7 +744,7 @@ SlangResult CPPExtractor::_parseBalanced(DiagnosticSink* sink)
     }
 }
 
-SlangResult CPPExtractor::_maybeParseField()
+SlangResult Parser::_maybeParseField()
 {
     // Can only add a field if we are in a class
     SLANG_ASSERT(m_currentScope->isClassLike());
@@ -821,7 +821,7 @@ SlangResult CPPExtractor::_maybeParseField()
     return SLANG_OK;
 }
 
-/* static */Node::Type CPPExtractor::_toNodeType(IdentifierStyle style)
+/* static */Node::Type Parser::_toNodeType(IdentifierStyle style)
 {
     switch (style)
     {
@@ -845,7 +845,7 @@ static UnownedStringSlice _trimUnderscorePrefix(const UnownedStringSlice& slice)
 }
 
 
-SlangResult CPPExtractor::_parsePreDeclare()
+SlangResult Parser::_parsePreDeclare()
 {
     // Skip the declare type token
     m_reader.advanceToken();
@@ -916,7 +916,7 @@ SlangResult CPPExtractor::_parsePreDeclare()
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::_parseTypeSet()
+SlangResult Parser::_parseTypeSet()
 {
     // Skip the declare type token
     m_reader.advanceToken();
@@ -942,7 +942,7 @@ SlangResult CPPExtractor::_parseTypeSet()
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
+SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
 {
     SLANG_ASSERT(options);
     m_options = options;
@@ -1094,7 +1094,7 @@ SlangResult CPPExtractor::parse(SourceFile* sourceFile, const Options* options)
     }
 }
 
-Node* CPPExtractor::findNode(ScopeNode* scope, const UnownedStringSlice& name)
+Node* Parser::findNode(ScopeNode* scope, const UnownedStringSlice& name)
 {
     // TODO(JS): We may want to lookup based on the path. 
     // If the name is qualified, we give up for not
@@ -1117,7 +1117,7 @@ Node* CPPExtractor::findNode(ScopeNode* scope, const UnownedStringSlice& name)
     return nullptr;
 }
 
-SlangResult CPPExtractor::_calcDerivedTypesRec(ScopeNode* inScopeNode)
+SlangResult Parser::_calcDerivedTypesRec(ScopeNode* inScopeNode)
 {
     if (inScopeNode->isClassLike())
     {
@@ -1184,12 +1184,12 @@ SlangResult CPPExtractor::_calcDerivedTypesRec(ScopeNode* inScopeNode)
     return SLANG_OK;
 }
 
-SlangResult CPPExtractor::calcDerivedTypes()
+SlangResult Parser::calcDerivedTypes()
 {
     return _calcDerivedTypesRec(m_rootNode);
 }
 
-/* static */String CPPExtractor::_calcMacroOrigin(const String& filePath, const Options& options)
+/* static */String Parser::_calcMacroOrigin(const String& filePath, const Options& options)
 {
     // Get the filename without extension
     String fileName = Path::getFileNameWithoutExt(filePath);
@@ -1213,4 +1213,4 @@ SlangResult CPPExtractor::calcDerivedTypes()
 }
 
 
-} // namespace SlangExperimental
+} // namespace CppExtract

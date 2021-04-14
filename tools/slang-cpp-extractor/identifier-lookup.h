@@ -3,7 +3,7 @@
 
 #include "diagnostics.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 enum class IdentifierStyle
@@ -90,6 +90,6 @@ SLANG_FORCE_INLINE bool hasFlag(IdentifierStyle style, IdentifierFlag::Enum flag
     return (getFlags(style) & flag) != 0;
 }
 
-} // SlangExperimental
+} // CppExtract
 
 #endif

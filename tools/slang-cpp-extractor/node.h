@@ -3,7 +3,7 @@
 
 #include "diagnostics.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 enum class ReflectionType : uint8_t
@@ -213,6 +213,6 @@ T* as(Node* node) { return (node && T::isType(node->m_type)) ? static_cast<T*>(n
 // A macro to define a single indent as a string
 #define CPP_EXTRACT_INDENT_STRING "    "
 
-} // SlangExperimental
+} // CppExtract
 
 #endif

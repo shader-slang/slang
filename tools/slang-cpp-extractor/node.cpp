@@ -1,6 +1,6 @@
 #include "node.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -284,4 +284,4 @@ void ClassLikeNode::dump(int indentCount, StringBuilder& out)
     out << "}\n";
 }
 
-} // namespace SlangExperimental
+} // namespace CppExtract

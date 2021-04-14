@@ -1,6 +1,6 @@
 #include "identifier-lookup.h"
 
-namespace SlangExperimental {
+namespace CppExtract {
 using namespace Slang;
 
 /* static */const IdentifierFlags IdentifierLookup::kIdentifierFlags[Index(IdentifierStyle::CountOf)] =
@@ -45,4 +45,4 @@ void IdentifierLookup::set(const char*const* names, size_t namesCount, Identifie
 }
 
 
-} // namespace SlangExperimental
+} // namespace CppExtract
