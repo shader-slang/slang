@@ -1,7 +1,7 @@
 #ifndef CPP_EXTRACT_NODE_H
 #define CPP_EXTRACT_NODE_H
 
-#include "../../source/slang/slang-diagnostics.h"
+#include "diagnostics.h"
 
 namespace SlangExperimental {
 using namespace Slang;

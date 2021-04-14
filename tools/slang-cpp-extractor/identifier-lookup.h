@@ -1,0 +1,95 @@
+#ifndef CPP_EXTRACT_IDENTIFIER_LOOKUP_H
+#define CPP_EXTRACT_IDENTIFIER_LOOKUP_H
+
+#include "diagnostics.h"
+
+namespace SlangExperimental {
+using namespace Slang;
+
+enum class IdentifierStyle
+{
+    None,               ///< It's not an identifier
+
+    Identifier,         ///< Just an identifier
+
+    PreDeclare,        ///< Declare a type (not visible in C++ code)
+    TypeSet,            ///< TypeSet
+
+    TypeModifier,       ///< const, volatile etc
+    Keyword,            ///< A keyword C/C++ keyword that is not another type
+    Class,              ///< class
+    Struct,             ///< struct
+    Namespace,          ///< namespace
+    Access,             ///< public, protected, private
+
+    Reflected,
+    Unreflected,
+
+    CountOf,
+};
+
+typedef uint32_t IdentifierFlags;
+struct IdentifierFlag
+{
+    enum Enum : IdentifierFlags
+    {
+        StartScope = 0x1,          ///< namespace, struct or class
+        ClassLike = 0x2,          ///< Struct or class
+        Keyword = 0x4,
+        Reflection = 0x8,
+    };
+};
+
+
+class IdentifierLookup
+{
+public:
+
+    IdentifierStyle get(const UnownedStringSlice& slice) const
+    {
+        Index index = m_pool.findIndex(slice);
+        return (index >= 0) ? m_styles[index] : IdentifierStyle::None;
+    }
+
+    void set(const char* name, IdentifierStyle style)
+    {
+        set(UnownedStringSlice(name), style);
+    }
+
+    void set(const UnownedStringSlice& name, IdentifierStyle style);
+
+    void set(const char*const* names, size_t namesCount, IdentifierStyle style);
+
+    void reset()
+    {
+        m_styles.clear();
+        m_pool.clear();
+    }
+
+    IdentifierLookup() :
+        m_pool(StringSlicePool::Style::Empty)
+    {
+        SLANG_ASSERT(m_pool.getSlicesCount() == 0);
+    }
+
+    static const IdentifierFlags kIdentifierFlags[Index(IdentifierStyle::CountOf)];
+
+protected:
+    List<IdentifierStyle> m_styles;
+    StringSlicePool m_pool;
+};
+
+
+SLANG_FORCE_INLINE IdentifierFlags getFlags(IdentifierStyle style)
+{
+    return IdentifierLookup::kIdentifierFlags[Index(style)];
+}
+
+SLANG_FORCE_INLINE bool hasFlag(IdentifierStyle style, IdentifierFlag::Enum flag)
+{
+    return (getFlags(style) & flag) != 0;
+}
+
+} // SlangExperimental
+
+#endif
