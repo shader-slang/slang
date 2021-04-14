@@ -4540,6 +4540,9 @@ namespace Slang
         dump(context, "[#");
         dump(context, String(inst->_debugUID));
         dump(context, "]");
+#else
+        SLANG_UNUSED(context);
+        SLANG_UNUSED(inst);
 #endif
     }
 

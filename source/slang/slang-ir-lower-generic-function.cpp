@@ -28,9 +28,6 @@ namespace Slang
             SLANG_ASSERT(genericParent);
             SLANG_ASSERT(genericParent->getDataType());
             auto func = as<IRFunc>(findGenericReturnVal(genericParent));
-            // Do not lower intrinsic functions.
-            if (func->findDecoration<IRTargetIntrinsicDecoration>())
-                return genericValue;
             if (!func)
             {
                 // Nested generic functions are supposed to be flattened before entering
@@ -41,7 +38,8 @@ namespace Slang
                 return genericValue;
             }
             SLANG_ASSERT(func);
-            if (!func->isDefinition())
+            // Do not lower intrinsic functions.
+            if (!func->isDefinition() || func->findDecoration<IRTargetIntrinsicDecoration>())
             {
                 sharedContext->loweredGenericFunctions[genericValue] = genericValue;
                 return genericValue;
