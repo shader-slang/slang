@@ -427,60 +427,34 @@ struct ParameterBlock {}
 
 //@ hidden:
 
+// Need to add constructors to the types above
+
+__generic<T> __extension vector<T, 2>
+{
+    __init(T x, T y);
+}
+__generic<T> __extension vector<T, 3>
+{
+    __init(T x, T y, T z);
+    __init(vector<T,2> xy, T z);
+    __init(T x, vector<T,2> yz);
+}
+__generic<T> __extension vector<T, 4>
+{
+    __init(T x, T y, T z, T w);
+    __init(vector<T,2> xy, T z, T w);
+    __init(T x, vector<T,2> yz, T w);
+    __init(T x, T y, vector<T,2> zw);
+    __init(vector<T,2> xy, vector<T,2> zw);
+    __init(vector<T,3> xyz, T w);
+    __init(T x, vector<T,3> yzw);
+}
+
 ${{{{
 
 static const char* kComponentNames[]{ "x", "y", "z", "w" };
-static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
 
-// Need to add constructors to the types above
-for (int N = 2; N <= 4; ++N)
-{
-    sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
-
-    // initialize from N scalars
-    sb << "__init(";
-    for (int ii = 0; ii < N; ++ii)
-    {
-        if (ii != 0) sb << ", ";
-        sb << "T " << kComponentNames[ii];
-    }
-    sb << ");\n";
-
-    // Initialize from an M-vector and then scalars
-    for (int M = 2; M < N; ++M)
-    {
-        sb << "__init(vector<T," << M << "> " << kVectorNames[M];
-        for (int ii = M; ii < N; ++ii)
-        {
-            sb << ", T " << kComponentNames[ii];
-        }
-        sb << ");\n";
-    }
-
-    // Initialize from two vectors, of size M and N-M
-    for(int M = 2; M <= (N-2); ++M)
-    {
-        int K = N - M;
-        SLANG_ASSERT(K >= 2);
-
-        sb << "__init(vector<T," << M << "> " << kVectorNames[M];
-        sb << ", vector<T," << K << "> ";
-        for (int ii = 0; ii < K; ++ii)
-        {
-            // The component names for the second parameter
-            // must start at `M`, so that we get signatures like:
-            //
-            //      __init(float2 xy, float2 zw)
-            //
-            sb << kComponentNames[M + ii];
-        }
-        sb << ");\n";
-    }
-
-    sb << "}\n";
-}
-
-// The above extension was generic in the *type* of the vector,
+// The above extensions are generic in the *type* of the vector,
 // but explicit in the *size*. We will now declare an extension
 // for each builtin type that is generic in the size.
 //
