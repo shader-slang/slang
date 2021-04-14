@@ -22,7 +22,7 @@
 #include "../../source/compiler-core/slang-name.h"
 
 #include "node.h"
-#include "slang-cpp-extractor-diagnostics.h"
+#include "diagnostics.h"
 
 /*
 Some command lines:
