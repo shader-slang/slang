@@ -9,6 +9,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -17,6 +20,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
