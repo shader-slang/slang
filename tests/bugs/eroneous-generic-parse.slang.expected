@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/bugs/eroneous-generic-parse.slang(7): error 20001: unexpected integer literal, expected identifier
+int doThing<1>() { return 2; }
+            ^
+}
+standard output = {
+}

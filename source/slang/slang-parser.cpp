@@ -1291,8 +1291,15 @@ namespace Slang
     {
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
-        while (!parser->LookAheadToken(TokenType::OpGreater))
+        for (;;)
         {
+            const TokenType tokenType = parser->tokenReader.peekTokenType();
+            if (tokenType == TokenType::OpGreater ||
+                tokenType == TokenType::EndOfFile)
+            {
+                break;
+            }
+
             AddMember(decl, ParseGenericParamDecl(parser, decl));
 
             if (parser->LookAheadToken(TokenType::OpGreater))
