@@ -60,17 +60,17 @@ public:
     SlangResult executeWithArgs(int argc, const char*const* argv);
 
         /// Write output
-    SlangResult writeOutput(Parser& extractor);
+    SlangResult writeOutput(NodeTree* tree);
 
         /// Write def files
-    SlangResult writeDefs(Parser& extractor);
+    SlangResult writeDefs(NodeTree* tree);
 
         /// Calculate the header 
-    SlangResult calcTypeHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out);
-    SlangResult calcChildrenHeader(Parser& exctractor, TypeSet* typeSet, StringBuilder& out);
-    SlangResult calcOriginHeader(Parser& extractor, StringBuilder& out);
+    SlangResult calcTypeHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out);
+    SlangResult calcOriginHeader(NodeTree* tree, StringBuilder& out);
 
-    SlangResult calcDef(Parser& extractor, SourceOrigin* origin, StringBuilder& out);
+    SlangResult calcDef(NodeTree* tree, SourceOrigin* origin, StringBuilder& out);
 
     const Options& getOptions() const { return m_options; }
 
@@ -142,7 +142,7 @@ SlangResult App::writeAllText(const Slang::String& fileName, const UnownedString
     return SLANG_OK;
 }
 
-SlangResult App::calcDef(Parser& extractor, SourceOrigin* origin, StringBuilder& out)
+SlangResult App::calcDef(NodeTree* tree, SourceOrigin* origin, StringBuilder& out)
 {
     Node* currentScope = nullptr;
 
@@ -165,7 +165,7 @@ SlangResult App::calcDef(Parser& extractor, SourceOrigin* origin, StringBuilder&
     return SLANG_OK;
 }
 
-SlangResult App::calcChildrenHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out)
+SlangResult App::calcChildrenHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out)
 {
     const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
@@ -283,13 +283,13 @@ SlangResult App::calcChildrenHeader(Parser& extractor, TypeSet* typeSet, StringB
     return SLANG_OK;
 }
 
-SlangResult App::calcOriginHeader(Parser& extractor, StringBuilder& out)
+SlangResult App::calcOriginHeader(NodeTree* tree, StringBuilder& out)
 {
     // Do macros by origin
 
     out << "// Origin macros\n\n";
 
-    for (SourceOrigin* origin : extractor.getSourceOrigins())
+    for (SourceOrigin* origin : tree->getSourceOrigins())
     {   
         out << "#define " << m_options.m_markPrefix << "ORIGIN_" << origin->m_macroOrigin << "(x, param) \\\n";
 
@@ -309,7 +309,7 @@ SlangResult App::calcOriginHeader(Parser& extractor, StringBuilder& out)
     return SLANG_OK;
 }
 
-SlangResult App::calcTypeHeader(Parser& extractor, TypeSet* typeSet, StringBuilder& out)
+SlangResult App::calcTypeHeader(NodeTree* tree, TypeSet* typeSet, StringBuilder& out)
 {
     const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
     const String& reflectTypeName = typeSet->m_typeName;
@@ -473,9 +473,9 @@ SlangResult App::calcTypeHeader(Parser& extractor, TypeSet* typeSet, StringBuild
     return SLANG_OK;
 }
 
-SlangResult App::writeDefs(Parser& extractor)
+SlangResult App::writeDefs(NodeTree* tree)
 {
-    const auto& origins = extractor.getSourceOrigins();
+    const auto& origins = tree->getSourceOrigins();
 
     for (SourceOrigin* origin : origins)
     {
@@ -492,7 +492,7 @@ SlangResult App::writeDefs(Parser& extractor)
         outPath << pathWithoutExt << "-defs." << ext;
 
         StringBuilder content;
-        SLANG_RETURN_ON_FAIL(calcDef(extractor, origin, content));
+        SLANG_RETURN_ON_FAIL(calcDef(tree, origin, content));
 
         // Write the defs file
         SLANG_RETURN_ON_FAIL(writeAllText(outPath, content.getUnownedSlice()));
@@ -501,7 +501,7 @@ SlangResult App::writeDefs(Parser& extractor)
     return SLANG_OK;
 }
 
-SlangResult App::writeOutput(Parser& parser)
+SlangResult App::writeOutput(NodeTree* tree)
 {
     String path;
     if (m_options.m_inputDirectory.getLength())
@@ -524,12 +524,12 @@ SlangResult App::writeOutput(Parser& parser)
     // Strip the extension if set
     path = Path::getPathWithoutExt(path);
 
-    for (TypeSet* typeSet : parser.getTypeSets())
+    for (TypeSet* typeSet : tree->getTypeSets())
     {
         {
             /// Calculate the header
             StringBuilder header;
-            SLANG_RETURN_ON_FAIL(calcTypeHeader(parser, typeSet, header));
+            SLANG_RETURN_ON_FAIL(calcTypeHeader(tree, typeSet, header));
 
             // Write it out
 
@@ -540,7 +540,7 @@ SlangResult App::writeOutput(Parser& parser)
 
         {
             StringBuilder childrenHeader;
-            SLANG_RETURN_ON_FAIL(calcChildrenHeader(parser, typeSet, childrenHeader));
+            SLANG_RETURN_ON_FAIL(calcChildrenHeader(tree, typeSet, childrenHeader));
 
             StringBuilder headerPath;
             headerPath << path << "-" << typeSet->m_fileMark << "-macro." + ext;
@@ -603,8 +603,9 @@ SlangResult App::execute(const Options& options)
     IdentifierLookup identifierLookup;
     _initIdentifierLookup(options, identifierLookup);
 
-    Parser parser(&m_slicePool, &m_namePool, m_sink, &identifierLookup);
+    NodeTree tree(&m_slicePool, &m_namePool, &identifierLookup);
 
+    
     // Read in each of the input files
     for (Index i = 0; i < m_options.m_inputPaths.getCount(); ++i)
     {
@@ -627,14 +628,17 @@ SlangResult App::execute(const Options& options)
 
         SourceFile* sourceFile = m_sourceManager->createSourceFileWithString(pathInfo, contents);
 
-        SLANG_RETURN_ON_FAIL(parser.parse(sourceFile, &m_options));
+        SourceOrigin* sourceOrigin = tree.addSourceOrigin(sourceFile, options);
+
+        Parser parser(&tree, m_sink);
+        SLANG_RETURN_ON_FAIL(parser.parse(sourceOrigin, &m_options));
     }
 
-    SLANG_RETURN_ON_FAIL(parser.calcDerivedTypes());
+    SLANG_RETURN_ON_FAIL(tree.calcDerivedTypes(m_sink));
 
     // Okay let's check out the typeSets
     {
-        for (TypeSet* typeSet : parser.getTypeSets())
+        for (TypeSet* typeSet : tree.getTypeSets())
         {
             // The macro name is in upper snake, so split it 
             List<UnownedStringSlice> slices;
@@ -663,11 +667,11 @@ SlangResult App::execute(const Options& options)
     {
         {
             StringBuilder buf;
-            parser.getRootNode()->dump(0, buf);
+            tree.getRootNode()->dump(0, buf);
             m_sink->writer->write(buf.getBuffer(), buf.getLength());
         }
 
-        for (TypeSet* typeSet : parser.getTypeSets())
+        for (TypeSet* typeSet : tree.getTypeSets())
         {
             const List<ClassLikeNode*>& baseTypes = typeSet->m_baseTypes;
 
@@ -682,12 +686,12 @@ SlangResult App::execute(const Options& options)
 
     if (options.m_defs)
     {
-        SLANG_RETURN_ON_FAIL(writeDefs(parser));
+        SLANG_RETURN_ON_FAIL(writeDefs(&tree));
     }
 
     if (options.m_outputPath.getLength())
     {
-        SLANG_RETURN_ON_FAIL(writeOutput(parser));
+        SLANG_RETURN_ON_FAIL(writeOutput(&tree));
     }
 
     return SLANG_OK;

@@ -12,43 +12,10 @@ using namespace Slang;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CPPExtractor !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Parser::Parser(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup) :
-    m_typePool(typePool),
+Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
     m_sink(sink),
-    m_namePool(namePool),
-    m_identifierLookup(identifierLookup),
-    m_typeSetPool(StringSlicePool::Style::Empty)
+    m_nodeTree(nodeTree)
 {
-    m_rootNode = new ScopeNode(Node::Type::Namespace);
-    m_rootNode->m_reflectionType = ReflectionType::Reflected;
-}
-
-TypeSet* Parser::getTypeSet(const UnownedStringSlice& slice)
-{
-    Index index = m_typeSetPool.findIndex(slice);
-    if (index < 0)
-    {
-        return nullptr;
-    }
-    return m_typeSets[index];
-}
-
-TypeSet* Parser::getOrAddTypeSet(const UnownedStringSlice& slice)
-{
-    const Index index = Index(m_typeSetPool.add(slice));
-    if (index >= m_typeSets.getCount())
-    {
-        SLANG_ASSERT(m_typeSets.getCount() == index);
-        TypeSet* typeSet = new TypeSet;
-
-        m_typeSets.add(typeSet);
-        typeSet->m_macroName = m_typeSetPool.getSlice(StringSlicePool::Handle(index));
-        return typeSet;
-    }
-    else
-    {
-        return m_typeSets[index];
-    }
 }
 
 bool Parser::_isMarker(const UnownedStringSlice& name)
@@ -108,7 +75,7 @@ bool Parser::advanceIfStyle(IdentifierStyle style, Token* outToken)
 {
     if (m_reader.peekTokenType() == TokenType::Identifier)
     {
-        IdentifierStyle readStyle = m_identifierLookup->get(m_reader.peekToken().getContent());
+        IdentifierStyle readStyle = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
         if (readStyle == style)
         {
             Token token = m_reader.advanceToken();
@@ -127,9 +94,9 @@ SlangResult Parser::pushAnonymousNamespace()
 {
     m_currentScope = m_currentScope->getAnonymousNamespace();
 
-    if (m_origin)
+    if (m_sourceOrigin)
     {
-        m_origin->addNode(m_currentScope);
+        m_sourceOrigin->addNode(m_currentScope);
     }
 
     return SLANG_OK;
@@ -137,9 +104,9 @@ SlangResult Parser::pushAnonymousNamespace()
 
 SlangResult Parser::pushScope(ScopeNode* scopeNode)
 {
-    if (m_origin)
+    if (m_sourceOrigin)
     {
-        m_origin->addNode(scopeNode);
+        m_sourceOrigin->addNode(scopeNode);
     }
 
     if (scopeNode->m_name.hasContent())
@@ -236,7 +203,6 @@ SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
         }
     }
 }
-
 
 SlangResult Parser::_maybeParseNode(Node::Type type)
 {
@@ -389,7 +355,7 @@ SlangResult Parser::_maybeParseNode(Node::Type type)
         // probably okay for now
 
         // Set the typeSet 
-        node->m_typeSet = getOrAddTypeSet(slice);
+        node->m_typeSet = m_nodeTree->getOrAddTypeSet(slice);
     }
 
     // Okay now looking for ( identifier)
@@ -578,9 +544,9 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
         prevTokenType = token.type;
     }
 
-    return m_typePool->getSlice(m_typePool->add(buf));
+    StringSlicePool* typePool = m_nodeTree->m_typePool;
+    return typePool->getSlice(typePool->add(buf));
 }
-
 
 SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
 {
@@ -597,7 +563,7 @@ SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Index& ioTempla
             return SLANG_FAIL;
         }
 
-        const IdentifierStyle style = m_identifierLookup->get(identifierToken.getContent());
+        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(identifierToken.getContent());
         if (hasFlag(style, IdentifierFlag::Keyword))
         {
             return SLANG_FAIL;
@@ -786,7 +752,9 @@ SlangResult Parser::_maybeParseField()
         StringBuilder buf;
         buf << typeName << arraySuffix;
 
-        typeName = m_typePool->getSlice(m_typePool->add(buf));
+        StringSlicePool* typePool = m_nodeTree->m_typePool;
+
+        typeName = typePool->getSlice(typePool->add(buf));
     }
 
     switch (m_reader.peekTokenType())
@@ -844,7 +812,6 @@ static UnownedStringSlice _trimUnderscorePrefix(const UnownedStringSlice& slice)
     }
 }
 
-
 SlangResult Parser::_parsePreDeclare()
 {
     // Skip the declare type token
@@ -855,7 +822,7 @@ SlangResult Parser::_parsePreDeclare()
     // Get the typeSet
     Token typeSetToken;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
-    TypeSet* typeSet = getOrAddTypeSet(typeSetToken.getContent());
+    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getContent());
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
@@ -865,7 +832,7 @@ SlangResult Parser::_parsePreDeclare()
         Token typeToken;
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeToken));
 
-        const IdentifierStyle style = m_identifierLookup->get(typeToken.getContent());
+        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(typeToken.getContent());
 
         if (style != IdentifierStyle::Struct && style != IdentifierStyle::Class)
         {
@@ -926,7 +893,7 @@ SlangResult Parser::_parseTypeSet()
     Token typeSetToken;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &typeSetToken));
 
-    TypeSet* typeSet = getOrAddTypeSet(typeSetToken.getContent());
+    TypeSet* typeSet = m_nodeTree->getOrAddTypeSet(typeSetToken.getContent());
 
     SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
 
@@ -942,19 +909,23 @@ SlangResult Parser::_parseTypeSet()
     return SLANG_OK;
 }
 
-SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
+SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 {
     SLANG_ASSERT(options);
     m_options = options;
 
+#if 0
     // Calculate from the path, a 'macro origin' name. 
-    const String macroOrigin = _calcMacroOrigin(sourceFile->getPathInfo().foundPath, *options);
+    const String macroOrigin = calcMacroOrigin(sourceFile->getPathInfo().foundPath, *options);
 
     RefPtr<SourceOrigin> origin = new SourceOrigin(sourceFile, macroOrigin);
-    m_origins.add(origin);
+    m_sourceOrigins.add(origin);
+#endif
 
     // Set the current origin
-    m_origin = origin;
+    m_sourceOrigin = sourceOrigin;
+
+    SourceFile* sourceFile = sourceOrigin->m_sourceFile;
 
     SourceManager* manager = sourceFile->getSourceManager();
 
@@ -962,9 +933,9 @@ SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
 
     Lexer lexer;
 
-    m_currentScope = m_rootNode;
+    m_currentScope = m_nodeTree->m_rootNode;
 
-    lexer.initialize(sourceView, m_sink, m_namePool, manager->getMemoryArena());
+    lexer.initialize(sourceView, m_sink, m_nodeTree->m_namePool, manager->getMemoryArena());
     m_tokenList = lexer.lexAllTokens();
     // See if there were any errors
     if (m_sink->getErrorCount())
@@ -980,7 +951,7 @@ SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
         {
             case TokenType::Identifier:
             {
-                const IdentifierStyle style = m_identifierLookup->get(m_reader.peekToken().getContent());
+                const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(m_reader.peekToken().getContent());
 
                 switch (style)
                 {
@@ -1059,7 +1030,7 @@ SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
             case TokenType::EndOfFile:
             {
                 // Okay we need to confirm that we are in the root node, and with no open braces
-                if (m_currentScope != m_rootNode)
+                if (m_currentScope != m_nodeTree->getRootNode())
                 {
                     m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::braceOpenAtEndOfFile);
                     return SLANG_FAIL;
@@ -1094,30 +1065,80 @@ SlangResult Parser::parse(SourceFile* sourceFile, const Options* options)
     }
 }
 
-Node* Parser::findNode(ScopeNode* scope, const UnownedStringSlice& name)
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! ParseSharedState !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+NodeTree::NodeTree(StringSlicePool* typePool, NamePool* namePool, IdentifierLookup* identifierLookup):
+    m_typePool(typePool),
+    m_namePool(namePool),
+    m_identifierLookup(identifierLookup),
+    m_typeSetPool(StringSlicePool::Style::Empty)
 {
-    // TODO(JS): We may want to lookup based on the path. 
-    // If the name is qualified, we give up for not
-    if (String(name).indexOf("::") >= 0)
+    m_rootNode = new ScopeNode(Node::Type::Namespace);
+    m_rootNode->m_reflectionType = ReflectionType::Reflected;
+}
+
+TypeSet* NodeTree::getTypeSet(const UnownedStringSlice& slice)
+{
+    Index index = m_typeSetPool.findIndex(slice);
+    if (index < 0)
     {
         return nullptr;
     }
-
-    // Okay try in all scopes up to the root
-    while (scope)
-    {
-        if (Node* node = scope->findChild(name))
-        {
-            return node;
-        }
-
-        scope = scope->m_parentScope;
-    }
-
-    return nullptr;
+    return m_typeSets[index];
 }
 
-SlangResult Parser::_calcDerivedTypesRec(ScopeNode* inScopeNode)
+TypeSet* NodeTree::getOrAddTypeSet(const UnownedStringSlice& slice)
+{
+    const Index index = Index(m_typeSetPool.add(slice));
+    if (index >= m_typeSets.getCount())
+    {
+        SLANG_ASSERT(m_typeSets.getCount() == index);
+        TypeSet* typeSet = new TypeSet;
+
+        m_typeSets.add(typeSet);
+        typeSet->m_macroName = m_typeSetPool.getSlice(StringSlicePool::Handle(index));
+        return typeSet;
+    }
+    else
+    {
+        return m_typeSets[index];
+    }
+}
+
+SourceOrigin* NodeTree::addSourceOrigin(SourceFile* sourceFile, const Options& options)
+{
+    // Calculate from the path, a 'macro origin' name. 
+    const String macroOrigin = calcMacroOrigin(sourceFile->getPathInfo().foundPath, options);
+
+    SourceOrigin* origin = new SourceOrigin(sourceFile, macroOrigin);
+    m_sourceOrigins.add(origin);
+    return origin;
+}
+
+/* static */String NodeTree::calcMacroOrigin(const String& filePath, const Options& options)
+{
+    // Get the filename without extension
+    String fileName = Path::getFileNameWithoutExt(filePath);
+
+    // We can work on just the slice
+    UnownedStringSlice slice = fileName.getUnownedSlice();
+
+    // Filename prefix
+    if (options.m_stripFilePrefix.getLength() && slice.startsWith(options.m_stripFilePrefix.getUnownedSlice()))
+    {
+        const Index len = options.m_stripFilePrefix.getLength();
+        slice = UnownedStringSlice(slice.begin() + len, slice.end());
+    }
+
+    // Trim -
+    slice = slice.trim('-');
+
+    StringBuilder out;
+    NameConventionUtil::convert(slice, CharCase::Upper, NameConvention::Snake, out);
+    return out;
+}
+
+SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSink* sink)
 {
     if (inScopeNode->isClassLike())
     {
@@ -1128,17 +1149,17 @@ SlangResult Parser::_calcDerivedTypesRec(ScopeNode* inScopeNode)
             ScopeNode* parentScope = classLikeNode->m_parentScope;
             if (parentScope == nullptr)
             {
-                m_sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
+                sink->diagnoseRaw(Severity::Error, UnownedStringSlice::fromLiteral("Can't lookup in scope if there is none!"));
                 return SLANG_FAIL;
             }
 
-            Node* superNode = findNode(parentScope, classLikeNode->m_super.getContent());
+            Node* superNode = Node::findNode(parentScope, classLikeNode->m_super.getContent());
 
             if (!superNode)
             {
                 if (classLikeNode->isReflected())
                 {
-                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotFound, classLikeNode->getAbsoluteName());
+                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotFound, classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
             }
@@ -1148,13 +1169,13 @@ SlangResult Parser::_calcDerivedTypesRec(ScopeNode* inScopeNode)
 
                 if (!superType)
                 {
-                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotAType, classLikeNode->getAbsoluteName());
+                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::superTypeNotAType, classLikeNode->getAbsoluteName());
                     return SLANG_FAIL;
                 }
 
                 if (superType->m_typeSet != classLikeNode->m_typeSet)
                 {
-                    m_sink->diagnose(classLikeNode->m_name, CPPDiagnostics::typeInDifferentTypeSet, classLikeNode->m_name.getContent(), classLikeNode->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
+                    sink->diagnose(classLikeNode->m_name, CPPDiagnostics::typeInDifferentTypeSet, classLikeNode->m_name.getContent(), classLikeNode->m_typeSet->m_macroName, superType->m_typeSet->m_macroName);
                     return SLANG_FAIL;
                 }
 
@@ -1177,39 +1198,16 @@ SlangResult Parser::_calcDerivedTypesRec(ScopeNode* inScopeNode)
         ScopeNode* childScope = as<ScopeNode>(child);
         if (childScope)
         {
-            SLANG_RETURN_ON_FAIL(_calcDerivedTypesRec(childScope));
+            SLANG_RETURN_ON_FAIL(_calcDerivedTypesRec(childScope, sink));
         }
     }
 
     return SLANG_OK;
 }
 
-SlangResult Parser::calcDerivedTypes()
+SlangResult NodeTree::calcDerivedTypes(DiagnosticSink* sink)
 {
-    return _calcDerivedTypesRec(m_rootNode);
-}
-
-/* static */String Parser::_calcMacroOrigin(const String& filePath, const Options& options)
-{
-    // Get the filename without extension
-    String fileName = Path::getFileNameWithoutExt(filePath);
-
-    // We can work on just the slice
-    UnownedStringSlice slice = fileName.getUnownedSlice();
-
-    // Filename prefix
-    if (options.m_stripFilePrefix.getLength() && slice.startsWith(options.m_stripFilePrefix.getUnownedSlice()))
-    {
-        const Index len = options.m_stripFilePrefix.getLength();
-        slice = UnownedStringSlice(slice.begin() + len, slice.end());
-    }
-
-    // Trim -
-    slice = slice.trim('-');
-
-    StringBuilder out;
-    NameConventionUtil::convert(slice, CharCase::Upper, NameConvention::Snake, out);
-    return out;
+    return _calcDerivedTypesRec(m_rootNode, sink);
 }
 
 

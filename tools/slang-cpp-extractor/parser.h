@@ -13,14 +13,13 @@ using namespace Slang;
 class TypeSet : public RefObject
 {
 public:
-
     /// This is the looked up name.
     UnownedStringSlice m_macroName;    ///< The name extracted from the macro SLANG_ABSTRACT_AST_CLASS -> AST
 
-    String m_typeName;           ///< The enum type name associated with this type for AST it is ASTNode
-    String m_fileMark;           ///< This 'mark' becomes of the output filename
+    String m_typeName;                  ///< The enum type name associated with this type for AST it is ASTNode
+    String m_fileMark;                  ///< This 'mark' becomes of the output filename
 
-    List<ClassLikeNode*> m_baseTypes;    ///< The base types for this type set
+    List<ClassLikeNode*> m_baseTypes;   ///< The base types for this type set
 };
 
 class SourceOrigin : public RefObject
@@ -43,10 +42,8 @@ public:
         m_macroOrigin(macroOrigin)
     {}
 
-    ///< The macro text is inserted into the macro to identify the origin. It is based on the filename
-    String m_macroOrigin;
-    /// The source file - also holds the path information
-    SourceFile* m_sourceFile;
+    String m_macroOrigin;               ///< The macro text is inserted into the macro to identify the origin. It is based on the filename
+    SourceFile* m_sourceFile;           ///< The source file - also holds the path information
 
     /// All of the nodes defined in this file in the order they were defined
     /// Note that the same namespace may be listed multiple times.
@@ -55,6 +52,50 @@ public:
 
 struct Options;
 class IdentifierLookup;
+
+/* NodeTree holds nodes that have been parsed into a tree rooted on the 'rootNode'.
+Also contains other state associated with or useful to a node tree */
+class NodeTree
+{
+public:
+    friend class Parser;
+        /// Get all of the parsed source origins
+    const List<RefPtr<SourceOrigin> >& getSourceOrigins() const { return m_sourceOrigins; }
+
+    TypeSet* getTypeSet(const UnownedStringSlice& slice);
+    TypeSet* getOrAddTypeSet(const UnownedStringSlice& slice);
+
+    SourceOrigin* addSourceOrigin(SourceFile* sourceFile, const Options& options);
+
+        /// Get all of the type sets
+    const List<RefPtr<TypeSet>>& getTypeSets() const { return m_typeSets; }
+
+        /// Get the root node
+    Node* getRootNode() const { return m_rootNode; }
+
+        /// When parsing we don't lookup all up super types/add derived types. This is because
+        /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
+    SlangResult calcDerivedTypes(DiagnosticSink* sink);
+
+    NodeTree(StringSlicePool* typePool, NamePool* namePool, IdentifierLookup* identifierLookup);
+
+    static String calcMacroOrigin(const String& filePath, const Options& options);
+
+protected:
+    SlangResult _calcDerivedTypesRec(ScopeNode* node, DiagnosticSink* sink);
+
+    StringSlicePool m_typeSetPool;              ///< Pool for type set names
+    List<RefPtr<TypeSet> > m_typeSets;          ///< The type sets
+
+    IdentifierLookup* m_identifierLookup;
+    StringSlicePool* m_typePool;                ///< Pool for just types
+
+    NamePool* m_namePool;
+
+    RefPtr<ScopeNode> m_rootNode;   ///< The root scope 
+
+    List<RefPtr<SourceOrigin>> m_sourceOrigins;
+};
 
 class Parser
 {
@@ -71,29 +112,10 @@ public:
     SlangResult consumeToClosingBrace(const Token* openBraceToken = nullptr);
     SlangResult popScope();
 
-    /// Parse the contents of the source file
-    SlangResult parse(SourceFile* sourceFile, const Options* options);
+        /// Parse the contents of the source file
+    SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
 
-    /// When parsing we don't lookup all up super types/add derived types. This is because
-    /// we allow files to be processed in any order, so we have to do the type lookup as a separate operation
-    SlangResult calcDerivedTypes();
-
-    /// Find the name starting in specified scope
-    Node* findNode(ScopeNode* scope, const UnownedStringSlice& name);
-
-    /// Get all of the parsed source origins
-    const List<RefPtr<SourceOrigin> >& getSourceOrigins() const { return m_origins; }
-
-    TypeSet* getTypeSet(const UnownedStringSlice& slice);
-    TypeSet* getOrAddTypeSet(const UnownedStringSlice& slice);
-
-    /// Get all of the type sets
-    const List<RefPtr<TypeSet>>& getTypeSets() const { return m_typeSets; }
-
-    /// Get the root node
-    Node* getRootNode() const { return m_rootNode; }
-
-    Parser(StringSlicePool* typePool, NamePool* namePool, DiagnosticSink* sink, IdentifierLookup* identifierLookup);
+    Parser(NodeTree* nodeTree, DiagnosticSink* sink);
 
 protected:
     static Node::Type _toNodeType(IdentifierStyle style);
@@ -112,13 +134,10 @@ protected:
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 
-    /// Parse balanced - if a sink is set will report to that sink
+        /// Parse balanced - if a sink is set will report to that sink
     SlangResult _parseBalanced(DiagnosticSink* sink);
 
-    SlangResult _calcDerivedTypesRec(ScopeNode* node);
-    static String _calcMacroOrigin(const String& filePath, const Options& options);
-
-    /// Concatenate all tokens from start to the current position
+        /// Concatenate all tokens from start to the current position
     UnownedStringSlice _concatTokens(TokenReader::ParsingCursor start);
 
     void _consumeTypeModifiers();
@@ -128,25 +147,14 @@ protected:
     TokenList m_tokenList;
     TokenReader m_reader;
 
-    ScopeNode* m_currentScope;      ///< The current scope being processed
+    ScopeNode* m_currentScope;          ///< The current scope being processed
+    SourceOrigin* m_sourceOrigin;       ///< The source origin that all tokens are in
 
-    RefPtr<ScopeNode> m_rootNode;   ///< The root scope 
+    DiagnosticSink* m_sink;             ///< Diagnostic sink 
 
-    SourceOrigin* m_origin;
-
-    DiagnosticSink* m_sink;
-
-    NamePool* m_namePool;
-
-    List<RefPtr<SourceOrigin>> m_origins;
+    NodeTree* m_nodeTree;    ///< Shared state between parses. Nodes will be added to this
 
     const Options* m_options;
-
-    StringSlicePool m_typeSetPool;              ///< Pool for type set names
-    List<RefPtr<TypeSet> > m_typeSets;          ///< The type sets
-
-    IdentifierLookup* m_identifierLookup;
-    StringSlicePool* m_typePool;                ///< Pool for just types
 };
 
 } // CppExtract

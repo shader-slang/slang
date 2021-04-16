@@ -79,6 +79,9 @@ public:
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
+        /// Find the name starting in specified scope
+    static Node* findNode(ScopeNode* scope, const UnownedStringSlice& name);
+
     Node(Type type) :
         m_type(type),
         m_parentScope(nullptr),

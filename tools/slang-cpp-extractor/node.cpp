@@ -77,6 +77,30 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
+/* static */Node* Node::findNode(ScopeNode* scope, const UnownedStringSlice& name)
+{
+    // TODO(JS): We may want to lookup based on the path. 
+    // If the name is qualified, we give up for not
+    if (String(name).indexOf("::") >= 0)
+    {
+        return nullptr;
+    }
+
+    // Okay try in all scopes up to the root
+    while (scope)
+    {
+        if (Node* node = scope->findChild(name))
+        {
+            return node;
+        }
+
+        scope = scope->m_parentScope;
+    }
+
+    return nullptr;
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ScopeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ScopeNode* ScopeNode::getAnonymousNamespace()
