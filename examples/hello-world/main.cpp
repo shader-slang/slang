@@ -321,7 +321,7 @@ int HelloWorldExample::createInOutBuffers()
     vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
     if (!stagingBufferData)
         return -1;
-    for (int i = 0; i < inputElementCount; i++)
+    for (size_t i = 0; i < inputElementCount; i++)
         stagingBufferData[i] = static_cast<float>(i);
     vkAPI.vkUnmapMemory(vkAPI.device, stagingMemory);
 
@@ -462,7 +462,7 @@ int HelloWorldExample::printComputeResults()
     vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
     if (!stagingBufferData)
         return -1;
-    for (int i = 0; i < inputElementCount; i++)
+    for (size_t i = 0; i < inputElementCount; i++)
     {
         printf("%f\n", stagingBufferData[i]);
     }
