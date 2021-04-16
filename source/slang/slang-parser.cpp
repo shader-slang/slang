@@ -147,9 +147,14 @@ namespace Slang
 
         Token ReadToken();
         Token ReadToken(TokenType type);
-        Token ReadToken(const char * string);
-        bool LookAheadToken(TokenType type, int offset = 0);
-        bool LookAheadToken(const char * string, int offset = 0);
+        Token ReadToken(const char* string);
+
+        bool LookAheadToken(TokenType type);
+        bool LookAheadToken(const char* string);
+
+        bool LookAheadToken(TokenType type, int offset);
+        bool LookAheadToken(const char* string, int offset);
+
         void                                        parseSourceFile(ModuleDecl* program);
         Decl*					ParseStruct();
         ClassDecl*					    ParseClass();
@@ -537,7 +542,7 @@ namespace Slang
         }
     }
 
-    bool Parser::LookAheadToken(const char * string, int offset)
+    bool Parser::LookAheadToken(const char* string, int offset)
     {
         TokenReader r = tokenReader;
         for (int ii = 0; ii < offset; ++ii)
@@ -554,6 +559,17 @@ namespace Slang
             r.advanceToken();
 
         return r.peekTokenType() == type;
+    }
+
+    bool Parser::LookAheadToken(TokenType type)
+    {
+        return tokenReader.peekTokenType() == type;
+    }
+
+    bool Parser::LookAheadToken(const char* string)
+    {
+        const auto& token = tokenReader.peekToken();
+        return token.type == TokenType::Identifier && token.getContent() == string;
     }
 
     // Consume a token and return true it if matches, otherwise false
@@ -1289,6 +1305,8 @@ namespace Slang
     static void ParseGenericDeclImpl(
         Parser* parser, GenericDecl* decl, const TFunc & parseInnerFunc)
     {
+        parser->LookAheadToken(TokenType::OpGreater);
+
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
         for (;;)
