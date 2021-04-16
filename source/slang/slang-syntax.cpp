@@ -30,7 +30,10 @@ void printDiagnosticArg(StringBuilder& sb, Val* val)
 
 void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 {
-    type.type->toText(sb);
+    if (type.type)
+        type.type->toText(sb);
+    else
+        sb << "<null>";
 }
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)

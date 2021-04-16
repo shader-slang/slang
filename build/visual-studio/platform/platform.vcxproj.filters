@@ -18,6 +18,9 @@
     <ClInclude Include="..\..\..\tools\platform\performance-counter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\platform\platform-api.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\platform\vector-math.h">
       <Filter>Header Files</Filter>
     </ClInclude>

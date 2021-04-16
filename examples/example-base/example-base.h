@@ -4,6 +4,10 @@
 #include "tools/platform/window.h"
 #include "source/core/slang-basic.h"
 
+#ifdef _WIN32
+void _Win32OutputDebugString(const char* str);
+#endif
+
 struct WindowedAppBase
 {
 protected:
@@ -34,6 +38,40 @@ public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
     virtual void finalize() { gQueue->wait(); }
 };
+
+int64_t getCurrentTime();
+int64_t getTimerFrequency();
+
+template<typename ... TArgs> inline void reportError(const char* format, TArgs... args)
+{
+    printf(format, args...);
+#ifdef _WIN32
+    char buffer[4096];
+    sprintf_s(buffer, format, args...);
+    _Win32OutputDebugString(buffer);
+#endif
+}
+
+template <typename... TArgs> inline void log(const char* format, TArgs... args)
+{
+    reportError(format, args...);
+}
+
+// Many Slang API functions return detailed diagnostic information
+// (error messages, warnings, etc.) as a "blob" of data, or return
+// a null blob pointer instead if there were no issues.
+//
+// For convenience, we define a subroutine that will dump the information
+// in a diagnostic blob if one is produced, and skip it otherwise.
+//
+inline void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
+{
+    if (diagnosticsBlob != nullptr)
+    {
+        reportError("%s", (const char*)diagnosticsBlob->getBufferPointer());
+    }
+}
+
 
 template<typename TApp>
 int innerMain()

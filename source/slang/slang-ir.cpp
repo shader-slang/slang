@@ -1587,6 +1587,25 @@ namespace Slang
         value->sourceLoc = sourceLocInfo->sourceLoc;
     }
 
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+    SLANG_API uint32_t _slangIRAllocBreak = 0xFFFFFFFF;
+    uint32_t& _debugGetIRAllocCounter()
+    {
+        static uint32_t counter = 0;
+        return counter;
+    }
+    uint32_t _debugGetAndIncreaseInstCounter()
+    {
+        if (_slangIRAllocBreak != 0xFFFFFFFF && _debugGetIRAllocCounter() == _slangIRAllocBreak)
+        {
+#if _WIN32 && defined(_MSC_VER)
+            __debugbreak();
+#endif
+        }
+        return _debugGetIRAllocCounter()++;
+    }
+#endif
+
     // Create an IR instruction/value and initialize it.
     //
     // In this case `argCount` and `args` represent the
@@ -1621,6 +1640,10 @@ namespace Slang
 
         // TODO: Do we need to run ctor after zeroing?
         new(inst)T();
+
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+        inst->_debugUID = _debugGetAndIncreaseInstCounter();
+#endif
 
         inst->operandCount = (uint32_t)(fixedArgCount + varArgCount);
 
@@ -1676,6 +1699,10 @@ namespace Slang
         memset(inst, 0, sizeof(IRInst));
         // TODO: Do we need to run ctor after zeroing?
         new (inst) IRInst;
+
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+        inst->_debugUID = _debugGetAndIncreaseInstCounter();
+#endif
 
         inst->m_op = op;
         if (type)
@@ -2213,6 +2240,9 @@ namespace Slang
         SLANG_UNUSED(endCursor);
 
         new(inst) IRInst();
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+        inst->_debugUID = _debugGetAndIncreaseInstCounter();
+#endif
         inst->m_op = op;
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t) operandCount;
@@ -2300,6 +2330,9 @@ namespace Slang
         SLANG_UNUSED(endCursor);
 
         new(inst) IRInst();
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+        inst->_debugUID = _debugGetAndIncreaseInstCounter();
+#endif
         inst->m_op = op;
         inst->typeUse.usedValue = type;
         inst->operandCount = (uint32_t)operandCount;
@@ -3155,7 +3188,7 @@ namespace Slang
                 //
                 // We want to emit `makeExistential(getValueFromBoundInterface(value) : C, witnessTable)`.
                 //
-                auto concreteType = cast<IRType>(slotArgs[0]);
+                auto concreteType = (IRType*)(slotArgs[0]);
                 auto witnessTable = slotArgs[1];
                 if (slotArgs[0]->getOp() == kIROp_DynamicType)
                     return value;
@@ -4501,6 +4534,18 @@ namespace Slang
         return name;
     }
 
+    static void dumpDebugID(IRDumpContext* context, IRInst* inst)
+    {
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+        dump(context, "[#");
+        dump(context, String(inst->_debugUID));
+        dump(context, "]");
+#else
+        SLANG_UNUSED(context);
+        SLANG_UNUSED(inst);
+#endif
+    }
+
     static void dumpID(
         IRDumpContext* context,
         IRInst*        inst)
@@ -4520,9 +4565,8 @@ namespace Slang
         {
             dump(context, "_");
         }
+        dumpDebugID(context, inst);
     }
-
-
     
     struct StringEncoder
     {
@@ -4973,7 +5017,7 @@ namespace Slang
         }
 
         dump(context, opInfo.name);
-
+        dumpDebugID(context, inst);
         dumpInstOperandList(context, inst);
     }
 

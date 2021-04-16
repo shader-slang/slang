@@ -17,6 +17,8 @@
 namespace nvrtc
 {
 
+
+
 typedef enum {
   NVRTC_SUCCESS = 0,
   NVRTC_ERROR_OUT_OF_MEMORY = 1,
@@ -644,8 +646,8 @@ struct NVRTCPathVisitor : Path::Visitor
 
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
-#if SLANG_WINDOWS_FAMILY
-    // We only need to search 64 bit versions on windows
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+    // We only need to search 64 bit versions on windows 
     NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
 
     // First try the instance path (if supported on platform)
@@ -717,7 +719,11 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
             return SLANG_OK;
         }
     }
+#else
+    SLANG_UNUSED(loader);
+    SLANG_UNUSED(outLibrary);
 #endif
+
     // This is an official-ish list of versions is here:
     // https://developer.nvidia.com/cuda-toolkit-archive
     
@@ -729,8 +735,10 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     return SLANG_E_NOT_FOUND;
 }
 
+
 /* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
+    
     ComPtr<ISlangSharedLibrary> library;
 
     // If the user supplies a path to their preferred version of NVRTC,
@@ -768,6 +776,5 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     set->addCompiler(compiler);
     return SLANG_OK;
 }
-
 
 }

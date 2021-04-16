@@ -170,6 +170,7 @@
     <ClInclude Include="..\..\..\tools\platform\gui.h" />
     <ClInclude Include="..\..\..\tools\platform\model.h" />
     <ClInclude Include="..\..\..\tools\platform\performance-counter.h" />
+    <ClInclude Include="..\..\..\tools\platform\platform-api.h" />
     <ClInclude Include="..\..\..\tools\platform\vector-math.h" />
     <ClInclude Include="..\..\..\tools\platform\window.h" />
   </ItemGroup>

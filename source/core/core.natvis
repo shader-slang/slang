@@ -89,6 +89,18 @@
     </Expand>
 </Type>
 
+    <Type Name="Slang::OrderedHashSet&lt;*&gt;">
+        <DisplayString>{{ size={dict._count} }}</DisplayString>
+        <Expand>
+            <LinkedListItems>
+                <Size>dict._count</Size>
+                <HeadPointer>dict.kvPairs.head</HeadPointer>
+                <NextPointer>next</NextPointer>
+                <ValueNode>Value</ValueNode>
+            </LinkedListItems>
+        </Expand>
+    </Type>
+    
 <Type Name="Slang::RefPtr&lt;*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>

@@ -1,137 +1,157 @@
 // main.cpp
 
-// This file implements an extremely simple example of loading and
-// executing a Slang shader program. This is primarily an example
-// of how to use Slang as a "drop-in" replacement for an existing
-// HLSL compiler like the `D3DCompile` API. More advanced usage
-// of advanced Slang language and API features is left to the
-// next example.
+// This file provides the application code for the `hello-world` example.
 //
-// The comments in the file will attempt to explain concepts as
-// they are introduced.
-//
-// Of course, in order to use the Slang API, we need to include
-// its header. We have set up the build options for this project
-// so that it is as simple as:
+
+// This example uses Vulkan to run a simple compute shader written in Slang.
+// The goal is to demonstrate how to use the Slang API to cross compile
+// shader code.
 //
 #include <slang.h>
-//
-// Other build setups are possible, and Slang doesn't assume that
-// its include directory must be added to your global include
-// path.
+#include <slang-com-ptr.h>
 
-// For the purposes of keeping the demo code as simple as possible,
-// while still retaining some level of portability, our examples
-// make use of a small platform and graphics API abstraction layer,
-// which is included in the Slang source distribution under the
-// `tools/` directory.
-//
-// Applications can of course use Slang without ever touching this
-// abstraction layer, so we will not focus on it when explaining
-// examples, except in places where best practices for interacting
-// with Slang may depend on an application/engine making certain
-// design choices in their abstraction layer.
-//
-#include "slang-gfx.h"
-#include "gfx-util/shader-cursor.h"
-#include "tools/platform/window.h"
-#include "slang-com-ptr.h"
-#include "source/core/slang-basic.h"
+#include "vulkan-api.h"
 #include "examples/example-base/example-base.h"
 
-using namespace gfx;
-using namespace Slang;
+using Slang::ComPtr;
 
-// For the purposes of a small example, we will define the vertex data for a
-// single triangle directly in the source file. It should be easy to extend
-// this example to load data from an external source, if desired.
-//
-struct Vertex
+struct HelloWorldExample
 {
-    float position[3];
-    float color[3];
+    // The Vulkan functions pointers result from loading the vulkan library.
+    VulkanAPI vkAPI;
+
+    // Vulkan objects used in this example.
+    VkQueue queue;
+    VkCommandPool commandPool = VK_NULL_HANDLE;
+
+    // Input and output buffers.
+    VkBuffer inOutBuffers[3] = {};
+    VkDeviceMemory bufferMemories[3] = {};
+
+    const size_t inputElementCount = 16;
+    const size_t bufferSize = sizeof(float) * inputElementCount;
+
+    // We use a staging buffer allocated on host-visible memory to
+    // upload/download data from GPU.
+    VkBuffer stagingBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory stagingMemory = VK_NULL_HANDLE;
+
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    VkPipeline pipeline = VK_NULL_HANDLE;
+
+    // Initializes the Vulkan instance and device.
+    int initVulkanInstanceAndDevice();
+
+    // This function contains the most interesting part of this example.
+    // It loads the `hello-world.slang` shader and compile it using the Slang API
+    // into a SPIRV module, then create a Vulkan pipeline from the compiled shader.
+    int createComputePipelineFromShader();
+
+    // Creates the input and output buffers.
+    int createInOutBuffers();
+
+    // Sets up descriptor set bindings and dispatches the compute task.
+    int dispatchCompute();
+
+    // Reads back and prints the result of the compute task.
+    int printComputeResults();
+
+    // Main logic of this example.
+    int run();
+
+    ~HelloWorldExample();
+
 };
 
-static const int kVertexCount = 3;
-static const Vertex kVertexData[kVertexCount] =
+int main()
 {
-    { { 0,  0, 0.5 }, { 1, 0, 0 } },
-    { { 0,  1, 0.5 }, { 0, 0, 1 } },
-    { { 1,  0, 0.5 }, { 0, 1, 0 } },
-};
-
-// The example application will be implemented as a `struct`, so that
-// we can scope the resources it allocates without using global variables.
-//
-struct HelloWorld : public WindowedAppBase
-{
-
-// Many Slang API functions return detailed diagnostic information
-// (error messages, warnings, etc.) as a "blob" of data, or return
-// a null blob pointer instead if there were no issues.
-//
-// For convenience, we define a subroutine that will dump the information
-// in a diagnostic blob if one is produced, and skip it otherwise.
-//
-void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
-{
-    if( diagnosticsBlob != nullptr )
-    {
-        printf("%s", (const char*) diagnosticsBlob->getBufferPointer());
-    }
+    HelloWorldExample example;
+    return example.run();
 }
 
-// The main task an application cares about is compiling shader code
-// from souce (if needed) and loading it through the chosen graphics API.
-//
-// In addition, an application may want to receive reflection information
-// about the program, which is what a `slang::ProgramLayout` provides.
-//
-gfx::Result loadShaderProgram(
-    gfx::IDevice*         device,
-    gfx::IShaderProgram**   outProgram)
-{
-    // We need to obatin a compilation session (`slang::ISession`) that will provide
-    // a scope to all the compilation and loading of code we do.
-    //
-    // Our example application uses the `gfx` graphics API abstraction layer, which already
-    // creates a Slang compilation session for us, so we just grab and use it here.
-    ComPtr<slang::ISession> slangSession;
-    slangSession = device->getSlangSession();
+/************************************************************/
+/* HelloWorldExample Implementation */
+/************************************************************/
 
-    // We can now start loading code into the slang session.
+int HelloWorldExample::run()
+{
+    RETURN_ON_FAIL(initVulkanInstanceAndDevice());
+    RETURN_ON_FAIL(createComputePipelineFromShader());
+    RETURN_ON_FAIL(createInOutBuffers());
+    RETURN_ON_FAIL(dispatchCompute());
+    RETURN_ON_FAIL(printComputeResults());
+    return 0;
+}
+
+int HelloWorldExample::initVulkanInstanceAndDevice()
+{
+    if (initializeVulkanDevice(vkAPI) != 0)
+    {
+        printf("Failed to load Vulkan.\n");
+        return -1;
+    }
+
+    VkCommandPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolCreateInfo.queueFamilyIndex = vkAPI.queueFamilyIndex;
+    RETURN_ON_FAIL(vkAPI.vkCreateCommandPool(
+        vkAPI.device, &poolCreateInfo, nullptr, &commandPool));
+
+    vkAPI.vkGetDeviceQueue(vkAPI.device, vkAPI.queueFamilyIndex, 0, &queue);
+    return 0;
+}
+
+int HelloWorldExample::createComputePipelineFromShader()
+{
+    // First we need to create slang global session with work with the Slang API.
+    ComPtr<slang::IGlobalSession> slangGlobalSession;
+    RETURN_ON_FAIL(slang::createGlobalSession(slangGlobalSession.writeRef()));
+
+    // Next we create a compilation session to generate SPIRV code from Slang source.
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = slangGlobalSession->findProfile("glsl440");
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));
+
+    // Once the session has been obtained, we can start loading code into it.
     //
     // The simplest way to load code is by calling `loadModule` with the name of a Slang
-    // module. A call to `loadModule("MyStuff")` will behave more or less as if you
+    // module. A call to `loadModule("hello-world")` will behave more or less as if you
     // wrote:
     //
-    //      import MyStuff;
+    //      import hello_world;
     //
     // In a Slang shader file. The compiler will use its search paths to try to locate
-    // `MyModule.slang`, then compile and load that file. If a matching module had
+    // `hello-world.slang`, then compile and load that file. If a matching module had
     // already been loaded previously, that would be used directly.
-    //
-    ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule* module = slangSession->loadModule("shaders", diagnosticsBlob.writeRef());
-    diagnoseIfNeeded(diagnosticsBlob);
-    if(!module)
-        return SLANG_FAIL;
+    slang::IModule* slangModule = nullptr;
+    {
+        ComPtr<slang::IBlob> diagnosticBlob;
+        slangModule = session->loadModule("hello-world", diagnosticBlob.writeRef());
+        diagnoseIfNeeded(diagnosticBlob);
+        if (!slangModule)
+            return -1;
+    }
 
-    // Loading the `shaders` module will compile and check all the shader code in it,
+    // Loading the `hello-world` module will compile and check all the shader code in it,
     // including the shader entry points we want to use. Now that the module is loaded
     // we can look up those entry points by name.
     //
     // Note: If you are using this `loadModule` approach to load your shader code it is
     // important to tag your entry point functions with the `[shader("...")]` attribute
-    // (e.g., `[shader("vertex")] void vertexMain(...)`). Without that information there
+    // (e.g., `[shader("compute")] void computeMain(...)`). Without that information there
     // is no umambiguous way for the compiler to know which functions represent entry
     // points when it parses your code via `loadModule()`.
     //
-    ComPtr<slang::IEntryPoint> vertexEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
-    //
-    ComPtr<slang::IEntryPoint> fragmentEntryPoint;
-    SLANG_RETURN_ON_FAIL(module->findEntryPointByName("fragmentMain", fragmentEntryPoint.writeRef()));
+    ComPtr<slang::IEntryPoint> entryPoint;
+    slangModule->findEntryPointByName("computeMain", entryPoint.writeRef());
 
     // At this point we have a few different Slang API objects that represent
     // pieces of our code: `module`, `vertexEntryPoint`, and `fragmentEntryPoint`.
@@ -147,18 +167,8 @@ gfx::Result loadShaderProgram(
     // and entry points.
     //
     Slang::List<slang::IComponentType*> componentTypes;
-    componentTypes.add(module);
-
-    // Later on when we go to extract compiled kernel code for our vertex
-    // and fragment shaders, we will need to make use of their order within
-    // the composition, so we will record the relative ordering of the entry
-    // points here as we add them.
-    int entryPointCount = 0;
-    int vertexEntryPointIndex = entryPointCount++;
-    componentTypes.add(vertexEntryPoint);
-
-    int fragmentEntryPointIndex = entryPointCount++;
-    componentTypes.add(fragmentEntryPoint);
+    componentTypes.add(slangModule);
+    componentTypes.add(entryPoint);
 
     // Actually creating the composite component type is a single operation
     // on the Slang session, but the operation could potentially fail if
@@ -166,233 +176,310 @@ gfx::Result loadShaderProgram(
     // combine multiple copies of the same module), so we need to deal
     // with the possibility of diagnostic output.
     //
-    ComPtr<slang::IComponentType> linkedProgram;
-    SlangResult result = slangSession->createCompositeComponentType(
-        componentTypes.getBuffer(),
-        componentTypes.getCount(),
-        linkedProgram.writeRef(),
-        diagnosticsBlob.writeRef());
-    diagnoseIfNeeded(diagnosticsBlob);
-    SLANG_RETURN_ON_FAIL(result);
+    ComPtr<slang::IComponentType> composedProgram;
+    {
+        ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = session->createCompositeComponentType(
+            componentTypes.getBuffer(),
+            componentTypes.getCount(),
+            composedProgram.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        RETURN_ON_FAIL(result);
+    }
 
-    // Once we've described the particular composition of entry points
-    // that we want to compile, we defer to the graphics API layer
-    // to extract compiled kernel code and load it into the API-specific
-    // program representation.
-    //
-    gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Graphics;
-    programDesc.slangProgram = linkedProgram;
-    SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
+    // Now we can call `composedProgram->getEntryPointCode()` to retrieve the
+    // compiled SPIRV code that we will use to create a vulkan compute pipeline.
+    // This will trigger the final Slang compilation and spirv code generation.
+    ComPtr<slang::IBlob> spirvCode;
+    {
+        ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = composedProgram->getEntryPointCode(
+            0, 0, spirvCode.writeRef(), diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        RETURN_ON_FAIL(result);
+    }
 
-    return SLANG_OK;
+    // The following steps are all Vulkan API calls to create a pipeline.
+
+    // First we need to create a descriptor set layout and a pipeline layout.
+    // In this example, the pipeline layout is simple: we have a single descriptor
+    // set with three buffer descriptors for our input/output storage buffers.
+    // General applications typically has much more complicated pipeline layouts,
+    // and should consider using Slang's reflection API to learn about the shader
+    // parameter layout of a shader program. However, Slang's reflection API is
+    // out of scope of this example.
+    VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    descSetLayoutCreateInfo.bindingCount = 3;
+    VkDescriptorSetLayoutBinding bindings[3];
+    for (int i = 0; i < 3; i++)
+    {
+        auto& binding = bindings[i];
+        binding.binding = i;
+        binding.descriptorCount = 1;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        binding.stageFlags = VK_SHADER_STAGE_ALL;
+        binding.pImmutableSamplers = nullptr;
+    }
+    descSetLayoutCreateInfo.pBindings = bindings;
+    RETURN_ON_FAIL(vkAPI.vkCreateDescriptorSetLayout(
+        vkAPI.device, &descSetLayoutCreateInfo, nullptr, &descriptorSetLayout));
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    pipelineLayoutCreateInfo.setLayoutCount = 1;
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+    RETURN_ON_FAIL(vkAPI.vkCreatePipelineLayout(
+        vkAPI.device, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout));
+
+    // Next we create a shader module from the compiled SPIRV code.
+    VkShaderModuleCreateInfo shaderCreateInfo = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    shaderCreateInfo.codeSize = spirvCode->getBufferSize();
+    shaderCreateInfo.pCode = static_cast<const uint32_t*>(spirvCode->getBufferPointer());
+    VkShaderModule vkShaderModule;
+    RETURN_ON_FAIL(
+        vkAPI.vkCreateShaderModule(vkAPI.device, &shaderCreateInfo, nullptr, &vkShaderModule));
+
+    // Now we have all we need to create a compute pipeline.
+    VkComputePipelineCreateInfo pipelineCreateInfo = {
+        VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    pipelineCreateInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipelineCreateInfo.stage.module = vkShaderModule;
+    pipelineCreateInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    pipelineCreateInfo.stage.pName = "main";
+    pipelineCreateInfo.layout = pipelineLayout;
+    RETURN_ON_FAIL(vkAPI.vkCreateComputePipelines(
+        vkAPI.device, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipeline));
+
+    // We can destroy shader module now since it will no longer be used.
+    vkAPI.vkDestroyShaderModule(vkAPI.device, vkShaderModule, nullptr);
+
+    return 0;
 }
 
-//
-// The above function shows the core of what is required to use the
-// Slang API as a simple compiler (e.g., a drop-in replacement for
-// fxc or dxc).
-//
-// The rest of this file implements an extremely simple rendering application
-// that will execute the vertex/fragment shaders loaded with the function
-// we have just defined.
-//
-
-// We will define global variables for the various platform and
-// graphics API objects that our application needs:
-//
-// As a reminder, *none* of these are Slang API objects. All
-// of them come from the utility library we are using to simplify
-// building an example program.
-//
-ComPtr<gfx::IPipelineState> gPipelineState;
-ComPtr<gfx::IBufferResource> gVertexBuffer;
-
-// Now that we've covered the function that actually loads and
-// compiles our Slang shade code, we can go through the rest
-// of the application code without as much commentary.
-//
-Slang::Result initialize()
+int HelloWorldExample::createInOutBuffers()
 {
-    // Create a window for our application to render into.
-    //
-    initializeBase("hello-world", 1024, 768);
+    // Create input and output buffers that resides in device-local memory.
+    for (int i = 0; i < 3; i++)
+    {
+        VkBufferCreateInfo bufferCreateInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        bufferCreateInfo.size = bufferSize;
+        bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                                 VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                                 VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        RETURN_ON_FAIL(
+            vkAPI.vkCreateBuffer(vkAPI.device, &bufferCreateInfo, nullptr, &inOutBuffers[i]));
+        VkMemoryRequirements memoryReqs = {};
+        vkAPI.vkGetBufferMemoryRequirements(vkAPI.device, inOutBuffers[i], &memoryReqs);
 
-    // We will create objects needed to configur the "input assembler"
-    // (IA) stage of the D3D pipeline.
-    //
-    // First, we create an input layout:
-    //
-    InputElementDesc inputElements[] = {
-        { "POSITION", 0, Format::RGB_Float32, offsetof(Vertex, position) },
-        { "COLOR",    0, Format::RGB_Float32, offsetof(Vertex, color) },
-    };
-    auto inputLayout = gDevice->createInputLayout(
-        &inputElements[0],
-        2);
-    if(!inputLayout) return SLANG_FAIL;
+        int memoryTypeIndex = vkAPI.findMemoryTypeIndex(
+            memoryReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        assert(memoryTypeIndex >= 0);
 
-    // Next we allocate a vertex buffer for our pre-initialized
-    // vertex data.
-    //
-    IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
-    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
-    gVertexBuffer = gDevice->createBufferResource(
-        IResource::Usage::VertexBuffer,
-        vertexBufferDesc,
-        &kVertexData[0]);
-    if(!gVertexBuffer) return SLANG_FAIL;
+        VkMemoryPropertyFlags actualMemoryProperites =
+            vkAPI.deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
 
-    // Now we will use our `loadShaderProgram` function to load
-    // the code from `shaders.slang` into the graphics API.
-    //
-    ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, shaderProgram.writeRef()));
+        VkMemoryAllocateInfo allocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        allocateInfo.allocationSize = memoryReqs.size;
+        allocateInfo.memoryTypeIndex = memoryTypeIndex;
+        RETURN_ON_FAIL(
+            vkAPI.vkAllocateMemory(vkAPI.device, &allocateInfo, nullptr, &bufferMemories[i]));
+        RETURN_ON_FAIL(
+            vkAPI.vkBindBufferMemory(vkAPI.device, inOutBuffers[i], bufferMemories[i], 0));
+    }
 
-    // Following the D3D12/Vulkan style of API, we need a pipeline state object
-    // (PSO) to encapsulate the configuration of the overall graphics pipeline.
-    //
-    GraphicsPipelineStateDesc desc;
-    desc.inputLayout = inputLayout;
-    desc.program = shaderProgram;
-    desc.framebufferLayout = gFramebufferLayout;
-    auto pipelineState = gDevice->createGraphicsPipelineState(desc);
-    if (!pipelineState)
-        return SLANG_FAIL;
+    // Create the device memory and buffer object used for reading/writing
+    // data to/from the device local buffers.
+    {
+        VkBufferCreateInfo bufferCreateInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        bufferCreateInfo.size = bufferSize;
+        bufferCreateInfo.usage =
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        RETURN_ON_FAIL(
+            vkAPI.vkCreateBuffer(vkAPI.device, &bufferCreateInfo, nullptr, &stagingBuffer));
+        VkMemoryRequirements memoryReqs = {};
+        vkAPI.vkGetBufferMemoryRequirements(vkAPI.device, stagingBuffer, &memoryReqs);
 
-    gPipelineState = pipelineState;
+        int memoryTypeIndex = vkAPI.findMemoryTypeIndex(
+            memoryReqs.memoryTypeBits,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        assert(memoryTypeIndex >= 0);
 
-    return SLANG_OK;
+        VkMemoryPropertyFlags actualMemoryProperites =
+            vkAPI.deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+
+        VkMemoryAllocateInfo allocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        allocateInfo.allocationSize = memoryReqs.size;
+        allocateInfo.memoryTypeIndex = memoryTypeIndex;
+        RETURN_ON_FAIL(
+            vkAPI.vkAllocateMemory(vkAPI.device, &allocateInfo, nullptr, &stagingMemory));
+        RETURN_ON_FAIL(vkAPI.vkBindBufferMemory(vkAPI.device, stagingBuffer, stagingMemory, 0));
+    }
+
+    // Map staging buffer and writes in the initial input content.
+    float* stagingBufferData = nullptr;
+    vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
+    if (!stagingBufferData)
+        return -1;
+    for (size_t i = 0; i < inputElementCount; i++)
+        stagingBufferData[i] = static_cast<float>(i);
+    vkAPI.vkUnmapMemory(vkAPI.device, stagingMemory);
+
+    // Create a temporary command buffer for recording commands that writes initial
+    // data into the input buffers.
+    VkCommandBuffer uploadCommandBuffer;
+    VkCommandBufferAllocateInfo commandBufferAllocInfo = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    commandBufferAllocInfo.commandBufferCount = 1;
+    commandBufferAllocInfo.commandPool = commandPool;
+    commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    RETURN_ON_FAIL(vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &uploadCommandBuffer));
+
+    VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    vkAPI.vkBeginCommandBuffer(uploadCommandBuffer, &beginInfo);
+    VkBufferCopy bufferCopy = {};
+    bufferCopy.size = bufferSize;
+    vkAPI.vkCmdCopyBuffer(uploadCommandBuffer, stagingBuffer, inOutBuffers[0], 1, &bufferCopy);
+    vkAPI.vkCmdCopyBuffer(uploadCommandBuffer, stagingBuffer, inOutBuffers[1], 1, &bufferCopy);
+    vkAPI.vkEndCommandBuffer(uploadCommandBuffer);
+    VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &uploadCommandBuffer;
+    vkAPI.vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkAPI.vkQueueWaitIdle(queue);
+    vkAPI.vkFreeCommandBuffers(vkAPI.device, commandPool, 1, &uploadCommandBuffer);
+    return 0;
 }
 
-// With the initialization out of the way, we can now turn our attention
-// to the per-frame rendering logic. As with the initialization, there is
-// nothing really Slang-specific here, so the commentary doesn't need
-// to be very detailed.
-//
-virtual void renderFrame(int frameBufferIndex) override
+int HelloWorldExample::dispatchCompute()
 {
-    ComPtr<ICommandBuffer> commandBuffer = gTransientHeaps[frameBufferIndex]->createCommandBuffer();
-    auto renderEncoder = commandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameBufferIndex]);
+    // Create a descriptor pool.
+    VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+        VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+    VkDescriptorPoolSize poolSizes[] = {
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16}};
+    descriptorPoolCreateInfo.maxSets = 4;
+    descriptorPoolCreateInfo.poolSizeCount = sizeof(poolSizes) / sizeof(VkDescriptorPoolSize);
+    descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+    descriptorPoolCreateInfo.flags = 0;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+    RETURN_ON_FAIL(vkAPI.vkCreateDescriptorPool(
+        vkAPI.device, &descriptorPoolCreateInfo, nullptr, &descriptorPool));
 
-    gfx::Viewport viewport = {};
-    viewport.maxZ = 1.0f;
-    viewport.extentX = (float)windowWidth;
-    viewport.extentY = (float)windowHeight;
-    renderEncoder->setViewportAndScissor(viewport);
+    // Allocate descriptor set.
+    VkDescriptorSetAllocateInfo descSetAllocInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    descSetAllocInfo.descriptorPool = descriptorPool;
+    descSetAllocInfo.descriptorSetCount = 1;
+    descSetAllocInfo.pSetLayouts = &descriptorSetLayout;
+    VkDescriptorSet descriptorSet = VK_NULL_HANDLE;
+    RETURN_ON_FAIL(vkAPI.vkAllocateDescriptorSets(vkAPI.device, &descSetAllocInfo, &descriptorSet));
 
-    // In order to bind shader parameters to the pipeline, we need
-    // to know how those parameters were assigned to locations/bindings/registers
-    // for the target graphics API.
-    //
-    // The Slang compiler assigns locations to parameters in a deterministic
-    // fashion, so it is possible for a programmer to hard-code locations
-    // into their application code that will match up with their shaders.
-    //
-    // Hard-coding of locations can become intractable as an application needs
-    // to support more different target platforms and graphics APIs, as well
-    // as more shaders with different specialized variants.
-    //
-    // Rather than rely on hard-coded locations, our examples will make use of
-    // reflection information provided by the Slang compiler (see `programLayout`
-    // above), and our example graphics API layer will translate that reflection
-    // information into a layout for a "root shader object."
-    //
-    // The root object will store values/bindings for all of the parameters in
-    // the `IShaderProgram` used to create the pipeline state. At a conceptual
-    // level we can think of `rootObject` as representing the "global scope" of
-    // the shader program that was loaded; it has entries for each global shader
-    // parameter that was declared.
-    //
-    // Readers who are familiar with D3D12 or Vulkan might think of this root
-    // layout as being similar in spirit to a "root signature" or "pipeline layout."
-    //
-    // We start parameter binding by binding the pipeline state in command encoder.
-    // This method will return a transient root shader object for us to write our
-    // shader parameters into.
-    //
-    auto rootObject = renderEncoder->bindPipeline(gPipelineState);
+    // Write descriptor set.
+    VkWriteDescriptorSet descriptorSetWrites[3] = {};
+    VkDescriptorBufferInfo bufferInfo[3];
+    for (int i = 0; i < 3; i++)
+    {
+        bufferInfo[i].buffer = inOutBuffers[i];
+        bufferInfo[i].offset = 0;
+        bufferInfo[i].range = bufferSize;
 
-    // We will update the model-view-projection matrix that is passed
-    // into the shader code via the `Uniforms` buffer on a per-frame
-    // basis, even though the data that is loaded does not change
-    // per-frame (we always use an identity matrix).
-    //
-    auto deviceInfo = gDevice->getDeviceInfo();
+        descriptorSetWrites[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorSetWrites[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorSetWrites[i].descriptorCount = 1;
+        descriptorSetWrites[i].dstBinding = i;
+        descriptorSetWrites[i].dstSet = descriptorSet;
+        descriptorSetWrites[i].pBufferInfo = &bufferInfo[i];
+    }
+    vkAPI.vkUpdateDescriptorSets(vkAPI.device, 3, descriptorSetWrites, 0, nullptr);
 
-    // We know that `rootObject` is a root shader object created
-    // from our program, and that it is set up to hold values for
-    // all the parameter of that program. In order to actually
-    // set values, we need to be able to look up the location
-    // of speciic parameter that we want to set.
-    //
-    // Our example graphics API layer supports this operation
-    // with the idea of a *shader cursor* which can be thought
-    // of as pointing "into" a particular shader object at
-    // some location/offset. This design choice abstracts over
-    // the many ways that different platforms and APIs represent
-    // the necessary offset information.
-    //
-    // We construct an initial shader cursor that points at the
-    // entire shader program. You can think of this as akin to
-    // a diretory path of `/` for the root directory in a file
-    // system.
-    //
-    ShaderCursor rootCursor(rootObject);
-    //
-    // Next, we use a convenience overload of `operator[]` to
-    // navigate from the root cursor down to the parameter we
-    // want to set.
-    //
-    // The operation `rootCursor["Uniforms"]` looks up the
-    // offset/location of the global shader parameter `Uniforms`
-    // (which is a uniform/constant buffer), and the subsequent
-    // `["modelViewProjection"]` step navigates from there down
-    // to the member named `modelViewProjection` in that buffer.
-    //
-    // Once we have formed a cursor that "points" at the
-    // model-view projection matrix, we can set its data directly.
-    //
-    rootCursor["Uniforms"]["modelViewProjection"].setData(
-        deviceInfo.identityProjectionMatrix, sizeof(float) * 16);
-    //
-    // Some readers might be concerned about the performance o
-    // the above operations because of the use of strings. For
-    // those readers, here are two things to note:
-    //
-    // * While these `operator[]` steps do need to perform string
-    //   comparisons, they do *not* make copies of the strings or
-    //   perform any heap allocation.
-    //
-    // * There are other overloads of `operator[]` that use the
-    //   *index* of a parameter/field instead of its name, and those
-    //   operations have fixed/constant overhead and perform no
-    //   string comparisons. The indices used are independent of
-    //   the target platform and graphics API, and can thus be
-    //   hard-coded even in cross-platform code.
-    //
+    // Allocate command buffer and record dispatch commands.
+    VkCommandBuffer commandBuffer;
+    VkCommandBufferAllocateInfo commandBufferAllocInfo = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    commandBufferAllocInfo.commandBufferCount = 1;
+    commandBufferAllocInfo.commandPool = commandPool;
+    commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    RETURN_ON_FAIL(
+        vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &commandBuffer));
+    VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    vkAPI.vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    vkAPI.vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkAPI.vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        pipelineLayout,
+        0,
+        1,
+        &descriptorSet,
+        0,
+        nullptr);
+    vkAPI.vkCmdDispatch(commandBuffer, (uint32_t)inputElementCount, 1, 1);
+    vkAPI.vkEndCommandBuffer(commandBuffer);
 
-    // We also need to set up a few pieces of fixed-function pipeline
-    // state that are not bound by the pipeline state above.
-    //
-    renderEncoder->setVertexBuffer(0, gVertexBuffer, sizeof(Vertex));
-    renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+    // Submit command buffer and wait.
+    VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    vkAPI.vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkAPI.vkQueueWaitIdle(queue);
+    vkAPI.vkFreeCommandBuffers(vkAPI.device, commandPool, 1, &commandBuffer);
 
-    // Finally, we are ready to issue a draw call for a single triangle.
-    //
-    renderEncoder->draw(3);
-    renderEncoder->endEncoding();
-    commandBuffer->close();
-    gQueue->executeCommandBuffer(commandBuffer);
-
-    // With that, we are done drawing for one frame, and ready for the next.
-    //
-    gSwapchain->present();
+    // Clean up.
+    vkAPI.vkDestroyDescriptorPool(vkAPI.device, descriptorPool, nullptr);
+    return 0;
 }
 
-};
+int HelloWorldExample::printComputeResults()
+{
+    // Allocate command buffer to read back data.
+    VkCommandBuffer commandBuffer;
+    VkCommandBufferAllocateInfo commandBufferAllocInfo = {
+        VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    commandBufferAllocInfo.commandBufferCount = 1;
+    commandBufferAllocInfo.commandPool = commandPool;
+    commandBufferAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    RETURN_ON_FAIL(
+        vkAPI.vkAllocateCommandBuffers(vkAPI.device, &commandBufferAllocInfo, &commandBuffer));
 
-// This macro instantiates an appropriate main function to
-// run the application defined above.
-PLATFORM_UI_MAIN(innerMain<HelloWorld>)
+    // Record commands to copy output buffer into staging buffer.
+    VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    vkAPI.vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    VkBufferCopy bufferCopy = {};
+    bufferCopy.size = bufferSize;
+    vkAPI.vkCmdCopyBuffer(commandBuffer, inOutBuffers[2], stagingBuffer, 1, &bufferCopy);
+    vkAPI.vkEndCommandBuffer(commandBuffer);
+
+    // Execute command buffer and wait.
+    VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+    vkAPI.vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkAPI.vkQueueWaitIdle(queue);
+    vkAPI.vkFreeCommandBuffers(vkAPI.device, commandPool, 1, &commandBuffer);
+
+    // Map and read back staging buffer.
+    float* stagingBufferData = nullptr;
+    vkAPI.vkMapMemory(vkAPI.device, stagingMemory, 0, bufferSize, 0, (void**)&stagingBufferData);
+    if (!stagingBufferData)
+        return -1;
+    for (size_t i = 0; i < inputElementCount; i++)
+    {
+        printf("%f\n", stagingBufferData[i]);
+    }
+    return 0;
+}
+
+HelloWorldExample::~HelloWorldExample()
+{
+    vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
+    for (int i = 0; i < 3; i++)
+    {
+        vkAPI.vkDestroyBuffer(vkAPI.device, inOutBuffers[i], nullptr);
+        vkAPI.vkFreeMemory(vkAPI.device, bufferMemories[i], nullptr);
+    }
+    vkAPI.vkDestroyBuffer(vkAPI.device, stagingBuffer, nullptr);
+    vkAPI.vkFreeMemory(vkAPI.device, stagingMemory, nullptr);
+    vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
+    vkAPI.vkDestroyDescriptorSetLayout(vkAPI.device, descriptorSetLayout, nullptr);
+    vkAPI.vkDestroyCommandPool(vkAPI.device, commandPool, nullptr);
+}
