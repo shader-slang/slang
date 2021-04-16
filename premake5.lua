@@ -634,6 +634,8 @@ end
 -- declaration of the "Hello, World" example project:
 --
 example "hello-world"
+    kind "ConsoleApp"
+    includedirs {"external/vulkan/include"}
 --
 -- Note how we are calling our custom `example()` subroutine with
 -- the same syntax sugar that Premake usually advocates for their
@@ -642,10 +644,14 @@ example "hello-world"
 --
 
 -- Let's go ahead and set up the projects for our other example now.
+example "triangle"
+
 example "gpu-printing"
     kind "ConsoleApp"
 
 example "shader-toy"
+
+example "model-viewer"
 
 example "shader-object"
     kind "ConsoleApp"
@@ -1228,6 +1234,10 @@ standardProject("slang", "source/slang")
                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
             }
     end
+
+    filter {"configurations:debug"}
+        defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
+    filter {}
        
     
 if enableProfile then

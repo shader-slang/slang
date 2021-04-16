@@ -83,6 +83,12 @@ SLANG_API SlangResult slang_createGlobalSession(
     slang::IGlobalSession** outGlobalSession)
 {
     Slang::ComPtr<slang::IGlobalSession> globalSession;
+
+#ifdef SLANG_ENABLE_IR_BREAK_ALLOC
+    // Set inst debug alloc counter to 0 so IRInsts for stdlib always starts from a large value.
+    Slang::_debugGetIRAllocCounter() = 0x80000000;
+#endif
+
     SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(apiVersion, globalSession.writeRef()));
 
     // If we have the embedded stdlib, load from that, else compile it
@@ -106,6 +112,12 @@ SLANG_API SlangResult slang_createGlobalSession(
     }
 
     *outGlobalSession = globalSession.detach();
+
+#ifdef SLANG_ENABLE_IR_BREAK_ALLOC
+    // Reset inst debug alloc counter to 0 so IRInsts for user code always starts from 0.
+    Slang::_debugGetIRAllocCounter() = 0;
+#endif
+
     return SLANG_OK;
 }
 

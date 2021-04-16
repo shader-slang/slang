@@ -345,25 +345,14 @@ struct PerModel
 ParameterBlock<PerModel>    gModelParams;
 
 // We want our shader to work with any kind of lighting environment
-// - that is, and type that implements `ILightEnv`. Furthermore,
-// we want the parameters of that lighting environment to be passed
-// as parameter block - `ParameterBlock<L>` for some type `L`.
-//
-// We handle this by defining a global generic type parameter for
-// our shader, and constrainting it to implement `ILightEnv`...
-//
-type_param TLightEnv : ILightEnv;
-//
-// ... and then defining a parameter block that uses that type
-// parameter as the "element type" of the block:
-//
-ParameterBlock<TLightEnv> gLightEnv;
+// - that is, and type that implements `ILightEnv`.
+
+ILightEnv gLightEnv;
 
 // Our handling of the material parameter for our shader
 // is quite similar to the case for the lighting environment:
 //
-type_param TMaterial : IMaterial;
-ParameterBlock<TMaterial>   gMaterial;
+IMaterial gMaterial;
 
 // Our vertex shader entry point is only marginally more
 // complicated than the Hello World example. We will
@@ -458,14 +447,14 @@ float4 fragmentMain(
     // a BRDF suitable for evaluating under illumination
     // from different light sources.
     //
-    // Note that the return type here is `TMaterial.BRDF`,
+    // Note that the return type here is `gMaterial.BRDF`,
     // which is the `BRDF` type *associated* with the (unknown)
     // `TMaterial` type. When `TMaterial` gets substituted for
     // a concrete type later (e.g., `SimpleMaterial`) this
     // will resolve to a concrete type too (e.g., `SimpleMaterial.BRDF`
     // which is an alias for `BlinnPhong`).
     //
-    TMaterial.BRDF brdf = gMaterial.prepare(g);
+    let brdf = gMaterial.prepare(g);
 
     // Now that we've done the first step of material evaluation
     // and sampled texture maps, etc., it is time to start

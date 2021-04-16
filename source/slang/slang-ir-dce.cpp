@@ -120,6 +120,15 @@ struct DeadCodeEliminationContext
             UInt operandCount = inst->getOperandCount();
             for( UInt ii = 0; ii < operandCount; ++ii )
             {
+                switch (inst->getOp())
+                {
+                case kIROp_BoundInterfaceType:
+                    if (inst->getOperand(ii)->getOp() == kIROp_WitnessTable)
+                        continue;
+                    break;
+                default:
+                    break;
+                }
                 markInstAsLive(inst->getOperand(ii));
             }
 
