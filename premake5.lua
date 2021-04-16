@@ -634,6 +634,8 @@ end
 -- declaration of the "Hello, World" example project:
 --
 example "hello-world"
+    kind "ConsoleApp"
+    includedirs {"external/vulkan/include"}
 --
 -- Note how we are calling our custom `example()` subroutine with
 -- the same syntax sugar that Premake usually advocates for their
@@ -642,6 +644,8 @@ example "hello-world"
 --
 
 -- Let's go ahead and set up the projects for our other example now.
+example "triangle"
+
 example "gpu-printing"
     kind "ConsoleApp"
 
