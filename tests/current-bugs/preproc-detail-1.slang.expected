@@ -1,0 +1,7 @@
+result code = 0
+standard error = {
+tests/current-bugs/preproc-detail-1.slang(10): error 15501: wrong number of arguments to macro (expected 1, got 0)
+}
+standard output = {
+
+}

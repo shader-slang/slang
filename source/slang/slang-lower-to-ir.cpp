@@ -15,6 +15,7 @@
 #include "slang-ir-strip.h"
 #include "slang-ir-validate.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-clone.h"
 
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -6098,23 +6099,32 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto entry = subBuilder->createInterfaceRequirementEntry(
                 getInterfaceRequirementKey(requirementDecl),
                 nullptr);
-            IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
-            if (requirementVal)
+            if (auto inheritance = as<InheritanceDecl>(requirementDecl))
             {
-                switch (requirementVal->getOp())
+                auto irBaseType = lowerType(context, inheritance->base.type);
+                auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
+                entry->setRequirementVal(irWitnessTableType);
+            }
+            else
+            {
+                IRInst* requirementVal = ensureDecl(subContext, requirementDecl).val;
+                if (requirementVal)
                 {
-                case kIROp_Func:
-                case kIROp_Generic:
-                {
-                    // Remove lowered `IRFunc`s since we only care about
-                    // function types.
-                    auto reqType = requirementVal->getFullType();
-                    entry->setRequirementVal(reqType);
-                    break;
-                }
-                default:
-                    entry->setRequirementVal(requirementVal);
-                    break;
+                    switch (requirementVal->getOp())
+                    {
+                    case kIROp_Func:
+                    case kIROp_Generic:
+                        {
+                            // Remove lowered `IRFunc`s since we only care about
+                            // function types.
+                            auto reqType = requirementVal->getFullType();
+                            entry->setRequirementVal(reqType);
+                            break;
+                        }
+                    default:
+                        entry->setRequirementVal(requirementVal);
+                        break;
+                    }
                 }
             }
             irInterface->setOperand(entryIndex, entry);
@@ -6598,6 +6608,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return nullptr;
     }
 
+    static bool isChildOf(IRInst* child, IRInst* parent)
+    {
+        while (child && child->getParent() != parent)
+            child = child->getParent();
+        return child != nullptr;
+    }
+    static void markInstsToClone(HashSet<IRInst*>& valuesToClone, IRInst* parentBlock, IRInst* value)
+    {
+        if (!isChildOf(value, parentBlock))
+            return;
+        if (valuesToClone.Add(value))
+        {
+            for (UInt i = 0; i < value->getOperandCount(); i++)
+            {
+                auto operand = value->getOperand(i);
+                markInstsToClone(valuesToClone, parentBlock, operand);
+            }
+        }
+        for (auto child : value->getChildren())
+            markInstsToClone(valuesToClone, parentBlock, child);
+        auto parent = parentBlock->getParent();
+        while (parent && parent != parentBlock)
+        {
+            valuesToClone.Add(parent);
+            parent = parent->getParent();
+        }
+    }
+
     // If any generic declarations have been created by `emitOuterGenerics`,
     // then finish them off by emitting `return` instructions for the
     // values that they should produce.
@@ -6612,9 +6650,94 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGeneric*  parentGeneric)
     {
         IRInst* v = val;
+
+        IRInst* returnType = v->getFullType();
+
         while (parentGeneric)
         {
+            // Create a universal type in `outterBlock` that will be used
+            // as the type of this generic inst. The return value of the
+            // generic inst will have a specialized type.
+            // For example, if we have a generic function
+            // g0 = generic<T> { return f: T->int }
+            // The type for `g0` should be:
+            // g0Type = generic<T1> { return IRFuncType{T1->int} }
+            // with `g0Type`, we can rewrite `g0` into:
+            // ```
+            //    g0 : g0Type = generic<T>
+            //    {
+            //       ftype = specialize(g0Type, T);
+            //       return f : ftype;
+            //    }
+            // ```
+            IRBuilder typeBuilder;
+            typeBuilder.sharedBuilder = subBuilder->sharedBuilder;
+            IRCloneEnv cloneEnv = {};
+            if (returnType)
+            {
+                HashSet<IRInst*> valuesToClone;
+                markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
+                if (valuesToClone.Count() == 0)
+                {
+                    // If returnType is independent of generic parameters, set
+                    // the generic inst's type to just `returnType`.
+                    parentGeneric->setFullType((IRType*)returnType);
+                }
+                else
+                {
+                    // In the general case, we need to construct a separate
+                    // generic value for the return type, and set the generic's type
+                    // to the newly construct generic value.
+                    typeBuilder.setInsertBefore(parentGeneric);
+                    auto typeGeneric = typeBuilder.emitGeneric();
+                    typeBuilder.setInsertInto(typeGeneric);
+                    typeBuilder.emitBlock();
+                    
+                    for (auto child : parentGeneric->getFirstBlock()->getChildren())
+                    {
+                        if (valuesToClone.Contains(child))
+                        {
+                            cloneInst(&cloneEnv, &typeBuilder, child);
+                        }
+                    }
+                    IRInst* clonedReturnType = nullptr;
+                    cloneEnv.mapOldValToNew.TryGetValue(returnType, clonedReturnType);
+                    SLANG_ASSERT(clonedReturnType);
+                    typeBuilder.emitReturn(clonedReturnType);
+                    parentGeneric->setFullType((IRType*)typeGeneric);
+                    returnType = typeGeneric;
+                }
+            }
+
             subBuilder->setInsertInto(parentGeneric->getFirstBlock());
+#if 0
+            // TODO: we cannot enable this right now as it breaks too many existing code
+            // that is assuming a generic function type is `IRFuncType` rather than `IRSpecialize`.
+            if (v->getFullType() != returnType)
+            {
+                // We need to rewrite the type of the return value as
+                // `specialize(returnType, ...)`.
+                SLANG_ASSERT(returnType->getOp() == kIROp_Generic);
+                auto oldType = v->getFullType();
+                SLANG_ASSERT(isChildOf(oldType, parentGeneric->getFirstBlock()));
+
+                List<IRInst*> specializeArgs;
+                for (auto param : parentGeneric->getParams())
+                {
+                    IRInst* arg = nullptr;
+                    if (cloneEnv.mapOldValToNew.TryGetValue(param, arg))
+                    {
+                        specializeArgs.add(arg);
+                    }
+                }
+                auto specializedType = subBuilder->emitSpecializeInst(
+                    subBuilder->getTypeKind(),
+                    returnType,
+                    (UInt)specializeArgs.getCount(),
+                    specializeArgs.getBuffer());
+                oldType->replaceUsesWith(specializedType);
+            }
+#endif
             subBuilder->emitReturn(v);
             parentGeneric->moveToEnd();
 
@@ -7261,11 +7384,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If this function is defined inside an interface, add a reference to the IRFunc from
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
-        if (auto genericVal = as<IRGeneric>(finalVal))
-        {
-            auto funcType = lowerFuncType(decl);
-            genericVal->setFullType((IRType*)funcType);
-        }
 
         return LoweredValInfo::simple(finalVal);
     }

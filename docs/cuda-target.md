@@ -1,7 +1,9 @@
 Slang CUDA Target Support
 =========================
 
-Slang has preliminary support for producing CUDA source, and PTX binaries using nvrtc. 
+Slang has preliminary support for producing CUDA source, and PTX binaries using (NVRTC)[https://docs.nvidia.com/cuda/nvrtc/index.html]. 
+
+NOTE! NVRTC is only available for 64-bit operating systems. On Windows Visual Studio make sure you are compiling for 'x64' and/or use 64 bit Slang binaries. 
 
 # Features
 
@@ -26,7 +28,7 @@ The following are a work in progress or not implemented but are planned to be so
 
 # How it works
 
-For producing PTX binaries Slang uses NVRTC. NVRTC dll/shared library has to be available to Slang (for example in the appropriate PATH for example) for it to be able to produce PTX.
+For producing PTX binaries Slang uses (NVRTC)[https://docs.nvidia.com/cuda/nvrtc/index.html]. NVRTC dll/shared library has to be available to Slang (for example in the appropriate PATH for example) for it to be able to produce PTX.
 
 The NVRTC compiler can be accessed directly via the pass through mechanism and is identifed by the enum value `SLANG_PASS_THROUGH_NVRTC`.
 

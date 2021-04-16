@@ -72,9 +72,10 @@
     </Expand>
   </Type>
   <Type Name="Slang::IRInst">
-    <DisplayString>{{{m_op}}}</DisplayString>
+    <DisplayString>{{{m_op} #{_debugUID}}}</DisplayString>
     <Expand>
       <Item Name="[op]">m_op</Item>
+      <Item Name="[UID]">_debugUID</Item>
       <Item Name="[type]">typeUse.usedValue</Item>
       <CustomListItems MaxItemsPerView="3">
 		  <Variable Name="child" InitialValue="m_decorationsAndChildren.first"/>
