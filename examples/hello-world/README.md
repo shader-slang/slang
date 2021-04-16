@@ -1,5 +1,5 @@
-Slang "Shader Object" Example
+Slang "Hello World" Example
 ==========================
 
-This example shows how to use the Shader Object model implemented in the `slang-gfx` layer to
-manage shader parameter binding and shader specialization.
+This example shows how to use the Slang API to compile a simple
+compute shader written in Slang into SPIRV and run it in Vulkan.
