@@ -257,19 +257,8 @@ public:
         }
     };
 
-    class FramebufferLayoutImpl
-        : public IFramebufferLayout
-        , public ComObject
+    class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebufferLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
-                return static_cast<IFramebufferLayout*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
@@ -313,16 +302,8 @@ public:
         }
     };
 
-    class InputLayoutImpl: public IInputLayout, public ComObject
+    class InputLayoutImpl : public InputLayoutBase
 	{
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IInputLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
-                return static_cast<IInputLayout*>(this);
-            return nullptr;
-        }
     public:
         List<D3D12_INPUT_ELEMENT_DESC> m_elements;
         List<char> m_text;                              ///< Holds all strings to keep in scope
@@ -2521,7 +2502,7 @@ public:
                 if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IRenderCommandEncoder)
                 {
-                    returnComPtr(outObject, static_cast<IRenderCommandEncoder*>(this));
+                    *outObject = static_cast<IRenderCommandEncoder*>(this);
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
@@ -2903,7 +2884,7 @@ public:
                 if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IComputeCommandEncoder)
                 {
-                    returnComPtr(outObject, static_cast<IComputeCommandEncoder*>(this));
+                    *outObject = static_cast<IComputeCommandEncoder*>(this);
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
