@@ -1305,8 +1305,6 @@ namespace Slang
     static void ParseGenericDeclImpl(
         Parser* parser, GenericDecl* decl, const TFunc & parseInnerFunc)
     {
-        parser->LookAheadToken(TokenType::OpGreater);
-
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
         for (;;)
