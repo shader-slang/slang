@@ -4804,6 +4804,7 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
+            printf("%s\n", diagnostics->getBufferPointer());
             // TODO: report compile error.
         }
         SLANG_RETURN_ON_FAIL(compileResult);

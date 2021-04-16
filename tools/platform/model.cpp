@@ -20,7 +20,10 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace gfx {
+namespace platform {
+
+using namespace gfx;
+using namespace Slang;
 
 // TinyObj provides a tuple type that bundles up indices, but doesn't
 // provide equality comparison or hashing for that type. We'd like
@@ -70,11 +73,11 @@ bool operator==(SmoothingGroupVertexID const& left, SmoothingGroupVertexID const
 
 namespace std
 {
-    template<> struct hash<gfx::ObjIndexKey>
+    template<> struct hash<platform::ObjIndexKey>
     {
-        size_t operator()(gfx::ObjIndexKey const& key) const
+        size_t operator()(platform::ObjIndexKey const& key) const
         {
-            gfx::Hasher hasher;
+            platform::Hasher hasher;
             hasher.add(key.index.vertex_index);
             hasher.add(key.index.normal_index);
             hasher.add(key.index.texcoord_index);
@@ -82,11 +85,11 @@ namespace std
         }
     };
 
-    template<> struct hash<gfx::SmoothingGroupVertexID>
+    template <> struct hash<platform::SmoothingGroupVertexID>
     {
-        size_t operator()(gfx::SmoothingGroupVertexID const& id) const
+        size_t operator()(platform::SmoothingGroupVertexID const& id) const
         {
-            gfx::Hasher hasher;
+            platform::Hasher hasher;
             hasher.add(id.smoothingGroup);
             hasher.add(id.positionID);
             return hasher.state;
@@ -94,7 +97,7 @@ namespace std
     };
 }
 
-namespace gfx
+namespace platform
 {
 
 ComPtr<ITextureResource> loadTextureImage(
@@ -202,7 +205,7 @@ static std::string makeString(const char* start, const char* end)
     return std::string(start, size_t(end - start));
 }
 
-Result ModelLoader::load(
+SlangResult ModelLoader::load(
     char const* inputPath,
     void**      outModel)
 {

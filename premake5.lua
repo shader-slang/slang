@@ -647,6 +647,8 @@ example "gpu-printing"
 
 example "shader-toy"
 
+example "model-viewer"
+
 example "shader-object"
     kind "ConsoleApp"
 
@@ -1228,6 +1230,10 @@ standardProject("slang", "source/slang")
                 "{COPY} ../../../external/slang-binaries/bin/" .. targetName .. "/libslang-glslang.so %{cfg.targetdir}"
             }
     end
+
+    filter {"configurations:debug"}
+        defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
+    filter {}
        
     
 if enableProfile then
