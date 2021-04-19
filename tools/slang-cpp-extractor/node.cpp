@@ -1,16 +1,12 @@
 #include "node.h"
 
+#include "file-util.h"
+
 namespace CppExtract {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static void _indent(Index indentCount, StringBuilder& out)
-{
-    for (Index i = 0; i < indentCount; ++i)
-    {
-        out << CPP_EXTRACT_INDENT_STRING;
-    }
-}
+SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { FileUtil::indent(indentCount, out); }
 
 void Node::calcScopeDepthFirst(List<Node*>& outNodes)
 {

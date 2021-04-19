@@ -81,8 +81,7 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
             }
             else if (arg == "-dump")
             {
-                outOptions.m_dump = true;
-                m_index++;
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-dump", outOptions.m_dump));
                 continue;
             }
             else if (arg == "-mark-prefix")
@@ -110,13 +109,18 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
                 SLANG_RETURN_ON_FAIL(_parseArgWithValue("-strip-prefix", outOptions.m_stripFilePrefix));
                 continue;
             }
+            else if (arg == "-unit-test")
+            {
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-unit-test", outOptions.m_enableUnitTests));
+                continue;
+            }
 
             m_sink->diagnose(SourceLoc(), CPPDiagnostics::unknownOption, arg);
             return SLANG_FAIL;
         }
         else
         {
-            // If it starts with - then it an unknown option
+            // If it doesn't start with - then it's assumed to be an input path
             outOptions.m_inputPaths.add(arg);
             m_index++;
         }

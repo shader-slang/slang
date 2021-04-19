@@ -213,9 +213,6 @@ struct ClassLikeNode : public ScopeNode
 template <typename T>
 T* as(Node* node) { return (node && T::isType(node->m_type)) ? static_cast<T*>(node) : nullptr; }
 
-// A macro to define a single indent as a string
-#define CPP_EXTRACT_INDENT_STRING "    "
-
 } // CppExtract
 
 #endif
