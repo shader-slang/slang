@@ -432,6 +432,12 @@ struct IRInst
 
     void removeAndDeallocateAllDecorationsAndChildren();
 
+#ifdef SLANG_ENABLE_IR_BREAK_ALLOC
+    // Unique allocation ID for this instruction since start of current process.
+    // Used to aid debugging only.
+    uint32_t _debugUID;
+#endif
+
     // The type of the result value of this instruction,
     // or `null` to indicate that the instruction has
     // no value.
@@ -603,7 +609,14 @@ struct IRType : IRInst
 {
     IRType* getCanonicalType() { return this; }
 
-    IR_PARENT_ISA(Type)
+    // Hack: specialize can also be a type. We should consider using a
+    // separate `specializeType` op code for types so we can use the normal
+    // `IR_PARENT_ISA` macro here.
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = (kIROpMeta_OpMask & opIn);
+        return (op >= kIROp_FirstType && op <= kIROp_LastType) || op == kIROp_Specialize;
+    }
 };
 
 IRType* unwrapArray(IRType* type);
@@ -1549,6 +1562,10 @@ bool isBuiltin(IRInst* inst);
 
     // Get the enclosuing function of an instruction.
 IRFunc* getParentFunc(IRInst* inst);
+
+#if SLANG_ENABLE_IR_BREAK_ALLOC
+uint32_t& _debugGetIRAllocCounter();
+#endif
 
 }
 

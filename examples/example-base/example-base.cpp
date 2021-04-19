@@ -1,4 +1,10 @@
 #include "example-base.h"
+#include <chrono>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
 
 using namespace Slang;
 using namespace gfx;
@@ -20,6 +26,7 @@ Slang::Result WindowedAppBase::initializeBase(const char* title, int width, int 
 
     // Initialize the rendering layer.
     IDevice::Desc deviceDesc = {};
+    // deviceDesc.slang.targetFlags = SLANG_TARGET_FLAG_DUMP_IR;
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if (SLANG_FAILED(res))
         return res;
@@ -158,3 +165,11 @@ void WindowedAppBase::windowSizeChanged()
         }
     }
 }
+
+int64_t getCurrentTime() { return std::chrono::high_resolution_clock::now().time_since_epoch().count(); }
+
+int64_t getTimerFrequency() { return std::chrono::high_resolution_clock::period::den; }
+
+#ifdef _WIN32
+void _Win32OutputDebugString(const char* str) { OutputDebugStringW(Slang::String(str).toWString().begin()); }
+#endif

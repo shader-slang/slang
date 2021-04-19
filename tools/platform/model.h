@@ -7,7 +7,9 @@
 #include <vector>
 #include <string>
 
-namespace gfx {
+#include "platform-api.h"
+
+namespace platform {
 
 struct ModelLoader
 {
@@ -17,7 +19,7 @@ struct ModelLoader
         glm::vec3                   specularColor;
         float                       specularity;
 
-        ComPtr<ITextureResource>     diffuseMap;
+        Slang::ComPtr<gfx::ITextureResource>     diffuseMap;
     };
 
     struct Vertex
@@ -39,9 +41,9 @@ struct ModelLoader
 
     struct ModelData
     {
-        ComPtr<IBufferResource> vertexBuffer;
-        ComPtr<IBufferResource> indexBuffer;
-        PrimitiveTopology       primitiveTopology;
+        Slang::ComPtr<gfx::IBufferResource> vertexBuffer;
+        Slang::ComPtr<gfx::IBufferResource> indexBuffer;
+        gfx::PrimitiveTopology       primitiveTopology;
         int                     vertexCount;
         int                     indexCount;
         int                     meshCount;
@@ -65,12 +67,12 @@ struct ModelLoader
         FlipWinding = 1 << 0,
     };
 
-    ICallbacks*              callbacks = nullptr;
-    Slang::ComPtr<IDevice> device;
-    LoadFlags                loadFlags = 0;
-    float                    scale = 1.0f;
+    ICallbacks* callbacks = nullptr;
+    gfx::IDevice* device;
+    LoadFlags loadFlags = 0;
+    float scale = 1.0f;
 
-    Result load(char const* inputPath, void** outModel);
+    SLANG_PLATFORM_API SlangResult load(char const* inputPath, void** outModel);
 };
 
 
