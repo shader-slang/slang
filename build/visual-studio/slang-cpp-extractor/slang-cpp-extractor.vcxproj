@@ -162,11 +162,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h" />
-    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\diagnostic-defs.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\diagnostics.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\options.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\parser.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\diagnostics.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\options.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\parser.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp" />
   </ItemGroup>
   <ItemGroup>
