@@ -9,15 +9,39 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostic-defs.h">
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\diagnostic-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.h">
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\diagnostics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\options.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-diagnostics.cpp">
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\diagnostics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\options.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp">
