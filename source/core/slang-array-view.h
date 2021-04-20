@@ -12,6 +12,8 @@ namespace Slang
     class ConstArrayView
     {
     public:
+        typedef ConstArrayView ThisType;
+
         const T* begin() const { return m_buffer; }
         
         const T* end() const { return m_buffer + m_count; }
@@ -70,6 +72,30 @@ namespace Slang
             return -1;
         }
 
+        bool operator==(const ThisType& rhs) const
+        {
+            if (&rhs == this)
+            {
+                return true;
+            }
+            const Index count = getCount();
+            if (count != rhs.getCount())
+            {
+                return false;
+            }
+            const T* thisEle = getBuffer();
+            const T* rhsEle = rhs.getBuffer();
+            for (Index i = 0; i < count; ++i)
+            {
+                if (thisEle[i] != rhsEle[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
         ConstArrayView() :
             m_buffer(nullptr),
             m_count(0)
@@ -111,6 +137,8 @@ namespace Slang
     class ArrayView: public ConstArrayView<T>
     {
     public:
+        typedef ArrayView ThisType;
+
         typedef ConstArrayView<T> Super;
         
         using Super::m_buffer;
@@ -147,6 +175,7 @@ namespace Slang
     {
         return ArrayView<T>(buffer, count);
     }
+
 }
 
 #endif
