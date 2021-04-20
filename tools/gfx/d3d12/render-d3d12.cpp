@@ -508,7 +508,7 @@ public:
             uint32_t viewHeapSize,
             uint32_t samplerHeapSize)
         {
-            Super::init(desc, device);
+            Super::init(desc, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT, device);
             auto d3dDevice = device->m_device;
             SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
                 D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));

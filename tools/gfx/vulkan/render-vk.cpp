@@ -777,6 +777,24 @@ public:
                 slang::VariableLayoutReflection* varLayout = nullptr)
             {
                 SlangInt descriptorSetCount = typeLayout->getDescriptorSetCount();
+                SlangInt defaultDescriptorSetIndex;
+                // If the type has ordinary uniform data fields, we need to make sure to create
+                // a descriptor set with a constant buffer binding in the case that the shader
+                // object is bound as a stand alone parameter block.
+                uint32_t bindingOffset = 0;
+                if (typeLayout->getSize() != 0)
+                {
+                    defaultDescriptorSetIndex = findOrAddDescriptorSet(0);
+                    auto& descriptorSetInfo = m_descriptorSetBuildInfos[defaultDescriptorSetIndex];
+                    VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
+                    vkBindingRangeDesc.binding = 0;
+                    bindingOffset = 1;
+                    vkBindingRangeDesc.descriptorCount = 1;
+                    vkBindingRangeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    vkBindingRangeDesc.stageFlags = VK_SHADER_STAGE_ALL;
+                    descriptorSetInfo.vkBindings.add(vkBindingRangeDesc);
+                }
+
                 for (SlangInt s = 0; s < descriptorSetCount; ++s)
                 {
                     SlangInt descriptorRangeCount =
@@ -803,7 +821,7 @@ public:
 
                         auto vkDescriptorType = _mapDescriptorType(slangBindingType);
                         VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
-                        vkBindingRangeDesc.binding =
+                        vkBindingRangeDesc.binding = bindingOffset +
                             (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(s, r);
                         vkBindingRangeDesc.descriptorCount =
                             (uint32_t)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
@@ -3050,6 +3068,17 @@ public:
                     m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
                     m_boundIndexBuffer.m_offset,
                     m_boundIndexFormat);
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
+                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(indexCount), 1, 0, 0);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -4366,7 +4395,10 @@ Result VKDevice::TransientResourceHeapImpl::init(
     const ITransientResourceHeap::Desc& desc,
     VKDevice* device)
 {
-    Super::init(desc, device);
+    Super::init(
+        desc,
+        (uint32_t)device->m_api.m_deviceProperties.limits.minUniformBufferOffsetAlignment,
+        device);
 
     m_descSetAllocator.m_api = &device->m_api;
 
@@ -5474,8 +5506,7 @@ Result VKDevice::createShaderObjectLayout(
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
-    SLANG_RETURN_ON_FAIL(
-        ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
+    SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
