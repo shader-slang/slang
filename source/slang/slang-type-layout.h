@@ -437,6 +437,7 @@ public:
         struct SubObjectRangeInfo
         {
             Int     bindingRangeIndex;
+            Int     spaceOffset;
         };
 
         List<RefPtr<DescriptorSetInfo>> m_descriptorSets;
