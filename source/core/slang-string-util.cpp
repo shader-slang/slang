@@ -80,7 +80,7 @@ namespace Slang {
 
     while (start < end)
     {
-        // Move cur so it's either at the end or at next split character
+        // Move cur so it's either at the end or at next splitSlice
         const char* cur = start;
         while (cur < end)
         {
