@@ -62,6 +62,12 @@ struct TestState
         SourceOrigin* sourceOrigin = tree.addSourceOrigin(sourceFile, state.m_options);
 
         Parser parser(&tree, &state.m_sink);
+
+        {
+            const Node::Type enableTypes[] = { Node::Type::Enum, Node::Type::EnumClass, Node::Type::EnumCase };
+            parser.setTypesEnabled(enableTypes, SLANG_COUNT_OF(enableTypes));
+        }
+
         SLANG_RETURN_ON_FAIL(parser.parse(sourceOrigin, &state.m_options));
     }
 

@@ -15,6 +15,8 @@ class Parser
 {
 public:
 
+    typedef uint32_t NodeTypeBitType;
+
     SlangResult expect(TokenType type, Token* outToken = nullptr);
 
     bool advanceIfMarker(Token* outToken = nullptr);
@@ -29,12 +31,18 @@ public:
         /// Parse the contents of the source file
     SlangResult parse(SourceOrigin* sourceOrigin, const Options* options);
 
+    void setTypeEnabled(Node::Type type, bool isEnabled = true);
+    bool isTypeEnabled(Node::Type type) { return (m_nodeTypeEnabled & (NodeTypeBitType(1) << int(type))) != 0; }
+    void setTypesEnabled(const Node::Type* types, Index typesCount, bool isEnabled = true);
+
     Parser(NodeTree* nodeTree, DiagnosticSink* sink);
 
 protected:
     static Node::Type _toNodeType(IdentifierStyle style);
 
     bool _isMarker(const UnownedStringSlice& name);
+
+    SlangResult _maybeConsumeScope();
 
     SlangResult _parsePreDeclare();
     SlangResult _parseTypeSet();
@@ -59,6 +67,8 @@ protected:
     void _consumeTypeModifiers();
 
     SlangResult _consumeToSync();
+
+    NodeTypeBitType m_nodeTypeEnabled;
 
     TokenList m_tokenList;
     TokenReader m_reader;

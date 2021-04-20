@@ -10,12 +10,46 @@
 namespace CppExtract {
 using namespace Slang;
 
+// If fails then we need more bits to identify types
+SLANG_COMPILE_TIME_ASSERT(int(Node::Type::CountOf) <= 8 * sizeof(uint32_t));
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Parser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink) :
     m_sink(sink),
-    m_nodeTree(nodeTree)
+    m_nodeTree(nodeTree),
+    m_nodeTypeEnabled(0)
 {
+    // Enable types by default
+    const Node::Type defaultEnabled[] =
+    {
+        Node::Type::ClassType,
+        Node::Type::StructType,
+        Node::Type::Namespace,
+        Node::Type::AnonymousNamespace,
+        Node::Type::Field,
+    };
+    setTypesEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
+}
+
+void Parser::setTypeEnabled(Node::Type type, bool isEnabled )
+{
+    if (isEnabled)
+    {
+        m_nodeTypeEnabled |= (NodeTypeBitType(1) << int(type));
+    }
+    else
+    {
+        m_nodeTypeEnabled &= ~(NodeTypeBitType(1) << int(type));
+    }
+}
+
+void Parser::setTypesEnabled(const Node::Type* types, Index typesCount, bool isEnabled)
+{
+    for (Index i = 0; i < typesCount; ++i)
+    {
+        setTypeEnabled(types[i], isEnabled);
+    }
 }
 
 bool Parser::_isMarker(const UnownedStringSlice& name)
@@ -161,6 +195,31 @@ SlangResult Parser::popScope()
 
     m_currentScope = m_currentScope->m_parentScope;
     return SLANG_OK;
+}
+
+SlangResult Parser::_maybeConsumeScope()
+{
+    // Look for either ; or { to open scope
+    while (true)
+    {
+        const TokenType type = m_reader.peekTokenType();
+        if (type == TokenType::Semicolon)
+        {
+            m_reader.advanceToken();
+            return SLANG_OK;
+        }
+        else if (type == TokenType::LBrace)
+        {
+            m_reader.advanceToken();
+            return consumeToClosingBrace();
+        }
+        else if (type == TokenType::EndOfFile)
+        {
+            return SLANG_OK;
+        }
+
+        m_reader.advanceToken();
+    }
 }
 
 SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
@@ -393,6 +452,10 @@ SlangResult Parser::_maybeParseNode(Node::Type type)
 
         // Just ignore it then
         return SLANG_OK;
+    }
+    else if (Node::isEnumLikeType(type))
+    {
+        return _parseEnum();
     }
 
     // Must be class | struct
@@ -953,9 +1016,10 @@ SlangResult Parser::_maybeParseField()
 {
     switch (style)
     {
-        case IdentifierStyle::Class: return Node::Type::ClassType;
-        case IdentifierStyle::Struct: return Node::Type::StructType;
-        case IdentifierStyle::Namespace: return Node::Type::Namespace;
+        case IdentifierStyle::Class:        return Node::Type::ClassType;
+        case IdentifierStyle::Struct:       return Node::Type::StructType;
+        case IdentifierStyle::Namespace:    return Node::Type::Namespace;
+        case IdentifierStyle::Enum:         return Node::Type::Enum;
         default: return Node::Type::Invalid;
     }
 }
@@ -1107,11 +1171,6 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
                 switch (style)
                 {
-                    case IdentifierStyle::Enum:
-                    {
-                        SLANG_RETURN_ON_FAIL(_parseEnum());
-                        break;
-                    }
                     case IdentifierStyle::PreDeclare:
                     {
                         SLANG_RETURN_ON_FAIL(_parsePreDeclare());
@@ -1153,7 +1212,16 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                         if (flags & IdentifierFlag::StartScope)
                         {
                             Node::Type type = _toNodeType(style);
-                            SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
+                            SLANG_ASSERT(type != Node::Type::Invalid);
+
+                            if (isTypeEnabled(type))
+                            {
+                                SLANG_RETURN_ON_FAIL(_maybeParseNode(type));
+                            }
+                            else
+                            {
+                                SLANG_RETURN_ON_FAIL(_maybeConsumeScope());
+                            }
                         }
                         else
                         {

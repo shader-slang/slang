@@ -35,7 +35,9 @@ public:
         AnonymousNamespace,
 
         Field,
-        EnumCase,       
+        EnumCase,
+
+        CountOf,
     };
 
     enum class TypeRange
