@@ -176,7 +176,9 @@ class CacheFileSystem: public ISlangFileSystemExt, public RefObject
 
 protected:
     
-        /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode. outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
+        /// Given a path, works out a uniqueIdentity, based on the uniqueIdentityMode.
+        /// outFileContents will be set if file had to be read to produce the uniqueIdentity (ie with Hash)
+        /// If the file doesn't have to be read, then outFileContents will be nullptr, even if it is backed by a file.
     SlangResult _calcUniqueIdentity(const String& path, String& outUniqueIdentity, ComPtr<ISlangBlob>& outFileContents);
 
         /// For a given path gets a PathInfo. Can return nullptr, if it is not possible to create the PathInfo for some reason

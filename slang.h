@@ -1006,22 +1006,26 @@ extern "C"
 
         /** Get a uniqueIdentity which uniquely identifies an object of the file system.
            
-        Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same file on the file system.
+        Given a path, returns a 'uniqueIdentity' which ideally is the same value for the same object on the file system.
 
-        The uniqueIdentity is used to compare if files are the same - which allows slang to cache source contents internally. It is also used
-        for #pragma once functionality.
+        The uniqueIdentity is used to compare if two paths are the same - which amongst other things allows Slang to
+        cache source contents internally. It is also used for #pragma once functionality.
 
         A *requirement* is for any implementation is that two paths can only return the same uniqueIdentity if the
-        contents of the two files are *identical*. If an implementation breaks this constraint it can produce incorrect compilation.
+        contents of the two files are *identical*h. If an implementation breaks this constraint it can produce incorrect compilation.
         If an implementation cannot *strictly* identify *the same* files, this will only have an effect on #pragma once behavior.
 
         The string for the uniqueIdentity is held zero terminated in the ISlangBlob of outUniqueIdentity.
    
         Note that there are many ways a uniqueIdentity may be generated for a file. For example it could be the
-        'canonical path' - assuming it is available and unambitious for a file system. Another possible mechanism
+        'canonical path' - assuming it is available and unambiguous for a file system. Another possible mechanism
         could be to store the filename combined with the file date time to uniquely identify it.
      
         The client must ensure the blob be released when no longer used, otherwise memory will leak.
+
+        NOTE! Ideally this method would be called 'getPathUniqueIdentity' but for historical reasons and
+        backward compatibility it's name remains with 'File' even though an implementation should be made to work
+        with directories too.
 
         @param path
         @param outUniqueIdentity
