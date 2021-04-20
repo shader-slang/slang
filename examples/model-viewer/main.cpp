@@ -846,6 +846,8 @@ void renderFrame(int frameIndex) override
     glm::mat4x4 correctionMatrix;
     memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float)*16);
     viewProjection = correctionMatrix * viewProjection;
+    // glm uses column-major layout, we need to translate it to row-major.
+    viewProjection = glm::transpose(viewProjection);
 
     auto drawCommandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
     auto drawCommandEncoder =

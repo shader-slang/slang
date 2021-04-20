@@ -3792,9 +3792,7 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 
 Result D3D12Device::initialize(const Desc& desc)
 {
-    auto slangDesc = desc.slang;
-    slangDesc.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(slangDesc, SLANG_DXBC, "sm_5_1"));
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_1"));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
