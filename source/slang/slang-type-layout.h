@@ -310,6 +310,7 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
 };
 
 struct LayoutRulesImpl;
+class VarLayout;
 
 // Base class for things that store layout info
 class Layout : public RefObject
@@ -436,8 +437,9 @@ public:
 
         struct SubObjectRangeInfo
         {
-            Int     bindingRangeIndex;
-            Int     spaceOffset;
+            Int                 bindingRangeIndex = 0;
+            Int                 spaceOffset = 0;
+            RefPtr<VarLayout>   offsetVarLayout;
         };
 
         List<RefPtr<DescriptorSetInfo>> m_descriptorSets;

@@ -1991,6 +1991,8 @@ extern "C"
     SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_getPendingDataTypeLayout(SlangReflectionTypeLayout* type);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSpecializedTypePendingDataVarLayout(SlangReflectionTypeLayout* type);
+    SLANG_API SlangInt spReflectionType_getSpecializedTypeArgCount(SlangReflectionType* type);
+    SLANG_API SlangReflectionType* spReflectionType_getSpecializedTypeArgType(SlangReflectionType* type, SlangInt index);
 
     SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangBindingType spReflectionTypeLayout_getBindingRangeType(SlangReflectionTypeLayout* typeLayout, SlangInt index);
@@ -2013,6 +2015,7 @@ extern "C"
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
+    SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSubObjectRangeOffset(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
 
 #if 0
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
@@ -2692,6 +2695,13 @@ namespace slang
         SlangInt getSubObjectRangeSpaceOffset(SlangInt subObjectRangeIndex)
         {
             return spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
+                (SlangReflectionTypeLayout*) this,
+                subObjectRangeIndex);
+        }
+
+        VariableLayoutReflection* getSubObjectRangeOffset(SlangInt subObjectRangeIndex)
+        {
+            return (VariableLayoutReflection*) spReflectionTypeLayout_getSubObjectRangeOffset(
                 (SlangReflectionTypeLayout*) this,
                 subObjectRangeIndex);
         }

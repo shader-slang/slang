@@ -26,6 +26,7 @@ Slang::Result WindowedAppBase::initializeBase(const char* title, int width, int 
 
     // Initialize the rendering layer.
     IDevice::Desc deviceDesc = {};
+    deviceDesc.deviceType = gfx::DeviceType::DirectX12;
     // deviceDesc.slang.targetFlags = SLANG_TARGET_FLAG_DUMP_IR;
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if (SLANG_FAILED(res))
