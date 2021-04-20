@@ -44,5 +44,49 @@ void IdentifierLookup::set(const char*const* names, size_t namesCount, Identifie
     }
 }
 
+void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
+{
+    reset();
+
+    // Some keywords
+    {
+        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
+    }
+
+    // Type modifier keywords
+    {
+        const char* names[] = { "const", "volatile" };
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
+    }
+
+    // Special markers
+    {
+        const char* names[] = { "PRE_DECLARE", "TYPE_SET", "REFLECTED", "UNREFLECTED" };
+        const IdentifierStyle styles[] = { IdentifierStyle::PreDeclare, IdentifierStyle::TypeSet, IdentifierStyle::Reflected, IdentifierStyle::Unreflected };
+        SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(names) == SLANG_COUNT_OF(styles));
+
+        StringBuilder buf;
+        for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
+        {
+            buf.Clear();
+            buf << markPrefix << names[i];
+            set(buf.getUnownedSlice(), styles[i]);
+        }
+    }
+
+    // Keywords which introduce types/scopes
+    {
+        set("struct", IdentifierStyle::Struct);
+        set("class", IdentifierStyle::Class);
+        set("namespace", IdentifierStyle::Namespace);
+    }
+
+    // Keywords that control access
+    {
+        const char* names[] = { "private", "protected", "public" };
+        set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
+    }
+}
 
 } // namespace CppExtract

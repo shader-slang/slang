@@ -66,6 +66,8 @@ public:
         m_pool.clear();
     }
 
+    void initDefault(const UnownedStringSlice& markPrefix);
+
     IdentifierLookup() :
         m_pool(StringSlicePool::Style::Empty)
     {

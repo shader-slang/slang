@@ -24,7 +24,7 @@ struct Options
 
     bool m_defs = false;            ///< If set will output a '-defs.h' file for each of the input files, that corresponds to previous defs files (although doesn't have fields/RAW)
     bool m_dump = false;            ///< If true will dump to stderr the types/fields and hierarchy it extracted
-    bool m_enableUnitTests = false; ///< If true will run internal unit tests
+    bool m_runUnitTests = false;    ///< If true will run internal unit tests
 
     bool m_outputFields = false;     ///< When dumping macros also dump field definitions
 

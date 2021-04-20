@@ -36,6 +36,9 @@
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\unit-test.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\cpp-extractor-main.cpp">
@@ -63,6 +66,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

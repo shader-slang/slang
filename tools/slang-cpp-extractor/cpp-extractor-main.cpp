@@ -27,6 +27,7 @@
 #include "parser.h"
 #include "macro-writer.h"
 #include "file-util.h"
+#include "unit-test.h"
 
 /*
 Some command lines:
@@ -62,9 +63,6 @@ public:
 
 protected:
 
-        /// Called to set up identifier lookup. Must be performed after options are initials
-    static void _initIdentifierLookup(const Options& options, IdentifierLookup& outLookup);
-
     NamePool m_namePool;
 
     Options m_options;
@@ -75,58 +73,17 @@ protected:
 };
 
 
-
-/* static */void App::_initIdentifierLookup(const Options& options, IdentifierLookup& outLookup)
-{
-    outLookup.reset();
-
-    // Some keywords
-    {
-        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
-        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
-    }
-
-    // Type modifier keywords
-    {
-        const char* names[] = { "const", "volatile" };
-        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::TypeModifier);
-    }
-
-    // Special markers
-    {
-        const char* names[] = {"PRE_DECLARE", "TYPE_SET", "REFLECTED", "UNREFLECTED"};
-        const IdentifierStyle styles[] = { IdentifierStyle::PreDeclare, IdentifierStyle::TypeSet, IdentifierStyle::Reflected, IdentifierStyle::Unreflected };
-        SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(names) == SLANG_COUNT_OF(styles));
-
-        StringBuilder buf;        
-        for (Index i = 0; i < SLANG_COUNT_OF(names); ++i)
-        {
-            buf.Clear();
-            buf << options.m_markPrefix << names[i];
-            outLookup.set(buf.getUnownedSlice(), styles[i]);
-        }
-    }
-
-    // Keywords which introduce types/scopes
-    {
-        outLookup.set("struct", IdentifierStyle::Struct);
-        outLookup.set("class", IdentifierStyle::Class);
-        outLookup.set("namespace", IdentifierStyle::Namespace);
-    }
-
-    // Keywords that control access
-    {
-        const char* names[] = { "private", "protected", "public" };
-        outLookup.set(names, SLANG_COUNT_OF(names), IdentifierStyle::Access);
-    }
-}
-
 SlangResult App::execute(const Options& options)
 {
     m_options = options;
 
+    if (options.m_runUnitTests)
+    {
+        SLANG_RETURN_ON_FAIL(UnitTestUtil::run());
+    }
+
     IdentifierLookup identifierLookup;
-    _initIdentifierLookup(options, identifierLookup);
+    identifierLookup.initDefault(options.m_markPrefix.getUnownedSlice());
 
     NodeTree tree(&m_slicePool, &m_namePool, &identifierLookup);
 

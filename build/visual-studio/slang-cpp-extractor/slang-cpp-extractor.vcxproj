@@ -171,6 +171,7 @@
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\options.h" />
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\parser.h" />
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\unit-test.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\cpp-extractor-main.cpp" />
@@ -182,6 +183,7 @@
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\options.cpp" />
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\parser.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

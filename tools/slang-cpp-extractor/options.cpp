@@ -111,7 +111,7 @@ SlangResult OptionsParser::parse(int argc, const char*const* argv, DiagnosticSin
             }
             else if (arg == "-unit-test")
             {
-                SLANG_RETURN_ON_FAIL(_parseArgFlag("-unit-test", outOptions.m_enableUnitTests));
+                SLANG_RETURN_ON_FAIL(_parseArgFlag("-unit-test", outOptions.m_runUnitTests));
                 continue;
             }
 
