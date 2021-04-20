@@ -5506,7 +5506,8 @@ Result VKDevice::createShaderObjectLayout(
     ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
-    SLANG_RETURN_ON_FAIL(ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
+    SLANG_RETURN_ON_FAIL(
+        ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
