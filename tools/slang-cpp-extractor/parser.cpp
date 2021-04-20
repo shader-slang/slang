@@ -1086,6 +1086,7 @@ SlangResult Parser::_maybeParseField()
         case IdentifierStyle::Struct:       return Node::Type::StructType;
         case IdentifierStyle::Namespace:    return Node::Type::Namespace;
         case IdentifierStyle::Enum:         return Node::Type::Enum;
+        case IdentifierStyle::TypeDef:      return Node::Type::TypeDef;
         default: return Node::Type::Invalid;
     }
 }
