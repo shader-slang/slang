@@ -1198,9 +1198,13 @@ namespace Slang
         // TypeLayouts created on the fly by reflection API
         Dictionary<Type*, RefPtr<TypeLayout>> typeLayouts;
 
+        Dictionary<Type*, ParameterBlockType*> parameterBlockTypes;
+
         Dictionary<Type*, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
         TypeLayout* getTypeLayout(Type* type);
+
+        TypeLayout* getParameterBlockLayout(Type* type);
 
     private:
         Linkage*                linkage = nullptr;
@@ -1274,6 +1278,11 @@ namespace Slang
             SlangInt               targetIndex = 0,
             slang::LayoutRules     rules = slang::LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) override;
+        SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getParameterBlockLayout(
+            slang::TypeReflection* elementType,
+            SlangInt targetIndex = 0,
+            slang::LayoutRules rules = slang::LayoutRules::Default,
+            ISlangBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL getTypeRTTIMangledName(
             slang::TypeReflection* type,
             ISlangBlob** outNameBlob) override;
