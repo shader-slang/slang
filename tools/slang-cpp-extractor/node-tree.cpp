@@ -98,7 +98,7 @@ SlangResult NodeTree::_calcDerivedTypesRec(ScopeNode* inScopeNode, DiagnosticSin
                 return SLANG_FAIL;
             }
 
-            Node* superNode = Node::findNode(parentScope, classLikeNode->m_super.getContent());
+            Node* superNode = Node::lookup(parentScope, classLikeNode->m_super.getContent());
 
             if (!superNode)
             {

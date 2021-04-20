@@ -50,11 +50,13 @@ protected:
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
 
+    SlangResult _parseTypeDef();
     SlangResult _parseEnum();
 
+    SlangResult _maybeParseType(List<Token>& outToks);
     SlangResult _maybeParseType(UnownedStringSlice& outType);
 
-    SlangResult _maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth);
+    SlangResult _maybeParseType(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArgs(Index& ioTemplateDepth);
     SlangResult _maybeParseTemplateArg(Index& ioTemplateDepth);
 

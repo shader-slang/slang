@@ -16,12 +16,6 @@
 namespace CppExtract {
 using namespace Slang;
 
-static const char enumSource[] =
-"enum SomeEnum\n"
-"{\n"
-"    Value,\n"
-"    Another = 10,\n"
-"};\n";
 
 struct TestState
 {
@@ -46,6 +40,15 @@ struct TestState
     IdentifierLookup m_identifierLookup;
 };
 
+static const char someSource[] =
+"enum SomeEnum\n"
+"{\n"
+"    Value,\n"
+"    Another = 10,\n"
+"};\n"
+"typedef SomeEnum AliasEnum;\n";
+
+
 /* static */SlangResult UnitTestUtil::run()
 {
     {
@@ -53,8 +56,8 @@ struct TestState
 
         NodeTree tree(&state.m_slicePool, &state.m_namePool, &state.m_identifierLookup);
         
-        UnownedStringSlice contents = UnownedStringSlice::fromLiteral(enumSource);
-        PathInfo pathInfo = PathInfo::makeFromString("enum.h");
+        UnownedStringSlice contents = UnownedStringSlice::fromLiteral(someSource);
+        PathInfo pathInfo = PathInfo::makeFromString("source.h");
 
         SourceManager* sourceManager = &state.m_sourceManager;
 
@@ -64,7 +67,7 @@ struct TestState
         Parser parser(&tree, &state.m_sink);
 
         {
-            const Node::Type enableTypes[] = { Node::Type::Enum, Node::Type::EnumClass, Node::Type::EnumCase };
+            const Node::Type enableTypes[] = { Node::Type::Enum, Node::Type::EnumClass, Node::Type::EnumCase, Node::Type::TypeDef };
             parser.setTypesEnabled(enableTypes, SLANG_COUNT_OF(enableTypes));
         }
 

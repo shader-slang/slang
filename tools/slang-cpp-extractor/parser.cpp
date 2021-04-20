@@ -419,7 +419,6 @@ SlangResult Parser::_parseEnum()
     SLANG_RETURN_ON_FAIL(expect(TokenType::RBrace));
     SLANG_RETURN_ON_FAIL(expect(TokenType::Semicolon));
 
-
     return popScope();
 }
 
@@ -630,8 +629,7 @@ SlangResult Parser::_maybeParseTemplateArg(Index& ioTemplateDepth)
     {
         case TokenType::Identifier:
         {
-            UnownedStringSlice name;
-            SLANG_RETURN_ON_FAIL(_maybeParseType(name, ioTemplateDepth));
+            SLANG_RETURN_ON_FAIL(_maybeParseType(ioTemplateDepth));
             return SLANG_OK;
         }
         case TokenType::IntegerLiteral:
@@ -771,10 +769,8 @@ UnownedStringSlice Parser::_concatTokens(TokenReader::ParsingCursor start)
     return typePool->getSlice(typePool->add(buf));
 }
 
-SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth)
+SlangResult Parser::_maybeParseType(Index& ioTemplateDepth)
 {
-    auto startCursor = m_reader.getCursor();
-
     _consumeTypeModifiers();
 
     advanceIfToken(TokenType::Scope);
@@ -824,15 +820,15 @@ SlangResult Parser::_maybeParseType(UnownedStringSlice& outType, Index& ioTempla
         break;
     }
 
-    // We can build up the out type, from the tokens we found
-    outType = _concatTokens(startCursor);
     return SLANG_OK;
 }
 
-SlangResult Parser::_maybeParseType(UnownedStringSlice& outType)
+SlangResult Parser::_maybeParseType(List<Token>& outToks)
 {
+    auto startCursor = m_reader.getCursor();
+
     Index templateDepth = 0;
-    SlangResult res = _maybeParseType(outType, templateDepth);
+    SlangResult res = _maybeParseType(templateDepth);
     if (SLANG_FAILED(res) && m_sink->getErrorCount())
     {
         return res;
@@ -843,6 +839,37 @@ SlangResult Parser::_maybeParseType(UnownedStringSlice& outType)
         m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
         return SLANG_FAIL;
     }
+
+    auto endCursor = m_reader.getCursor();
+    m_reader.setCursor(startCursor);
+
+    while (!m_reader.isAtCursor(endCursor))
+    {
+        outToks.add(m_reader.advanceToken());
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult Parser::_maybeParseType(UnownedStringSlice& outType)
+{
+    auto startCursor = m_reader.getCursor();
+
+    Index templateDepth = 0;
+    SlangResult res = _maybeParseType(templateDepth);
+    if (SLANG_FAILED(res) && m_sink->getErrorCount())
+    {
+        return res;
+    }
+
+    if (templateDepth != 0)
+    {
+        m_sink->diagnose(m_reader.peekToken(), CPPDiagnostics::unexpectedTemplateClose);
+        return SLANG_FAIL;
+    }
+
+    // We can build up the out type, from the tokens we found
+    outType = _concatTokens(startCursor);
     return SLANG_OK;
 }
 
@@ -931,6 +958,45 @@ SlangResult Parser::_parseBalanced(DiagnosticSink* sink)
         // Skip the token
         m_reader.advanceToken();
     }
+}
+
+SlangResult Parser::_parseTypeDef()
+{
+    if (!m_currentScope->acceptsTypes())
+    {
+        m_sink->diagnose(m_reader.peekLoc(), CPPDiagnostics::cannotDeclareTypeInScope);
+        return SLANG_FAIL;
+    }
+
+    // Consume the typedef
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
+
+    // Parse the type
+    List<Token> toks;
+    SLANG_RETURN_ON_FAIL(_maybeParseType(toks));
+
+    Token name;
+
+    // Get the name
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &name));
+
+    if (Node::lookupNameInScope(m_currentScope, name.getContent()))
+    {
+        m_sink->diagnose(name.loc, CPPDiagnostics::identifierAlreadyDefined, name.getContent());
+        return SLANG_FAIL;
+    }
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Semicolon));
+
+    RefPtr<TypeDefNode> node = new TypeDefNode;
+    node->m_name = name;
+
+    // Set what aliases too
+    node->m_targetTypeTokens.swapWith(toks);
+
+    m_currentScope->addChild(node);
+
+    return SLANG_OK;
 }
 
 SlangResult Parser::_maybeParseField()
@@ -1203,6 +1269,19 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                     {
                         m_reader.advanceToken();
                         SLANG_RETURN_ON_FAIL(expect(TokenType::Colon));
+                        break;
+                    }
+                    case IdentifierStyle::TypeDef:
+                    {
+                        if (isTypeEnabled(Node::Type::TypeDef))
+                        {
+                            SLANG_RETURN_ON_FAIL(_parseTypeDef());
+                        }
+                        else
+                        {
+                            m_reader.advanceToken();
+                            SLANG_RETURN_ON_FAIL(_consumeToSync());
+                        }
                         break;
                     }
                     default:

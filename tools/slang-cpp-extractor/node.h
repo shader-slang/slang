@@ -37,6 +37,8 @@ public:
         Field,
         EnumCase,
 
+        TypeDef,
+
         CountOf,
     };
 
@@ -92,6 +94,8 @@ public:
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
 
+    ScopeNode* getRootScope();
+
     typedef bool(*Filter)(Node* node);
 
     static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
@@ -104,8 +108,19 @@ public:
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
-        /// Find the name starting in specified scope
-    static Node* findNode(ScopeNode* scope, const UnownedStringSlice& name);
+        /// Lookup a name in just the specified scope
+        /// Handles anonymous namespaces, or name lookups that are in the parents space
+    static Node* lookupNameInScope(ScopeNode* scope, const UnownedStringSlice& name);
+
+        /// Lookup from a path
+    static Node* lookupFromScope(ScopeNode* scope, const UnownedStringSlice* path, Index pathCount);
+        /// Looks up *just* from the specified scope. 
+    static Node* lookupFromScope(ScopeNode* scope, const UnownedStringSlice& slice);
+
+        /// Look up name (which can contain ::) 
+    static Node* lookup(ScopeNode* scope, const UnownedStringSlice& name);
+
+    static void splitPath(const UnownedStringSlice& slice, List<UnownedStringSlice>& outSplitPath);
 
     Node(Type type) :
         m_type(type),
@@ -267,6 +282,21 @@ struct EnumNode : public ScopeNode
     }
 
     Token m_backingToken;
+};
+
+struct TypeDefNode : public Node
+{
+    typedef Node Super;
+    static bool isType(Type type) { return type == Type::TypeDef; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    TypeDefNode():
+        Super(Type::TypeDef)
+    {
+    }
+
+    List<Token> m_targetTypeTokens;
 };
 
 template <typename T>

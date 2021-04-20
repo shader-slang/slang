@@ -23,6 +23,8 @@ enum class IdentifierStyle
     Namespace,          ///< namespace
     Enum,               ///< enum
 
+    TypeDef,            ///< typedef
+
     Access,             ///< public, protected, private
 
     Reflected,

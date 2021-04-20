@@ -17,6 +17,8 @@ using namespace Slang;
     IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Namespace
     IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Enum
 
+    IdentifierFlag::Keyword,                              /// Typedef 
+
     IdentifierFlag::Keyword,                              /// Access
     IdentifierFlag::Reflection,                           /// Reflected
     IdentifierFlag::Reflection,                           /// Unreflected
@@ -61,7 +63,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
 
     // Some keywords
     {
-        const char* names[] = { "virtual", "typedef", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
+        const char* names[] = { "virtual", "continue", "if", "case", "break", "catch", "default", "delete", "do", "else", "for", "new", "goto", "return", "switch", "throw", "using", "while", "operator" };
         set(names, SLANG_COUNT_OF(names), IdentifierStyle::Keyword);
     }
 
@@ -94,6 +96,7 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
             { "class", IdentifierStyle::Class },
             { "namespace", IdentifierStyle::Namespace },
             { "enum", IdentifierStyle::Enum },
+            { "typedef", IdentifierStyle::TypeDef },
         };
 
         set(pairs, SLANG_COUNT_OF(pairs));
