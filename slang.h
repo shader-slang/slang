@@ -2012,6 +2012,7 @@ extern "C"
 
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
+    SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(SlangReflectionTypeLayout* typeLayout, SlangInt subObjectRangeIndex);
 
 #if 0
     SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeCount(SlangReflectionTypeLayout* typeLayout);
@@ -2684,6 +2685,13 @@ namespace slang
         SlangInt getSubObjectRangeBindingRangeIndex(SlangInt subObjectRangeIndex)
         {
             return spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(
+                (SlangReflectionTypeLayout*) this,
+                subObjectRangeIndex);
+        }
+
+        SlangInt getSubObjectRangeSpaceOffset(SlangInt subObjectRangeIndex)
+        {
+            return spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
                 (SlangReflectionTypeLayout*) this,
                 subObjectRangeIndex);
         }
