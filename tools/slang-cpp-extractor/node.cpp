@@ -129,7 +129,38 @@ void ScopeNode::addChild(Node* child)
 Node* ScopeNode::findChild(const UnownedStringSlice& name) const
 {
     Node** nodePtr = m_childMap.TryGetValue(name);
-    return (nodePtr) ? *nodePtr : nullptr;
+    if (nodePtr)
+    {
+        return *nodePtr;
+    }
+
+#if 0
+    // If we have an anonymous namespace in this scope, try looking up in there..
+    if (m_anonymousNamespace)
+    {
+        Node* foundNode = m_anonymousNamespace->findChild(name);
+        if (foundNode)
+        {
+            return foundNode;
+        }
+    }
+
+    // I could have an enum (that's not an enum class)
+    for (Node* node : m_children)
+    {
+        EnumNode* enumNode = as<EnumNode>(node);
+        if (enumNode && enumNode->m_type == Node::Type::Enum)
+        {
+            nodePtr = enumNode->m_childMap.TryGetValue(name);
+            if (nodePtr)
+            {
+                return *nodePtr;
+            }
+        }
+    }
+#endif
+
+    return nullptr;
 }
 
 void ScopeNode::calcScopeDepthFirst(List<Node*>& outNodes)
@@ -171,6 +202,66 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
     }
 
     _indent(indentCount, out);
+    out << "}\n";
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumCaseNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void EnumCaseNode::dump(int indent, StringBuilder& out)
+{
+    if (isReflected())
+    {
+        _indent(indent, out);
+        out  << m_name.getContent();
+
+        if (m_value.type != TokenType::Invalid)
+        {
+            out << " = ";
+            out << m_value.getContent();
+        }
+
+        out << ",\n";
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void EnumNode::dump(int indent, StringBuilder& out)
+{
+    if (!isReflected())
+    {
+        return;
+    }
+
+    _indent(indent, out);
+
+    out << "enum ";
+
+    if (m_type == Type::EnumClass)
+    {
+        out << "class ";
+    }
+
+    if (m_name.type != TokenType::Invalid)
+    {
+        out << m_name.getContent();
+    }
+
+    if (m_backingToken.type != TokenType::Invalid)
+    {
+        out << " : " << m_backingToken.getContent();
+    }
+
+    out << "\n";
+    _indent(indent, out);
+    out << "{\n";
+
+    for (Node* child : m_children)
+    {
+        child->dump(indent + 1, out);
+    }
+
+    _indent(indent, out);
     out << "}\n";
 }
 

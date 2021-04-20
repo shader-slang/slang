@@ -11,14 +11,16 @@ using namespace Slang;
     0,              /// Type set
     IdentifierFlag::Keyword,              /// TypeModifier
     IdentifierFlag::Keyword,              /// Keyword
+
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Class
     IdentifierFlag::Keyword | IdentifierFlag::StartScope | IdentifierFlag::ClassLike, /// Struct
     IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Namespace
+    IdentifierFlag::Keyword | IdentifierFlag::StartScope, /// Enum
+
     IdentifierFlag::Keyword,                              /// Access
     IdentifierFlag::Reflection,                           /// Reflected
     IdentifierFlag::Reflection,                           /// Unreflected
 };
-
 
 void IdentifierLookup::set(const UnownedStringSlice& name, IdentifierStyle style)
 {
@@ -41,6 +43,15 @@ void IdentifierLookup::set(const char*const* names, size_t namesCount, Identifie
     for (size_t i = 0; i < namesCount; ++i)
     {
         set(UnownedStringSlice(names[i]), style);
+    }
+}
+
+void IdentifierLookup::set(const Pair* pairs, Index pairsCount)
+{
+    for (Index i = 0; i < pairsCount; ++i)
+    {
+        const auto& pair = pairs[i];
+        set(UnownedStringSlice(pair.name), pair.style);
     }
 }
 
@@ -77,9 +88,15 @@ void IdentifierLookup::initDefault(const UnownedStringSlice& markPrefix)
 
     // Keywords which introduce types/scopes
     {
-        set("struct", IdentifierStyle::Struct);
-        set("class", IdentifierStyle::Class);
-        set("namespace", IdentifierStyle::Namespace);
+        const Pair pairs[] =
+        {
+            { "struct", IdentifierStyle::Struct },
+            { "class", IdentifierStyle::Class },
+            { "namespace", IdentifierStyle::Namespace },
+            { "enum", IdentifierStyle::Enum },
+        };
+
+        set(pairs, SLANG_COUNT_OF(pairs));
     }
 
     // Keywords that control access

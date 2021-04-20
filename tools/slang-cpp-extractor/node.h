@@ -28,10 +28,14 @@ public:
         StructType,
         ClassType,
 
+        Enum,               
+        EnumClass,
+
         Namespace,
         AnonymousNamespace,
 
         Field,
+        EnumCase,       
     };
 
     enum class TypeRange
@@ -41,10 +45,29 @@ public:
 
         ClassLikeStart = int(Type::StructType),
         ClassLikeEnd = int(Type::ClassType),
+
+        EnumStart = int(Type::Enum),
+        EnumEnd = int(Type::EnumClass),
     };
 
     static bool isScopeType(Type type) { return int(type) >= int(TypeRange::ScopeStart) && int(type) <= int(TypeRange::ScopeEnd); }
     static bool isClassLikeType(Type type) { return int(type) >= int(TypeRange::ClassLikeStart) &&  int(type) <= int(TypeRange::ClassLikeEnd); }
+    static bool isEnumLikeType(Type type) { return int(type) >= int(TypeRange::EnumStart) &&  int(type) <= int(TypeRange::EnumEnd); }
+    static bool canAcceptTypes(Type type)
+    {
+        switch (type)
+        {
+            case Type::StructType:
+            case Type::ClassType:
+            case Type::Namespace:
+            case Type::AnonymousNamespace:
+            {
+                return true;
+            }
+            default: break;
+        }
+        return false;
+    }
 
     static bool isType(Type type) { return true; }
 
@@ -108,6 +131,8 @@ struct ScopeNode : public Node
 
         /// True if can accept fields (class like types can)
     bool acceptsFields() const { return isClassLike(); }
+        /// True if the scope can accept types
+    bool acceptsTypes() const { return canAcceptTypes(m_type); }
 
         /// Gets the reflection for any contained types
     ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
@@ -208,6 +233,38 @@ struct ClassLikeNode : public ScopeNode
 
     Token m_super;                   ///< Super class name
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
+};
+
+struct EnumCaseNode : public Node
+{
+    typedef Node Super;
+
+    static bool isType(Type type) { return type == Type::EnumCase; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    EnumCaseNode():
+        Super(Type::EnumCase)
+    {
+    }
+
+    Token m_value;              ///< If not defined will be invalid
+};
+
+struct EnumNode : public ScopeNode
+{
+    typedef ScopeNode Super;
+    static bool isType(Type type) { return isEnumLikeType(type); }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    EnumNode(Type type):
+        Super(type)
+    {
+        SLANG_ASSERT(isEnumLikeType(type));
+    }
+
+    Token m_backingToken;
 };
 
 template <typename T>

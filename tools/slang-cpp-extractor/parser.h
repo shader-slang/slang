@@ -42,6 +42,8 @@ protected:
     SlangResult _maybeParseNode(Node::Type type);
     SlangResult _maybeParseField();
 
+    SlangResult _parseEnum();
+
     SlangResult _maybeParseType(UnownedStringSlice& outType);
 
     SlangResult _maybeParseType(UnownedStringSlice& outType, Index& ioTemplateDepth);

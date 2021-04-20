@@ -17,9 +17,12 @@ enum class IdentifierStyle
 
     TypeModifier,       ///< const, volatile etc
     Keyword,            ///< A keyword C/C++ keyword that is not another type
+
     Class,              ///< class
     Struct,             ///< struct
     Namespace,          ///< namespace
+    Enum,               ///< enum
+
     Access,             ///< public, protected, private
 
     Reflected,
@@ -45,6 +48,12 @@ class IdentifierLookup
 {
 public:
 
+    struct Pair
+    {
+        const char* name;
+        IdentifierStyle style;
+    };
+
     IdentifierStyle get(const UnownedStringSlice& slice) const
     {
         Index index = m_pool.findIndex(slice);
@@ -59,6 +68,8 @@ public:
     void set(const UnownedStringSlice& name, IdentifierStyle style);
 
     void set(const char*const* names, size_t namesCount, IdentifierStyle style);
+
+    void set(const Pair* pairs, Index pairsCount);
 
     void reset()
     {

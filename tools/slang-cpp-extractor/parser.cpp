@@ -204,6 +204,166 @@ SlangResult Parser::consumeToClosingBrace(const Token* inOpenBraceToken)
     }
 }
 
+
+SlangResult Parser::_parseEnum()
+{
+    // We are looking for
+    // enum ([class name] | [name]) [: base] ( { | ; )
+
+    Token enumToken;
+
+    // consume enum
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &enumToken));
+
+    if (!m_currentScope->acceptsTypes())
+    {
+        m_sink->diagnose(enumToken.loc, CPPDiagnostics::cannotDeclareTypeInScope);
+        return SLANG_FAIL;
+    }
+
+    Node::Type type = Node::Type::Enum;
+
+    Token nameToken;
+    if (advanceIfToken(TokenType::Identifier, &nameToken))
+    {
+        const IdentifierStyle style = m_nodeTree->m_identifierLookup->get(nameToken.getContent());
+
+        if (style == IdentifierStyle::Class)
+        {
+            type = Node::Type::EnumClass;
+            SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &nameToken));
+        }
+        else if (style == IdentifierStyle::None)
+        {
+            // It holds the name then
+        }
+        else
+        {
+            m_sink->diagnose(nameToken.loc, CPPDiagnostics::expectingIdentifier, nameToken.getContent());
+            return SLANG_FAIL;
+        }
+    }
+
+    RefPtr<EnumNode> node = new EnumNode(type);
+    node->m_name = nameToken;
+
+    if (advanceIfToken(TokenType::Colon))
+    {
+        // We may have tokens up to { or ;
+        List<Token> backingTokens;
+
+        while (true)
+        {
+            TokenType tokenType = m_reader.peekTokenType();
+            if (tokenType == TokenType::Semicolon ||
+                tokenType == TokenType::LBrace ||
+                tokenType == TokenType::EndOfFile)
+            {
+                break;
+            }
+
+            backingTokens.add(m_reader.advanceToken());
+        }
+
+        // TODO - Look up the backing type. It can only be an integral. We can assume it must be defined before lookup
+        // for our uses here.
+        // If we can't find the type, we could assume it's size is undefined
+
+        if (backingTokens.getCount() == 1)
+        {
+            node->m_backingToken = backingTokens[0];
+        }
+    }
+
+    pushScope(node);
+
+    if (advanceIfToken(TokenType::Semicolon))
+    {
+        if (nameToken.type != TokenType::Invalid)
+        {
+            Node* node = m_currentScope->findChild(nameToken.getContent());
+            if (node)
+            {
+                // Strictly speaking we should check the backing type etc, match, but for now ignore and assume it's ok
+
+                if (node->m_type == type)
+                {
+                    return SLANG_OK;
+                }
+                m_sink->diagnose(nameToken.loc, CPPDiagnostics::typeAlreadyDeclared, nameToken.getContent());
+                return SLANG_FAIL;
+            }
+            return popScope();
+        }
+    }
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LBrace));
+
+    while (true)
+    {
+        TokenType tokenType = m_reader.peekTokenType();
+        if (tokenType == TokenType::RBrace)
+        {
+            break;
+        }
+
+        RefPtr<EnumCaseNode> caseNode(new EnumCaseNode);
+
+        // We could also check if the name is a valid identifier for name, for now just assume.
+        SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &caseNode->m_name));
+
+        if (node->findChild(caseNode->m_name.getContent()))
+        {
+            m_sink->diagnose(caseNode->m_name.loc, CPPDiagnostics::identifierAlreadyDefined, caseNode->m_name.getContent());
+            return SLANG_FAIL;
+        }
+
+        // Add the value
+        node->addChild(caseNode);
+
+        // TODO(JS):
+        // This could be better. We could lookup the value etc. For now just assume only one token is valid.
+        
+        if (advanceIfToken(TokenType::OpAssign))
+        {
+            List<Token> valueTokens;
+            // Consume up to } or ,
+            while (true)
+            {
+                TokenType assignType = m_reader.peekTokenType();
+
+                if (assignType == TokenType::Comma ||
+                    assignType == TokenType::RBrace ||
+                    assignType == TokenType::EndOfFile)
+                {
+                    break;
+                }
+                valueTokens.add(m_reader.advanceToken());
+            }
+
+            if (valueTokens.getCount() == 1)
+            {
+                caseNode->m_value = valueTokens[0];
+            }
+        }
+
+        tokenType = m_reader.peekTokenType();
+        if (tokenType == TokenType::Comma)
+        {
+            m_reader.advanceToken();
+            continue;
+        }
+    
+        break;
+    }
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RBrace));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Semicolon));
+
+
+    return popScope();
+}
+
 SlangResult Parser::_maybeParseNode(Node::Type type)
 {
     // We are looking for
@@ -947,6 +1107,11 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
 
                 switch (style)
                 {
+                    case IdentifierStyle::Enum:
+                    {
+                        SLANG_RETURN_ON_FAIL(_parseEnum());
+                        break;
+                    }
                     case IdentifierStyle::PreDeclare:
                     {
                         SLANG_RETURN_ON_FAIL(_parsePreDeclare());
