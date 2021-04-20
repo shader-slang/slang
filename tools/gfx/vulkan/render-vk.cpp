@@ -153,16 +153,8 @@ public:
         const VulkanApi* m_api;
     };
 
-    class InputLayoutImpl : public IInputLayout, public ComObject
+    class InputLayoutImpl : public InputLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IInputLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
-                return static_cast<IInputLayout*>(this);
-            return nullptr;
-        }
     public:
         List<VkVertexInputAttributeDescription> m_vertexDescs;
         int m_vertexSize;
@@ -310,19 +302,8 @@ public:
         VkDeviceSize                size;
     };
 
-    class FramebufferLayoutImpl
-        : public IFramebufferLayout
-        , public ComObject
+    class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebufferLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
-                return static_cast<IFramebufferLayout*>(this);
-            return nullptr;
-        }
-
     public:
         VkRenderPass m_renderPass;
         RefPtr<VKDevice> m_renderer;

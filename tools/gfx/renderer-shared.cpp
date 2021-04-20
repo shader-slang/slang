@@ -183,6 +183,20 @@ IShaderProgram* gfx::ShaderProgramBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+IInputLayout* gfx::InputLayoutBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
+        return static_cast<IInputLayout*>(this);
+    return nullptr;
+}
+
+IFramebufferLayout* gfx::FramebufferLayoutBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
+        return static_cast<IFramebufferLayout*>(this);
+    return nullptr;
+}
+
 IPipelineState* gfx::PipelineStateBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
@@ -197,6 +211,14 @@ void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)
     auto program = desc.getProgram();
     m_program = program;
     isSpecializable = (program->slangProgram && program->slangProgram->getSpecializationParamCount() != 0);
+
+    // Hold a strong reference to inputLayout and framebufferLayout objects to prevent it from
+    // destruction.
+    if (inDesc.type == PipelineType::Graphics)
+    {
+        inputLayout = static_cast<InputLayoutBase*>(inDesc.graphics.inputLayout);
+        framebufferLayout = static_cast<FramebufferLayoutBase*>(inDesc.graphics.framebufferLayout);
+    }
 }
 
 IDevice* gfx::RendererBase::getInterface(const Guid& guid)

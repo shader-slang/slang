@@ -265,19 +265,8 @@ protected:
         float m_clearValue[4];
     };
 
-    class FramebufferLayoutImpl
-        : public IFramebufferLayout
-        , public ComObject
+    class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebufferLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
-                return static_cast<IFramebufferLayout*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
@@ -345,16 +334,8 @@ protected:
         }
     };
 
-    class InputLayoutImpl: public IInputLayout, public ComObject
+    class InputLayoutImpl: public InputLayoutBase
 	{
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IInputLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
-                return static_cast<IInputLayout*>(this);
-            return nullptr;
-        }
     public:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};

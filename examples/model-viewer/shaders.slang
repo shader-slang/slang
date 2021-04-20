@@ -468,7 +468,6 @@ float4 fragmentMain(
     // `illuminance` loop in RenderMan Shading Language works.
     //
 
-    float3 color = gLightEnv.illuminate(g, brdf, V);
-
+    float3 color = saturate(gLightEnv.illuminate(g, brdf, V) + float3(0.3));
     return float4(color, 1);
 }
