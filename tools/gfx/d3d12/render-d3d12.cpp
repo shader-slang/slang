@@ -1213,16 +1213,19 @@ public:
                             // guarantee that the descritpors used by non-sub-object binding ranges are all
                             // contiguous.
                             //
-                            auto subObjectType =
-                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                            // This call will add all descriptor ranges reported in `typeLayout` that is associated
+                            // with `bindingRangeIndex`.
+                            //
                             addBindingRange(
-                                subObjectType,
+                                typeLayout,
                                 physicalDescriptorSetIndex,
                                 offset,
                                 bindingRangeIndex);
 
                             // We also need to recurse into the element type of the constant buffer to add
                             // any binding ranges defined in the element type.
+                            auto subObjectType =
+                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
                             BindingRegisterOffset subOffset;
                             subOffset.spaceOffset =
                                 offset.spaceOffset +
