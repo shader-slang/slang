@@ -44,8 +44,7 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
-            // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
-        case kIROp_HalfType:    return UnownedStringSlice("half");
+        case kIROp_HalfType:    return UnownedStringSlice("__half");
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
@@ -70,8 +69,7 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
-            // Not clear just yet how we should handle half... we want all processing as float probly, but when reading/writing to memory converting
-        case kIROp_HalfType:    return UnownedStringSlice("half");
+        case kIROp_HalfType:    return UnownedStringSlice("__half");
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
@@ -160,12 +158,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
     switch (type->getOp())
     {
-        case kIROp_HalfType:
-        {
-            // Special case half
-            out << getBuiltinTypeName(kIROp_FloatType);
-            return SLANG_OK;
-        }
         case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
