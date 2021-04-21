@@ -1,12 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE:-E
 
-#if 0
+// Test that diagnostics appear for invalid tokens.
+
+#if 1
 // Octal warning
 000
 /// Unclosed string literal
 "Hello!
-/// A non 7 bit ascii code
-Š
 #else
 Hello
 #endif
