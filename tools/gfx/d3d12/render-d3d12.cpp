@@ -257,19 +257,8 @@ public:
         }
     };
 
-    class FramebufferLayoutImpl
-        : public IFramebufferLayout
-        , public ComObject
+    class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebufferLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
-                return static_cast<IFramebufferLayout*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
@@ -313,16 +302,8 @@ public:
         }
     };
 
-    class InputLayoutImpl: public IInputLayout, public ComObject
+    class InputLayoutImpl : public InputLayoutBase
 	{
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IInputLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
-                return static_cast<IInputLayout*>(this);
-            return nullptr;
-        }
     public:
         List<D3D12_INPUT_ELEMENT_DESC> m_elements;
         List<char> m_text;                              ///< Holds all strings to keep in scope
@@ -1033,6 +1014,35 @@ public:
                 return result;
             }
 
+            Result addDescriptorRange(
+                Index physicalDescriptorSetIndex,
+                D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
+                UINT registerIndex,
+                UINT spaceIndex,
+                UINT count)
+            {
+                auto& descriptorSet = m_descriptorSets[physicalDescriptorSetIndex];
+
+                D3D12_DESCRIPTOR_RANGE range = {};
+                range.RangeType = rangeType;
+                range.NumDescriptors = count;
+                range.BaseShaderRegister = registerIndex;
+                range.RegisterSpace = spaceIndex;
+                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+                if (range.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
+                {
+                    descriptorSet.m_samplerRanges.add(range);
+                    descriptorSet.m_samplerCount += range.NumDescriptors;
+                }
+                else
+                {
+                    descriptorSet.m_resourceRanges.add(range);
+                    descriptorSet.m_resourceCount += range.NumDescriptors;
+                }
+
+                return SLANG_OK;
+            }
                 /// Add one descriptor range as specified in Slang reflection information to the layout.
                 ///
                 /// The layout information is taken from `typeLayout` for the descriptor
@@ -1056,8 +1066,6 @@ public:
                 Index                           logicalDescriptorSetIndex,
                 Index                           descriptorRangeIndex)
             {
-                auto& descriptorSet = m_descriptorSets[physicalDescriptorSetIndex];
-
                 auto bindingType = typeLayout->getDescriptorSetDescriptorRangeType(logicalDescriptorSetIndex, descriptorRangeIndex);
                 auto count = typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(logicalDescriptorSetIndex, descriptorRangeIndex);
                 auto index = typeLayout->getDescriptorSetDescriptorRangeIndexOffset(logicalDescriptorSetIndex, descriptorRangeIndex);
@@ -1066,25 +1074,12 @@ public:
                 D3D12_DESCRIPTOR_RANGE_TYPE rangeType;
                 SLANG_RETURN_ON_FAIL(translateDescriptorRangeType(bindingType, &rangeType));
 
-                D3D12_DESCRIPTOR_RANGE range = {};
-                range.RangeType = rangeType;
-                range.NumDescriptors = (UINT) count;
-                range.BaseShaderRegister = (UINT) index + offset[rangeType];
-                range.RegisterSpace = (UINT) space;
-                range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-                if (range.RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
-                {
-                    descriptorSet.m_samplerRanges.add(range);
-                    descriptorSet.m_samplerCount += range.NumDescriptors;
-                }
-                else
-                {
-                    descriptorSet.m_resourceRanges.add(range);
-                    descriptorSet.m_resourceCount += range.NumDescriptors;
-                }
-
-                return SLANG_OK;
+                return addDescriptorRange(
+                    physicalDescriptorSetIndex,
+                    rangeType,
+                    (UINT)index + offset[rangeType],
+                    (UINT)space,
+                    (UINT)count);
             }
 
                 /// Add one binding range to the computed layout.
@@ -1196,14 +1191,11 @@ public:
                     addBindingRange(typeLayout, physicalDescriptorSetIndex, offset, bindingRangeIndex);
                 }
 
-                // Next we need to recurse on the various sub-objects that the type might contain.
+                // Next we need to add any sub binding ranges in `ConstantBuffer` bindings.
                 // 
                 Index subObjectCount = typeLayout->getSubObjectRangeCount();
                 for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectCount; subObjectRangeIndex++)
                 {
-                    // There are a few different concerns being tackled at once here, which depend on
-                    // the type of each sub-object range.
-                    //
                     auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
                     auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
                     switch (bindingType)
@@ -1221,55 +1213,116 @@ public:
                             // guarantee that the descritpors used by non-sub-object binding ranges are all
                             // contiguous.
                             //
-                            addBindingRange(typeLayout, physicalDescriptorSetIndex, offset, bindingRangeIndex);
+                            // This call will add all descriptor ranges reported in `typeLayout` that is associated
+                            // with `bindingRangeIndex`.
+                            //
+                            addBindingRange(
+                                typeLayout,
+                                physicalDescriptorSetIndex,
+                                offset,
+                                bindingRangeIndex);
+
+                            // We also need to recurse into the element type of the constant buffer to add
+                            // any binding ranges defined in the element type.
+                            auto subObjectType =
+                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                            BindingRegisterOffset subOffset;
+                            subOffset.spaceOffset =
+                                offset.spaceOffset +
+                                (uint32_t)typeLayout->getSubObjectRangeSpaceOffset(
+                                    subObjectRangeIndex);
+                            addParameterBlocks(
+                                _unwrapParameterGroups(subObjectType),
+                                physicalDescriptorSetIndex,
+                                subOffset);
                         }
                         break;
+                    default:
+                        break;
+                    }
+                }
 
+                addParameterBlocks(typeLayout, physicalDescriptorSetIndex, offset);
+            }
+
+                /// Add child parameter blocks defined in `typeLayout` to the root signature.
+            void addParameterBlocks(
+                slang::TypeLayoutReflection* typeLayout,
+                Index physicalDescriptorSetIndex,
+                BindingRegisterOffset const& offset)
+            {
+                Index subObjectCount = typeLayout->getSubObjectRangeCount();
+                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectCount;
+                     subObjectRangeIndex++)
+                {
+                    // There are a few different concerns being tackled at once here, which depend
+                    // on the type of each sub-object range.
+                    //
+                    auto bindingRangeIndex =
+                        typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
+                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
+                    switch (bindingType)
+                    {
                     case slang::BindingType::ParameterBlock:
                         {
-                            // A parameter block (`ParameterBlock<ConcreteType>`) will always map to a distinct
-                            // descriptor set, and its contained view/sampler binding ranges will be bound
-                            // through that set.
+                            // A parameter block (`ParameterBlock<ConcreteType>`) will always map to
+                            // a distinct descriptor set, and its contained view/sampler binding
+                            // ranges will be bound through that set.
                             //
                             auto blockPhysicalDescriptorSetIndex = addDescriptorSet();
 
-                            // We will need to recursively add the binding ranges implied by the type of
-                            // the parameter block.
+                            // We will need to recursively add the binding ranges implied by the
+                            // type of the parameter block.
                             //
-                            auto blockTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-
-                            // One important detail is that the `blockTypeLayout` does not know the base register
-                            // space that the contents of the block should use. All descriptor ranges stored in
-                            // that layout will by default use a space offset of zero.
+                            auto blockTypeLayout =
+                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                            
+                            // One important detail is that the `blockTypeLayout` does not know the
+                            // base register space that the contents of the block should use. All
+                            // descriptor ranges stored in that layout will by default use a space
+                            // offset of zero.
                             //
-                            // We need to compute the space offset to apply when recursing into that block type
-                            // based on the binding range we are processing here.
+                            // We need to compute the space offset to apply when recursing into that
+                            // block type based on the binding range we are processing here.
                             //
-                            auto blockLogicalDescriptorSetIndex = typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
-                            auto blockSpaceOffset = typeLayout->getDescriptorSetSpaceOffset(blockLogicalDescriptorSetIndex);
-
-                            // The space offset for this binding range should be added to any additional space
-                            // offset that was being passed down from above this layer.
+                            auto spaceOffset =
+                                typeLayout->getSubObjectRangeSpaceOffset(subObjectRangeIndex);
+                            // The space offset for this binding range should be added to any
+                            // additional space offset that was being passed down from above this
+                            // layer.
                             //
-                            // Any other offset information (register offsets) should be ignored at this point,
-                            // because `register` offsets from outside of the block don't affect layout within
-                            // the block.
+                            // Any other offset information (register offsets) should be ignored at
+                            // this point, because `register` offsets from outside of the block
+                            // don't affect layout within the block.
                             //
                             BindingRegisterOffset blockOffset;
-                            blockOffset.spaceOffset = offset.spaceOffset + (uint32_t) blockSpaceOffset;
+                            blockOffset.spaceOffset = offset.spaceOffset + (uint32_t)spaceOffset;
 
-                            // Once we have all the details worked out, we can write the binding ranges for the
-                            // block's type into the newly-allocated descriptor set.
+                            // Note: there is an important subtlety going on here. We are passing in
+                            // the type `blockTypeLayout` which corresponds to
+                            // `ParameterBlock<ConcreteType>` and *not* to `ConcreteType` alone.
+                            // We call `_unwrapParameterGroups` on `blockTypeLayout` get the layout
+                            // for the element type.
+                            auto elementLayout = _unwrapParameterGroups(blockTypeLayout);
+
+                            // If the element type requires constant buffer storage, add an
+                            // implicit constant buffer descriptor in descriptor set.
+                            if (elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
+                            {
+                                addDescriptorRange(
+                                    blockPhysicalDescriptorSetIndex,
+                                    D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
+                                    0,
+                                    blockOffset.spaceOffset,
+                                    1);
+                                blockOffset.offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] = 1;
+                            }
+
+                            // Once we have all the details worked out, we can write the binding
+                            // ranges for the block's type into the newly-allocated descriptor set.
                             //
-                            // Note: there is an important subtlety going on here. We are passing in the type
-                            // `blockTypeLayout` which corresponds to `ParameterBlock<ConcreteType>` and *not* to
-                            // `ConcreteType` alone. Because of that detail, the binding/descriptor ranges will
-                            // include any "default constant buffer" range that needed to be allocated based
-                            // on `ConcreteType`.
-                            //
-                            // TODO: validate that this logic is right.
-                            //
-                            addBindingRangesAndParameterBlocks(blockTypeLayout, blockPhysicalDescriptorSetIndex, blockOffset);
+                            addBindingRangesAndParameterBlocks(
+                                elementLayout, blockPhysicalDescriptorSetIndex, blockOffset);
                         }
                         break;
 
@@ -2521,7 +2574,7 @@ public:
                 if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IRenderCommandEncoder)
                 {
-                    returnComPtr(outObject, static_cast<IRenderCommandEncoder*>(this));
+                    *outObject = static_cast<IRenderCommandEncoder*>(this);
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
@@ -2903,7 +2956,7 @@ public:
                 if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
                     uuid == GfxGUID::IID_IComputeCommandEncoder)
                 {
-                    returnComPtr(outObject, static_cast<IComputeCommandEncoder*>(this));
+                    *outObject = static_cast<IComputeCommandEncoder*>(this);
                     return SLANG_OK;
                 }
                 *outObject = nullptr;
@@ -4804,7 +4857,7 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
-            printf("%s\n", diagnostics->getBufferPointer());
+            printf("%s\n", (char*)diagnostics->getBufferPointer());
             // TODO: report compile error.
         }
         SLANG_RETURN_ON_FAIL(compileResult);

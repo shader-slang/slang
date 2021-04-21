@@ -395,6 +395,24 @@ public:
     ComPtr<slang::IComponentType> slangProgram;
 };
 
+class InputLayoutBase
+    : public IInputLayout
+    , public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IInputLayout* getInterface(const Slang::Guid& guid);
+};
+
+class FramebufferLayoutBase
+    : public IFramebufferLayout
+    , public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IFramebufferLayout* getInterface(const Slang::Guid& guid);
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject
@@ -413,6 +431,11 @@ public:
             return static_cast<ShaderProgramBase*>(type == PipelineType::Compute ? compute.program : graphics.program);
         }
     } desc;
+
+    // We need to hold inputLayout and framebufferLayout objects alive, since we may use it to
+    // create specialized pipeline states later.
+    Slang::RefPtr<InputLayoutBase> inputLayout;
+    Slang::RefPtr<FramebufferLayoutBase> framebufferLayout;
 
     // The pipeline state from which this pipeline state is specialized.
     // If null, this pipeline is either an unspecialized pipeline.

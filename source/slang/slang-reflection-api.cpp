@@ -1396,7 +1396,12 @@ namespace Slang
                 //
                 TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
                 subObjectRange.bindingRangeIndex = bindingRangeIndex;
-
+                subObjectRange.spaceOffset = 0;
+                if (kind == LayoutResourceKind::RegisterSpace)
+                {
+                    auto resInfo = path->var->FindResourceInfo(LayoutResourceKind::RegisterSpace);
+                    subObjectRange.spaceOffset = resInfo->index;
+                }
                 // It is possible that the sub-object has descriptor ranges
                 // that will need to be exposed upward, into the parent.
                 //
@@ -2008,6 +2013,24 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(Sla
     if(subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount()) return 0;
 
     return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].bindingRangeIndex;
+}
+
+SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
+    SlangReflectionTypeLayout* inTypeLayout,
+    SlangInt subObjectRangeIndex)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if (!typeLayout)
+        return 0;
+
+    auto extTypeLayout = Slang::getExtendedTypeLayout(typeLayout);
+
+    if (subObjectRangeIndex < 0)
+        return 0;
+    if (subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount())
+        return 0;
+
+    return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset;
 }
 
 
