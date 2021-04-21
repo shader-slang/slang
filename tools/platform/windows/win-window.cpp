@@ -294,6 +294,8 @@ void Application::run(Window* mainWindow, bool waitForEvents)
     while (!Win32AppContext::isTerminated)
     {
         doEventsImpl(waitForEvents);
+        if (Win32AppContext::isTerminated)
+            break;
         if (mainWindow)
         {
             mainWindow->events.mainLoop();
@@ -343,14 +345,7 @@ public:
             Win32AppContext::windows[handle] = this;
     }
 
-    ~Win32PlatformWindow()
-    {
-        if (handle)
-        {
-            Win32AppContext::windows.Remove(handle);
-        }
-        DestroyWindow(handle);
-    }
+    ~Win32PlatformWindow() { close(); }
 
     virtual void setClientSize(uint32_t width, uint32_t height) override
     {
@@ -401,7 +396,15 @@ public:
         MoveWindow(handle, left, top, width, height, FALSE);
     }
 
-    virtual void close() override {}
+    virtual void close() override
+    {
+        if (handle)
+        {
+            Win32AppContext::windows.Remove(handle);
+        }
+        DestroyWindow(handle);
+        handle = NULL;
+    }
     virtual bool getFocused() override { return GetFocus() == handle; }
     virtual bool getVisible() override { return visible; }
     virtual WindowHandle getNativeHandle() override

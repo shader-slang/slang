@@ -1201,11 +1201,6 @@ LegalType legalizeTypeImpl(
         //
         auto legalConcreteType = legalizeType(context, pseudoPtrType->getValueType());
 
-        // If element type hasn't change, return original type.
-        if (legalConcreteType.flavor == LegalType::Flavor::simple &&
-            legalConcreteType.getSimple() == pseudoPtrType->getValueType())
-            return LegalType::simple(pseudoPtrType);
-
         // TODO: If/when we change our generation of pseudo-pointers
         // so that use-site code emits a "pseudo-load" then we may
         // need to change the logic here so that we return

@@ -212,6 +212,11 @@ RefPtr<Model> loadModel(
     struct Callbacks : platform::ModelLoader::ICallbacks
     {
         RendererContext* context;
+        // Hold a reference to all material and mesh objects
+        // created during loading so that they can be properly
+        // freed.
+        std::vector<RefPtr<Material>> materials;
+        std::vector<RefPtr<Mesh>> meshes;
         void* createMaterial(MaterialData const& data) override
         {
             SimpleMaterial* material = new SimpleMaterial();
@@ -219,6 +224,7 @@ RefPtr<Model> loadModel(
             material->specularColor = data.specularColor;
             material->specularity = data.specularity;
             material->createShaderObject(context);
+            materials.push_back(material);
             return material;
         }
 
@@ -228,6 +234,7 @@ RefPtr<Model> loadModel(
             mesh->firstIndex = data.firstIndex;
             mesh->indexCount = data.indexCount;
             mesh->material = (Material*)data.material;
+            meshes.push_back(mesh);
             return mesh;
         }
 
@@ -626,7 +633,6 @@ struct LightEnv : public RefObject
 //
 struct ModelViewer : WindowedAppBase
 {
-
 RendererContext context;
 
 // Most of the application state is stored in the list of loaded models,
@@ -809,7 +815,9 @@ void renderFrame(int frameIndex) override
     //
     glm::mat4x4 identity = glm::mat4x4(1.0f);
     auto clientRect = getWindow()->getClientRect();
-    glm::mat4x4 projection = glm::perspective(
+    if (clientRect.height == 0)
+        return;
+    glm::mat4x4 projection = glm::perspectiveRH_ZO(
         glm::radians(60.0f), float(clientRect.width) / float(clientRect.height),
         0.1f,
         1000.0f);
@@ -834,6 +842,12 @@ void renderFrame(int frameIndex) override
     view = glm::translate(view, -cameraPosition);
 
     glm::mat4x4 viewProjection = projection * view;
+    auto deviceInfo = gDevice->getDeviceInfo();
+    glm::mat4x4 correctionMatrix;
+    memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float)*16);
+    viewProjection = correctionMatrix * viewProjection;
+    // glm uses column-major layout, we need to translate it to row-major.
+    viewProjection = glm::transpose(viewProjection);
 
     auto drawCommandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
     auto drawCommandEncoder =
@@ -848,24 +862,20 @@ void renderFrame(int frameIndex) override
     // We are only rendering one view, so we can fill in a per-view
     // shader object once and use it across all draw calls.
     //
+
     auto viewShaderObject = gDevice->createShaderObject(context.perViewShaderType);
     {
         ShaderCursor cursor(viewShaderObject);
         cursor["viewProjection"].setData(&viewProjection, sizeof(viewProjection));
         cursor["eyePosition"].setData(&cameraPosition, sizeof(cameraPosition));
     }
-
     // The majority of our rendering logic is handled as a loop
     // over the models in the scene, and their meshes.
     //
     for(auto& model : gModels)
     {
-        auto rootObject = drawCommandEncoder->bindPipeline(gPipelineState);
-        ShaderCursor rootCursor(rootObject);
-        rootCursor["gViewParams"].setObject(viewShaderObject);
         drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer, sizeof(Model::Vertex));
         drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R_UInt32);
-
         // For each model we provide a parameter
         // block that holds the per-model transformation
         // parameters, corresponding to the `PerModel` type
@@ -879,10 +889,8 @@ void renderFrame(int frameIndex) override
             cursor["inverseTransposeModelTransform"].setData(
                 &inverseTransposeModelTransform, sizeof(inverseTransposeModelTransform));
         }
-        rootCursor["gModelParams"].setObject(modelShaderObject);
 
         auto lightShaderObject = lightEnv->createShaderObject();
-        rootCursor["gLightEnv"].setObject(lightShaderObject);
 
         // Now we loop over the meshes in the model.
         //
@@ -893,6 +901,13 @@ void renderFrame(int frameIndex) override
         //
         for(auto& mesh : model->meshes)
         {
+            // Set the pipeline and binding state for drawing each mesh.
+            auto rootObject = drawCommandEncoder->bindPipeline(gPipelineState);
+            ShaderCursor rootCursor(rootObject);
+            rootCursor["gViewParams"].setObject(viewShaderObject);
+            rootCursor["gModelParams"].setObject(modelShaderObject);
+            rootCursor["gLightEnv"].setObject(lightShaderObject);
+
             // Each mesh has a material, and each material has its own
             // parameter block that was created at load time, so we
             // can just re-use the persistent parameter block for the
@@ -911,6 +926,9 @@ void renderFrame(int frameIndex) override
             drawCommandEncoder->drawIndexed(mesh->indexCount, mesh->firstIndex);
         }
     }
+    drawCommandEncoder->endEncoding();
+    drawCommandBuffer->close();
+    gQueue->executeCommandBuffer(drawCommandBuffer);
 
     gSwapchain->present();
 }

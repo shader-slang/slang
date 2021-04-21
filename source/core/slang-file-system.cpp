@@ -473,19 +473,43 @@ SlangResult CacheFileSystem::_calcUniqueIdentity(const String& path, String& out
         case UniqueIdentityMode::SimplifyPathAndHash:
         case UniqueIdentityMode::Hash:
         {
+            // If m_uniqueIdentityMode is SimplifyPathAndHash, the path will already be simplified before this function is hit (and it hasn't been found
+            // via path lookup). That being the case only option left is to 'hash' (or fallback to backing impls uniqueIdentity impl)
+
             // If we don't have a file system -> assume cannot be found
             if (m_fileSystem == nullptr)
             {
                 return SLANG_E_NOT_FOUND;
             }
 
-            // I can only see if this is the same file as already loaded by loading the file and doing a hash
+            // First attempt to load as a file
             Result res = m_fileSystem->loadFile(path.getBuffer(), outFileContents.writeRef());
-            if (SLANG_FAILED(res) || outFileContents == nullptr)
+
+            // If it succeeded but there is no contents, then make the result NOT_FOUND
+            res = (SLANG_SUCCEEDED(res) && outFileContents == nullptr) ? SLANG_E_NOT_FOUND : res;
+
+            // If that failed, we may be able to do something if m_fileSystemExt is available
+            if (SLANG_FAILED(res))
             {
-                return SLANG_FAIL;
+                // If we have m_fileSystemExt interface we can just use it's implementation, as a fallback.
+                // Doing so will mean the uniqueIdentity will work if say it's a directory
+                if (m_fileSystemExt)
+                {
+                    ComPtr<ISlangBlob> uniqueIdentity;
+                    SLANG_RETURN_ON_FAIL(m_fileSystemExt->getFileUniqueIdentity(path.getBuffer(), uniqueIdentity.writeRef()));
+                    // Get the path as a string
+                    outUniqueIdentity = StringUtil::getString(uniqueIdentity);
+                    return SLANG_OK;
+                }
+               
+                // If we can't access as a file (or use the backing implementations impl), we are in a tricky situation.
+                // The ISlangFileSystem interface provides no way to determine if the path is a directory for example -
+                // so there is no way of determining if something along the path exists.
+                // 
+                // So we just return the error.
+                return res;
             }
-             
+ 
             // Calculate the hash on the contents
             const uint64_t hash = getHashCode64((const char*)outFileContents->getBufferPointer(), outFileContents->getBufferSize());
 

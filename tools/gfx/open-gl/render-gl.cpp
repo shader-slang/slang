@@ -201,16 +201,8 @@ public:
         GLsizei                 offset;
     };
 
-    class InputLayoutImpl: public IInputLayout, public ComObject
+    class InputLayoutImpl : public InputLayoutBase
 	{
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IInputLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
-                return static_cast<IInputLayout*>(this);
-            return nullptr;
-        }
     public:
         VertexAttributeDesc m_attributes[kMaxVertexStreams];
         UInt m_attributeCount = 0;
@@ -329,19 +321,8 @@ public:
         GLuint                      m_bufferID;
     };
 
-    class FramebufferLayoutImpl
-        : public IFramebufferLayout
-        , public ComObject
+    class FramebufferLayoutImpl : public FramebufferLayoutBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebufferLayout* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
-                return static_cast<IFramebufferLayout*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<IFramebufferLayout::AttachmentLayout> m_renderTargets;
         bool m_hasDepthStencil = false;
