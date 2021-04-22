@@ -428,6 +428,14 @@ struct NVRTCPathVisitor : Path::Visitor
     List<Candidate> m_candidates;
 };
 
+template <typename T>
+SLANG_FORCE_INLINE static void _unusedFunction(const T& func)
+{
+    SLANG_UNUSED(func);
+}
+
+#define SLANG_UNUSED_FUNCTION(x) _unusedFunction(x)
+
 static UnownedStringSlice _getNVRTCBaseName()
 {
 #if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
@@ -501,7 +509,7 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
     visitor.sortCandidates();
 
     return SLANG_OK;
-}
+}    
 
 static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
 
@@ -911,9 +919,8 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     SLANG_UNUSED(loader);
     SLANG_UNUSED(outLibrary);
 
-    SLANG_UNUSED(_getNVRTCBaseName);
-    SLANG_UNUSED(_findNVRTC);
-
+    SLANG_UNUSED_FUNCTION(_getNVRTCBaseName);
+    SLANG_UNUSED_FUNCTION(_findNVRTC);
 #endif
 
     // This is an official-ish list of versions is here:
