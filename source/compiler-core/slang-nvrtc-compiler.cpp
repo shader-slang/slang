@@ -13,11 +13,10 @@
 #include "../core/slang-shared-library.h"
 #include "../core/slang-semantic-version.h"
 
+#include "../core/slang-shared-library.h"
 
 namespace nvrtc
 {
-
-
 
 typedef enum {
   NVRTC_SUCCESS = 0,
@@ -124,11 +123,23 @@ protected:
         nvrtcProgram m_program;
     };
 
+    SlangResult _findIncludePath(String& outIncludePath);
+
+    SlangResult _getIncludePath(String& outIncludePath);
+
+    SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) \
     ret (*m_##name) params;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
+
+    // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT* include cuda_fp16.h.
+    List<String> m_cudaFp16FoundPaths;
+
+    bool m_includeSearched = false;
+    // Holds location of where include (for cuda_fp16.h) is found. 
+    String m_includePath;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;  
 };
@@ -232,6 +243,392 @@ static SlangResult _parseNVRTCLine(const UnownedStringSlice& line, DownstreamDia
     return SLANG_E_NOT_FOUND;
 }
 
+/* An implementation of Path::Visitor that can be used for finding NVRTC shared library installations. */
+struct NVRTCPathVisitor : Path::Visitor
+{
+    struct Candidate
+    {
+        typedef Candidate ThisType;
+
+        bool operator==(const ThisType& rhs) const { return path == rhs.path && version == rhs.version; }
+        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        static Candidate make(const String& path, const SemanticVersion& version)
+        {
+            Candidate can;
+            can.version = version;
+            can.path = path;
+            return can;
+        }
+        String path;
+        SemanticVersion version;
+    };
+
+    Index findVersion(const SemanticVersion& version) const
+    {
+        const Index count = m_candidates.getCount();
+        for (Index i = 0; i < count; ++i)
+        {
+            if (m_candidates[i].version == version)
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    static bool _orderCandiate(const Candidate& a, const Candidate& b) { return a.version < b.version; }
+    void sortCandidates() { m_candidates.sort(_orderCandiate); }
+
+    
+#if SLANG_WINDOWS_FAMILY
+    SlangResult getVersion(const UnownedStringSlice& filename, SemanticVersion& outVersion)
+    {
+        // Versions on windows of the form
+        // nvrtc64_110_2.dll
+        //          11 - Major
+        //           0 Minor
+        //           2 Patch
+        Index endIndex = filename.indexOf('.');
+        endIndex = (endIndex < 0) ? filename.getLength() : endIndex;
+
+        // If we have a version slice, split it
+        UnownedStringSlice versionSlice = UnownedStringSlice(filename.begin() + m_prefix.getLength(), filename.begin() + endIndex);
+
+        if (versionSlice.getLength() <= 0)
+        {
+            return SLANG_E_NOT_FOUND;
+        }
+        Int patch = 0;
+        UnownedStringSlice majorMinorSlice;
+        {
+            List<UnownedStringSlice> slices;
+            StringUtil::split(versionSlice, '_', slices);
+            if (slices.getCount() >= 2)
+            {
+                // We don't bother checking for error here, if it's not parsable, it will be 0
+                StringUtil::parseInt(slices[1], patch);
+            }
+            majorMinorSlice = slices[0];
+        }
+
+        if (majorMinorSlice.getLength() < 2)
+        {
+            // Must be a major and minor
+            return SLANG_FAIL;
+        }
+
+        UnownedStringSlice majorSlice = majorMinorSlice.head(majorMinorSlice.getLength() - 1);
+        UnownedStringSlice minorSlice = majorMinorSlice.subString(majorMinorSlice.getLength() - 1, 1);
+
+        Int major;
+        Int minor;
+
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(majorSlice, major));
+        SLANG_RETURN_ON_FAIL(StringUtil::parseInt(minorSlice, minor));
+
+        outVersion = SemanticVersion(int(major), int(minor), int(patch));
+        return SLANG_OK;
+    }
+#else
+    // How the path is constructed depends on platform
+    // https://docs.nvidia.com/cuda/nvrtc/index.html
+    // TODO(JS): Handle version number depending on the platform - it's different for Windows/OSX/Linux
+    SlangResult getVersion(const UnownedStringSlice& filename, SemanticVersion& outVersion)
+    {
+        SLANG_UNUSED(filename);
+        SLANG_UNUSED(outVersion);
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
+
+#endif
+
+    void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
+    {
+        // Lets make sure it start's with nvrtc, but not worry about case
+        if (type == Path::Type::File)
+        {
+            // If there is a defined extension, make sure it has it
+            if (m_postfix.getLength() && filename.getLength() >= m_postfix.getLength())
+            {
+                // We test without case - really for windows
+                UnownedStringSlice filenamePostfix = filename.tail(filename.getLength() - m_postfix.getLength());
+                if (!filenamePostfix.caseInsensitiveEquals(m_postfix.getUnownedSlice()))
+                {
+                    return;
+                }
+            }
+
+            
+            if (filename.getLength() >= m_prefix.getLength() &&
+                filename.subString(0, m_prefix.getLength()).caseInsensitiveEquals(m_prefix.getUnownedSlice()))
+            {
+                SemanticVersion version;
+                // If it produces an error, just use 0.0.0
+                if (SLANG_FAILED(getVersion(filename, version)))
+                {
+                    version = SemanticVersion();
+                }
+
+                // We may want to add multiple versions, if they are in different locations - as there may be multiple entries
+                // in the PATH, and only one works. We'll only know which works by loading
+
+#if 0
+                // We already found this version, so let's not add it again
+                if (findVersion(version) >= 0)
+                {
+                    return;
+                }
+#endif
+
+                // Strip to make a shared library name
+                UnownedStringSlice sharedLibraryName = filename.tail(m_prefix.getLength() - m_sharedLibraryStem.getLength());
+                sharedLibraryName = filename.head(filename.getLength() - m_postfix.getLength());
+
+                auto candidate = Candidate::make(Path::combine(m_basePath, sharedLibraryName), version);
+
+                // If we already have this candidate, then skip
+                if (m_candidates.indexOf(candidate) >= 0)
+                {
+                    return;
+                }
+
+                // Add to the list of candidates
+                m_candidates.add(candidate);
+            }
+        }
+    }
+
+    SlangResult findInDirectory(const String& path)
+    {
+        m_basePath = path;
+        return Path::find(path, nullptr, this);
+    }
+
+    bool hasCandidates() const { return m_candidates.getCount() > 0; }
+
+    NVRTCPathVisitor(const UnownedStringSlice& sharedLibraryStem) :
+        m_sharedLibraryStem(sharedLibraryStem)
+    {
+        // Work out the prefix and postfix of the shader
+        StringBuilder buf;
+        SharedLibrary::appendPlatformFileName(sharedLibraryStem, buf);
+        const Index index = buf.indexOf(sharedLibraryStem);
+        SLANG_ASSERT(index >= 0);
+
+        m_prefix = buf.getUnownedSlice().head(index + sharedLibraryStem.getLength());
+        m_postfix = buf.getUnownedSlice().tail(index + sharedLibraryStem.getLength());
+    }
+
+    String m_prefix;
+    String m_postfix;
+    String m_basePath;
+    String m_sharedLibraryStem;
+
+    List<Candidate> m_candidates;
+};
+
+static UnownedStringSlice _getNVRTCBaseName()
+{
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+    return UnownedStringSlice::fromLiteral("nvrtc64_");
+#else
+    return UnownedStringSlice::fromLiteral("nvrtc");
+#endif
+}
+
+// Candidates are in m_candidates list. Will be ordered from the oldest to newest (in version number)
+static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
+{
+    // First try the instance path (if supported on platform)
+    {
+        StringBuilder instancePath;
+        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePath)))
+        {
+            visitor.findInDirectory(instancePath);
+        }
+    }
+
+    // If we don't have a candidate try CUDA_PATH
+    if (!visitor.hasCandidates())
+    {
+        StringBuilder buf;
+        if (!SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
+        {
+            // Look for candidates in the directory
+            visitor.findInDirectory(Path::combine(buf, "bin"));
+        }
+    }
+
+    // If we haven't we go searching through PATH
+    if (!visitor.hasCandidates())
+    {
+        List<UnownedStringSlice> splitPath;
+
+        StringBuilder buf;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("PATH"), buf)))
+        {
+            // Split so we get individual paths
+            List<UnownedStringSlice> paths;
+            StringUtil::split(buf.getUnownedSlice(), ';', paths);
+
+            // We use a pool to make sure we only check each path once
+            StringSlicePool pool(StringSlicePool::Style::Empty);
+
+            // We are going to search the paths in order 
+            for (const auto path : paths)
+            {
+                // PATH can have the same path multiple times. If we have already searched this path, we don't need to again
+                if (!pool.has(path))
+                {
+                    pool.add(path);
+
+                    Path::split(path, splitPath);
+
+                    // We could search every path, but here we restrict to paths that look like CUDA installations.
+                    // It's a path that contains a CUDA directory and has bin
+                    if (splitPath.indexOf("CUDA") >= 0 && splitPath[splitPath.getCount() - 1].caseInsensitiveEquals(UnownedStringSlice::fromLiteral("bin")))
+                    {
+                        // Okay lets search it
+                        visitor.findInDirectory(path);
+                    }
+                }
+            }
+        }
+    }
+
+    // Put into version order with oldest first. 
+    visitor.sortCandidates();
+
+    return SLANG_OK;
+}
+
+static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
+
+SlangResult NVRTCDownstreamCompiler::_getIncludePath(String& outPath)
+{
+    if (!m_includeSearched)
+    {
+        m_includeSearched = true;
+
+        SLANG_ASSERT(m_includePath.getLength() == 0);
+
+        _findIncludePath(m_includePath);
+    }
+
+    outPath = m_includePath;
+    return m_includePath.getLength() ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
+SlangResult _findFileInIncludePath(const String& path, const UnownedStringSlice& filename, String& outPath)
+{
+    if (File::exists(Path::combine(path, filename)))
+    {
+        outPath = path;
+        return SLANG_OK;
+    }
+
+    {
+        String includePath = Path::combine(path, "include");
+        if (File::exists(Path::combine(includePath, filename)))
+        {
+            outPath = includePath;
+            return SLANG_OK;
+        }
+    }
+
+    {
+        String cudaIncludePath = Path::combine(path, "CUDA/include");
+        if (File::exists(Path::combine(cudaIncludePath, filename)))
+        {
+            outPath = cudaIncludePath;
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
+{
+    outPath = String();
+
+    // Try looking up from a symbol. This will work as long as the nvrtc is loaded somehow from a dll/sharedlibrary
+    // And the header is included from there
+    {
+        String libPath = SharedLibraryUtils::getSharedLibraryFileName(m_nvrtcCreateProgram);
+        if (libPath.getLength())
+        {
+            const String parentPath = Path::getParentDirectory(libPath);
+            if (SLANG_SUCCEEDED(_findFileInIncludePath(parentPath, g_fp16HeaderName, outPath)))
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
+    // Try CUDA_PATH environment variable
+    {
+        StringBuilder buf;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
+        {
+            String includePath = Path::combine(buf, "include");
+
+            if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
+            {
+                outPath = includePath;
+                return SLANG_OK;
+            }
+        }
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine)
+{
+    if ((options.flags & CompileOptions::Flag::EnableFloat16) == 0)
+    {
+        return SLANG_OK;
+    }
+
+    // First check if we know if one of the include paths contains cuda_fp16.h
+    for (const auto& includePath : options.includePaths)
+    {
+        if (m_cudaFp16FoundPaths.indexOf(includePath) >= 0)
+        {
+            // Okay we have an include path that we know works.
+            // Just need to enable HALF in prelude
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
+            return SLANG_OK;
+        }
+    }
+
+    // Let's see if one of the paths finds cuda_fp16.h
+    for (const auto& includePath : options.includePaths)
+    {
+        const String checkPath = Path::combine(includePath, g_fp16HeaderName);
+        if (File::exists(checkPath))
+        {
+            m_cudaFp16FoundPaths.add(includePath);
+            // Just need to enable HALF in prelude
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
+            return SLANG_OK;
+        }
+    }
+
+    String includePath;
+    SLANG_RETURN_ON_FAIL(_getIncludePath(includePath));
+
+    // Add the found include path
+    ioCmdLine.addArg("-I");
+    ioCmdLine.addArg(includePath);
+
+    ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
+
+    return SLANG_OK;
+}
+
 SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
@@ -301,6 +698,8 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         cmdLine.addArg("-I");
         cmdLine.addArg(include);
     }
+
+    SLANG_RETURN_ON_FAIL(_maybeAddHalfSupport(options, cmdLine));
 
     // Neither of these options are strictly required, for general use of nvrtc,
     // but are enabled to make use withing Slang work more smoothly
@@ -391,7 +790,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
         // We will define a dummy `stddef.h` that includes the bare minimum
         // lines required to get the OptiX headers to compile without complaint.
         //
-        // TODO: Confirm that the `LP64` definition herei s actually needed.
+        // TODO: Confirm that the `LP64` definition here is actually needed.
         //
         headerIncludeNames.add("stddef.h");
         headers.add("#pragma once\n" "#define LP64\n");
@@ -488,227 +887,15 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     return SLANG_OK;
 }
 
-/* An implementation of Path::Visitor that can be used for finding NVRTC shared library installations. */
-struct NVRTCPathVisitor : Path::Visitor
-{
-    struct Candidate
-    {
-        typedef Candidate ThisType;
 
-        bool operator==(const ThisType& rhs) const { return path == rhs.path && version == rhs.version; }
-        bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
-
-        static Candidate make(const String& path, const SemanticVersion& version) 
-        {
-            Candidate can;
-            can.version = version;
-            can.path = path;
-            return can;
-        }
-        String path;
-        SemanticVersion version;
-    };
-
-    Index findVersion(const SemanticVersion& version) const
-    {
-        const Index count = m_candidates.getCount();
-        for (Index i = 0; i < count; ++i)
-        {
-            if (m_candidates[i].version == version)
-            {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    static bool _orderCandiate(const Candidate& a, const Candidate& b) { return a.version < b.version; }
-    void sortCandidates() { m_candidates.sort(_orderCandiate); }
-
-    void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
-    {
-        // Lets make sure it start's with nvrtc64, but not worry about case
-        if (type == Path::Type::File)
-        {
-            // If there is a defined extension, make sure it has it
-            if (m_postfix.getLength() && filename.getLength() >= m_postfix.getLength())
-            {
-                // We test without case - really for windows
-                UnownedStringSlice filenamePostfix = filename.tail(filename.getLength() - m_postfix.getLength());
-                if (!filenamePostfix.caseInsensitiveEquals(m_postfix.getUnownedSlice()))
-                {
-                    return;
-                }
-            }
-
-            if (filename.getLength() >= m_prefix.getLength() &&
-                filename.subString(0, m_prefix.getLength()).caseInsensitiveEquals(m_prefix.getUnownedSlice()))
-            {
-                // Versions are typically (on windows) of the form
-                // nvrtc64_110_2.dll
-                //          11 - Major
-                //           0 Minor
-                //           2 Patch
-                Index endIndex = filename.indexOf('.');
-                endIndex = (endIndex < 0) ? filename.getLength() : endIndex;
-
-                UnownedStringSlice versionSlice = UnownedStringSlice(filename.begin() + m_prefix.getLength(), filename.begin() + endIndex);
-
-                Int patch = 0;
-                UnownedStringSlice majorMinorSlice;
-                {
-                    List<UnownedStringSlice> slices;
-                    StringUtil::split(versionSlice, '_', slices);
-                    if (slices.getCount() >= 2)
-                    {
-                        // We don't bother checking for error here, if it's not parsable, it will be 0
-                        StringUtil::parseInt(slices[1], patch);
-                    }
-                    majorMinorSlice = slices[0];
-                }
-
-                if (majorMinorSlice.getLength() < 2)
-                {
-                    // Must be a major and minor
-                    return;
-                }
-
-                UnownedStringSlice majorSlice = majorMinorSlice.head(majorMinorSlice.getLength() - 1);
-                UnownedStringSlice minorSlice = majorMinorSlice.subString(majorMinorSlice.getLength() - 1, 1);
-
-                Int major;
-                Int minor;
-
-                if (SLANG_FAILED(StringUtil::parseInt(majorSlice, major)) ||
-                    SLANG_FAILED(StringUtil::parseInt(minorSlice, minor)))
-                {
-                    return;
-                }
-
-                const SemanticVersion version = SemanticVersion(int(major), int(minor), int(patch));
-
-                // We may want to add multiple versions, if they are in different locations - as there may be multiple entries
-                // in the PATH, and only one works. We'll only know which works by loading
-#if 0
-                // We already found this version, so let's not add it again
-                if (findVersion(version) >= 0)
-                {
-                    return;
-                }
-#endif
-
-                // Strip to make a shared library name
-                UnownedStringSlice sharedLibraryName = filename.tail(m_prefix.getLength() - m_sharedLibraryStem.getLength());
-                sharedLibraryName = filename.head(filename.getLength() - m_postfix.getLength());
-
-                auto candidate = Candidate::make(Path::combine(m_basePath, sharedLibraryName), version);
-
-                // If we already have this candidate, then skip
-                if (m_candidates.indexOf(candidate) >= 0)
-                {
-                    return;
-                }
-
-                // Add to the list of candidates
-                m_candidates.add(candidate);
-            }
-        }
-    }
-
-    SlangResult findInDirectory(const String& path)
-    {
-        m_basePath = path;
-        return Path::find(path, nullptr, this);
-    }
-
-    bool hasCandidates() const { return m_candidates.getCount() > 0; }
-
-    NVRTCPathVisitor(const UnownedStringSlice& sharedLibraryStem):
-        m_sharedLibraryStem(sharedLibraryStem)
-    {
-        // Work out the prefix and postfix of the shader
-        StringBuilder buf;
-        SharedLibrary::appendPlatformFileName(sharedLibraryStem, buf);
-        const Index index = buf.indexOf(sharedLibraryStem);
-        SLANG_ASSERT(index >= 0);
-
-        m_prefix = buf.getUnownedSlice().head(index + sharedLibraryStem.getLength());
-        m_postfix = buf.getUnownedSlice().tail(index + sharedLibraryStem.getLength());
-    }
-
-    String m_prefix;
-    String m_postfix;
-    String m_basePath;
-    String m_sharedLibraryStem;
-
-    List<Candidate> m_candidates;
-};
 
 static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<ISlangSharedLibrary>& outLibrary)
 {
 #if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
+
     // We only need to search 64 bit versions on windows 
-    NVRTCPathVisitor visitor(UnownedStringSlice::fromLiteral("nvrtc64_"));
-
-    // First try the instance path (if supported on platform)
-    {
-        StringBuilder instancePath;
-        if (SLANG_SUCCEEDED(PlatformUtil::getInstancePath(instancePath)))
-        {
-            visitor.findInDirectory(instancePath);
-        }
-    }
-
-    // If we don't have a candidate try CUDA_PATH
-    if (!visitor.hasCandidates())
-    {
-        StringBuilder buf;
-        if (!SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("CUDA_PATH"), buf)))
-        {    
-            // Look for candidates in the directory
-            visitor.findInDirectory(Path::combine(buf, "bin"));
-        }
-    }
-
-    // If we haven't we go searching through PATH
-    if (!visitor.hasCandidates())
-    {
-        List<UnownedStringSlice> splitPath;
-
-        StringBuilder buf;
-        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("PATH"), buf)))
-        {
-            // Split so we get individual paths
-            List<UnownedStringSlice> paths;
-            StringUtil::split(buf.getUnownedSlice(), ';', paths);
-
-            // We use a pool to make sure we only check each path once
-            StringSlicePool pool(StringSlicePool::Style::Empty);
-
-            // We are going to search the paths in order 
-            for (const auto path : paths)
-            {
-                // PATH can have the same path multiple times. If we have already searched this path, we don't need to again
-                if (!pool.has(path))
-                {
-                    pool.add(path);
-
-                    Path::split(path, splitPath);
-
-                    // We could search every path, but here we restrict to paths that look like CUDA installations.
-                    // It's a path that contains a CUDA directory and has bin
-                    if (splitPath.indexOf("CUDA") >= 0 && splitPath[splitPath.getCount() - 1].caseInsensitiveEquals(UnownedStringSlice::fromLiteral("bin")))
-                    {
-                        // Okay lets search it
-                        visitor.findInDirectory(path);
-                    }
-                }
-            }
-        }
-    }
-
-    // Put into version order with oldest first. 
-    visitor.sortCandidates();
+    NVRTCPathVisitor visitor(_getNVRTCBaseName());
+    SLANG_RETURN_ON_FAIL(_findNVRTC(visitor));
 
     // We want to start with the newest version...
     for (Index i = visitor.m_candidates.getCount() - 1; i >= 0; --i)
@@ -735,10 +922,8 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
     return SLANG_E_NOT_FOUND;
 }
 
-
 /* static */SlangResult NVRTCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
-    
     ComPtr<ISlangSharedLibrary> library;
 
     // If the user supplies a path to their preferred version of NVRTC,

@@ -27,7 +27,7 @@ static bool _isSingleNameBasicType(IROp op)
     }
 }
 
-/* static */ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
+UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 {
     switch (op)
     {
@@ -44,7 +44,11 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
-        case kIROp_HalfType:    return UnownedStringSlice("__half");
+        case kIROp_HalfType:
+        {
+            m_extensionTracker->requireBaseType(BaseType::Half);
+            return UnownedStringSlice("__half");
+        }
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");
@@ -53,7 +57,7 @@ static bool _isSingleNameBasicType(IROp op)
 }
 
 
-/* static */ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
+UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
 {
     switch (op)
     {
@@ -69,7 +73,11 @@ static bool _isSingleNameBasicType(IROp op)
         case kIROp_UIntType:    return UnownedStringSlice("uint");
         case kIROp_UInt64Type:  return UnownedStringSlice("ulonglong");
 
-        case kIROp_HalfType:    return UnownedStringSlice("__half");
+        case kIROp_HalfType:
+        {
+            m_extensionTracker->requireBaseType(BaseType::Half);
+            return UnownedStringSlice("__half");
+        }
 
         case kIROp_FloatType:   return UnownedStringSlice("float");
         case kIROp_DoubleType:  return UnownedStringSlice("double");

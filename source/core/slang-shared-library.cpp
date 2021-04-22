@@ -76,9 +76,21 @@ TemporarySharedLibrary::~TemporarySharedLibrary()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!! DefaultSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-ISlangUnknown* DefaultSharedLibrary::getInterface(const Guid& guid)
+SLANG_NO_THROW SlangResult SLANG_MCALL DefaultSharedLibrary::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    return (guid == ISlangUnknown::getTypeGuid() || guid == ISlangSharedLibrary::getTypeGuid()) ? static_cast<ISlangSharedLibrary*>(this) : nullptr;
+    if (uuid == DefaultSharedLibrary::getTypeGuid())
+    {
+        *outObject = this;
+        return SLANG_OK;
+    }
+
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangSharedLibrary::getTypeGuid()) 
+    {
+        addReference();
+        *outObject = static_cast<ISlangSharedLibrary*>(this);
+        return SLANG_OK;
+    }
+    return SLANG_E_NO_INTERFACE;
 }
 
 DefaultSharedLibrary::~DefaultSharedLibrary()
