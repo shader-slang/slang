@@ -11,6 +11,8 @@ Row-major vs Column-major storage layouts
 -------------------------
 In this article, the term matrix layouts or storage layouts refers to the order of matrix elements in memory. Specifically, we use the following umambiguous technique to determine whether a matrix is in `row-major` and `column-major` layout: if we have a 4x4 matrix defined as `float m[16]`, and the translation terms are stored at `m[12], m[13], m[14]`, then we say this matrix is in `column-major` layout. If the translation terms are stored at `m[3], m[7], m[11]`, then we say this matrix is in `row-major` layout.
 
+> Note: the term row-major and column-major are heavily overloaded and can mean very different things depending on the context. In this article, we use these terms only as a way to distinguish where the translation terms are placed in a matrix, not anything else. This may contradict with the naming convention that you are used to depending on the platform you are comming from, but the consistent way to make things right stays the same regardless of how it is called.
+
 Using this technique, it should be easy to know the layout that your host math library is using. For example, the `glm` library uses `column-major` layout by default under the definition of this article.
 
 If the host code generates a `column-major` matrix, then a vertex shader written in GLSL should be like this:
@@ -44,11 +46,15 @@ globalSession->createSession(slangSessionDesc, &session);
 ```
 
 In summary, to make sure your application works correctly on all platforms, you need to make sure the application does the following things consistently:
-###Using row-major matrix layout
+
+**Option 1 (translation terms in 12,13,14)**
+
 - Make sure the host code fills in matrices in row-major layout, i.e. translation terms are specified in `m[3], m[7], m[11]` elements.
 - Leave `defaultMatrixLayoutMode` as default value when creating a Slang session, or specify `SLANG_MATRIX_LAYOUT_ROW_MAJOR`.
 - Write `mul(Matrix, Vector)` in shader code to transform `Vector` by `Matrix`.
-###Using column-major matrix layout
+
+**Option 2 (translation terms in 3,7,11**
+
 - Make sure the host code fills in matrices in column-major layout, i.e. translations terms are specified in `m[12], m[13], m[14]` elements.
 - Set `defaultMatrixLayoutMode` to `SLANG_MATRIX_LAYOUT_COLUMN_MAJOR` when creating a Slang session.
 - Write `mul(Vector, Matrix)` in shader code.
