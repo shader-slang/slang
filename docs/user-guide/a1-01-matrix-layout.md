@@ -50,7 +50,7 @@ In summary, we put together all options you have to ensure correct result:
 
 **Option 2: using row-major matrix layout, and `mul(v, m)` math convention**
 
-- Make sure the host code fills in matrices in so that translations terms are specified in `m[12], m[13], m[14]` elements. Matrices filled in this way are compatible with typical OpenGL applications.
+- Make sure the host code fills in matrices so that translations terms are specified in `m[12], m[13], m[14]` elements. Matrices filled in this way are compatible with typical OpenGL applications.
 - Leave `defaultMatrixLayoutMode` as default value when creating a Slang session, or specify `SLANG_MATRIX_LAYOUT_ROW_MAJOR`.
 - Write `mul(Vector, Matrix)` in shader code.
 
@@ -62,7 +62,7 @@ In summary, we put together all options you have to ensure correct result:
 
 **Option 4: using column-major matrix layout, and `mul(v, m)` math convention**
 
-- Make sure the host code fills in matrices in so that translations terms are specified in `m[3], m[7], m[11]` elements.
+- Make sure the host code fills in matrices so that translations terms are specified in `m[3], m[7], m[11]` elements.
 - Set `defaultMatrixLayoutMode` to `SLANG_MATRIX_LAYOUT_COLUMN_MAJOR` when creating a Slang session.
 - Write `mul(Vector, Matrix)` in shader code.
 
