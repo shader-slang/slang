@@ -15,7 +15,16 @@
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\file-util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\macro-writer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node-tree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\node.h">
@@ -27,12 +36,27 @@
     <ClInclude Include="..\..\..\tools\slang-cpp-extractor\parser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\tools\slang-cpp-extractor\unit-test.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\cpp-extractor-main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\diagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\file-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\identifier-lookup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\macro-writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node-tree.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\node.cpp">
@@ -44,7 +68,7 @@
     <ClCompile Include="..\..\..\tools\slang-cpp-extractor\parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\slang-cpp-extractor-main.cpp">
+    <ClCompile Include="..\..\..\tools\slang-cpp-extractor\unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

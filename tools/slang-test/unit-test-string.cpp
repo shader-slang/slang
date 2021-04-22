@@ -84,24 +84,43 @@ static void stringUnitTest()
 
     {
         UnownedStringSlice values[] = { UnownedStringSlice("hello"), UnownedStringSlice("world"), UnownedStringSlice("!") };
+        ArrayView<UnownedStringSlice> valuesView(values, SLANG_COUNT_OF(values));
 
+        List<UnownedStringSlice> checkValues;
         StringBuilder builder;
-        builder.Clear();
-        StringUtil::join(values, 0, ',', builder);
-        SLANG_CHECK(builder == "");
 
-        builder.Clear();
-        StringUtil::join(values, 1, ',', builder);
-        SLANG_CHECK(builder == "hello");
+        {
+            builder.Clear();
+            StringUtil::join(values, 0, ',', builder);
+            SLANG_CHECK(builder == "");
+        }
 
+        {
+            builder.Clear();
+            StringUtil::join(values, 1, ',', builder);
+            SLANG_CHECK(builder == "hello");
 
-        builder.Clear();
-        StringUtil::join(values, 2, ',', builder);
-        SLANG_CHECK(builder == "hello,world");
+            StringUtil::split(builder.getUnownedSlice(), ',', checkValues);
+            SLANG_CHECK(checkValues.getArrayView() == ArrayView<UnownedStringSlice>(values, 1));
+        }
 
-        builder.Clear();
-        StringUtil::join(values, 3, UnownedStringSlice("ab"), builder);
-        SLANG_CHECK(builder == "helloabworldab!");
+        {
+            builder.Clear();
+            StringUtil::join(values, 2, ',', builder);
+            SLANG_CHECK(builder == "hello,world");
+
+            StringUtil::split(builder.getUnownedSlice(), ',', checkValues);
+            SLANG_CHECK(checkValues.getArrayView() == ArrayView<UnownedStringSlice>(values, 2));
+        }
+
+        {
+            builder.Clear();
+            StringUtil::join(values, 3, UnownedStringSlice("ab"), builder);
+            SLANG_CHECK(builder == "helloabworldab!");
+
+            StringUtil::split(builder.getUnownedSlice(), UnownedStringSlice("ab"), checkValues);
+            SLANG_CHECK(checkValues.getArrayView() == ArrayView<UnownedStringSlice>(values, 3));
+        }
     }
 }
 

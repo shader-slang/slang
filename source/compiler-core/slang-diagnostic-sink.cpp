@@ -385,6 +385,23 @@ static void formatDiagnostic(
     }
 }
 
+void DiagnosticSink::init(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer)
+{
+    m_errorCount = 0;
+    m_internalErrorLocsNoted = 0;
+
+    m_flags = 0;
+
+    m_sourceManager = sourceManager;
+    m_sourceLocationLexer = sourceLocationLexer;
+
+    // If we have a source location lexer, we'll by default enable source location output
+    if (sourceLocationLexer)
+    {
+        setFlag(Flag::SourceLocationLine);
+    }
+}
+
 void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
 {
     StringBuilder sb;
