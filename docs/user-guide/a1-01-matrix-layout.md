@@ -53,7 +53,7 @@ In summary, to make sure your application works correctly on all platforms, you 
 - Leave `defaultMatrixLayoutMode` as default value when creating a Slang session, or specify `SLANG_MATRIX_LAYOUT_ROW_MAJOR`.
 - Write `mul(Matrix, Vector)` in shader code to transform `Vector` by `Matrix`.
 
-**Option 2 (translation terms in 3,7,11**
+**Option 2 (translation terms in 3,7,11)**
 
 - Make sure the host code fills in matrices in column-major layout, i.e. translations terms are specified in `m[12], m[13], m[14]` elements.
 - Set `defaultMatrixLayoutMode` to `SLANG_MATRIX_LAYOUT_COLUMN_MAJOR` when creating a Slang session.
