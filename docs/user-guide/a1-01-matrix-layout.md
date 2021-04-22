@@ -45,11 +45,11 @@ globalSession->createSession(slangSessionDesc, &session);
 
 In summary, to make sure your application works correctly on all platforms, you need to make sure the application does the following things consistently:
 ###Using row-major matrix layout
-- Make sure the host code fills in matrices in row-major layout, i.e. translation terms are specified in `m[12], m[13], m[14]` elements.
+- Make sure the host code fills in matrices in row-major layout, i.e. translation terms are specified in `m[3], m[7], m[11]` elements.
 - Leave `defaultMatrixLayoutMode` as default value when creating a Slang session, or specify `SLANG_MATRIX_LAYOUT_ROW_MAJOR`.
 - Write `mul(Matrix, Vector)` in shader code to transform `Vector` by `Matrix`.
 ###Using column-major matrix layout
-- Make sure the host code fills in matrices in column-major layout, i.e. translations terms are specified in `m[3], m[7], m[11]` elements.
+- Make sure the host code fills in matrices in column-major layout, i.e. translations terms are specified in `m[12], m[13], m[14]` elements.
 - Set `defaultMatrixLayoutMode` to `SLANG_MATRIX_LAYOUT_COLUMN_MAJOR` when creating a Slang session.
 - Write `mul(Vector, Matrix)` in shader code.
 
