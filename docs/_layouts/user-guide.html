@@ -32,27 +32,27 @@
     }
 
     ol {
-      list-style: decimal;
-      list-style-position: inside;
+      counter-reset: section;
+      list-style-type: none;
     }
 
-    ol li {
-      list-style: decimal;
-      list-style-position: inside;
+    li:before {
+      counter-increment: section;
+      content: counters(section, ".") " ";
     }
   </style>
   {% seo %}
 </head>
 
 <body>
-  <div id="container">
-    <div class="inner" style="padding:40px;width:1000px">
+  <div id="main_content_wrap" class="outer">
+    <div id="main_content" class="inner" style="padding:40px;width:1000px">
       <div id="dividerContainer">
         <div id="tocColumn">
           {% include user-guide-toc.html %}
         </div>
         <div id="rightColumn">
-          <section id="main_content">
+          <section>
             {{ content }}
           </section>
 
@@ -65,8 +65,6 @@
           </footer>
         </div>
       </div>
-
-
     </div>
   </div>
 
