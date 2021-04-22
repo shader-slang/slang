@@ -906,9 +906,14 @@ static SlangResult _findAndLoadNVRTC(ISlangSharedLibraryLoader* loader, ComPtr<I
             return SLANG_OK;
         }
     }
+
 #else
     SLANG_UNUSED(loader);
     SLANG_UNUSED(outLibrary);
+
+    SLANG_UNUSED(_getNVRTCBaseName);
+    SLANG_UNUSED(_findNVRTC);
+
 #endif
 
     // This is an official-ish list of versions is here:
