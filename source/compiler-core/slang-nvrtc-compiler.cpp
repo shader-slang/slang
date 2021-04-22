@@ -556,7 +556,7 @@ SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
     // Try looking up from a symbol. This will work as long as the nvrtc is loaded somehow from a dll/sharedlibrary
     // And the header is included from there
     {
-        String libPath = SharedLibraryUtils::getSharedLibraryFileName(m_nvrtcCreateProgram);
+        String libPath = SharedLibraryUtils::getSharedLibraryFileName((void*)m_nvrtcCreateProgram);
         if (libPath.getLength())
         {
             const String parentPath = Path::getParentDirectory(libPath);
