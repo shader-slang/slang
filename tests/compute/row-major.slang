@@ -16,8 +16,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     float4 v = float4(1, 2, 3, 1);
 
-    // ! If I do float4 - I get an error but not on the right line !
-
     float4x4 M = matrixBuffer;
     
     float4 r = mul(v, M);
