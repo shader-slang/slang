@@ -23,6 +23,7 @@ public:
     Slang::List<Slang::RefPtr<TBufferResource>> m_constantBuffers;
     Slang::Index m_constantBufferAllocCounter = 0;
     size_t m_constantBufferOffsetAllocCounter = 0;
+    uint32_t m_alignment = 256;
     uint64_t m_version;
     uint64_t getVersion() { return m_version; }
     uint64_t& getVersionCounter()
@@ -31,7 +32,7 @@ public:
         return version;
     }
 
-    Result init(const ITransientResourceHeap::Desc& desc, TDevice* device)
+    Result init(const ITransientResourceHeap::Desc& desc, uint32_t alignment, TDevice* device)
     {
         m_device = device;
 
@@ -53,12 +54,17 @@ public:
         return SLANG_OK;
     }
 
+    static size_t alignUp(size_t value, uint32_t alignment)
+    {
+        return (value + alignment - 1) / alignment * alignment;
+    }
+
     Result allocateConstantBuffer(
         size_t size,
         IBufferResource*& outBufferWeakPtr,
         size_t& outOffset)
     {
-        size_t bufferAllocOffset = m_constantBufferOffsetAllocCounter;
+        size_t bufferAllocOffset = alignUp(m_constantBufferOffsetAllocCounter, m_alignment);
         Slang::Index bufferId = -1;
         // Find first constant buffer from `m_constantBufferAllocCounter` that has enough space
         // for this allocation.
