@@ -3933,6 +3933,12 @@ namespace slang
             LayoutRules     rules = LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) = 0;
 
+        virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getParameterBlockLayout(
+            TypeReflection* elementType,
+            SlangInt        targetIndex = 0,
+            LayoutRules     rules = LayoutRules::Default,
+            ISlangBlob**    outDiagnostics = nullptr) = 0;
+
             /** Get the mangled name for a type RTTI object.
             */
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeRTTIMangledName(

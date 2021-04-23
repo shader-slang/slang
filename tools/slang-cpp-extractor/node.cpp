@@ -1,14 +1,29 @@
 #include "node.h"
 
+#include "file-util.h"
+
+#include "../../source/core/slang-string-util.h"
+
 namespace CppExtract {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Node Impl !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static void _indent(Index indentCount, StringBuilder& out)
+SLANG_FORCE_INLINE static void _indent(Index indentCount, StringBuilder& out) { FileUtil::indent(indentCount, out); }
+
+ScopeNode* Node::getRootScope()
 {
-    for (Index i = 0; i < indentCount; ++i)
+    if (m_parentScope)
     {
-        out << CPP_EXTRACT_INDENT_STRING;
+        ScopeNode* scope = m_parentScope;
+        while (scope->m_parentScope)
+        {
+            scope = scope->m_parentScope;
+        }
+        return scope;
+    }
+    else
+    {
+        return as<ScopeNode>(this);
     }
 }
 
@@ -77,29 +92,158 @@ void Node::calcAbsoluteName(StringBuilder& outName) const
     }
 }
 
-/* static */Node* Node::findNode(ScopeNode* scope, const UnownedStringSlice& name)
+/* static */Node* Node::lookupNameInScope(ScopeNode* scope, const UnownedStringSlice& name)
 {
-    // TODO(JS): We may want to lookup based on the path. 
-    // If the name is qualified, we give up for not
-    if (String(name).indexOf("::") >= 0)
+    // TODO(JS): Doesn't handle 'using namespace'.
+
+    // Must be unqualified name
+    SLANG_ASSERT(name.indexOf(UnownedStringSlice::fromLiteral("::")) < 0);
+
+    Node* childNode = scope->findChild(name);
+    if (childNode)
     {
-        return nullptr;
+        return childNode;
     }
 
-    // Okay try in all scopes up to the root
-    while (scope)
+    // If we have an anonymous namespace in this scope, try looking up in there..
+    if (scope->m_anonymousNamespace)
     {
-        if (Node* node = scope->findChild(name))
+        Node* childNode = scope->m_anonymousNamespace->findChild(name);
+        if (childNode)
         {
-            return node;
+            return childNode;
         }
+    }
 
-        scope = scope->m_parentScope;
+    // I could have an enum (that's not an enum class)
+    for (Node* node : scope->m_children)
+    {
+        EnumNode* enumNode = as<EnumNode>(node);
+        if (enumNode && enumNode->m_type == Node::Type::Enum)
+        {
+            Node** nodePtr = enumNode->m_childMap.TryGetValue(name);
+            if (nodePtr)
+            {
+                return *nodePtr;
+            }
+        }
     }
 
     return nullptr;
 }
 
+/* static */Node* Node::lookupFromScope(ScopeNode* scope, const UnownedStringSlice* parts, Index partsCount)
+{
+    SLANG_ASSERT(partsCount > 0);
+    if (partsCount == 1)
+    {
+        return lookupNameInScope(scope, parts[0]);
+    }
+
+    for (Index i = 0; i < partsCount; ++i)
+    {
+        const UnownedStringSlice& part = parts[i];
+
+        Node* node = lookupNameInScope(scope, part);
+        if (node == nullptr)
+        {
+            return node;
+        }
+        // If at end, then we are done
+        if (i == partsCount - 1)
+        {
+            return node;
+        }
+
+        // If there are more elements, then node must be some kind of scope,
+        // if we are going to find it
+        scope = as<ScopeNode>(node);
+        if (scope == nullptr)
+        {
+            break;
+        }
+    }
+
+    return nullptr;
+}
+
+/* static */void Node::splitPath(const UnownedStringSlice& inPath, List<UnownedStringSlice>& outParts)
+{
+    if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
+    {
+        StringUtil::split(inPath, UnownedStringSlice::fromLiteral("::"), outParts);
+        // Remove any whitespace
+        for (auto& part : outParts)
+        {
+            part = part.trim();
+        }
+    }
+    else
+    {
+        outParts.clear();
+        outParts.add(inPath.trim());
+    }
+}
+
+/* static */Node* Node::lookupFromScope(ScopeNode* scope, const UnownedStringSlice& inPath)
+{
+    if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
+    {
+        List<UnownedStringSlice> parts;
+        splitPath(inPath, parts);
+
+        return lookupFromScope(scope, parts.getBuffer(), parts.getCount());
+    }
+    else
+    {
+        return lookupNameInScope(scope, inPath);
+    }
+}
+
+/* static */Node* Node::lookup(ScopeNode* scope, const UnownedStringSlice& inPath)
+{
+    if (inPath.indexOf(UnownedStringSlice::fromLiteral("::")) >= 0)
+    {
+        List<UnownedStringSlice> parts;
+        splitPath(inPath, parts);
+
+        if (parts[0].getLength() == 0)
+        {
+            // It's a lookup from global scope
+            ScopeNode* rootScope = scope->getRootScope();
+            return lookupFromScope(rootScope, parts.getBuffer() + 1, parts.getCount() + 1);
+        }
+
+        // Okay lets try a lookup from each scope up to the global scope
+        while (scope)
+        {
+            Node* node = lookupFromScope(scope, parts.getBuffer(), parts.getCount());
+            if (node)
+            {
+                return node;
+            }
+
+            scope = scope->m_parentScope;
+        }
+    }
+    else
+    {
+        while (scope)
+        {
+            // Lookup in this scope
+            Node* node = lookupNameInScope(scope, inPath);
+            if (node)
+            {
+                return node;
+            }
+
+            // Try parent scope
+            scope = scope->m_parentScope;
+        }
+    }
+
+    return nullptr;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ScopeNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -133,7 +277,14 @@ void ScopeNode::addChild(Node* child)
 Node* ScopeNode::findChild(const UnownedStringSlice& name) const
 {
     Node** nodePtr = m_childMap.TryGetValue(name);
-    return (nodePtr) ? *nodePtr : nullptr;
+    if (nodePtr)
+    {
+        return *nodePtr;
+    }
+
+
+
+    return nullptr;
 }
 
 void ScopeNode::calcScopeDepthFirst(List<Node*>& outNodes)
@@ -175,6 +326,85 @@ void ScopeNode::dump(int indentCount, StringBuilder& out)
     }
 
     _indent(indentCount, out);
+    out << "}\n";
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumCaseNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void EnumCaseNode::dump(int indent, StringBuilder& out)
+{
+    if (isReflected())
+    {
+        _indent(indent, out);
+        out << m_name.getContent();
+
+        if (m_value.type != TokenType::Invalid)
+        {
+            out << " = ";
+            out << m_value.getContent();
+        }
+
+        out << ",\n";
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void TypeDefNode::dump(int indent, StringBuilder& out)
+{
+    if (isReflected())
+    {
+        _indent(indent, out);
+
+        out << "typedef ";
+
+        for (auto& tok : m_targetTypeTokens)
+        {
+            out << tok.getContent() << " ";
+        }
+
+        out << m_name.getContent() << ";\n";
+    }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! EnumNode !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+void EnumNode::dump(int indent, StringBuilder& out)
+{
+    if (!isReflected())
+    {
+        return;
+    }
+
+    _indent(indent, out);
+
+    out << "enum ";
+
+    if (m_type == Type::EnumClass)
+    {
+        out << "class ";
+    }
+
+    if (m_name.type != TokenType::Invalid)
+    {
+        out << m_name.getContent();
+    }
+
+    if (m_backingToken.type != TokenType::Invalid)
+    {
+        out << " : " << m_backingToken.getContent();
+    }
+
+    out << "\n";
+    _indent(indent, out);
+    out << "{\n";
+
+    for (Node* child : m_children)
+    {
+        child->dump(indent + 1, out);
+    }
+
+    _indent(indent, out);
     out << "}\n";
 }
 

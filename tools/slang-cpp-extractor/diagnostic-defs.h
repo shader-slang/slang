@@ -41,7 +41,10 @@ DIAGNOSTIC(100009, Error, unexpectedUnbalancedToken, "Unexpected unbalanced toke
 DIAGNOSTIC(100010, Error, unexpectedEndOfFile, "Unexpected end of file")
 DIAGNOSTIC(100011, Error, expectingTypeKeyword, "Expecting type keyword - struct or class, found $0")
 
-DIAGNOSTIC(100011, Error, typeInDifferentTypeSet, "Type $0 in different type set $1 from super class $2")
+DIAGNOSTIC(100012, Error, typeInDifferentTypeSet, "Type $0 in different type set $1 from super class $2")
+DIAGNOSTIC(100013, Error, expectingIdentifier, "Expecting an identifier, found $0")
+DIAGNOSTIC(100014, Error, cannotDeclareTypeInScope, "Cannot declare types in this scope")
+DIAGNOSTIC(100015, Error, identifierAlreadyDefined, "Identifier already defined '$0'")
 
 // Command line errors 100100
 

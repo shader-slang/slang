@@ -1,7 +1,16 @@
+// Define SLANG_CUDA_ENABLE_HALF to use the cuda_fp16 include to add half support. 
+// For this to work NVRTC needs to have the path to the CUDA SDK.
+//
+// As it stands the includes paths defined for Slang are passed down to NVRTC. Similarly defines defined for the Slang compile
+// are passed down. 
+
+#ifdef SLANG_CUDA_ENABLE_HALF
+#include <cuda_fp16.h>
+#endif
+
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
 #endif
-
 
 // Must be large enough to cause overflow and therefore infinity
 #ifndef SLANG_INFINITY
@@ -42,6 +51,35 @@
 // Here we don't have the index zeroing behavior, as such bounds checks are generally not on GPU targets either. 
 #ifndef SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK
 #   define SLANG_CUDA_FIXED_ARRAY_BOUND_CHECK(index, count) SLANG_PRELUDE_ASSERT(index < count); 
+#endif
+
+//
+// Half support
+// 
+
+#if SLANG_CUDA_ENABLE_HALF
+
+// Add the other vector half types
+struct __half3 { __half2 xy; __half z; };
+struct __half4 { __half2 xy; __half2 zw; };
+
+// Mechanism to make half vectors
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 make___half2(__half x, __half y) { return __halves2half2(x, y); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 make___half3(__half x, __half y, __half z) { __half3 o; o.xy = __halves2half2(x, y); o.z = z; return o; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 make___half4(__half x, __half y, __half z, __half w) { __half4 o; o.xy = __halves2half2(x, y); o.zw = __halves2half2(z, w); return o; }
+
+// Use the round nearest as the default - it is the only one defined
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __float22half2(const float2 a) { return __float22half2_rn(a); }
+
+// Implement the vector versions
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __float2half(float2 a) { return __float22half2(a); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 __float2half(float3 a) { __half3 o; o.xy = __float22half2(make_float2(a.x, a.y)); o.z = __float2half(a.z); return o; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 __float2half(float4 a) { __half4 o; o.xy = __float22half2(make_float2(a.x, a.y)); o.zw = __float22half2(make_float2(a.z, a.w)); return o; }
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 __half2float(__half2 a) { return __half22float2(a); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float3 __half2float(__half3 a) { float2 xy = __half22float2(a.xy); float z = __half2float(a.z); return make_float3(xy.x, xy.y, z); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 __half2float(__half4 a) { float2 xy = __half22float2(a.xy); float2 zw = __half22float2(a.zw); return make_float4(xy.x, xy.y, zw.x, zw.y); }
+
 #endif
 
  // This macro handles how out-of-range surface coordinates are handled; 

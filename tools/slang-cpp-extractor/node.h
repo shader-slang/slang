@@ -28,10 +28,18 @@ public:
         StructType,
         ClassType,
 
+        Enum,               
+        EnumClass,
+
         Namespace,
         AnonymousNamespace,
 
         Field,
+        EnumCase,
+
+        TypeDef,
+
+        CountOf,
     };
 
     enum class TypeRange
@@ -41,10 +49,29 @@ public:
 
         ClassLikeStart = int(Type::StructType),
         ClassLikeEnd = int(Type::ClassType),
+
+        EnumStart = int(Type::Enum),
+        EnumEnd = int(Type::EnumClass),
     };
 
     static bool isScopeType(Type type) { return int(type) >= int(TypeRange::ScopeStart) && int(type) <= int(TypeRange::ScopeEnd); }
     static bool isClassLikeType(Type type) { return int(type) >= int(TypeRange::ClassLikeStart) &&  int(type) <= int(TypeRange::ClassLikeEnd); }
+    static bool isEnumLikeType(Type type) { return int(type) >= int(TypeRange::EnumStart) &&  int(type) <= int(TypeRange::EnumEnd); }
+    static bool canAcceptTypes(Type type)
+    {
+        switch (type)
+        {
+            case Type::StructType:
+            case Type::ClassType:
+            case Type::Namespace:
+            case Type::AnonymousNamespace:
+            {
+                return true;
+            }
+            default: break;
+        }
+        return false;
+    }
 
     static bool isType(Type type) { return true; }
 
@@ -67,6 +94,8 @@ public:
         /// True if reflected
     bool isReflected() const { return m_reflectionType == ReflectionType::Reflected; }
 
+    ScopeNode* getRootScope();
+
     typedef bool(*Filter)(Node* node);
 
     static bool isClassLikeAndReflected(Node* node) { return node->isClassLike() && node->isReflected(); }
@@ -79,8 +108,19 @@ public:
 
     static void calcScopePath(Node* node, List<Node*>& outPath);
 
-        /// Find the name starting in specified scope
-    static Node* findNode(ScopeNode* scope, const UnownedStringSlice& name);
+        /// Lookup a name in just the specified scope
+        /// Handles anonymous namespaces, or name lookups that are in the parents space
+    static Node* lookupNameInScope(ScopeNode* scope, const UnownedStringSlice& name);
+
+        /// Lookup from a path
+    static Node* lookupFromScope(ScopeNode* scope, const UnownedStringSlice* path, Index pathCount);
+        /// Looks up *just* from the specified scope. 
+    static Node* lookupFromScope(ScopeNode* scope, const UnownedStringSlice& slice);
+
+        /// Look up name (which can contain ::) 
+    static Node* lookup(ScopeNode* scope, const UnownedStringSlice& name);
+
+    static void splitPath(const UnownedStringSlice& slice, List<UnownedStringSlice>& outSplitPath);
 
     Node(Type type) :
         m_type(type),
@@ -108,6 +148,8 @@ struct ScopeNode : public Node
 
         /// True if can accept fields (class like types can)
     bool acceptsFields() const { return isClassLike(); }
+        /// True if the scope can accept types
+    bool acceptsTypes() const { return canAcceptTypes(m_type); }
 
         /// Gets the reflection for any contained types
     ReflectionType getContainedReflectionType() const { return m_reflectionType == ReflectionType::NotReflected ? ReflectionType::NotReflected : m_reflectionOverride; }
@@ -210,11 +252,55 @@ struct ClassLikeNode : public ScopeNode
     ClassLikeNode* m_superNode;      ///< If this is a class/struct, the type it is derived from (or nullptr if base)
 };
 
+struct EnumCaseNode : public Node
+{
+    typedef Node Super;
+
+    static bool isType(Type type) { return type == Type::EnumCase; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    EnumCaseNode():
+        Super(Type::EnumCase)
+    {
+    }
+
+    Token m_value;              ///< If not defined will be invalid
+};
+
+struct EnumNode : public ScopeNode
+{
+    typedef ScopeNode Super;
+    static bool isType(Type type) { return isEnumLikeType(type); }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    EnumNode(Type type):
+        Super(type)
+    {
+        SLANG_ASSERT(isEnumLikeType(type));
+    }
+
+    Token m_backingToken;
+};
+
+struct TypeDefNode : public Node
+{
+    typedef Node Super;
+    static bool isType(Type type) { return type == Type::TypeDef; }
+
+    virtual void dump(int indent, StringBuilder& out) SLANG_OVERRIDE;
+
+    TypeDefNode():
+        Super(Type::TypeDef)
+    {
+    }
+
+    List<Token> m_targetTypeTokens;
+};
+
 template <typename T>
 T* as(Node* node) { return (node && T::isType(node->m_type)) ? static_cast<T*>(node) : nullptr; }
-
-// A macro to define a single indent as a string
-#define CPP_EXTRACT_INDENT_STRING "    "
 
 } // CppExtract
 
