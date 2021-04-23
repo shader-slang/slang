@@ -9,14 +9,14 @@ The differences between default matrix layout or storage conventions between GLS
 
 A high level summary:
 
-* Default matrix **layout** in memory for Slang in `column-major`. 
+* Default matrix **layout** in memory for Slang is `column-major`. 
   * This default is for *legacy* reasons and may change in the future.
 * Row-major layout is the only *portable* layout to use across targets. 
 * Use `setMatrixLayoutMode`/`spSetMatrixLayoutMode`/`createSession` to set the default  
 * Use `-matrix-layout-row-major` or `-matrix-layout-column-major` for the command line 
   * or via `spProcessCommandLineArguments`/`processCommandLineArguments`
 
-On the portability issue, some targets *ignore* the matrix layout mode, notably CUDA and CPU/C++. For this reason for the widest breadth of targets and portability it is recommended to use *row-major* layout.
+On the portability issue, some targets *ignore* the matrix layout mode, notably CUDA and CPU/C++. For this reason for the widest breadth of targets it is recommended to use *row-major* matrix layout.
 
 Two conventions of matrix transform math
 -------------------------
@@ -29,14 +29,14 @@ In HLSL/Slang the order of vector and matrix parameters to `mul` determine how t
 
 Through this mechanism a developer is able to write transforms in their preferred style. 
 
-These two styles are not directly interchangable - for a given `v` and `m` then generally `mul(v, m) != mul(m, v)`. That for that the matrix needs to be transposed so 
+These two styles are not directly interchangable - for a given `v` and `m` then generally `mul(v, m) != mul(m, v)`. For that the matrix needs to be transposed so 
 
 * `mul(v, m) == mul(transpose(m), v)`
 * `mul(m, v) == mul(v, transpose(m))`
 
-This behavior is *independent* of how a matrix layout in memory. Host code needs to be aware of how a shader code will interpret a matrix stored in memory, it's layout, as well as the convention is being used in shader code (ie `mul(v,m)` or `mul(m, v)`).
+This behavior is *independent* of how a matrix layout in memory. Host code needs to be aware of how a shader code will interpret a matrix stored in memory, it's layout, as well as the vector interpretation convention used in shader code (ie `mul(v,m)` or `mul(m, v)`).
 
-[Matrix layout](https://en.wikipedia.org/wiki/Row-_and_column-major_order) can be either row or column major. In `row-major` and `column-major` just determine which elements are contiguous in memory. `Row major` means the rows elements are contiguous. `Column major` means the column elements are contiguous.
+[Matrix layout](https://en.wikipedia.org/wiki/Row-_and_column-major_order) can be either `row-major` or `column-major`. The difference just determines which elements are contiguous in memory. `Row-major` means the rows elements are contiguous. `Column-major` means the column elements are contiguous.
 
 Another way to think about this difference is in terms of where translation terms should be placed in memory when filling a typical 4x4 transform matrix. For `row-major` matrix layout, translation will be at `m + 12, 13, 14`. For a `column-major` matrix layout, translation will be at `m + 3, 7, 11`.
 
@@ -45,11 +45,7 @@ Slang automatically handles the convention differences when cross-compiling code
 Overriding default matrix layout
 --------------------------
 
-Slang allows users to override default matrix layout with a compiler flag. 
-
-For portability reasons it's recommended to use the 'row-major' layout - as that is the only style that will work on CUDA and C++/CPU targets. 
-
-This compiler flag can be specified during the creation of a `Session`:
+Slang allows users to override default matrix layout with a compiler flag. This compiler flag can be specified during the creation of a `Session`:
 
 ```
 slang::IGlobalSession* globalSession;
@@ -61,7 +57,7 @@ slang::ISession* session;
 globalSession->createSession(slangSessionDesc, &session);
 ```
 
-This makes Slang treat all matrices as in column-major layout, and for example emitting `column_major` qualifier in resulting HLSL code.
+This makes Slang treat all matrices as in `column-major` layout, and for example emitting `column_major` qualifier in resulting HLSL code.
 
 Alternatively the default layout can be set via
 
@@ -79,7 +75,7 @@ There are 4 variables:
 * Shader vector interpretation (as determined via `mul(v, m)` or `mul(m, v)`
 * Shader matrix memory layout 
 
-The simplest scenario is that they are all `row-major`/`row vector`. In that case code will be most easily portable. NOTE! Currently this requires setting Slangs default matrix mode to `row-major`, as it's default is `column-major`. 
+The simplest scenario is that they are all `row-major`/`row vector`. In that case code will be most easily portable. NOTE! Currently this requires setting Slangs default matrix layout mode to `row-major`, as it's default is `column-major`. 
 
 Also simple but *not* as portable is if they are all `column-major`/`column vector`. It is not portable because some targets (CUDA/C++/CPU) ignore `column-major` matrix layout.
 
