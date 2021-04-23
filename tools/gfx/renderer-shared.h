@@ -5,6 +5,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-com-object.h"
 
+#include "resource-desc-utils.h"
+
 namespace gfx
 {
 

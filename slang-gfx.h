@@ -165,6 +165,51 @@ enum class PrimitiveTopology
     TriangleList,
 };
 
+enum class ResourceState
+{
+    Undefined,
+    VertexBuffer,
+    IndexBuffer,
+    ConstantBuffer,
+    StreamOutput,
+    ShaderResource,
+    UnorderedAccess,
+    RenderTarget,
+    DepthRead,
+    DepthWrite,
+    Present,
+    CopySource,
+    CopyDestination,
+    ResolveSource,
+    ResolveDestination,
+    _Count
+};
+
+struct ResourceStateSet
+{
+public:
+    void add(ResourceState state) { m_bitFields |= (1LL << (uint32_t)state); }
+    template <typename... TResourceState> void add(ResourceState s, TResourceState... states)
+    {
+        add(s);
+        add(states...);
+    }
+    bool contains(ResourceState state) const { return (m_bitFields & (1LL << (uint32_t)state)) != 0; }
+    ResourceStateSet()
+        : m_bitFields(0)
+    {}
+    ResourceStateSet(const ResourceStateSet& other) = default;
+    ResourceStateSet(ResourceState state) { add(state); }
+    template <typename... TResourceState> ResourceStateSet(TResourceState... states)
+    {
+        add(states...);
+    }
+
+private:
+    uint64_t m_bitFields = 0;
+    void add() {}
+};
+
 class IResource: public ISlangUnknown
 {
 public:
@@ -181,44 +226,6 @@ public:
         CountOf,
     };
 
-        /// Describes how a resource is to be used
-    enum class Usage
-    {
-        Unknown = 0,
-        VertexBuffer,
-        IndexBuffer,
-        ConstantBuffer,
-        StreamOutput,
-        RenderTarget,
-        DepthRead,
-        DepthWrite,
-        UnorderedAccess,
-        PixelShaderResource,
-        NonPixelShaderResource,
-        ShaderResource,
-        GenericRead,
-        CopySource,
-        CopyDest,
-        CountOf,
-    };
-
-        /// Binding flags describe all of the ways a resource can be bound - and therefore used
-    struct BindFlag
-    {
-        enum Enum
-        {
-            VertexBuffer            = 0x001,
-            IndexBuffer             = 0x002,
-            ConstantBuffer          = 0x004,
-            StreamOutput            = 0x008,
-            RenderTarget            = 0x010,
-            DepthStencil            = 0x020,
-            UnorderedAccess         = 0x040,
-            PixelShaderResource     = 0x080,
-            NonPixelShaderResource  = 0x100,
-        };
-    };
-
         /// Combinations describe how a resource can be accessed (typically by the host/cpu)
     struct AccessFlag
     {
@@ -232,52 +239,13 @@ public:
         /// Base class for Descs
     struct DescBase
     {
-        bool canBind(BindFlag::Enum bindFlag) const { return (bindFlags & bindFlag) != 0; }
         bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
 
         Type type = Type::Unknown;
-
-        int bindFlags = 0;          ///< Combination of Resource::BindFlag or 0 (and will use initialUsage to set)
+        ResourceState defaultState = ResourceState::Undefined;
+        ResourceStateSet allowedStates = ResourceStateSet();
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
     };
-
-    inline static BindFlag::Enum getDefaultBindFlagsFromUsage(IResource::Usage usage)
-    {
-        switch (usage)
-        {
-        case Usage::VertexBuffer:
-            return BindFlag::VertexBuffer;
-        case Usage::IndexBuffer:
-            return BindFlag::IndexBuffer;
-        case Usage::ConstantBuffer:
-            return BindFlag::ConstantBuffer;
-        case Usage::StreamOutput:
-            return BindFlag::StreamOutput;
-        case Usage::RenderTarget:
-            return BindFlag::RenderTarget;
-        case Usage::DepthRead:
-        case Usage::DepthWrite:
-            return BindFlag::DepthStencil;
-        case Usage::UnorderedAccess:
-            return BindFlag::Enum(BindFlag::UnorderedAccess | BindFlag::PixelShaderResource |
-                BindFlag::NonPixelShaderResource);
-        case Usage::PixelShaderResource:
-            return BindFlag::PixelShaderResource;
-        case Usage::NonPixelShaderResource:
-            return BindFlag::NonPixelShaderResource;
-        case Usage::ShaderResource:
-        case Usage::GenericRead:
-            return BindFlag::Enum(
-                BindFlag::PixelShaderResource |
-                BindFlag::NonPixelShaderResource);
-        case Usage::CopySource:
-            return BindFlag::Enum(0);
-        case Usage::CopyDest:
-            return BindFlag::Enum(0);
-        default:
-            return BindFlag::Enum(-1);
-        }
-    }
 
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() = 0;
 };
@@ -291,22 +259,9 @@ class IBufferResource: public IResource
 public:
     struct Desc: public DescBase
     {
-        void init(size_t sizeInBytesIn)
-        {
-            sizeInBytes = sizeInBytesIn;
-            elementSize = 0;
-            format = Format::Unknown;
-        }
-        void setDefaults(Usage initialUsage)
-        {
-            if (bindFlags == 0)
-            {
-                bindFlags = getDefaultBindFlagsFromUsage(initialUsage);
-            }
-        }
-        size_t sizeInBytes;     ///< Total size in bytes
-        int elementSize;        ///< Get the element stride. If > 0, this is a structured buffer
-        Format format;
+        size_t sizeInBytes = 0;     ///< Total size in bytes
+        int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
+        Format format = Format::Unknown;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
 };
@@ -314,32 +269,6 @@ public:
     {                                                                                  \
         0x1b274efe, 0x5e37, 0x492b, { 0x82, 0x6e, 0x7e, 0xe7, 0xe8, 0xf5, 0xa4, 0x9b } \
     }
-
-template <typename T> T _slang_gfx_max(T v0, T v1) { return v0 > v1 ? v0 : v1; }
-
-static inline unsigned int _slang_gfx_ones32(unsigned int x)
-{
-    /* 32-bit recursive reduction using SWAR...
-            but first step is mapping 2-bit values
-            into sum of 2 1-bit values in sneaky way
-    */
-    x -= ((x >> 1) & 0x55555555);
-    x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
-    x = (((x >> 4) + x) & 0x0f0f0f0f);
-    x += (x >> 8);
-    x += (x >> 16);
-    return (x & 0x0000003f);
-}
-
-static inline unsigned int _slang_gfx_log2Floor(unsigned int x)
-{
-    x |= (x >> 1);
-    x |= (x >> 2);
-    x |= (x >> 4);
-    x |= (x >> 8);
-    x |= (x >> 16);
-    return (_slang_gfx_ones32(x >> 1));
-}
 
 struct DepthStencilClearValue
 {
@@ -362,234 +291,27 @@ class ITextureResource: public IResource
 public:
     struct SampleDesc
     {
-        void init()
-        {
-            numSamples = 1;
-            quality = 0;
-        }
-        int numSamples;                     ///< Number of samples per pixel
-        int quality;                        ///< The quality measure for the samples
+        int numSamples = 1;                     ///< Number of samples per pixel
+        int quality = 0;                        ///< The quality measure for the samples
     };
 
     struct Size
     {
-        void init()
-        {
-            width = height = depth = 1;
-        }
-        void init(int widthIn, int heightIn = 1, int depthIn = 1)
-        {
-            width = widthIn;
-            height = heightIn;
-            depth = depthIn;
-        }
-            /// Given the type works out the maximum dimension size
-        int calcMaxDimension(Type type) const
-        {
-            switch (type)
-            {
-            case IResource::Type::Texture1D:
-                return this->width;
-            case IResource::Type::Texture3D:
-                return _slang_gfx_max(_slang_gfx_max(this->width, this->height), this->depth);
-            case IResource::Type::TextureCube: // fallthru
-            case IResource::Type::Texture2D:
-                {
-                    return _slang_gfx_max(this->width, this->height);
-                }
-            default:
-                return 0;
-            }
-        }
-
-        SLANG_FORCE_INLINE static int calcMipSize(int width, int mipLevel)
-        {
-            width = width >> mipLevel;
-            return width > 0 ? width : 1;
-        }
-            /// Given a size, calculates the size at a mip level
-        Size calcMipSize(int mipLevel) const
-        {
-            Size size;
-            size.width = calcMipSize(this->width, mipLevel);
-            size.height = calcMipSize(this->height, mipLevel);
-            size.depth = calcMipSize(this->depth, mipLevel);
-            return size;
-        }
-
-        int width;              ///< Width in pixels
-        int height;             ///< Height in pixels (if 2d or 3d)
-        int depth;              ///< Depth (if 3d)
+        int width = 0;              ///< Width in pixels
+        int height = 0;             ///< Height in pixels (if 2d or 3d)
+        int depth = 0;              ///< Depth (if 3d)
     };
 
     struct Desc: public DescBase
     {
-            /// Initialize with default values
-        void init(Type typeIn)
-        {
-            this->type = typeIn;
-            this->size.init();
-
-            this->format = Format::Unknown;
-            this->arraySize = 0;
-            this->numMipLevels = 0;
-            this->sampleDesc.init();
-
-            this->bindFlags = 0;
-            this->cpuAccessFlags = 0;
-        }
-            /// Initialize different dimensions. For cubemap, use init2D
-        void init1D(Format formatIn, int widthIn, int numMipMapsIn = 0)
-        {
-            this->type = Type::Texture1D;
-            this->size.init(widthIn);
-
-            this->format = formatIn;
-            this->arraySize = 0;
-            this->numMipLevels = numMipMapsIn;
-            this->sampleDesc.init();
-
-            this->bindFlags = 0;
-            this->cpuAccessFlags = 0;
-        }
-
-        void init2D(Type typeIn, Format formatIn, int widthIn, int heightIn, int numMipMapsIn = 0)
-        {
-            assert(typeIn == Type::Texture2D || typeIn == Type::TextureCube);
-
-            this->type = typeIn;
-            this->size.init(widthIn, heightIn);
-
-            this->format = formatIn;
-            this->arraySize = 0;
-            this->numMipLevels = numMipMapsIn;
-            this->sampleDesc.init();
-
-            this->bindFlags = 0;
-            this->cpuAccessFlags = 0;
-        }
-
-        void init3D(Format formatIn, int widthIn, int heightIn, int depthIn, int numMipMapsIn = 0)
-        {
-            this->type = Type::Texture3D;
-            this->size.init(widthIn, heightIn, depthIn);
-
-            this->format = formatIn;
-            this->arraySize = 0;
-            this->numMipLevels = numMipMapsIn;
-            this->sampleDesc.init();
-
-            this->bindFlags = 0;
-            this->cpuAccessFlags = 0;
-        }
-
-            /// Given the type, calculates the number of mip maps. 0 on error
-        int calcNumMipLevels() const
-        {
-            const int maxDimensionSize = this->size.calcMaxDimension(type);
-            return (maxDimensionSize > 0) ? (_slang_gfx_log2Floor(maxDimensionSize) + 1) : 0;
-        }
-            /// Calculate the total number of sub resources. 0 on error.
-        int calcNumSubResources() const
-        {
-            const int numMipMaps =
-                (this->numMipLevels > 0) ? this->numMipLevels : calcNumMipLevels();
-            const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
-
-            switch (type)
-            {
-            case IResource::Type::Texture1D:
-            case IResource::Type::Texture2D:
-            case IResource::Type::Texture3D:
-                {
-                    return numMipMaps * arrSize;
-                }
-            case IResource::Type::TextureCube:
-                {
-                    // There are 6 faces to a cubemap
-                    return numMipMaps * arrSize * 6;
-                }
-            default:
-                return 0;
-            }
-        }
-
-            /// Calculate the effective array size - in essence the amount if mip map sets needed.
-            /// In practice takes into account if the arraySize is 0 (it's not an array, but it will still have at least one mip set)
-            /// and if the type is a cubemap (multiplies the amount of mip sets by 6)
-        int calcEffectiveArraySize() const
-        {
-            const int arrSize = (this->arraySize > 0) ? this->arraySize : 1;
-
-            switch (type)
-            {
-            case IResource::Type::Texture1D: // fallthru
-            case IResource::Type::Texture2D:
-                {
-                    return arrSize;
-                }
-            case IResource::Type::TextureCube:
-                return arrSize * 6;
-            case IResource::Type::Texture3D:
-                return 1;
-            default:
-                return 0;
-            }
-        }
-
-            /// Use type to fix the size values (and array size).
-            /// For example a 1d texture, should have height and depth set to 1.
-        void fixSize()
-        {
-            switch (type)
-            {
-            case IResource::Type::Texture1D:
-                {
-                    this->size.height = 1;
-                    this->size.depth = 1;
-                    break;
-                }
-            case IResource::Type::TextureCube:
-            case IResource::Type::Texture2D:
-                {
-                    this->size.depth = 1;
-                    break;
-                }
-            case IResource::Type::Texture3D:
-                {
-                    // Can't have an array
-                    this->arraySize = 0;
-                    break;
-                }
-            default:
-                break;
-            }
-        }
-
-            /// Set up default parameters based on type and usage
-        void setDefaults(Usage usage)
-        {
-            this->initialUsage = usage;
-            fixSize();
-            if (this->bindFlags == 0)
-            {
-                this->bindFlags = getDefaultBindFlagsFromUsage(initialUsage);
-            }
-            if (this->numMipLevels <= 0)
-            {
-                this->numMipLevels = calcNumMipLevels();
-            }
-        }
-
         Size size;
 
-        int arraySize;          ///< Array size
+        int arraySize = 0;          ///< Array size
 
-        int numMipLevels;       ///< Number of mip levels - if 0 will create all mip levels
-        Format format;          ///< The resources format
-        SampleDesc sampleDesc;  ///< How the resource is sampled
+        int numMipLevels = 0;       ///< Number of mip levels - if 0 will create all mip levels
+        Format format;              ///< The resources format
+        SampleDesc sampleDesc;      ///< How the resource is sampled
         ClearValue optimalClearValue;
-        Usage initialUsage;
     };
 
         /// Data for a single subresource of a texture.
@@ -1041,21 +763,6 @@ struct WindowHandle
     }
 };
 
-enum class ResourceState
-{
-    Undefined,
-    ShaderResource,
-    UnorderedAccess,
-    RenderTarget,
-    DepthRead,
-    DepthWrite,
-    Present,
-    CopySource,
-    CopyDestination,
-    ResolveSource,
-    ResolveDestination,
-};
-
 struct FaceMask
 {
     enum Enum
@@ -1426,36 +1133,32 @@ public:
         ///     effectiveElementCount = (isArray ? arrayElementCount : 1) * (isCube ? 6 : 1);
         ///
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) = 0;
 
         /// Create a texture resource. initData holds the initialize data to set the contents of the texture when constructed.
     inline SLANG_NO_THROW ComPtr<ITextureResource> createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData = nullptr)
     {
         ComPtr<ITextureResource> resource;
-        SLANG_RETURN_NULL_ON_FAIL(createTextureResource(initialUsage, desc, initData, resource.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createTextureResource(desc, initData, resource.writeRef()));
         return resource;
     }
 
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) = 0;
 
     inline SLANG_NO_THROW ComPtr<IBufferResource> createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData = nullptr)
     {
         ComPtr<IBufferResource> resource;
-        SLANG_RETURN_NULL_ON_FAIL(createBufferResource(initialUsage, desc, initData, resource.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createBufferResource(desc, initData, resource.writeRef()));
         return resource;
     }
 

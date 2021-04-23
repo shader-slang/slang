@@ -139,16 +139,23 @@ GUI::GUI(
     io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
 
     {
-        gfx::ITextureResource::Desc desc;
-        desc.init2D(IResource::Type::Texture2D, Format::RGBA_Unorm_UInt8, width, height, 1);
-        desc.setDefaults(IResource::Usage::PixelShaderResource);
+        gfx::ITextureResource::Desc desc = {};
+        desc.type = IResource::Type::Texture2D;
+        desc.format = Format::RGBA_Unorm_UInt8;
+        desc.arraySize = 0;
+        desc.size.width = width;
+        desc.size.height = height;
+        desc.size.depth = 1;
+        desc.numMipLevels = 1;
+        desc.defaultState = ResourceState::ShaderResource;
+        desc.allowedStates =
+            ResourceStateSet(ResourceState::ShaderResource, ResourceState::CopyDestination);
 
         ITextureResource::SubresourceData initData = {};
         initData.data = pixels;
         initData.strideY = width * 4 * sizeof(unsigned char);
 
-        auto texture =
-            device->createTextureResource(IResource::Usage::PixelShaderResource, desc, &initData);
+        auto texture = device->createTextureResource(desc, &initData);
 
         gfx::IResourceView::Desc viewDesc;
         viewDesc.format = desc.format;
@@ -204,19 +211,22 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     // Allocate transient vertex/index buffers to hold the data for this frame.
 
     gfx::IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(vertexCount * sizeof(ImDrawVert));
-    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
+    vertexBufferDesc.type = IResource::Type::Buffer;
+    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+    vertexBufferDesc.allowedStates =
+        ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
+    vertexBufferDesc.sizeInBytes = vertexCount * sizeof(ImDrawVert);
     vertexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto vertexBuffer =
-        device->createBufferResource(IResource::Usage::VertexBuffer, vertexBufferDesc);
+    auto vertexBuffer = device->createBufferResource(vertexBufferDesc);
 
     gfx::IBufferResource::Desc indexBufferDesc;
-    indexBufferDesc.init(indexCount * sizeof(ImDrawIdx));
-    indexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
+    indexBufferDesc.type = IResource::Type::Buffer;
+    indexBufferDesc.sizeInBytes = indexCount * sizeof(ImDrawIdx);
+    indexBufferDesc.allowedStates =
+        ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
+    indexBufferDesc.defaultState = ResourceState::IndexBuffer;
     indexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto indexBuffer = device->createBufferResource(
-        IResource::Usage::IndexBuffer,
-        indexBufferDesc);
+    auto indexBuffer = device->createBufferResource(indexBufferDesc);
     auto cmdBuf = transientHeap->createCommandBuffer();
     auto encoder = cmdBuf->encodeResourceCommands();
     {
@@ -238,11 +248,13 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
     // Allocate a transient constant buffer for projection matrix
     gfx::IBufferResource::Desc constantBufferDesc;
-    constantBufferDesc.init(sizeof(glm::mat4x4));
-    constantBufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+    constantBufferDesc.type = IResource::Type::Buffer;
+    constantBufferDesc.allowedStates =
+        ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+    constantBufferDesc.defaultState = ResourceState::ConstantBuffer;
+    constantBufferDesc.sizeInBytes = sizeof(glm::mat4x4);
     constantBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-    auto constantBuffer =
-        device->createBufferResource(IResource::Usage::ConstantBuffer, constantBufferDesc);
+    auto constantBuffer = device->createBufferResource(constantBufferDesc);
 
     {
         float L = draw_data->DisplayPos.x;
