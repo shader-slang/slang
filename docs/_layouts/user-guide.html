@@ -31,28 +31,23 @@
       padding-left: 20px;
     }
 
-    ol {
-      counter-reset: section;
+    .toc_list {
       list-style-type: none;
-    }
-
-    li:before {
-      counter-increment: section;
-      content: counters(section, ".") " ";
+      padding-left:16px;
     }
   </style>
   {% seo %}
 </head>
 
 <body>
-  <div id="main_content_wrap" class="outer">
-    <div id="main_content" class="inner" style="padding:40px;width:1000px">
+  <div id="container">
+    <div class="inner" style="padding:40px;width:1000px">
       <div id="dividerContainer">
         <div id="tocColumn">
           {% include user-guide-toc.html %}
         </div>
         <div id="rightColumn">
-          <section>
+          <section id="main_content">
             {{ content }}
           </section>
 
