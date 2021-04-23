@@ -2,7 +2,6 @@
 
 //DIAGNOSTIC_TEST:SIMPLE:-target hlsl -stage compute -entry computeMain
 
-// This data is in row major layout order.... 
 //TEST_INPUT:cbuffer(data=[1.0 0.0 0.0 0.0  0.0 1.0 0.0 0.0  0.0 0.0 1.0 0.0 10.0 20.0 30.0 1.0]):name matrixBuffer
 ConstantBuffer<float4x4> matrixBuffer;
 
@@ -19,7 +18,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     
     float4 r = mul(v, M);
 
-	output[0] = r.x;
+    output[0] = r.x;
     output[1] = r.y;
     output[2] = r.z;
     output[3] = r.w;

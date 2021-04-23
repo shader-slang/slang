@@ -20,7 +20,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     
     float4 r = mul(v, M);
 
-	output[0] = r.x;
+    output[0] = r.x;
     output[1] = r.y;
     output[2] = r.z;
     output[3] = r.w;
