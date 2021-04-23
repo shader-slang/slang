@@ -217,16 +217,16 @@ public:
         /// character caret at location
     SourceLocationLexer getSourceLocationLexer() const { return m_sourceLocationLexer; }
 
+        /// Initialize state. 
+    void init(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer);
+
         /// Ctor
-    DiagnosticSink(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer)
-        : m_sourceManager(sourceManager),
-            m_sourceLocationLexer(sourceLocationLexer)
+    DiagnosticSink(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer) { init(sourceManager, sourceLocationLexer); }
+        /// Default Ctor
+    DiagnosticSink():
+        m_sourceManager(nullptr),
+        m_sourceLocationLexer (nullptr)
     {
-        // If we have a source location lexer, we'll by default enable source location output
-        if (sourceLocationLexer)
-        {
-            setFlag(Flag::SourceLocationLine);
-        }
     }
 
     // Public members

@@ -1397,7 +1397,7 @@ namespace Slang
                 TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
                 subObjectRange.bindingRangeIndex = bindingRangeIndex;
                 subObjectRange.spaceOffset = 0;
-                if (kind == LayoutResourceKind::RegisterSpace)
+                if (kind == LayoutResourceKind::RegisterSpace && path)
                 {
                     auto resInfo = path->var->FindResourceInfo(LayoutResourceKind::RegisterSpace);
                     subObjectRange.spaceOffset = resInfo->index;
