@@ -897,6 +897,37 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     return asExternal(typeLayout);
 }
 
+SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getParameterBlockLayout(
+    slang::TypeReflection* inType,
+    SlangInt targetIndex,
+    slang::LayoutRules rules,
+    ISlangBlob** outDiagnostics)
+{
+    auto type = asInternal(inType);
+
+    if (targetIndex < 0 || targetIndex >= targets.getCount())
+        return nullptr;
+
+    auto target = targets[targetIndex];
+
+    // TODO: We need a way to pass through the layout rules
+    // that the user requested (e.g., constant buffers vs.
+    // structured buffer rules). Right now the API only
+    // exposes a single case, so this isn't a big deal.
+    //
+    SLANG_UNUSED(rules);
+
+    auto typeLayout = target->getParameterBlockLayout(type);
+
+    // TODO: We currently don't have a path for capturing
+    // errors that occur during layout (e.g., types that
+    // are invalid because of target-specific layout constraints).
+    //
+    SLANG_UNUSED(outDiagnostics);
+
+    return asExternal(typeLayout);
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeRTTIMangledName(
     slang::TypeReflection* type, ISlangBlob** outNameBlob)
 {
@@ -1100,6 +1131,18 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     result = createTypeLayout(layoutContext, type);
     getTypeLayouts()[type] = result;
     return result.Ptr();
+}
+
+TypeLayout* TargetRequest::getParameterBlockLayout(Type* type)
+{
+    ParameterBlockType* parameterBlockType = nullptr;
+    if (!parameterBlockTypes.TryGetValue(type, parameterBlockType))
+    {
+        parameterBlockType = getLinkage()->getASTBuilder()->create<ParameterBlockType>();
+        parameterBlockType->elementType = type;
+        parameterBlockTypes.Add(type, parameterBlockType);
+    }
+    return getTypeLayout(parameterBlockType);
 }
 
 
