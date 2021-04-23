@@ -183,7 +183,6 @@ public:
     {
     public:
         typedef TextureResource Parent;
-
         TextureResourceImpl(const Desc& desc, Usage initialUsage, VKDevice* device) :
             Parent(desc),
             m_initialUsage(initialUsage),
@@ -306,7 +305,7 @@ public:
     {
     public:
         VkRenderPass m_renderPass;
-        RefPtr<VKDevice> m_renderer;
+        BreakableReference<VKDevice> m_renderer;
         Array<VkAttachmentDescription, kMaxAttachments> m_attachmentDescs;
         Array<VkAttachmentReference, kMaxRenderTargets> m_colorReferences;
         VkAttachmentReference m_depthReference;
@@ -318,6 +317,7 @@ public:
         {
             m_renderer->m_api.vkDestroyRenderPass(m_renderer->m_api.m_device, m_renderPass, nullptr);
         }
+        virtual void comFree() override { m_renderer.breakStrongReference(); }
         Result init(VKDevice* renderer, const IFramebufferLayout::Desc& desc)
         {
             m_renderer = renderer;
@@ -774,9 +774,28 @@ public:
 
             Result _addDescriptorSets(
                 slang::TypeLayoutReflection* typeLayout,
+                bool createImplicitConstantBufferForUniforms,
                 slang::VariableLayoutReflection* varLayout = nullptr)
             {
                 SlangInt descriptorSetCount = typeLayout->getDescriptorSetCount();
+                SlangInt defaultDescriptorSetIndex;
+                // If the type has ordinary uniform data fields, we need to make sure to create
+                // a descriptor set with a constant buffer binding in the case that the shader
+                // object is bound as a stand alone parameter block.
+                uint32_t bindingOffset = 0;
+                if (createImplicitConstantBufferForUniforms && typeLayout->getSize() != 0)
+                {
+                    defaultDescriptorSetIndex = findOrAddDescriptorSet(0);
+                    auto& descriptorSetInfo = m_descriptorSetBuildInfos[defaultDescriptorSetIndex];
+                    VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
+                    vkBindingRangeDesc.binding = 0;
+                    bindingOffset = 1;
+                    vkBindingRangeDesc.descriptorCount = 1;
+                    vkBindingRangeDesc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    vkBindingRangeDesc.stageFlags = VK_SHADER_STAGE_ALL;
+                    descriptorSetInfo.vkBindings.add(vkBindingRangeDesc);
+                }
+
                 for (SlangInt s = 0; s < descriptorSetCount; ++s)
                 {
                     SlangInt descriptorRangeCount =
@@ -803,7 +822,7 @@ public:
 
                         auto vkDescriptorType = _mapDescriptorType(slangBindingType);
                         VkDescriptorSetLayoutBinding vkBindingRangeDesc = {};
-                        vkBindingRangeDesc.binding =
+                        vkBindingRangeDesc.binding = bindingOffset +
                             (uint32_t)typeLayout->getDescriptorSetDescriptorRangeIndexOffset(s, r);
                         vkBindingRangeDesc.descriptorCount =
                             (uint32_t)typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
@@ -822,13 +841,18 @@ public:
                 return SLANG_OK;
             }
 
-            Result setElementTypeLayout(slang::TypeLayoutReflection* typeLayout)
+            Result setElementTypeLayout(
+                slang::TypeLayoutReflection* typeLayout,
+                bool buildDescriptorSetLayout)
             {
                 // First we will use the Slang layout information to allocate
                 // the descriptor set layout(s) required to store values
                 // of the given type.
                 //
-                SLANG_RETURN_ON_FAIL(_addDescriptorSets(typeLayout));
+                if (buildDescriptorSetLayout)
+                {
+                    SLANG_RETURN_ON_FAIL(_addDescriptorSets(typeLayout, true));
+                }
 
                 typeLayout = _unwrapParameterGroups(typeLayout);
 
@@ -918,6 +942,7 @@ public:
                         ShaderObjectLayoutImpl::createForElementType(
                             m_renderer,
                             slangLeafTypeLayout->getElementTypeLayout(),
+                            true,
                             subObjectLayout.writeRef());
                     }
 
@@ -942,10 +967,11 @@ public:
         static Result createForElementType(
             VKDevice* renderer,
             slang::TypeLayoutReflection* elementType,
+            bool createConstantBufferForOrdinaryData,
             ShaderObjectLayoutImpl** outLayout)
         {
             Builder builder(renderer);
-            builder.setElementTypeLayout(elementType);
+            builder.setElementTypeLayout(elementType, createConstantBufferForOrdinaryData);
             return builder.build(outLayout);
         }
 
@@ -1050,7 +1076,7 @@ public:
             void addEntryPointParams(slang::EntryPointLayout* entryPointLayout)
             {
                 m_slangEntryPointLayout = entryPointLayout;
-                setElementTypeLayout(entryPointLayout->getTypeLayout());
+                setElementTypeLayout(entryPointLayout->getTypeLayout(), false);
                 m_pushConstantSize = (uint32_t)_unwrapParameterGroups(entryPointLayout->getTypeLayout())
                                          ->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
                 m_stage = VulkanUtil::getShaderStage(entryPointLayout->getStage());
@@ -1121,7 +1147,7 @@ public:
 
             void addGlobalParams(slang::VariableLayoutReflection* globalsLayout)
             {
-                setElementTypeLayout(globalsLayout->getTypeLayout());
+                setElementTypeLayout(globalsLayout->getTypeLayout(), true);
             }
 
             void addEntryPoint(EntryPointLayout* entryPointLayout)
@@ -1141,6 +1167,7 @@ public:
                 auto slangEntryPointLayout = entryPointLayout->getSlangLayout();
                 _addDescriptorSets(
                     _unwrapParameterGroups(slangEntryPointLayout->getTypeLayout()),
+                    false,
                     slangEntryPointLayout->getVarLayout());
                 m_entryPoints.add(info);
             }
@@ -3050,6 +3077,17 @@ public:
                     m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
                     m_boundIndexBuffer.m_offset,
                     m_boundIndexFormat);
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
+                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(indexCount), 1, 0, 0);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -4195,6 +4233,8 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     // Float16 features
     VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
+    // 16 bit storage features
+    VkPhysicalDevice16BitStorageFeatures storage16BitFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR };
     // AtomicInt64 features
     VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR };
     // Atomic Float features
@@ -4232,6 +4272,10 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
         float16Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &float16Features;
 
+        // 16-bit storage
+        storage16BitFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &storage16BitFeatures;
+
         // Atomic64
         atomicInt64Features.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &atomicInt64Features;
@@ -4257,6 +4301,19 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
             // We have half support
             m_features.add("half");
+        }
+
+        if (storage16BitFeatures.storageBuffer16BitAccess)
+        {
+            // Link into the creation features
+            storage16BitFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &storage16BitFeatures;
+
+            // Add the 16-bit storage extension
+            deviceExtensions.add(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+
+            // We have half support
+            m_features.add("16-bit-storage");
         }
 
         if (atomicInt64Features.shaderBufferInt64Atomics)
@@ -4366,7 +4423,10 @@ Result VKDevice::TransientResourceHeapImpl::init(
     const ITransientResourceHeap::Desc& desc,
     VKDevice* device)
 {
-    Super::init(desc, device);
+    Super::init(
+        desc,
+        (uint32_t)device->m_api.m_deviceProperties.limits.minUniformBufferOffsetAlignment,
+        device);
 
     m_descSetAllocator.m_api = &device->m_api;
 
@@ -4465,6 +4525,7 @@ Result VKDevice::createFramebufferLayout(const IFramebufferLayout::Desc& desc, I
 {
     RefPtr<FramebufferLayoutImpl> layout = new FramebufferLayoutImpl();
     SLANG_RETURN_ON_FAIL(layout->init(this, desc));
+    m_deviceObjectsWithPotentialBackReferences.add(layout);
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
@@ -5475,7 +5536,7 @@ Result VKDevice::createShaderObjectLayout(
 {
     RefPtr<ShaderObjectLayoutImpl> layout;
     SLANG_RETURN_ON_FAIL(
-        ShaderObjectLayoutImpl::createForElementType(this, typeLayout, layout.writeRef()));
+        ShaderObjectLayoutImpl::createForElementType(this, typeLayout, true, layout.writeRef()));
     returnRefPtrMove(outLayout, layout);
     return SLANG_OK;
 }
