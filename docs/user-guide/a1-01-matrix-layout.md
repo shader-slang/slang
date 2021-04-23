@@ -36,9 +36,9 @@ These two styles are not directly interchangable - for a given `v` and `m` then 
 
 This behavior is *independent* of how a matrix layout in memory. Host code needs to be aware of how a shader code will interpret a matrix stored in memory, it's layout, as well as the convention is being used in shader code (ie `mul(v,m)` or `mul(m, v)`).
 
-[Matrix layout](https://en.wikipedia.org/wiki/Row-_and_column-major_order) can be either row or column major. In `row major` and `column major` just determine which elements are contiguous i memory. `Row major` means the rows elements are contiguous. `Column major` means the column elements are contiguous.
+[Matrix layout](https://en.wikipedia.org/wiki/Row-_and_column-major_order) can be either row or column major. In `row-major` and `column-major` just determine which elements are contiguous in memory. `Row major` means the rows elements are contiguous. `Column major` means the column elements are contiguous.
 
-Another way to think about this difference is in terms of where translation terms should be placed in memory when filling a typical 4x4 transform matrix. For `row-major` matrix layout, translation will be at `m + 12, 13, 14`. For a `column-major` matrix layout, translation will be at `m + 4, 7, 11`.
+Another way to think about this difference is in terms of where translation terms should be placed in memory when filling a typical 4x4 transform matrix. For `row-major` matrix layout, translation will be at `m + 12, 13, 14`. For a `column-major` matrix layout, translation will be at `m + 3, 7, 11`.
 
 Slang automatically handles the convention differences when cross-compiling code to GLSL. For example, a `float3x4` matrix will be translated to `mat4x3` in the resulting GLSL. Correspondingly, `mul(v, m)` will be translated to `m*v` in GLSL. Therefore, as long as the user sticks to the above practices consistently, they will get correct result with the same matrix value in memory regardless of what graphics API they are actually using.
 
@@ -50,6 +50,7 @@ Slang allows users to override default matrix layout with a compiler flag.
 For portability reasons it's recommended to use the 'row-major' layout - as that is the only style that will work on CUDA and C++/CPU targets. 
 
 This compiler flag can be specified during the creation of a `Session`:
+
 ```
 slang::IGlobalSession* globalSession;
 ...
@@ -62,10 +63,11 @@ globalSession->createSession(slangSessionDesc, &session);
 
 This makes Slang treat all matrices as in column-major layout, and for example emitting `column_major` qualifier in resulting HLSL code.
 
-* Use `setMatrixLayoutMode`/`spSetMatrixLayoutMode` to set the default  
-* Or use `-matrix-layout-row-major` or `-matrix-layout-column-major` for the command line (or parsed args)
+Alternatively the default layout can be set via
 
-Note that if you choose to use column-major layout, you either need to flip the matrix multiplication order in shader code or fill in the matrix in transpose order in host code.
+* `setMatrixLayoutMode`/`spSetMatrixLayoutMode` API calls
+* `-matrix-layout-row-major` or `-matrix-layout-column-major` command line options
+  * or via `spProcessCommandLineArguments`/`processCommandLineArguments`
 
 Examples
 --------
@@ -83,4 +85,16 @@ Also simple but *not* as portable is if they are all `column-major`/`column vect
 
 If there is an inconsistency, then it may be necessary to transpose at the host/kernel boundary.
 
-Any flip between conventions/layout is effectively a transpose, as long as there are an *even* number of `row-major layout`/`row vector interpretation`s then the expected results will be produced.  
+Any flip between `vector interpretation`/`matrix layout` is effectively a transpose, as long as there are an *even* number of `row-major layout`/`row vector interpretation`s then the expected results will be produced. If there is an odd number a transpose will be necessary at the host/kernel boundary.
+
+By this logic...
+
+* row vector host interpretation
+* row-major matrix host layout
+* column vector shader interpretation
+* column-major matrix shader layout
+
+Will be ok as are 2 (ie *even*) 'row' (one vector interpretation and the other matrix layout).
+ 
+
+  
