@@ -11,7 +11,17 @@ class CUDAExtensionTracker : public RefObject
 {
 public:
 
+    typedef uint32_t BaseTypeFlags;
+
     SemanticVersion m_smVersion;
+
+    void requireBaseType(BaseType baseType) { m_baseTypeFlags |= _getFlag(baseType); }
+    bool isBaseTypeRequired(BaseType baseType) { return (m_baseTypeFlags & _getFlag(baseType)) != 0; }
+
+protected:
+    static BaseTypeFlags _getFlag(BaseType baseType) { return BaseTypeFlags(1) << int(baseType); }
+
+    BaseTypeFlags m_baseTypeFlags = 0; 
 };
 
 class CUDASourceEmitter : public CPPSourceEmitter
@@ -30,8 +40,8 @@ public:
         };
     };
 
-    static UnownedStringSlice getBuiltinTypeName(IROp op);
-    static UnownedStringSlice getVectorPrefix(IROp op);
+    UnownedStringSlice getBuiltinTypeName(IROp op);
+    UnownedStringSlice getVectorPrefix(IROp op);
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
