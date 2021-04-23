@@ -1421,6 +1421,11 @@ SlangResult dissassembleDXILUsingDXC(
 
                     options.requiredCapabilityVersions.add(version);
                 }
+
+                if (cudaTracker->isBaseTypeRequired(BaseType::Half))
+                {
+                    options.flags |= CompileOptions::Flag::EnableFloat16;
+                }
             }
 
             options.sourceContents = source.source;

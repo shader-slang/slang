@@ -1066,6 +1066,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "uint16_t(packHalf2x16(vec2($0, 0.0)))")
+__target_intrinsic(cuda, "__half_as_ushort")
 uint16_t asuint16(float16_t value);
 
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
@@ -1078,6 +1079,7 @@ matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> va
 
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "float16_t(unpackHalf2x16($0).x)")
+__target_intrinsic(cuda, "__ushort_as_half")
 float16_t asfloat16(uint16_t value);
 
 vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
@@ -1088,11 +1090,16 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<uint16_t,R,C> v
 
 // Float<->signed cases:
 
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly] int16_t asint16(float16_t value) { return asuint16(value); }
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "__half_as_short")
+[__unsafeForceInlineEarly] int16_t asint16(float16_t value) { return asuint16(value); }
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly] vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value) { return asuint16(value); }
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly] matrix<int16_t,R,C> asint16<let R : int, let C : int>(matrix<float16_t,R,C> value) { return asuint16(value); }
 
-__target_intrinsic(hlsl) [__unsafeForceInlineEarly] float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "__short_as_half")
+[__unsafeForceInlineEarly] float16_t asfloat16(int16_t value) { return asfloat16(asuint16(value)); }
+
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly] vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value) { return asfloat16(asuint16(value)); }
 __target_intrinsic(hlsl) [__unsafeForceInlineEarly] matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> value) { return asfloat16(asuint16(value)); }
 
@@ -1593,6 +1600,8 @@ vector<float, N> f16tof32(vector<uint, N> value)
     VECTOR_MAP_UNARY(float, N, f16tof32, value);
 }
 
+
+
 // Convert to 16-bit float stored in low bits of integer
 __target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
 __glsl_version(420)
@@ -1605,6 +1614,39 @@ vector<uint, N> f32tof16(vector<float, N> value)
 {
     VECTOR_MAP_UNARY(uint, N, f32tof16, value);
 }
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// The following is Slang specific and NOT part of standard HLSL
+// It's not clear what happens with float16 time in HLSL -> can the float16 coerce to uint for example? If so that would
+// give the wrong result
+
+__target_intrinsic(glsl, "unpackHalf2x16($0).x")
+__target_intrinsic(cuda, "__half2float")
+__glsl_version(420)
+float f16tof32(float16_t value);
+
+__generic<let N : int>
+__target_intrinsic(hlsl)
+__target_intrinsic(cuda, "__half2float")
+vector<float, N> f16tof32(vector<float16_t, N> value)
+{
+    VECTOR_MAP_UNARY(float, N, f16tof32, value);
+}
+
+// Convert to float16_t
+__target_intrinsic(glsl, "packHalf2x16(vec2($0,0.0))")
+__glsl_version(420)
+__target_intrinsic(cuda, "__float2half")
+float16_t f32tof16_(float value);
+
+__generic<let N : int>
+__target_intrinsic(cuda, "__float2half")
+vector<float16_t, N> f32tof16_(vector<float, N> value)
+{
+    VECTOR_MAP_UNARY(uint, N, f32tof16, value);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 // Flip surface normal to face forward, if needed
 __generic<T : __BuiltinFloatingPointType, let N : int>

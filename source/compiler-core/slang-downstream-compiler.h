@@ -140,9 +140,9 @@ public:
     {
         enum Enum : SourceLanguageFlags
         {
-            Unknown = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_UNKNOWN,
-            Slang   = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_SLANG,
-            HLSL    = SourceLanguageFlags(1) <<  SLANG_SOURCE_LANGUAGE_HLSL,
+            Unknown = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_UNKNOWN,
+            Slang   = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SLANG,
+            HLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_HLSL,
             GLSL    = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_GLSL,
             C       = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_C,
             CPP     = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
@@ -247,9 +247,10 @@ public:
         {
             enum Enum : Flags
             {
-                EnableExceptionHandling = 0x01,
-                Verbose                 = 0x02,
-                EnableSecurityChecks    = 0x04,
+                EnableExceptionHandling = 0x01,             ///< Enables exception handling support (say as optionally supported by C++)
+                Verbose                 = 0x02,             ///< Give more verbose diagnostics
+                EnableSecurityChecks    = 0x04,             ///< Enable runtime security checks (such as for buffer overruns) - enabling typically decreases performance
+                EnableFloat16           = 0x08,             ///< If set compiles with support for float16/half
             };
         };
 
