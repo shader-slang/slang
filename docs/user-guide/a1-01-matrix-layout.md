@@ -82,7 +82,7 @@ If only targetting platforms that honor matrix layout, there is more flexibility
 1) Consistency : Same vector interpretation in shader and host code
 2) Performance: Host vector interpretation should match host matrix layout
 
-Then there are two combinations 
+Then there are two combinations that work
 
 1) `row-major` matrix layout for host and kernel, and `row` vector interpretation.
 2) `column-major` matrix layout for host and kernel, and `column` vector interpretation.
@@ -102,7 +102,7 @@ Another way of thinking about these combinations is to think of each change in `
 |   Column    |    Row        |    Row          |    Column
 |   Column    |    Row        |    Column       |    Row
 
-The 'Kernel Mat Layout' is the shader matrix layout setting. If it's not possible to use the setting (say because it is not supported on a target), then doing a transpose at the host/kernel boundary will fix the issue. 
+To be clear 'Kernel Mat Layout' is the shader matrix layout setting. As previously touched upon, if it is not possible to use the setting (say because it is not supported on a target), then doing a transpose at the host/kernel boundary can fix the issue. 
 
 Overriding default matrix layout
 --------------------------------
