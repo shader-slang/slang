@@ -54,3 +54,6 @@ prelude/*.h.cpp
 /source/slang/slang-ref-object-generated-macro.h
 /source/slang/slang-ast-generated.h
 /source/slang/slang-ast-generated-macro.h
+/docs/_site
+/docs/Gemfile.lock
+/docs/Gemfile

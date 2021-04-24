@@ -41,11 +41,13 @@ public:
             Slang::ComPtr<IBufferResource> bufferPtr;
             IBufferResource::Desc bufferDesc;
             bufferDesc.type = IResource::Type::Buffer;
-            bufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
-            bufferDesc.init(desc.constantBufferSize);
+            bufferDesc.defaultState = ResourceState::ConstantBuffer;
+            bufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+            bufferDesc.sizeInBytes = desc.constantBufferSize;
             bufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(m_device->createBufferResource(
-                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, bufferPtr.writeRef()));
+            SLANG_RETURN_ON_FAIL(
+                m_device->createBufferResource(bufferDesc, nullptr, bufferPtr.writeRef()));
             m_constantBuffers.add(static_cast<TBufferResource*>(bufferPtr.get()));
         }
 
@@ -85,17 +87,19 @@ public:
             Slang::ComPtr<IBufferResource> bufferPtr;
             IBufferResource::Desc bufferDesc;
             bufferDesc.type = IResource::Type::Buffer;
-            bufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+            bufferDesc.defaultState = ResourceState::ConstantBuffer;
+            bufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
             bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
             size_t lastConstantBufferSize = 0;
             if (m_constantBuffers.getCount())
             {
                 lastConstantBufferSize = m_constantBuffers.getLast()->getDesc()->sizeInBytes;
             }
-            bufferDesc.init(Slang::Math::Max(
-                lastConstantBufferSize * 2, Slang::Math::Max(size, size_t(4 << 20))));
-            SLANG_RETURN_ON_FAIL(m_device->createBufferResource(
-                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, bufferPtr.writeRef()));
+            bufferDesc.sizeInBytes = Slang::Math::Max(
+                lastConstantBufferSize * 2, Slang::Math::Max(size, size_t(4 << 20)));
+            SLANG_RETURN_ON_FAIL(
+                m_device->createBufferResource(bufferDesc, nullptr, bufferPtr.writeRef()));
             bufferId = m_constantBuffers.getCount();
             bufferAllocOffset = 0;
             m_constantBuffers.add(static_cast<TBufferResource*>(bufferPtr.get()));
