@@ -165,13 +165,16 @@ int main()
     bufferDesc.sizeInBytes = numberCount * sizeof(float);
     bufferDesc.format = gfx::Format::Unknown;
     bufferDesc.elementSize = sizeof(float);
-    bufferDesc.bindFlags = gfx::IResource::BindFlag::NonPixelShaderResource |
-                           gfx::IResource::BindFlag::UnorderedAccess;
+    bufferDesc.allowedStates = ResourceStateSet(
+        ResourceState::ShaderResource,
+        ResourceState::UnorderedAccess,
+        ResourceState::CopyDestination,
+        ResourceState::CopySource);
+    bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.cpuAccessFlags = IResource::AccessFlag::Write | IResource::AccessFlag::Read;
 
     ComPtr<gfx::IBufferResource> numbersBuffer;
     SLANG_RETURN_ON_FAIL(device->createBufferResource(
-        gfx::IResource::Usage::UnorderedAccess,
         bufferDesc,
         (void*)initialData,
         numbersBuffer.writeRef()));

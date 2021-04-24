@@ -213,7 +213,7 @@ struct AssignValsFromLayoutContext
 
         ComPtr<ITextureResource> texture;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
-            textureEntry->textureDesc, textureBindFlags, device, texture));
+            textureEntry->textureDesc, ResourceState::ShaderResource, device, texture));
 
         auto sampler = _createSamplerState(device, samplerEntry->samplerDesc);
 
@@ -229,13 +229,11 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
-    static const int textureBindFlags = IResource::BindFlag::NonPixelShaderResource | IResource::BindFlag::PixelShaderResource;
-
     SlangResult assignTexture(ShaderCursor const& dstCursor, ShaderInputLayout::TextureVal* srcVal)
     {
         ComPtr<ITextureResource> texture;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
-            srcVal->textureDesc, textureBindFlags, device, texture));
+            srcVal->textureDesc, ResourceState::ShaderResource, device, texture));
 
         // TODO: support UAV textures...
 
@@ -494,10 +492,13 @@ SlangResult RenderTestApp::initialize(
                     inputElements, SLANG_COUNT_OF(inputElements), inputLayout.writeRef()));
 
                 IBufferResource::Desc vertexBufferDesc;
-                vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
+                vertexBufferDesc.type = IResource::Type::Buffer;
+                vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+                vertexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
+                vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+                vertexBufferDesc.allowedStates = ResourceStateSet(ResourceState::VertexBuffer);
 
                 SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                    IResource::Usage::VertexBuffer,
                     vertexBufferDesc,
                     kVertexData,
                     m_vertexBuffer.writeRef()));
@@ -537,27 +538,28 @@ void RenderTestApp::_initializeRenderPass()
     m_queue = m_device->createCommandQueue(queueDesc);
     
     gfx::ITextureResource::Desc depthBufferDesc;
-    depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
-    depthBufferDesc.init2D(
-        gfx::IResource::Type::Texture2D,
-        gfx::Format::D_Float32,
-        gWindowWidth,
-        gWindowHeight,
-        0);
+    depthBufferDesc.type = IResource::Type::Texture2D;
+    depthBufferDesc.size.width = gWindowWidth;
+    depthBufferDesc.size.height = gWindowHeight;
+    depthBufferDesc.size.depth = 1;
+    depthBufferDesc.numMipLevels = 1;
+    depthBufferDesc.format = Format::D_Float32;
+    depthBufferDesc.defaultState = ResourceState::DepthWrite;
+    depthBufferDesc.allowedStates = ResourceState::DepthWrite;
 
-    ComPtr<gfx::ITextureResource> depthBufferResource = m_device->createTextureResource(
-        gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+    ComPtr<gfx::ITextureResource> depthBufferResource =
+        m_device->createTextureResource(depthBufferDesc, nullptr);
 
     gfx::ITextureResource::Desc colorBufferDesc;
-    colorBufferDesc.setDefaults(gfx::IResource::Usage::RenderTarget);
-    colorBufferDesc.init2D(
-        gfx::IResource::Type::Texture2D,
-        gfx::Format::RGBA_Unorm_UInt8,
-        gWindowWidth,
-        gWindowHeight,
-        0);
-    m_colorBuffer = m_device->createTextureResource(
-        gfx::IResource::Usage::RenderTarget, colorBufferDesc, nullptr);
+    colorBufferDesc.type = IResource::Type::Texture2D;
+    colorBufferDesc.size.width = gWindowWidth;
+    colorBufferDesc.size.height = gWindowHeight;
+    colorBufferDesc.size.depth = 1;
+    colorBufferDesc.numMipLevels = 1;
+    colorBufferDesc.format = Format::RGBA_Unorm_UInt8;
+    colorBufferDesc.defaultState = ResourceState::RenderTarget;
+    colorBufferDesc.allowedStates = ResourceState::RenderTarget;
+    m_colorBuffer = m_device->createTextureResource(colorBufferDesc, nullptr);
 
     gfx::IResourceView::Desc colorBufferViewDesc;
     memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
@@ -677,10 +679,12 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
 
                 auto stagingBufferDesc = bufferDesc;
                 stagingBufferDesc.cpuAccessFlags = IResource::AccessFlag::Read;
-                stagingBufferDesc.bindFlags = 0;
+                stagingBufferDesc.allowedStates =
+                    ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
+                stagingBufferDesc.defaultState = ResourceState::CopyDestination;
 
                 ComPtr<IBufferResource> stagingBuffer;
-                SLANG_RETURN_ON_FAIL(m_device->createBufferResource(IResource::Usage::CopyDest, stagingBufferDesc, nullptr, stagingBuffer.writeRef()));
+                SLANG_RETURN_ON_FAIL(m_device->createBufferResource(stagingBufferDesc, nullptr, stagingBuffer.writeRef()));
 
                 ComPtr<ICommandBuffer> commandBuffer;
                 SLANG_RETURN_ON_FAIL(

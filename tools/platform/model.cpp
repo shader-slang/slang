@@ -189,12 +189,16 @@ ComPtr<ITextureResource> loadTextureImage(
 
     int mipCount = (int) subresourceInitData.size();
 
-    ITextureResource::Desc desc;
-    desc.init2D(IResource::Type::Texture2D, format, extentX, extentY, mipCount);
-
-    auto texture =
-        device->createTextureResource(IResource::Usage::PixelShaderResource, desc, subresourceInitData.data());
-
+    ITextureResource::Desc desc = {};
+    desc.type = IResource::Type::Texture2D;
+    desc.defaultState = ResourceState::ShaderResource;
+    desc.allowedStates = ResourceStateSet(ResourceState::ShaderResource);
+    desc.format = format;
+    desc.size.width = extentX;
+    desc.size.height = extentY;
+    desc.size.depth = 1;
+    desc.numMipLevels = mipCount;
+    auto texture = device->createTextureResource(desc, subresourceInitData.data());
     free(data);
 
     return texture;
@@ -542,23 +546,23 @@ SlangResult ModelLoader::load(
     modelData.meshes = meshes.data();
 
     IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(modelData.vertexCount * sizeof(Vertex));
-    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
+    vertexBufferDesc.type = IResource::Type::Buffer;
+    vertexBufferDesc.sizeInBytes = modelData.vertexCount * sizeof(Vertex);
+    vertexBufferDesc.allowedStates =
+        ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
+    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
 
-    modelData.vertexBuffer = device->createBufferResource(
-        IResource::Usage::VertexBuffer,
-        vertexBufferDesc,
-        flatVertices.data());
+    modelData.vertexBuffer = device->createBufferResource(vertexBufferDesc, flatVertices.data());
     if(!modelData.vertexBuffer) return SLANG_FAIL;
 
     IBufferResource::Desc indexBufferDesc;
-    indexBufferDesc.init(modelData.indexCount * sizeof(Index));
-    vertexBufferDesc.setDefaults(IResource::Usage::IndexBuffer);
+    indexBufferDesc.type = IResource::Type::Buffer;
+    indexBufferDesc.sizeInBytes = modelData.indexCount * sizeof(Index);
+    indexBufferDesc.allowedStates =
+        ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
+    indexBufferDesc.defaultState = ResourceState::IndexBuffer;
 
-    modelData.indexBuffer = device->createBufferResource(
-        IResource::Usage::IndexBuffer,
-        indexBufferDesc,
-        flatIndices.data());
+    modelData.indexBuffer = device->createBufferResource(indexBufferDesc, flatIndices.data());
     if(!modelData.indexBuffer) return SLANG_FAIL;
 
     *outModel = callbacks->createModel(modelData);

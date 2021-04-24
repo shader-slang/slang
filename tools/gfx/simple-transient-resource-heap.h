@@ -31,11 +31,13 @@ public:
     {
         m_device = device;
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.setDefaults(IResource::Usage::ConstantBuffer);
+        bufferDesc.type = IResource::Type::Buffer;
+        bufferDesc.allowedStates = ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+        bufferDesc.defaultState = ResourceState::ConstantBuffer;
         bufferDesc.sizeInBytes = desc.constantBufferSize;
         bufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
-        SLANG_RETURN_ON_FAIL(device->createBufferResource(
-            IResource::Usage::ConstantBuffer, bufferDesc, nullptr, m_constantBuffer.writeRef()));
+        SLANG_RETURN_ON_FAIL(
+            device->createBufferResource(bufferDesc, nullptr, m_constantBuffer.writeRef()));
         return SLANG_OK;
     }
     virtual SLANG_NO_THROW Result SLANG_MCALL
