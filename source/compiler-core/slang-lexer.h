@@ -130,6 +130,9 @@ namespace Slang
 
         TokenList lexAllTokens();
 
+            /// Get the diagnostic sink, taking into account flags. Can return nullptr if ignoring invalid
+        DiagnosticSink* getDiagnosticSink(LexerFlags flags) { return ((flags & kLexerFlag_IgnoreInvalid) == 0) ? m_sink : nullptr; }
+
         SourceView*     m_sourceView;
         DiagnosticSink* m_sink;
         NamePool*       m_namePool;

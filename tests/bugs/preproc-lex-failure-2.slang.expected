@@ -1,0 +1,12 @@
+result code = 0
+standard error = {
+tests/bugs/preproc-lex-failure-2.slang(4): warning 10002: '0' prefix indicates octal literal
+000
+^~~
+tests/bugs/preproc-lex-failure-2.slang(5): error 10005: newline in literal
+
+^
+}
+standard output = {
+000 "Hello! 
+}

@@ -331,7 +331,7 @@ namespace Slang
         return lexer->m_startLoc + (lexer->m_cursor - lexer->m_begin);
     }
 
-    static void _lexDigits(Lexer* lexer, int base)
+    static void _lexDigits(Lexer* lexer, int base, LexerFlags flags)
     {
         for(;;)
         {
@@ -362,8 +362,11 @@ namespace Slang
 
             if(digitVal >= base)
             {
-                char buffer[] = { (char) c, 0 };
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::invalidDigitForBase, buffer, base);
+                if (auto sink = lexer->getDiagnosticSink(flags))
+                {
+                    char buffer[] = { (char) c, 0 };
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::invalidDigitForBase, buffer, base);
+                }
             }
 
             _advance(lexer);
@@ -415,7 +418,7 @@ namespace Slang
         return true;
     }
 
-    static bool _maybeLexNumberExponent(Lexer* lexer, int base)
+    static bool _maybeLexNumberExponent(Lexer* lexer, int base, LexerFlags flags)
     {
         if(!_isNumberExponent(_peek(lexer), base))
             return false;
@@ -433,37 +436,37 @@ namespace Slang
 
         // TODO(tfoley): it would be an error to not see digits here...
 
-        _lexDigits(lexer, 10);
+        _lexDigits(lexer, 10, flags);
 
         return true;
     }
 
-    static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base)
+    static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base, LexerFlags flags)
     {
-        _lexDigits(lexer, base);
-        _maybeLexNumberExponent(lexer, base);
+        _lexDigits(lexer, base, flags);
+        _maybeLexNumberExponent(lexer, base, flags);
 
         return _maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
-    static TokenType _lexNumber(Lexer* lexer, int base)
+    static TokenType _lexNumber(Lexer* lexer, int base, LexerFlags flags)
     {
-        // TODO(tfoley): Need to consider whehter to allow any kind of digit separator character.
+        // TODO(tfoley): Need to consider whether to allow any kind of digit separator character.
 
         TokenType tokenType = TokenType::IntegerLiteral;
 
         // At the start of things, we just concern ourselves with digits
-        _lexDigits(lexer, base);
+        _lexDigits(lexer, base, flags);
 
         if( _peek(lexer) == '.' )
         {
             tokenType = TokenType::FloatingPointLiteral;
 
             _advance(lexer);
-            _lexDigits(lexer, base);
+            _lexDigits(lexer, base, flags);
         }
 
-        if( _maybeLexNumberExponent(lexer, base))
+        if( _maybeLexNumberExponent(lexer, base, flags))
         {
             tokenType = TokenType::FloatingPointLiteral;
         }
@@ -666,7 +669,7 @@ namespace Slang
         return value;
     }
 
-    static void _lexStringLiteralBody(Lexer* lexer, char quote)
+    static void _lexStringLiteralBody(Lexer* lexer, char quote, LexerFlags flags)
     {
         for(;;)
         {
@@ -680,11 +683,17 @@ namespace Slang
             switch(c)
             {
             case kEOF:
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
+                if (auto sink = lexer->getDiagnosticSink(flags))
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
+                }
                 return;
 
             case '\n': case '\r':
-                lexer->m_sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
+                if (auto sink = lexer->getDiagnosticSink(flags))
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
+                }
                 return;
 
             case '\\':
@@ -946,7 +955,7 @@ namespace Slang
             {
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
-                return _lexNumberAfterDecimalPoint(lexer, 10);
+                return _lexNumberAfterDecimalPoint(lexer, 10, effectiveFlags);
 
             // TODO(tfoley): handle ellipsis (`...`)
 
@@ -954,9 +963,9 @@ namespace Slang
                 return TokenType::Dot;
             }
 
-                    case '1': case '2': case '3': case '4':
+        case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-            return _lexNumber(lexer, 10);
+            return _lexNumber(lexer, 10, effectiveFlags);
 
         case '0':
             {
@@ -969,20 +978,23 @@ namespace Slang
 
                 case '.':
                     _advance(lexer);
-                    return _lexNumberAfterDecimalPoint(lexer, 10);
+                    return _lexNumberAfterDecimalPoint(lexer, 10, effectiveFlags);
 
                 case 'x': case 'X':
                     _advance(lexer);
-                    return _lexNumber(lexer, 16);
+                    return _lexNumber(lexer, 16, effectiveFlags);
 
                 case 'b': case 'B':
                     _advance(lexer);
-                    return _lexNumber(lexer, 2);
+                    return _lexNumber(lexer, 2, effectiveFlags);
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
-                    lexer->m_sink->diagnose(loc, LexerDiagnostics::octalLiteral);
-                    return _lexNumber(lexer, 8);
+                    if (auto sink = lexer->getDiagnosticSink(effectiveFlags))
+                    {
+                        sink->diagnose(loc, LexerDiagnostics::octalLiteral);
+                    }
+                    return _lexNumber(lexer, 8, effectiveFlags);
                 }
             }
 
@@ -1004,12 +1016,12 @@ namespace Slang
 
         case '\"':
             _advance(lexer);
-            _lexStringLiteralBody(lexer, '\"');
+            _lexStringLiteralBody(lexer, '\"', effectiveFlags);
             return TokenType::StringLiteral;
 
         case '\'':
             _advance(lexer);
-            _lexStringLiteralBody(lexer, '\'');
+            _lexStringLiteralBody(lexer, '\'', effectiveFlags);
             return TokenType::CharLiteral;
 
         case '+':
@@ -1189,9 +1201,9 @@ namespace Slang
 
             auto loc = _getSourceLoc(lexer);
             int c = _advance(lexer);
-            if(!(effectiveFlags & kLexerFlag_IgnoreInvalid))
+
+            if (auto sink = lexer->getDiagnosticSink(effectiveFlags))
             {
-                auto sink = lexer->m_sink;
                 if(c >= 0x20 && c <=  0x7E)
                 {
                     char buffer[] = { (char) c, 0 };
