@@ -1196,13 +1196,11 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override
     {
-        TextureResource::Desc srcDesc(desc);
-        srcDesc.setDefaults(initialUsage);
+        TextureResource::Desc srcDesc = fixupTextureDesc(desc);
 
         RefPtr<CPUTextureResource> texture = new CPUTextureResource(srcDesc);
 
@@ -1213,11 +1211,11 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
-        const IBufferResource::Desc& desc,
+        const IBufferResource::Desc& descIn,
         const void* initData,
         IBufferResource** outResource) override
     {
+        auto desc = fixupBufferDesc(descIn);
         RefPtr<CPUBufferResource> resource = new CPUBufferResource(desc);
         SLANG_RETURN_ON_FAIL(resource->init());
         if (initData)
