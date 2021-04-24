@@ -103,11 +103,14 @@ Result execute()
     size_t printBufferSize = 4 * 1024; // use a small-ish (4KB) buffer for print output
 
     IBufferResource::Desc printBufferDesc;
-    printBufferDesc.init(printBufferSize);
+    printBufferDesc.type = IResource::Type::Buffer;
+    printBufferDesc.sizeInBytes = printBufferSize;
     printBufferDesc.elementSize = sizeof(uint32_t);
+    printBufferDesc.defaultState = ResourceState::UnorderedAccess;
+    printBufferDesc.allowedStates = ResourceStateSet(
+        ResourceState::CopySource, ResourceState::CopyDestination, ResourceState::UnorderedAccess);
     printBufferDesc.cpuAccessFlags = IResource::AccessFlag::Read; // | Resource::AccessFlag::Write;
-    auto printBuffer =
-        gDevice->createBufferResource(IResource::Usage::UnorderedAccess, printBufferDesc);
+    auto printBuffer = gDevice->createBufferResource(printBufferDesc);
 
     IResourceView::Desc printBufferViewDesc;
     printBufferViewDesc.type = IResourceView::Type::UnorderedAccess;

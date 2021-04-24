@@ -63,8 +63,6 @@ struct ID3D12GraphicsCommandList1 {};
 namespace gfx {
 using namespace Slang;
 
-static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage);
-
 class D3D12Device : public RendererBase
 {
 public:
@@ -81,12 +79,10 @@ public:
         ISwapchain** outSwapchain) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
@@ -189,16 +185,15 @@ public:
     public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(IResource::Usage initialUsage, const Desc& desc):
-            Parent(desc), m_initialUsage(initialUsage)
-            , m_defaultState(_calcResourceState(initialUsage))
+        BufferResourceImpl(const Desc& desc)
+            : Parent(desc)
+            , m_defaultState(D3DUtil::translateResourceState(desc.defaultState))
         {
         }
 
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
-        Usage m_initialUsage;
         D3D12_RESOURCE_STATES m_defaultState;
     };
 
@@ -207,10 +202,10 @@ public:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(const Desc& desc):
-            Parent(desc)
+        TextureResourceImpl(const Desc& desc)
+            : Parent(desc)
+            , m_defaultState(D3DUtil::translateResourceState(desc.defaultState))
         {
-            m_defaultState = _calcResourceState(desc.initialUsage);
         }
 
         D3D12Resource m_resource;
@@ -528,10 +523,13 @@ public:
             {
                 ComPtr<IBufferResource> bufferResourcePtr;
                 IBufferResource::Desc bufferDesc;
-                bufferDesc.init(desc.constantBufferSize);
+                bufferDesc.type = IResource::Type::Buffer;
+                bufferDesc.defaultState = ResourceState::ConstantBuffer;
+                bufferDesc.allowedStates =
+                    ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+                bufferDesc.sizeInBytes = desc.constantBufferSize;
                 bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
                 SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                    IResource::Usage::ConstantBuffer,
                     bufferDesc,
                     nullptr,
                     bufferResourcePtr.writeRef()));
@@ -2796,10 +2794,6 @@ public:
                 for (UInt i = 0; i < slotCount; i++)
                 {
                     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-                    if (buffer)
-                    {
-                        assert(buffer->m_initialUsage == IResource::Usage::VertexBuffer);
-                    }
 
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
@@ -3210,9 +3204,18 @@ public:
                 ComPtr<ID3D12Resource> d3dResource;
                 m_swapChain->GetBuffer(i, IID_PPV_ARGS(d3dResource.writeRef()));
                 ITextureResource::Desc imageDesc = {};
-                imageDesc.setDefaults(IResource::Usage::RenderTarget);
-                imageDesc.init2D(
-                    IResource::Type::Texture2D, m_desc.format, m_desc.width, m_desc.height, 0);
+                imageDesc.allowedStates = ResourceStateSet(
+                    ResourceState::Present,
+                    ResourceState::RenderTarget,
+                    ResourceState::CopyDestination);
+                imageDesc.type = IResource::Type::Texture2D;
+                imageDesc.arraySize = 0;
+                imageDesc.format = m_desc.format;
+                imageDesc.size.width = m_desc.width;
+                imageDesc.size.height = m_desc.height;
+                imageDesc.size.depth = 1;
+                imageDesc.numMipLevels = 1;
+                imageDesc.defaultState = ResourceState::Present;
                 RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
                 image->m_resource.setResource(d3dResource.get());
                 image->m_defaultState = D3D12_RESOURCE_STATE_PRESENT;
@@ -4033,53 +4036,32 @@ SlangResult D3D12Device::readTextureResource(
         outPixelSize);
 }
 
-static D3D12_RESOURCE_STATES _calcResourceState(IResource::Usage usage)
+static D3D12_RESOURCE_FLAGS _calcResourceFlag(ResourceState state)
 {
-    typedef IResource::Usage Usage;
-    switch (usage)
+    switch (state)
     {
-        case Usage::VertexBuffer:           return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        case Usage::IndexBuffer:            return D3D12_RESOURCE_STATE_INDEX_BUFFER;
-        case Usage::ConstantBuffer:         return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-        case Usage::StreamOutput:           return D3D12_RESOURCE_STATE_STREAM_OUT;
-        case Usage::RenderTarget:           return D3D12_RESOURCE_STATE_RENDER_TARGET;
-        case Usage::DepthWrite:             return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-        case Usage::DepthRead:              return D3D12_RESOURCE_STATE_DEPTH_READ;
-        case Usage::UnorderedAccess:        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-        case Usage::PixelShaderResource:    return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        case Usage::NonPixelShaderResource: return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-        case Usage::ShaderResource:         return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE |
-                                                   D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        case Usage::GenericRead:            return D3D12_RESOURCE_STATE_GENERIC_READ;
-        case Usage::CopySource:             return D3D12_RESOURCE_STATE_COPY_SOURCE;
-        case Usage::CopyDest:               return D3D12_RESOURCE_STATE_COPY_DEST;
-        default: return D3D12_RESOURCE_STATES(0);
+    case ResourceState::RenderTarget:
+        return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    case ResourceState::DepthRead:
+    case ResourceState::DepthWrite:
+        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+    case ResourceState::UnorderedAccess:
+        return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+    default:
+        return D3D12_RESOURCE_FLAG_NONE;
     }
 }
 
-static D3D12_RESOURCE_FLAGS _calcResourceFlag(IResource::BindFlag::Enum bindFlag)
-{
-    typedef IResource::BindFlag BindFlag;
-    switch (bindFlag)
-    {
-        case BindFlag::RenderTarget:        return D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        case BindFlag::DepthStencil:        return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        case BindFlag::UnorderedAccess:     return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        default:                            return D3D12_RESOURCE_FLAG_NONE;
-    }
-}
-
-static D3D12_RESOURCE_FLAGS _calcResourceBindFlags(IResource::Usage initialUsage, int bindFlags)
+static D3D12_RESOURCE_FLAGS _calcResourceFlags(ResourceStateSet states)
 {
     int dstFlags = 0;
-    while (bindFlags)
+    for (uint32_t i = 0; i < (uint32_t)ResourceState::_Count; i++)
     {
-        int lsb = bindFlags & -bindFlags;
-
-        dstFlags |= _calcResourceFlag(IResource::BindFlag::Enum(lsb));
-        bindFlags &= ~lsb;
+        auto state = (ResourceState)i;
+        if (states.contains(state))
+            dstFlags |= _calcResourceFlag(state);
     }
-    return D3D12_RESOURCE_FLAGS(dstFlags);
+    return (D3D12_RESOURCE_FLAGS)dstFlags;
 }
 
 static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
@@ -4098,13 +4080,12 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
     }
 }
 
-Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
     // Description of uploading on Dx12
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
 
-    TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(initialUsage);
+    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
 
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
@@ -4112,7 +4093,7 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
         return SLANG_FAIL;
     }
 
-    const int arraySize = srcDesc.calcEffectiveArraySize();
+    const int arraySize = calcEffectiveArraySize(srcDesc);
 
     const D3D12_RESOURCE_DIMENSION dimension = _calcResourceDimension(srcDesc.type);
     if (dimension == D3D12_RESOURCE_DIMENSION_UNKNOWN)
@@ -4138,20 +4119,7 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
     resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-    switch (initialUsage)
-    {
-    case IResource::Usage::RenderTarget:
-        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-        break;
-    case IResource::Usage::DepthWrite:
-        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-        break;
-    case IResource::Usage::UnorderedAccess:
-        resourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-        break;
-    default:
-        break;
-    }
+    resourceDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     resourceDesc.Alignment = 0;
 
@@ -4251,7 +4219,7 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
                 const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
                 const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-                const TextureResource::Size mipSize = srcDesc.size.calcMipSize(j);
+                const TextureResource::Size mipSize = calcMipSize(srcDesc.size, j);
 
                 assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
 
@@ -4314,10 +4282,10 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
     }
     {
         auto encodeInfo = encodeResourceCommands();
-        const D3D12_RESOURCE_STATES finalState = _calcResourceState(initialUsage);
         {
             D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
-            texture->m_resource.transition(D3D12_RESOURCE_STATE_COPY_DEST, finalState, submitter);
+            texture->m_resource.transition(
+                D3D12_RESOURCE_STATE_COPY_DEST, texture->m_defaultState, submitter);
         }
         submitResourceCommandsAndWait(encodeInfo);
     }
@@ -4326,10 +4294,9 @@ Result D3D12Device::createTextureResource(IResource::Usage initialUsage, const I
     return SLANG_OK;
 }
 
-Result D3D12Device::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
+Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
-    BufferResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(initialUsage);
+    BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
 
     // Always align up to 256 bytes, since that is required for constant buffers.
     //
@@ -4337,14 +4304,14 @@ Result D3D12Device::createBufferResource(IResource::Usage initialUsage, const IB
     //
     const size_t alignedSizeInBytes = D3DUtil::calcAligned(srcDesc.sizeInBytes, 256);
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, srcDesc));
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
     D3D12_RESOURCE_DESC bufferDesc;
     _initBufferResourceDesc(alignedSizeInBytes, bufferDesc);
 
-    bufferDesc.Flags = _calcResourceBindFlags(initialUsage, srcDesc.bindFlags);
+    bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
-    const D3D12_RESOURCE_STATES initialState = _calcResourceState(initialUsage);
+    const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
     SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
 
     returnComPtr(outResource, buffer);

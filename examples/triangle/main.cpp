@@ -236,12 +236,10 @@ Slang::Result initialize()
     // vertex data.
     //
     IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(kVertexCount * sizeof(Vertex));
-    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
-    gVertexBuffer = gDevice->createBufferResource(
-        IResource::Usage::VertexBuffer,
-        vertexBufferDesc,
-        &kVertexData[0]);
+    vertexBufferDesc.type = IResource::Type::Buffer;
+    vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
+    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
+    gVertexBuffer = gDevice->createBufferResource(vertexBufferDesc, &kVertexData[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
 
     // Now we will use our `loadShaderProgram` function to load

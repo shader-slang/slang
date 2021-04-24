@@ -290,10 +290,10 @@ Result initialize()
     if(!inputLayout) return SLANG_FAIL;
 
     IBufferResource::Desc vertexBufferDesc;
-    vertexBufferDesc.init(FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex));
-    vertexBufferDesc.setDefaults(IResource::Usage::VertexBuffer);
+    vertexBufferDesc.type = IResource::Type::Buffer;
+    vertexBufferDesc.sizeInBytes = FullScreenTriangle::kVertexCount * sizeof(FullScreenTriangle::Vertex);
+    vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
     gVertexBuffer = gDevice->createBufferResource(
-        IResource::Usage::VertexBuffer,
         vertexBufferDesc,
         &FullScreenTriangle::kVertices[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
