@@ -3,7 +3,7 @@ layout: user-guide
 ---
 
 Slang User's Guide
-------------------
+=============
 
 Welcome to the Slang User's Guide, an introduction to the Slang language, compiler, and API. In this guide, you will learn:
 - Slang's language features, including those inherited from HLSL and additional language features to make it easy to work with shaders.
