@@ -67,12 +67,10 @@ public:
         const IRenderPassLayout::Desc& desc,
         IRenderPassLayout** outRenderPassLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
@@ -165,15 +163,13 @@ public:
     public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(IResource::Usage initialUsage, const IBufferResource::Desc& desc, VKDevice* renderer):
-            Parent(desc),
-            m_renderer(renderer),
-            m_initialUsage(initialUsage)
+        BufferResourceImpl(const IBufferResource::Desc& desc, VKDevice* renderer)
+            : Parent(desc)
+            , m_renderer(renderer)
         {
             assert(renderer);
         }
 
-        IResource::Usage m_initialUsage;
         RefPtr<VKDevice> m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
@@ -183,10 +179,9 @@ public:
     {
     public:
         typedef TextureResource Parent;
-        TextureResourceImpl(const Desc& desc, Usage initialUsage, VKDevice* device) :
-            Parent(desc),
-            m_initialUsage(initialUsage),
-            m_device(device)
+        TextureResourceImpl(const Desc& desc, VKDevice* device)
+            : Parent(desc)
+            , m_device(device)
         {
         }
         ~TextureResourceImpl()
@@ -198,8 +193,6 @@ public:
                 vkAPI.vkDestroyImage(vkAPI.m_device, m_image, nullptr);
             }
         }
-
-        Usage m_initialUsage;
 
         VkImage m_image = VK_NULL_HANDLE;
         VkFormat m_vkformat = VK_FORMAT_R8G8B8A8_UNORM;
@@ -3005,11 +2998,6 @@ public:
                 for (Index i = 0; i < Index(slotCount); i++)
                 {
                     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-                    if (buffer)
-                    {
-                        assert(buffer->m_initialUsage == IResource::Usage::VertexBuffer);
-                    }
-
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
                     boundBuffer.m_stride = int(strides[i]);
@@ -3618,11 +3606,19 @@ public:
             for (uint32_t i = 0; i < m_desc.imageCount; i++)
             {
                 ITextureResource::Desc imageDesc = {};
-
-                imageDesc.init2D(
-                    IResource::Type::Texture2D, m_desc.format, m_desc.width, m_desc.height, 1);
-                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(
-                    imageDesc, gfx::IResource::Usage::RenderTarget, m_renderer);
+                imageDesc.allowedStates = ResourceStateSet(
+                    ResourceState::Present,
+                    ResourceState::RenderTarget,
+                    ResourceState::CopyDestination);
+                imageDesc.type = IResource::Type::Texture2D;
+                imageDesc.arraySize = 0;
+                imageDesc.format = m_desc.format;
+                imageDesc.size.width = m_desc.width;
+                imageDesc.size.height = m_desc.height;
+                imageDesc.size.depth = 1;
+                imageDesc.numMipLevels = 1;
+                imageDesc.defaultState = ResourceState::Present;
+                RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc, m_renderer);
                 image->m_image = vkImages[i];
                 image->m_imageMemory = 0;
                 image->m_vkformat = m_vkformat;
@@ -4604,56 +4600,69 @@ SlangResult VKDevice::readBufferResource(
     return SLANG_OK;
 }
 
-static VkBufferUsageFlagBits _calcBufferUsageFlags(IResource::BindFlag::Enum bind)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
 {
-    typedef IResource::BindFlag BindFlag;
-
-    switch (bind)
+    switch (state)
     {
-        case BindFlag::VertexBuffer:            return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-        case BindFlag::IndexBuffer:             return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-        case BindFlag::ConstantBuffer:          return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        case BindFlag::StreamOutput:
-        case BindFlag::RenderTarget:
-        case BindFlag::DepthStencil:
+    case ResourceState::VertexBuffer:
+        return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    case ResourceState::IndexBuffer:
+        return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    case ResourceState::ConstantBuffer:
+        return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    case ResourceState::StreamOutput:
+        return VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT;
+    case ResourceState::RenderTarget:
+    case ResourceState::DepthRead:
+    case ResourceState::DepthWrite:
         {
-            assert(!"Not supported yet");
+            assert(!"Invalid resource state for buffer resource.");
             return VkBufferUsageFlagBits(0);
         }
-        case BindFlag::UnorderedAccess:         return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-        case BindFlag::PixelShaderResource:     return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        case BindFlag::NonPixelShaderResource:  return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        default:                                return VkBufferUsageFlagBits(0);
+    case ResourceState::UnorderedAccess:
+        return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+    case ResourceState::ShaderResource:
+        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    case ResourceState::CopySource:
+        return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::CopyDestination:
+        return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    default:
+        return VkBufferUsageFlagBits(0);
     }
 }
 
-static VkBufferUsageFlagBits _calcBufferUsageFlags(int bindFlags)
+static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceStateSet states)
 {
     int dstFlags = 0;
-    while (bindFlags)
+    for (uint32_t i = 0; i < (uint32_t)ResourceState::_Count; i++)
     {
-        int lsb = bindFlags & -bindFlags;
-        dstFlags |= _calcBufferUsageFlags(IResource::BindFlag::Enum(lsb));
-        bindFlags &= ~lsb;
+        auto state = (ResourceState)i;
+        if (states.contains(state))
+            dstFlags |= _calcBufferUsageFlags(state);
     }
     return VkBufferUsageFlagBits(dstFlags);
 }
 
-static VkImageUsageFlagBits _calcImageUsageFlags(IResource::BindFlag::Enum bind)
+static VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
 {
-    typedef IResource::BindFlag BindFlag;
-
-    switch (bind)
+    switch (state)
     {
-        case BindFlag::RenderTarget:            return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        case BindFlag::DepthStencil:            return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        case BindFlag::NonPixelShaderResource:
-        case BindFlag::PixelShaderResource:
-        {
-            // Ignore
-            return VkImageUsageFlagBits(0);
-        }
-        default:
+    case ResourceState::RenderTarget:
+        return VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    case ResourceState::DepthWrite:
+        return VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    case ResourceState::DepthRead:
+        return VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+    case ResourceState::ShaderResource:
+        return VK_IMAGE_USAGE_SAMPLED_BIT;
+    case ResourceState::UnorderedAccess:
+        return VK_IMAGE_USAGE_STORAGE_BIT;
+    case ResourceState::CopySource:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::CopyDestination:
+        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    default:
         {
             assert(!"Unsupported");
             return VkImageUsageFlagBits(0);
@@ -4661,29 +4670,25 @@ static VkImageUsageFlagBits _calcImageUsageFlags(IResource::BindFlag::Enum bind)
     }
 }
 
-static VkImageUsageFlagBits _calcImageUsageFlags(int bindFlags)
+static VkImageUsageFlagBits _calcImageUsageFlags(ResourceStateSet states)
 {
     int dstFlags = 0;
-    while (bindFlags)
+    for (uint32_t i = 0; i < (uint32_t)ResourceState::_Count; i++)
     {
-        int lsb = bindFlags & -bindFlags;
-        dstFlags |= _calcImageUsageFlags(IResource::BindFlag::Enum(lsb));
-        bindFlags &= ~lsb;
+        auto state = (ResourceState)i;
+        if (states.contains(state))
+            dstFlags |= _calcImageUsageFlags(state);
     }
     return VkImageUsageFlagBits(dstFlags);
 }
 
-static VkImageUsageFlags _calcImageUsageFlags(int bindFlags, int cpuAccessFlags, const void* initData)
+static VkImageUsageFlags _calcImageUsageFlags(
+    ResourceStateSet states,
+    int cpuAccessFlags,
+    const void* initData)
 {
-    VkImageUsageFlags usage = _calcImageUsageFlags(bindFlags);
+    VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
-    usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
-
-    if (cpuAccessFlags & IResource::AccessFlag::Read)
-    {
-        // If it can be read from, set this
-        usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    }
     if ((cpuAccessFlags & IResource::AccessFlag::Write) || initData)
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
@@ -4826,10 +4831,9 @@ size_t calcNumRows(Format format, int height)
     return (size_t)height;
 }
 
-Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
-    TextureResource::Desc desc(descIn);
-    desc.setDefaults(initialUsage);
+    TextureResource::Desc desc = fixupTextureDesc(descIn);
 
     const VkFormat format = VulkanUtil::getVkFormat(desc.format);
     if (format == VK_FORMAT_UNDEFINED)
@@ -4838,9 +4842,9 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
         return SLANG_FAIL;
     }
 
-    const int arraySize = desc.calcEffectiveArraySize();
+    const int arraySize = calcEffectiveArraySize(desc);
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, initialUsage, this));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, this));
     texture->m_vkformat = format;
     // Create the image
     {
@@ -4888,7 +4892,7 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
         imageInfo.format = format;
 
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = _calcImageUsageFlags(desc.bindFlags, desc.cpuAccessFlags, initData);
+        imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -4934,7 +4938,7 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
         // Calculate how large an array entry is
         for (int j = 0; j < numMipMaps; ++j)
         {
-            const TextureResource::Size mipSize = desc.size.calcMipSize(j);
+            const TextureResource::Size mipSize = calcMipSize(desc.size, j);
 
             auto rowSizeInBytes = calcRowSize(desc.format, mipSize.width);
             auto numRows = calcNumRows(desc.format, mipSize.height);
@@ -5042,30 +5046,25 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
                 }
             }
         }
-        _transitionImageLayout(texture->m_image, format, *texture->getDesc(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        auto defaultLayout = VulkanUtil::getImageLayoutFromState(desc.defaultState);
+        _transitionImageLayout(
+            texture->m_image,
+            format,
+            *texture->getDesc(),
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            defaultLayout);
     }
     else
     {
-        switch (initialUsage)
+        auto defaultLayout = VulkanUtil::getImageLayoutFromState(desc.defaultState);
+        if (defaultLayout != VK_IMAGE_LAYOUT_UNDEFINED)
         {
-        case IResource::Usage::RenderTarget:
             _transitionImageLayout(
                 texture->m_image,
                 format,
                 *texture->getDesc(),
                 VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-            break;
-        case IResource::Usage::DepthWrite:
-            _transitionImageLayout(
-                texture->m_image,
-                format,
-                *texture->getDesc(),
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
-            break;
-        default:
-            break;
+                defaultLayout);
         }
     }
     m_deviceQueue.flushAndWait();
@@ -5073,29 +5072,27 @@ Result VKDevice::createTextureResource(IResource::Usage initialUsage, const ITex
     return SLANG_OK;
 }
 
-Result VKDevice::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
+Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
-    BufferResource::Desc desc(descIn);
-    desc.setDefaults(initialUsage);
+    BufferResource::Desc desc = fixupBufferDesc(descIn);
 
     const size_t bufferSize = desc.sizeInBytes;
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
-    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.bindFlags) |
-                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates);
 
-    switch (initialUsage)
+    if (initData)
     {
-        case IResource::Usage::ConstantBuffer:
-        {
-            reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-            break;
-        }
-        default: break;
+        usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(initialUsage, desc, this));
+    if (desc.allowedStates.contains(ResourceState::ConstantBuffer))
+    {
+        reqMemoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    }
+
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
     SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
 
     if ((desc.cpuAccessFlags & IResource::AccessFlag::Write) || initData)
