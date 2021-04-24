@@ -160,7 +160,8 @@
     var path = window.location.pathname;
     var pageName = path.split("/").pop();
     var currentPageID = pageName.substr(0, pageName.lastIndexOf("."));
-
+    if (currentPageID.length == 0)
+      currentPageID = "index";
     var tocLists = document.getElementsByClassName("toc_root_list");
     for (var i = 0; i < tocLists.length; i++) {
       var tocList = tocLists[i];
