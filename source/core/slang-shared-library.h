@@ -48,9 +48,13 @@ private:
 class DefaultSharedLibrary : public ISlangSharedLibrary, public RefObject
 {
     public:
-    // ISlangUnknown 
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_CLASS_GUID(0xe7f2597b, 0xf803, 0x4b6e, { 0xaf, 0x8b, 0xcb, 0xe3, 0xa2, 0x21, 0xfd, 0x5a })
 
+    // ISlangUnknown
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE;
+    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF         
+    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
+    
     // ISlangSharedLibrary
     virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) SLANG_OVERRIDE;
 

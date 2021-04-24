@@ -1359,6 +1359,11 @@ public:
         SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(
             cuCtxCreate(&m_context->m_context, 0, m_device), reportType);
 
+        // Not clear how to detect half support on CUDA. For now we'll assume we have it
+        {
+            m_features.add("half");
+        }
+
         // Initialize DeviceInfo
         {
             m_info.deviceType = DeviceType::CUDA;
