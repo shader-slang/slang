@@ -1611,6 +1611,7 @@ struct OptionsParser
                     switch (outputFormat)
                     {
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::PTX:
                         rawOutput.isWholeProgram = true;
                         break;
                     default:
