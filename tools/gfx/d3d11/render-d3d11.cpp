@@ -75,12 +75,10 @@ public:
     virtual void setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
@@ -177,14 +175,12 @@ protected:
 	public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(const IBufferResource::Desc& desc, IResource::Usage initialUsage):
-            Parent(desc),
-            m_initialUsage(initialUsage)
+        BufferResourceImpl(const IBufferResource::Desc& desc):
+            Parent(desc)
         {
         }
 
         MapFlavor m_mapFlavor;
-        Usage m_initialUsage;
         ComPtr<ID3D11Buffer> m_buffer;
         ComPtr<ID3D11Buffer> m_staging;
     };
@@ -193,12 +189,10 @@ protected:
     public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(const Desc& desc, Usage initialUsage) :
-            Parent(desc),
-            m_initialUsage(initialUsage)
+        TextureResourceImpl(const Desc& desc)
+            : Parent(desc)
         {
         }
-        Usage m_initialUsage;
         ComPtr<ID3D11Resource> m_resource;
 
     };
@@ -314,10 +308,19 @@ protected:
             ComPtr<ID3D11Resource> d3dResource;
             m_swapChain->GetBuffer(0, IID_PPV_ARGS(d3dResource.writeRef()));
             ITextureResource::Desc imageDesc = {};
-            imageDesc.init2D(
-                IResource::Type::Texture2D, m_desc.format, m_desc.width, m_desc.height, 0);
-            RefPtr<TextureResourceImpl> image =
-                new TextureResourceImpl(imageDesc, IResource::Usage::RenderTarget);
+            imageDesc.type = IResource::Type::Texture2D;
+            imageDesc.arraySize = 0;
+            imageDesc.numMipLevels = 1;
+            imageDesc.size.width = m_desc.width;
+            imageDesc.size.height = m_desc.height;
+            imageDesc.size.depth = 1;
+            imageDesc.format = m_desc.format;
+            imageDesc.defaultState = ResourceState::Present;
+            imageDesc.allowedStates = ResourceStateSet(
+                ResourceState::Present,
+                ResourceState::CopyDestination,
+                ResourceState::RenderTarget);
+            RefPtr<TextureResourceImpl> image = new TextureResourceImpl(imageDesc);
             image->m_resource = d3dResource;
             for (uint32_t i = 0; i < m_desc.imageCount; i++)
             {
@@ -1199,11 +1202,15 @@ protected:
             //
 
             ComPtr<IBufferResource> bufferResourcePtr;
-            IBufferResource::Desc bufferDesc;
-            bufferDesc.init(specializedOrdinaryDataSize);
+            IBufferResource::Desc bufferDesc = {};
+            bufferDesc.type = IResource::Type::Buffer;
+            bufferDesc.sizeInBytes = specializedOrdinaryDataSize;
+            bufferDesc.defaultState = ResourceState::ConstantBuffer;
+            bufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
             bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, bufferResourcePtr.writeRef()));
+            SLANG_RETURN_ON_FAIL(
+                device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
 
             // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
@@ -1896,33 +1903,40 @@ SlangResult D3D11Device::readTextureResource(
     }
 }
 
-static D3D11_BIND_FLAG _calcResourceFlag(IResource::BindFlag::Enum bindFlag)
+static D3D11_BIND_FLAG _calcResourceFlag(ResourceState state)
 {
-    typedef IResource::BindFlag BindFlag;
-    switch (bindFlag)
+    switch (state)
     {
-        case BindFlag::VertexBuffer:            return D3D11_BIND_VERTEX_BUFFER;
-        case BindFlag::IndexBuffer:             return D3D11_BIND_INDEX_BUFFER;
-        case BindFlag::ConstantBuffer:          return D3D11_BIND_CONSTANT_BUFFER;
-        case BindFlag::StreamOutput:            return D3D11_BIND_STREAM_OUTPUT;
-        case BindFlag::RenderTarget:            return D3D11_BIND_RENDER_TARGET;
-        case BindFlag::DepthStencil:            return D3D11_BIND_DEPTH_STENCIL;
-        case BindFlag::UnorderedAccess:         return D3D11_BIND_UNORDERED_ACCESS;
-        case BindFlag::PixelShaderResource:     return D3D11_BIND_SHADER_RESOURCE;
-        case BindFlag::NonPixelShaderResource:  return D3D11_BIND_SHADER_RESOURCE;
-        default:                                return D3D11_BIND_FLAG(0);
+    case ResourceState::VertexBuffer:
+        return D3D11_BIND_VERTEX_BUFFER;
+    case ResourceState::IndexBuffer:
+        return D3D11_BIND_INDEX_BUFFER;
+    case ResourceState::ConstantBuffer:
+        return D3D11_BIND_CONSTANT_BUFFER;
+    case ResourceState::StreamOutput:
+        return D3D11_BIND_STREAM_OUTPUT;
+    case ResourceState::RenderTarget:
+        return D3D11_BIND_RENDER_TARGET;
+    case ResourceState::DepthRead:
+    case ResourceState::DepthWrite:
+        return D3D11_BIND_DEPTH_STENCIL;
+    case ResourceState::UnorderedAccess:
+        return D3D11_BIND_UNORDERED_ACCESS;
+    case ResourceState::ShaderResource:
+        return D3D11_BIND_SHADER_RESOURCE;
+    default:
+        return D3D11_BIND_FLAG(0);
     }
 }
 
-static int _calcResourceBindFlags(int bindFlags)
+static int _calcResourceBindFlags(ResourceStateSet allowedStates)
 {
     int dstFlags = 0;
-    while (bindFlags)
+    for (uint32_t i = 0; i < (uint32_t)ResourceState::_Count; i++)
     {
-        int lsb = bindFlags & -bindFlags;
-
-        dstFlags |= _calcResourceFlag(IResource::BindFlag::Enum(lsb));
-        bindFlags &= ~lsb;
+        auto state = (ResourceState)i;
+        if (allowedStates.contains(state))
+            dstFlags |= _calcResourceFlag(state);
     }
     return dstFlags;
 }
@@ -1940,12 +1954,11 @@ static int _calcResourceAccessFlags(int accessFlags)
     }
 }
 
-Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+Result D3D11Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
 {
-    TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(initialUsage);
+    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
 
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
+    const int effectiveArraySize = calcEffectiveArraySize(srcDesc);
 
     const DXGI_FORMAT format = D3DUtil::getMapFormat(srcDesc.format);
     if (format == DXGI_FORMAT_UNKNOWN)
@@ -1953,7 +1966,7 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
         return SLANG_FAIL;
     }
 
-    const int bindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+    const int bindFlags = _calcResourceBindFlags(srcDesc.allowedStates);
 
     // Set up the initialize data
     List<D3D11_SUBRESOURCE_DATA> subRes;
@@ -1967,7 +1980,7 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
             {
                 for (int j = 0; j < srcDesc.numMipLevels; j++)
                 {
-                    const int mipHeight = ITextureResource::Size::calcMipSize(srcDesc.size.height, j);
+                    const int mipHeight = calcMipSize(srcDesc.size.height, j);
 
                     D3D11_SUBRESOURCE_DATA& data = subRes[subResourceIndex];
                     auto& srcData = initData[subResourceIndex];
@@ -1985,7 +1998,7 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
 
     const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc, initialUsage));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
     
     switch (srcDesc.type)
     {
@@ -2062,12 +2075,11 @@ Result D3D11Device::createTextureResource(IResource::Usage initialUsage, const I
     return SLANG_OK;
 }
 
-Result D3D11Device::createBufferResource(IResource::Usage initialUsage, const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
+Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
-    IBufferResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(initialUsage);
+    IBufferResource::Desc srcDesc = fixupBufferDesc(descIn);
 
-    auto d3dBindFlags = _calcResourceBindFlags(srcDesc.bindFlags);
+    auto d3dBindFlags = _calcResourceBindFlags(srcDesc.allowedStates);
 
     size_t alignedSizeInBytes = srcDesc.sizeInBytes;
 
@@ -2096,14 +2108,14 @@ Result D3D11Device::createBufferResource(IResource::Usage initialUsage, const IB
 
     // If written by CPU, make it dynamic
     if ((descIn.cpuAccessFlags & IResource::AccessFlag::Write) &&
-        ((descIn.bindFlags & IResource::BindFlag::UnorderedAccess) == 0))
+        !descIn.allowedStates.contains(ResourceState::UnorderedAccess))
     {
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     }
 
-    switch (initialUsage)
+    switch (descIn.defaultState)
     {
-    case IResource::Usage::ConstantBuffer:
+    case ResourceState::ConstantBuffer:
         {
             // We'll just assume ConstantBuffers are dynamic for now
             bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -2134,7 +2146,7 @@ Result D3D11Device::createBufferResource(IResource::Usage initialUsage, const IB
     D3D11_SUBRESOURCE_DATA subResourceData = { 0 };
     subResourceData.pSysMem = initData;
 
-    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc, initialUsage));
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
 
