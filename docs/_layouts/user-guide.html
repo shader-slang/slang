@@ -146,9 +146,9 @@
     var rightColumn = document.getElementById("rightColumn");
     function updatePosition()
     {
-      tocColumn.style.left = (rightColumn.getBoundingClientRect().x - tocColumn.getBoundingClientRect().width) + "px";
       if (window.innerWidth > 700)
         tocColumn.style.display = "";
+      tocColumn.style.left = (rightColumn.getBoundingClientRect().x - tocColumn.getBoundingClientRect().width) + "px";
     }
     window.addEventListener("resize", updatePosition);
     updatePosition();
