@@ -11,11 +11,12 @@ A high level summary:
 
 * Default matrix **layout** in memory for Slang is `column-major`. 
   * This default is for *legacy* reasons and may change in the future.
-* Row-major layout is the only *portable* layout to use across targets. 
+* Row-major layout is the only *portable* layout to use across targets (with significant caveats for non 4x4 matrices)
 * Use `setMatrixLayoutMode`/`spSetMatrixLayoutMode`/`createSession` to set the default  
 * Use `-matrix-layout-row-major` or `-matrix-layout-column-major` for the command line 
   * or via `spProcessCommandLineArguments`/`processCommandLineArguments`
-
+* Depending on your host maths library, matrix sizes and targets, it may be necessary to convert matrices at host/kernel boundary  
+  
 On the portability issue, some targets *ignore* the matrix layout mode, notably CUDA and CPU/C++. For this reason for the widest breadth of targets it is recommended to use *row-major* matrix layout.
 
 Two conventions of matrix transform math
@@ -103,6 +104,34 @@ Another way of thinking about these combinations is to think of each change in `
 |   Column    |    Row        |    Column       |    Row
 
 To be clear 'Kernel Mat Layout' is the shader matrix layout setting. As previously touched upon, if it is not possible to use the setting (say because it is not supported on a target), then doing a transpose at the host/kernel boundary can fix the issue. 
+
+Matrix Layout
+-------------
+
+The above discussion is largely around 4x4 32-bit element matrices. For graphics APIs such as Vulkan, GL, and D3D there are typically additional restrictions for matrix layout. One restriction is for 16 byte alignment between rows (for `row-major` layout) and columns (for `column-major` layout). 
+
+More CPU-like targets such as CUDA and C++/CPU do not have this restriction, and have all elements are consecutive. 
+
+This being the case only the following matrix types/matrix layouts will work across all targets. (Listed in the HLSL convention of RxC). 
+ 
+* 1x4 `row-major` matrix layout
+* 2x4 `row-major` matrix layout
+* 3x4 `row-major` matrix layout
+* 4x4 `row-major` matrix layout
+
+These are all 'row-major' because as previously discussed currently only `row-major` matrix layout works across all targets currently.
+
+NOTE! This only applies to matrices that are trafficed between host and kernel - any matrix size will work appropriately for variables in shader/kernel code for example.
+
+The hosts maths library also plays a part here. The library may hold all elements consecutively in memory. If that's the case it will match the CPU/CUDA kernels, but will only work on 'graphics'-like targets that match that layout for the size. 
+
+For SIMD based host maths libraries it can be even more convoluted. If a SIMD library is being used that prefers `row` vector interpretation and therefore will have `row-majow` layout it may for many sizes *not* match the CPU-like consecutive layout. For example a 4x3 - it will likely be packed with 16 byte row alignment. Additionally even if a matrix is packed in the same way it may not be the same size. For example a 3x2 matrix *may* hold the rows consecutively *but* be 16 bytes in size, as opposed to the 12 bytes that a CPU-like kernel will expect. 
+
+If a SIMD based host maths library with graphics-like APIs are being used, there is a good chance (but certainly *not* guarenteed) that layout across non 4x4 sizes will match because SIMD typically implies 16 byte alignment. 
+
+If your application uses matrix sizes that are not 4x4 across the host/kernel boundary and it wants to work across all targets, it is *likely* that *some* matrices will have to be converted across the boundary. This being the case, having to handle transposing matrices at the boundary is a less significant issue. 
+
+In conclusion if your application has to perform matrix conversion work at the host/kernel boundary the previous observation about "best performance" implies `row-major` layout and `row` vector interpretation becomes somewhat mute.
 
 Overriding default matrix layout
 --------------------------------
