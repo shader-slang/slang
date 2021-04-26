@@ -23,6 +23,7 @@
       overflow-y: auto;
       box-sizing: border-box;
       max-height: 100vh;
+      display: block;
     }
 
     #tocInner {
@@ -74,11 +75,52 @@
     {
       color: #303080
     }
+    #btnToggleTOC {
+      display: none;
+      width: fit-content;
+      margin-left: 10px;
+      margin-top: 10px;
+      padding: 10px;
+      border-style: solid;
+      border-color: #808080;
+      border-width: 1px;
+    }
+    @media screen and (max-width: 850px) {
+      #tocColumn {
+        width: 300px;
+        display: block;
+      }
+      #centeringDiv {
+         padding-left: 300px;
+      }
+    }
+
+    @media screen and (max-width: 700px) {
+      #tocColumn {
+        width: 100%;
+        position: static;
+        display: none;
+      }
+      #tocInner {
+        padding: 10px;
+      }
+      #rightColumn {
+        padding-left: 10px;
+        padding-right: 10px;
+      }
+      #centeringDiv {
+         padding-left: 0px;
+      }
+      #btnToggleTOC {
+        display: block;
+      }
+    }
   </style>
   {% seo %}
 </head>
 
 <body>
+    <button id="btnToggleTOC" onclick="toggleTOC()">Table of Contents</button>
     <div id="tocColumn">
       <div id="tocInner">
         {% include_relative user-guide-toc.html %}
@@ -105,6 +147,8 @@
     function updatePosition()
     {
       tocColumn.style.left = (rightColumn.getBoundingClientRect().x - tocColumn.getBoundingClientRect().width) + "px";
+      if (window.innerWidth > 700)
+        tocColumn.style.display = "";
     }
     window.addEventListener("resize", updatePosition);
     updatePosition();
@@ -113,7 +157,14 @@
   <script>
     var tocItemsArray = [];
     var selectedItem = null;
-
+    function toggleTOC() {
+      var tocColumn = document.getElementById("tocColumn");
+      if (tocColumn.style.display == "block")
+        tocColumn.style.display = "none";
+      else
+        tocColumn.style.display = "block";
+      event.stopPropagation();
+    }
     function expandItem(e) {
       if (e == selectedItem)
         e.style["font-weight"] = "bold";
