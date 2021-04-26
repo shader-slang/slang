@@ -1,7 +1,7 @@
-// non-square-row-major.slang
+// non-square-column-major.slang
 
 // Note! This test doesn't work on CUDA or CPU targets, because both these targets ignore
-// row/column major setting. 
+// row/column major setting, as well as they handle alignment differently.
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -xslang -matrix-layout-column-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -xslang -matrix-layout-column-major -shaderobj
