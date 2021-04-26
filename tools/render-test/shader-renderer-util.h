@@ -16,7 +16,7 @@ struct ShaderRendererUtil
         /// Generate a texture using the InputTextureDesc and construct a TextureResource using the Renderer with the contents
     static Slang::Result generateTextureResource(
         const InputTextureDesc& inputDesc,
-        int bindFlags,
+        ResourceState defaultState,
         IDevice* device,
         ComPtr<ITextureResource>& textureOut);
 
@@ -24,7 +24,7 @@ struct ShaderRendererUtil
     static Slang::Result createTextureResource(
         const InputTextureDesc& inputDesc,
         const TextureData& texData,
-        int bindFlags,
+        ResourceState defaultState,
         IDevice* device,
         ComPtr<ITextureResource>& textureOut);
 

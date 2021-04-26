@@ -108,12 +108,10 @@ public:
     virtual void setStencilReference(uint32_t referenceValue) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
@@ -213,11 +211,10 @@ public:
 		public:
         typedef BufferResource Parent;
 
-        BufferResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLDevice>* renderer, GLuint id, GLenum target):
+        BufferResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer, GLuint id, GLenum target):
             Parent(desc),
 			m_renderer(renderer),
 			m_handle(id),
-            m_initialUsage(initialUsage),
             m_target(target),
             m_size(desc.sizeInBytes)
 		{}
@@ -229,7 +226,6 @@ public:
 			}
 		}
 
-        Usage m_initialUsage;
 		RefPtr<WeakSink<GLDevice>> m_renderer;
 		GLuint m_handle;
         GLenum m_target;
@@ -241,9 +237,8 @@ public:
         public:
         typedef TextureResource Parent;
 
-        TextureResourceImpl(Usage initialUsage, const Desc& desc, WeakSink<GLDevice>* renderer):
+        TextureResourceImpl(const Desc& desc, WeakSink<GLDevice>* renderer):
             Parent(desc),
-            m_initialUsage(initialUsage),
             m_renderer(renderer)
         {
             m_target = 0;
@@ -258,7 +253,6 @@ public:
             }
          }
 
-        Usage m_initialUsage;
         RefPtr<WeakSink<GLDevice>> m_renderer;
         GLenum m_target;
         GLuint m_handle;
@@ -471,15 +465,21 @@ public:
                 m_images.clear();
                 for (uint32_t i = 0; i < m_desc.imageCount; i++)
                 {
-                    ITextureResource::Desc texDesc = {};
-                    texDesc.init2D(
-                        IResource::Type::Texture2D,
-                        gfx::Format::RGBA_Unorm_UInt8,
-                        m_desc.width,
-                        m_desc.height,
-                        1);
-                    RefPtr<TextureResourceImpl> tex = new TextureResourceImpl(
-                        IResource::Usage::RenderTarget, texDesc, m_renderer);
+                    ITextureResource::Desc imageDesc = {};
+                    imageDesc.allowedStates = ResourceStateSet(
+                        ResourceState::Present,
+                        ResourceState::RenderTarget,
+                        ResourceState::CopyDestination);
+                    imageDesc.type = IResource::Type::Texture2D;
+                    imageDesc.arraySize = 0;
+                    imageDesc.format = m_desc.format;
+                    imageDesc.size.width = m_desc.width;
+                    imageDesc.size.height = m_desc.height;
+                    imageDesc.size.depth = 1;
+                    imageDesc.numMipLevels = 1;
+                    imageDesc.defaultState = ResourceState::Present;
+                    RefPtr<TextureResourceImpl> tex =
+                        new TextureResourceImpl(imageDesc, m_renderer);
                     tex->m_handle = m_backBuffer;
                     m_images.add(tex);
                 }
@@ -1414,10 +1414,14 @@ public:
 
             ComPtr<IBufferResource> bufferResourcePtr;
             IBufferResource::Desc bufferDesc;
-            bufferDesc.init(specializedOrdinaryDataSize);
+            bufferDesc.type = IResource::Type::Buffer;
+            bufferDesc.sizeInBytes = specializedOrdinaryDataSize;
+            bufferDesc.defaultState = ResourceState::ConstantBuffer;
+            bufferDesc.allowedStates =
+                ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
             bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(device->createBufferResource(
-                IResource::Usage::ConstantBuffer, bufferDesc, nullptr, bufferResourcePtr.writeRef()));
+            SLANG_RETURN_ON_FAIL(
+                device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
 
             // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
@@ -2373,13 +2377,11 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::readTextureResource(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
-    IResource::Usage initialUsage,
     const ITextureResource::Desc& descIn,
     const ITextureResource::SubresourceData* initData,
     ITextureResource** outResource)
 {
-    TextureResource::Desc srcDesc(descIn);
-    srcDesc.setDefaults(initialUsage);
+    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
 
     GlPixelFormat pixelFormat = _getGlPixelFormat(srcDesc.format);
     if (pixelFormat == GlPixelFormat::Unknown)
@@ -2393,13 +2395,13 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
     const GLenum format = info.format;
     const GLenum formatType = info.formatType;
 
-    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(initialUsage, srcDesc, m_weakRenderer));
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc, m_weakRenderer));
 
     GLenum target = 0;
     GLuint handle = 0;
     glGenTextures(1, &handle);
 
-    const int effectiveArraySize = srcDesc.calcEffectiveArraySize();
+    const int effectiveArraySize = calcEffectiveArraySize(srcDesc);
 
     // Set on texture so will be freed if failure
     texture->m_handle = handle;
@@ -2575,38 +2577,37 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
     return SLANG_OK;
 }
 
-static GLenum _calcUsage(IResource::Usage usage)
+static GLenum _calcUsage(ResourceState state)
 {
-    typedef IResource::Usage Usage;
-    switch (usage)
+    switch (state)
     {
-        case Usage::ConstantBuffer:     return GL_DYNAMIC_DRAW;
-        default:                        return GL_STATIC_READ;
+    case ResourceState::ConstantBuffer:
+        return GL_DYNAMIC_DRAW;
+    default:
+        return GL_STATIC_READ;
     }
 }
 
-static GLenum _calcTarget(IResource::Usage usage)
+static GLenum _calcTarget(ResourceState state)
 {
-    typedef IResource::Usage Usage;
-    switch (usage)
+    switch (state)
     {
-        case Usage::ConstantBuffer:     return GL_UNIFORM_BUFFER;
-        default:                        return GL_SHADER_STORAGE_BUFFER;
+    case ResourceState::ConstantBuffer:
+        return GL_UNIFORM_BUFFER;
+    default:
+        return GL_SHADER_STORAGE_BUFFER;
     }
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferResource(
-    IResource::Usage initialUsage,
     const IBufferResource::Desc& descIn,
     const void* initData,
     IBufferResource** outResource)
 {
-    BufferResource::Desc desc(descIn);
-    desc.setDefaults(initialUsage);
+    BufferResource::Desc desc = fixupBufferDesc(descIn);
 
-    const GLenum target = _calcTarget(initialUsage);
-    // TODO: should derive from desc...
-    const GLenum usage = _calcUsage(initialUsage);
+    const GLenum target = _calcTarget(desc.defaultState);
+    const GLenum usage = _calcUsage(desc.defaultState);
 
     GLuint bufferID = 0;
     glGenBuffers(1, &bufferID);
@@ -2614,7 +2615,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferResource(
 
     glBufferData(target, descIn.sizeInBytes, initData, usage);
 
-    RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(initialUsage, desc, m_weakRenderer, bufferID, target);
+    RefPtr<BufferResourceImpl> resourceImpl = new BufferResourceImpl(desc, m_weakRenderer, bufferID, target);
     returnComPtr(outResource, resourceImpl);
     return SLANG_OK;
 }
