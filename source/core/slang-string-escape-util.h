@@ -18,9 +18,9 @@ struct StringEscapeUtil
 {
     enum class Style
     {
-        C,          ///< Escape/quoting in the style on C/C++
-        Unix,       ///< Unix style escaping
-        Win,        ///< Windows style escaping
+        Cpp,        ///< Escape/quoting in the style on C/C++
+        UnixCmd,    ///< Unix command line style escaping
+        WinCmd,     ///< Windows command line style 
     };
 
         /// True if quoting is needed

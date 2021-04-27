@@ -69,7 +69,7 @@ static char _getUnescapedChar(char c)
 
 /* static */bool StringEscapeUtil::isQuotingNeeded(Style style, const UnownedStringSlice& slice)
 {
-    if (style == Style::C)
+    if (style == Style::Cpp)
     {
         // In C/C++ we always need quotes
         return true;

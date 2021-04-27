@@ -12,9 +12,9 @@ namespace Slang {
 struct CommandLine
 {
 #if SLANG_WINDOWS_FAMILY
-    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::Win;
+    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::WinCmd;
 #else
-    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::Unix;
+    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::UnixCmd;
 #endif
 
     enum class ExecutableType
