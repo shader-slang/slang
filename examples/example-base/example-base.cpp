@@ -180,7 +180,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
     {
-        char* typeStr = "";
+        const char* typeStr = "";
         switch (type)
         {
         case DebugMessageType::Info:
@@ -195,7 +195,7 @@ public:
         default:
             break;
         }
-        char* sourceStr = "[GraphicsLayer]: ";
+        const char* sourceStr = "[GraphicsLayer]: ";
         switch (source)
         {
         case DebugMessageSource::Slang:
