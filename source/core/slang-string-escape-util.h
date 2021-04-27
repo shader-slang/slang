@@ -32,8 +32,10 @@ struct StringEscapeUtil
         /// If the slice appears to be quoted for the style, unquote it, else just append to out
     static SlangResult appendMaybeUnquoted(Style style, const UnownedStringSlice& slice, StringBuilder& out);
 
+        /// Append with quotes (even if not needed)
     static void appendQuoted(Style style, const UnownedStringSlice& slice, StringBuilder& out);
 
+        /// Append unquoted to out. 
     static SlangResult appendUnquoted(Style style, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// Takes slice and adds C++/C type escaping for special characters (like '\', '"' and if not ascii will write out as hex sequence)
@@ -53,4 +55,4 @@ struct StringEscapeUtil
 
 } // namespace Slang
 
-#endif // SLANG_STRING_UTIL_H
+#endif // SLANG_CORE_STRING_ESCAPE_UTIL_H

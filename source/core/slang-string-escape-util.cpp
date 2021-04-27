@@ -31,7 +31,6 @@ static int _getHexDigit(char c)
     }
 }
 
-
 static char _getEscapedChar(char c)
 {
     switch (c)
