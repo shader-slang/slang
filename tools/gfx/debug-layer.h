@@ -193,8 +193,8 @@ public:
 class DebugRootShaderObject : public DebugShaderObject
 {
 public:
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 };
 
 class DebugCommandBuffer;
@@ -206,8 +206,8 @@ public:
 
 public:
     IComputeCommandEncoder* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -226,8 +226,8 @@ public:
 
 public:
     IRenderCommandEncoder* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -263,8 +263,8 @@ public:
 
 public:
     IResourceCommandEncoder* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(

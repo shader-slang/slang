@@ -1,9 +1,5 @@
-#pragma once
-
 #include "debug-layer.h"
-#include "core/slang-basic.h"
 #include "renderer-shared.h"
-#include "slang-com-ptr.h"
 #include "slang-gfx.h"
 
 using namespace Slang;
@@ -40,7 +36,8 @@ String _gfxGetFuncName(const char* input)
     if (endIndex == -1)
         endIndex = str.getLength();
     auto startIndex = prefixIndex + 5;
-    String subStr = "I" + str.subString(startIndex, endIndex - startIndex);
+    String subStr =
+        Slang::UnownedStringSlice("I") + str.subString(startIndex, endIndex - startIndex);
     return subStr;
 }
 
