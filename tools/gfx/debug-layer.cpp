@@ -284,7 +284,8 @@ Result DebugDevice::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
     SLANG_GFX_API_FUNC;
 
     auto innerDesc = desc;
-    innerDesc.layout = static_cast<DebugFramebufferLayout*>(desc.layout)->baseObject.get();
+    innerDesc.layout =
+        desc.layout ? static_cast<DebugFramebufferLayout*>(desc.layout)->baseObject.get() : nullptr;
     innerDesc.depthStencilView =
         desc.depthStencilView
             ? static_cast<DebugResourceView*>(desc.depthStencilView)->baseObject.get()
@@ -316,7 +317,8 @@ Result DebugDevice::createRenderPassLayout(
 
     auto innerDesc = desc;
     innerDesc.framebufferLayout =
-        static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject.get();
+        desc.framebufferLayout? static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject.get()
+            : nullptr;
     RefPtr<DebugRenderPassLayout> outObject = new DebugRenderPassLayout();
     auto result = baseObject->createRenderPassLayout(innerDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
@@ -402,10 +404,14 @@ Result DebugDevice::createGraphicsPipelineState(
     SLANG_GFX_API_FUNC;
 
     GraphicsPipelineStateDesc innerDesc = desc;
-    innerDesc.program = static_cast<DebugShaderProgram*>(desc.program)->baseObject;
-    innerDesc.inputLayout = static_cast<DebugInputLayout*>(desc.inputLayout)->baseObject;
+    innerDesc.program =
+        desc.program ? static_cast<DebugShaderProgram*>(desc.program)->baseObject : nullptr;
+    innerDesc.inputLayout =
+        desc.inputLayout ? static_cast<DebugInputLayout*>(desc.inputLayout)->baseObject : nullptr;
     innerDesc.framebufferLayout =
-        static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject;
+        desc.framebufferLayout
+            ? static_cast<DebugFramebufferLayout*>(desc.framebufferLayout)->baseObject
+            : nullptr;
     RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
     auto result =
         baseObject->createGraphicsPipelineState(innerDesc, outObject->baseObject.writeRef());
@@ -503,12 +509,17 @@ void DebugCommandBuffer::encodeRenderCommands(
     SLANG_GFX_API_FUNC;
     checkCommandBufferOpenWhenCreatingEncoder();
     checkEncodersClosedBeforeNewEncoder();
-    auto innerRenderPass = static_cast<DebugRenderPassLayout*>(renderPass)->baseObject;
-    auto innerFramebuffer = static_cast<DebugFramebuffer*>(framebuffer)->baseObject;
+    auto innerRenderPass =
+        renderPass ? static_cast<DebugRenderPassLayout*>(renderPass)->baseObject : nullptr;
+    auto innerFramebuffer =
+        framebuffer ? static_cast<DebugFramebuffer*>(framebuffer)->baseObject : nullptr;
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
         innerRenderPass, innerFramebuffer, m_renderCommandEncoder.baseObject.writeRef());
-    *outEncoder = &m_renderCommandEncoder;
+    if (m_renderCommandEncoder.baseObject)
+        *outEncoder = &m_renderCommandEncoder;
+    else
+        *outEncoder = nullptr;
 }
 
 void DebugCommandBuffer::encodeComputeCommands(IComputeCommandEncoder** outEncoder)

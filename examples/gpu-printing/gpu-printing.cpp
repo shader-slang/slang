@@ -156,7 +156,7 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
             // that the buffer is corrupted or invalid, but we will try to
             // soldier on and process further commands.
             //
-            fprintf(stderr, "error: unexpected GPU printing op %d\n", op);
+            fprintf(stderr, "error: unexpected GPU printing op %d\n", (int)op);
             break;
 
         case GPUPrintingOp::Nop:
