@@ -36,9 +36,10 @@ String _gfxGetFuncName(const char* input)
     if (endIndex == -1)
         endIndex = str.getLength();
     auto startIndex = prefixIndex + 5;
-    String subStr =
-        Slang::UnownedStringSlice("I") + str.subString(startIndex, endIndex - startIndex);
-    return subStr;
+    StringBuilder sb;
+    sb.appendChar('I');
+    sb.append(str.subString(startIndex, endIndex - startIndex));
+    return sb.ProduceString();
 }
 
 template <typename... TArgs>
