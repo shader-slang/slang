@@ -4393,12 +4393,14 @@ bool ReportHit(float tHit, uint hitKind, A attributes)
 __target_intrinsic(hlsl)
 __target_intrinsic(GL_NV_ray_tracing, ignoreIntersectionNV)
 __target_intrinsic(GL_EXT_ray_tracing, "ignoreIntersectionEXT;")
+__target_intrinsic(cuda, "optixIgnoreIntersection")
 void IgnoreHit();
 
 // 10.3.5
 __target_intrinsic(hlsl)
 __target_intrinsic(GL_NV_ray_tracing, terminateRayNV)
 __target_intrinsic(GL_EXT_ray_tracing, "terminateRayEXT;")
+__target_intrinsic(cuda, "optixTerminateRay")
 void AcceptHitAndEndSearch();
 
 // 10.4 - System Values and Special Semantics
@@ -4415,20 +4417,24 @@ uint3 DispatchRaysIndex();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_LaunchSizeNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_LaunchSizeEXT)")
+__target_intrinsic(cuda, "optixGetLaunchDimensions")
 uint3 DispatchRaysDimensions();
 
 // 10.4.2 - Ray System Values
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayOriginNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayOriginEXT)")
+__target_intrinsic(cuda, "optixGetWorldRayOrigin")
 float3 WorldRayOrigin();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_WorldRayDirectionNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_WorldRayDirectionEXT)")
+__target_intrinsic(cuda, "optixGetWorldRayDirection")
 float3 WorldRayDirection();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_RayTminNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTminEXT)")
+__target_intrinsic(cuda, "optixGetRayTmin")
 float RayTMin();
 
 // Note: The `RayTCurrent()` intrinsic should translate to
@@ -4443,32 +4449,41 @@ float RayTMin();
 //
 __target_intrinsic(GL_NV_ray_tracing, "(gl_RayTmaxNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_RayTmaxEXT)")
+__target_intrinsic(cuda, "optixGetRayTmax")
 float RayTCurrent();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_IncomingRayFlagsNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_IncomingRayFlagsEXT)")
+__target_intrinsic(cuda, "optixGetRayFlags")
 uint RayFlags();
 
 // 10.4.3 - Primitive/Object Space System Values
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_InstanceCustomIndexNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_InstanceCustomIndexEXT)")
+__target_intrinsic(cuda, "optixGetInstanceIndex")
 uint InstanceIndex();
 
 __target_intrinsic(__glslRayTracing, "(gl_InstanceID)")
+__target_intrinsic(cuda, "optixGetInstanceId")
 uint InstanceID();
 
 __target_intrinsic(__glslRayTracing, "(gl_PrimitiveID)")
+__target_intrinsic(cuda, "optixGetPrimitiveIndex")
 uint PrimitiveIndex();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayOriginNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayOriginEXT)")
+__target_intrinsic(cuda, "optixGetObjectRayOrigin")
 float3 ObjectRayOrigin();
 
 __target_intrinsic(GL_NV_ray_tracing, "(gl_ObjectRayDirectionNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_ObjectRayDirectionEXT)")
+__target_intrinsic(cuda, "optixGetObjectRayDirection")
 float3 ObjectRayDirection();
 
+// TODO: optix has an optixGetObjectToWorldTransformMatrix function that returns 12
+// floats by reference. 
 __target_intrinsic(GL_NV_ray_tracing, "transpose(gl_ObjectToWorldNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "transpose(gl_ObjectToWorldEXT)")
 float3x4 ObjectToWorld3x4();
@@ -4500,6 +4515,7 @@ float3x4 WorldToObject() { return WorldToObject3x4(); }
 // 10.4.4 - Hit Specific System values
 __target_intrinsic(GL_NV_ray_tracing, "(gl_HitKindNV)")
 __target_intrinsic(GL_EXT_ray_tracing, "(gl_HitKindEXT)")
+__target_intrinsic(cuda, "optixGetHitKind")
 uint HitKind();
 
 // Pre-defined hit kinds (not documented explicitly)
