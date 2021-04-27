@@ -14,7 +14,7 @@ struct CommandLine
 #if SLANG_WINDOWS_FAMILY
     static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::Win;
 #else
-    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::StyleUnix;
+    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::Unix;
 #endif
 
     enum class ExecutableType
