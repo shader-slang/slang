@@ -890,7 +890,16 @@ struct OptionsParser
                         SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &includeDirStr));
                     }
 
-                    compileRequest->addSearchPath(String(includeDirStr).begin());
+                    StringBuilder includeDir;
+                    
+#if SLANG_WINDOWS_FAMILY
+                    // The include path might be quoted, on windows so, we potentially have to decode.
+                    StringEscapeUtil::appendMaybeUnquoted(CommandLine::kQuoteStyle, UnownedStringSlice(includeDirStr), includeDir);
+#else
+                    includeDir = includeDirStr;
+#endif
+
+                    compileRequest->addSearchPath(includeDir.getBuffer());
                 }
                 //
                 // A `-o` option is used to specify a desired output file.

@@ -29,52 +29,18 @@ namespace Slang {
 #endif
 }
 
-/* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
-{
-   // TODO(JS): This escaping is not complete... !
-    if (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0)
-    {
-        out << "\"";
-
-        const char* cur = slice.begin();
-        const char* end = slice.end();
-
-        while (cur < end)
-        {
-            char c = *cur++;
-            switch (c)
-            {
-                case '\"':
-                {
-                    // Escape quotes.
-                    out << "\\\"";
-                    break;
-                }
-                default:
-                    out.append(c);
-            }
-        }
-
-        out << "\"";
-
-        return;
-    }
-
-    out << slice;
-}
-
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
     // When outputting the command line we potentially need to escape the path to the
     // command and args - that aren't already explicitly marked as escaped. 
     StringBuilder cmd;
-    appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+    StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
         if (arg.type == CommandLine::ArgType::Unescaped)
         {
-            appendCommandLineEscaped(arg.value.getUnownedSlice(), cmd);
+            StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, arg.value.getUnownedSlice(), cmd);
         }
         else
         {

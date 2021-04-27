@@ -5,10 +5,18 @@
 #include "slang-string.h"
 #include "slang-list.h"
 
+#include "slang-string-escape-util.h"
+
 namespace Slang {
 
 struct CommandLine
 {
+#if SLANG_WINDOWS_FAMILY
+    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::Win;
+#else
+    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::StyleUnix;
+#endif
+
     enum class ExecutableType
     {
         Unknown,                    ///< The executable is not specified 
@@ -89,9 +97,6 @@ struct ProcessUtil
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
 
-        /// Append text escaped for using on a command line
-    static void appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out);
-
     static uint64_t getClockFrequency();
 
     static uint64_t getClockTick();
@@ -123,12 +128,12 @@ SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String
         // Work out the path with the postfix
         StringBuilder fullPath;
         fullPath << path << pathPostfix;  
-        ProcessUtil::appendCommandLineEscaped(fullPath.getUnownedSlice(), builder);
+        StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, fullPath.getUnownedSlice(), builder);
     }
     else
     {
-        ProcessUtil::appendCommandLineEscaped(path.getUnownedSlice(), builder);
-    }
+        StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, path.getUnownedSlice(), builder);
+    } 
 
     // This arg doesn't need subsequent escaping
     addEscapedArg(builder);

@@ -9,10 +9,13 @@
 #include "../../slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string-escape-util.h"
+
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-render-api-util.h"
+
 
 #include "directory-util.h"
 #include "test-context.h"
@@ -268,16 +271,50 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
     return SLANG_OK;
 }
 
+static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
+{
+    const char* cursor = *ioCursor;
+    const char*const argBegin = cursor;
+    
+    // Let's try to read one option
+    for (;;)
+    {
+        switch (*cursor)
+        {
+            default:
+            {
+                ++cursor;
+                break;
+            }
+            case '"':
+            {
+                // If we have quotes let's just parse them as is and make output
+                SLANG_RETURN_ON_FAIL(StringEscapeUtil::lexQuoted(CommandLine::kQuoteStyle, cursor, '"', &cursor));
+                break;
+            }
+            case 0:
+            case '\r':
+            case '\n':
+            case ' ':
+            case '\t':
+            {
+                char const* argEnd = cursor;
+                assert(argBegin != argEnd);
 
-static TestResult _gatherTestOptions(
+                outArg = UnownedStringSlice(argBegin, argEnd);
+                *ioCursor = cursor;
+                return SLANG_OK;
+            }
+        }
+    }
+}
+
+static SlangResult _gatherTestOptions(
     TestCategorySet*    categorySet, 
     char const**    ioCursor,
     TestOptions&    outOptions)
 {
-    if (SLANG_FAILED(_parseCategories(categorySet, ioCursor, outOptions)))
-    {
-        return TestResult::Fail;
-    }
+    SLANG_RETURN_ON_FAIL(_parseCategories(categorySet, ioCursor, outOptions));
 
     char const* cursor = *ioCursor;
 
@@ -285,7 +322,7 @@ static TestResult _gatherTestOptions(
         cursor++;
     else
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
 
     // Next scan for a sub-command name
@@ -302,7 +339,7 @@ static TestResult _gatherTestOptions(
             break;
         
         case 0: case '\r': case '\n':
-            return TestResult::Fail;
+            return SLANG_FAIL;
         }
 
         break;
@@ -315,12 +352,11 @@ static TestResult _gatherTestOptions(
         cursor++;
     else
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
 
     // Now scan for arguments. For now we just assume that
     // any whitespace separation indicates a new argument
-    // (we don't support quoting)
     for(;;)
     {
         skipHorizontalSpace(&cursor);
@@ -332,32 +368,17 @@ static TestResult _gatherTestOptions(
             skipToEndOfLine(&cursor);
 
             *ioCursor = cursor;
-            return TestResult::Pass;
+            return SLANG_OK;
 
         default:
             break;
         }
 
         // Let's try to read one option
-        char const* argBegin = cursor;
-        for(;;)
-        {
-            switch( *cursor )
-            {
-            default:
-                cursor++;
-                continue;
+        UnownedStringSlice arg;
+        SLANG_RETURN_ON_FAIL(_parseArg(&cursor, arg));
 
-            case 0: case '\r': case '\n': case ' ': case '\t':
-                break;
-            }
-
-            break;
-        }
-        char const* argEnd = cursor;
-        assert(argBegin != argEnd);
-
-        outOptions.args.add(getString(argBegin, argEnd));
+        outOptions.args.add(arg);
     }
 }
 
@@ -379,12 +400,17 @@ static void _combineOptions(
     }
 }
 
+
 // Try to read command-line options from the test file itself
-TestResult gatherTestsForFile(
+static SlangResult _gatherTestsForFile(
     TestCategorySet*    categorySet,
     String				filePath,
-    FileTestList*       testList)
+    FileTestList*       ioTestList,
+    TestResult&         outTestResult)
 {
+    // Set a default of failure, until we determine some other result
+    outTestResult = TestResult::Fail;
+
     String fileContents;
     try
     {
@@ -392,7 +418,7 @@ TestResult gatherTestsForFile(
     }
     catch (const Slang::IOException&)
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
 
     // Walk through the lines of the file, looking for test commands
@@ -416,7 +442,8 @@ TestResult gatherTestsForFile(
         // Look for a pattern that matches what we want
         if (match(&cursor, "TEST_IGNORE_FILE"))
         {
-            return TestResult::Ignored;
+            outTestResult = TestResult::Ignored;
+            return SLANG_OK;
         }
 
         TestDetails testDetails;
@@ -427,16 +454,12 @@ TestResult gatherTestsForFile(
 
         if (match(&cursor, "TEST_CATEGORY"))
         {
-            if (SLANG_FAILED(_parseCategories(categorySet, &cursor, fileOptions)))
-            {
-                return TestResult::Fail;
-            }
+            SLANG_RETURN_ON_FAIL(_parseCategories(categorySet, &cursor, fileOptions));
         }
 
         if(match(&cursor, "TEST"))
         { 
-            if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
-                return TestResult::Fail;
+            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis = _getRequiredRenderApisByCommand(testDetails.options.command.getUnownedSlice());
@@ -445,19 +468,18 @@ TestResult gatherTestsForFile(
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
 
-            testList->tests.add(testDetails);
+            ioTestList->tests.add(testDetails);
         }
         else if (match(&cursor, "DIAGNOSTIC_TEST"))
         {
-            if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
-                return TestResult::Fail;
+            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            testList->tests.add(testDetails);
+            ioTestList->tests.add(testDetails);
         }
         else
         {
@@ -465,7 +487,8 @@ TestResult gatherTestsForFile(
         }
     }
 
-    return TestResult::Pass;
+    outTestResult = TestResult::Pass;
+    return SLANG_OK;
 }
 
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
@@ -3040,24 +3063,27 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
-void runTestsOnFile(
+static SlangResult _runTestsOnFile(
     TestContext*    context,
     String          filePath)
 {
     // Gather a list of tests to run
     FileTestList testList;
+    TestResult testResult = TestResult::Fail;
 
-    if( gatherTestsForFile(&context->categorySet, filePath, &testList) == TestResult::Ignored )
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList, testResult));
+
+    if (testResult == TestResult::Ignored)
     {
         // Test was explicitly ignored
-        return;
+        return SLANG_OK;
     }
 
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.getCount() == 0 )
     {
         context->reporter->addTest(filePath, TestResult::Ignored);
-        return;
+        return SLANG_OK;
     }
 
     RenderApiFlags apiUsedFlags = 0;
@@ -3187,6 +3213,8 @@ void runTestsOnFile(
             // Could determine if to continue or not here... based on result
         }        
     }
+
+    return SLANG_OK;
 }
 
 
@@ -3254,10 +3282,14 @@ void runTestsInDirectory(
             if( shouldRunTest(context, file) )
             {
     //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-                runTestsOnFile(context, file);
+                if (SLANG_FAILED(_runTestsOnFile(context, file)))
+                {
+                    fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
+                }
             }
         }
     }
+
     {
         List<String> subDirs;
         DirectoryUtil::findDirectories(directoryPath, subDirs);
