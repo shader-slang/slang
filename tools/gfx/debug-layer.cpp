@@ -441,7 +441,9 @@ SlangResult DebugDevice::readTextureResource(
     size_t* outPixelSize)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->readTextureResource(resource, state, outBlob, outRowPitch, outPixelSize);
+    auto resourceImpl = static_cast<DebugTextureResource*>(resource);
+    return baseObject->readTextureResource(
+        resourceImpl->baseObject, state, outBlob, outRowPitch, outPixelSize);
 }
 
 SlangResult DebugDevice::readBufferResource(
@@ -451,7 +453,8 @@ SlangResult DebugDevice::readBufferResource(
     ISlangBlob** outBlob)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->readBufferResource(buffer, offset, size, outBlob);
+    auto bufferImpl = static_cast<DebugBufferResource*>(buffer);
+    return baseObject->readBufferResource(bufferImpl->baseObject, offset, size, outBlob);
 }
 
 const DeviceInfo& DebugDevice::getDeviceInfo() const
@@ -698,7 +701,9 @@ void DebugResourceCommandEncoder::copyBuffer(
     size_t size)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->copyBuffer(dst, dstOffset, src, srcOffset, size);
+    auto dstImpl = static_cast<DebugBufferResource*>(dst);
+    auto srcImpl = static_cast<DebugBufferResource*>(src);
+    baseObject->copyBuffer(dstImpl->baseObject, dstOffset, srcImpl->baseObject, srcOffset, size);
 }
 
 void DebugResourceCommandEncoder::uploadBufferData(
@@ -708,7 +713,8 @@ void DebugResourceCommandEncoder::uploadBufferData(
     void* data)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->uploadBufferData(dst, offset, size, data);
+    auto dstImpl = static_cast<DebugBufferResource*>(dst);
+    baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
 const ICommandQueue::Desc& DebugCommandQueue::getDesc()

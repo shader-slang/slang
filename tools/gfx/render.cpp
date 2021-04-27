@@ -122,7 +122,10 @@ extern "C"
         if (SLANG_FAILED(resultCode))
             return resultCode;
         if (!debugLayerEnabled)
+        {
             returnComPtr(outDevice, innerDevice);
+            return resultCode;
+        }
         RefPtr<DebugDevice> debugDevice = new DebugDevice();
         debugDevice->baseObject = innerDevice;
         returnComPtr(outDevice, debugDevice);
