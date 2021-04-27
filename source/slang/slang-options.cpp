@@ -892,11 +892,11 @@ struct OptionsParser
 
                     StringBuilder includeDir;
                     
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY 
                     // The include path might be quoted, on windows so, we potentially have to decode.
                     StringEscapeUtil::appendMaybeUnquoted(CommandLine::kQuoteStyle, UnownedStringSlice(includeDirStr), includeDir);
 #else
-                    includeDir = includeDirStr;
+                    includeDir.append(includeDirStr);
 #endif
 
                     compileRequest->addSearchPath(includeDir.getBuffer());
