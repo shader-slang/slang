@@ -1885,6 +1885,7 @@ public:
         {
             getDebugCallback()->handleMessage(
                 compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
                 (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
