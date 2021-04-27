@@ -8,12 +8,14 @@
 #include "vulkan/render-vk.h"
 #include "cuda/render-cuda.h"
 #include "cpu/render-cpu.h"
+#include "debug-layer.h"
+
 #include <cstring>
 
 namespace gfx {
 using namespace Slang;
 
-static const IResource::DescBase s_emptyDescBase = {};
+static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -47,8 +49,7 @@ extern "C"
         return s_formatSize[int(format)];
     }
 
-    SLANG_GFX_API SlangResult SLANG_MCALL
-        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice)
+    SlangResult _createDevice(const IDevice::Desc* desc, IDevice** outDevice)
     {
         switch (desc->deviceType)
         {
@@ -77,16 +78,16 @@ extern "C"
             {
                 IDevice::Desc newDesc = *desc;
                 newDesc.deviceType = DeviceType::DirectX12;
-                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
                     return SLANG_OK;
                 newDesc.deviceType = DeviceType::Vulkan;
-                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
                     return SLANG_OK;
                 newDesc.deviceType = DeviceType::DirectX11;
-                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
                     return SLANG_OK;
                 newDesc.deviceType = DeviceType::OpenGl;
-                if (gfxCreateDevice(&newDesc, outDevice) == SLANG_OK)
+                if (_createDevice(&newDesc, outDevice) == SLANG_OK)
                     return SLANG_OK;
                 return SLANG_FAIL;
             }
@@ -111,6 +112,32 @@ extern "C"
         default:
             return SLANG_FAIL;
         }
+    }
+
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice)
+    {
+        ComPtr<IDevice> innerDevice;
+        auto resultCode = _createDevice(desc, innerDevice.writeRef());
+        if (SLANG_FAILED(resultCode))
+            return resultCode;
+        if (!debugLayerEnabled)
+            returnComPtr(outDevice, innerDevice);
+        RefPtr<DebugDevice> debugDevice = new DebugDevice();
+        debugDevice->baseObject = innerDevice;
+        returnComPtr(outDevice, debugDevice);
+        return resultCode;
+    }
+
+    SLANG_GFX_API SlangResult SLANG_MCALL gfxSetDebugCallback(IDebugCallback* callback)
+    {
+        _getDebugCallback() = callback;
+        return SLANG_OK;
+    }
+
+    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer()
+    {
+        debugLayerEnabled = true;
     }
 
     const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type)

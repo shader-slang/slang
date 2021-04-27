@@ -72,10 +72,13 @@ inline void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
     }
 }
 
+void initDebugCallback();
 
 template<typename TApp>
 int innerMain()
 {
+    initDebugCallback();
+
     TApp app;
 
     if (SLANG_FAILED(app.initialize()))

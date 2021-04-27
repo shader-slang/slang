@@ -1883,7 +1883,9 @@ public:
             (SlangInt)0, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
-            // TODO: report compile error.
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         
