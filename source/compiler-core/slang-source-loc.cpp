@@ -67,7 +67,7 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
         case Type::FromString:
         case Type::FoundPath:
         {
-            StringCppEscapeUtil::appendQuoted(foundPath.getUnownedSlice(), out);    
+            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), foundPath.getUnownedSlice(), out);    
             break;
         }
         default: break;

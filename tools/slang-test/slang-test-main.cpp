@@ -289,7 +289,8 @@ static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
             case '"':
             {
                 // If we have quotes let's just parse them as is and make output
-                SLANG_RETURN_ON_FAIL(StringSpaceEscapeUtil::lexQuoted(cursor, '"', &cursor));
+                auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+                SLANG_RETURN_ON_FAIL(escapeHandler->lexQuoted(cursor, &cursor));
                 break;
             }
             case 0:

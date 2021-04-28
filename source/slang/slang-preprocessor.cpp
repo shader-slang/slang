@@ -1051,7 +1051,8 @@ static void MaybeBeginMacroExpansion(
                     // We need to escape to a string
                     newToken.type = TokenType::StringLiteral;
 
-                    StringCppEscapeUtil::appendQuoted(humaneSourceLoc.pathInfo.foundPath.getUnownedSlice(), buf);
+                    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+                    StringEscapeUtil::appendQuoted(escapeHandler, humaneSourceLoc.pathInfo.foundPath.getUnownedSlice(), buf);
                 }
 
                 // We are going to keep the actual text in the slice pool, so it stays in scope

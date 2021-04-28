@@ -82,8 +82,9 @@ struct ExecuteResult
 
 struct ProcessUtil
 {
-        /// The util that has escaping functionality that is appropriate for this platform
-    typedef StringSpaceEscapeUtil EscapeUtil;
+        /// The quoting style used for the command line on this target. Currently just uses Space,
+        /// but in future may take into account platform sec
+    static StringEscapeHandler* getEscapeHandler();
 
         /// Get the suffix used on this platform
     static UnownedStringSlice getExecutableSuffix();
@@ -118,7 +119,7 @@ SLANG_INLINE Index CommandLine::findArgIndex(const UnownedStringSlice& slice) co
 // -----------------------------------------------------------------------
 SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix)
 {
-    typedef ProcessUtil::EscapeUtil EscapeUtil;
+    auto escapeHandler = ProcessUtil::getEscapeHandler();
 
     StringBuilder builder;
     builder << prefix;
@@ -127,11 +128,11 @@ SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String
         // Work out the path with the postfix
         StringBuilder fullPath;
         fullPath << path << pathPostfix;  
-        EscapeUtil::appendMaybeQuoted(fullPath.getUnownedSlice(), builder);
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, fullPath.getUnownedSlice(), builder);
     }
     else
     {
-        EscapeUtil::appendMaybeQuoted(path.getUnownedSlice(), builder);
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, path.getUnownedSlice(), builder);
     } 
 
     // This arg doesn't need subsequent escaping

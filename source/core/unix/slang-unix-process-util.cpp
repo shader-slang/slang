@@ -3,6 +3,7 @@
 
 #include "../slang-common.h"
 #include "../slang-string-util.h"
+#include "../slang-string-escape-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,18 +30,25 @@ namespace Slang {
 #endif
 }
 
+/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
+{
+    return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+}
+
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
+    auto escapeHandler = getEscapeHandler();
+
     // When outputting the command line we potentially need to escape the path to the
     // command and args - that aren't already explicitly marked as escaped. 
     StringBuilder cmd;
-    EscapeUtil::appendMaybeQuoted(commandLine.m_executable.getUnownedSlice(), cmd);
+    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
         if (arg.type == CommandLine::ArgType::Unescaped)
         {
-            EscapeUtil::appendMaybeQuoted(arg.value.getUnownedSlice(), cmd);
+            StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.value.getUnownedSlice(), cmd);
         }
         else
         {
@@ -225,7 +233,6 @@ namespace Slang {
 
     return SLANG_FAIL;
 }
-
 
 /* static */uint64_t ProcessUtil::getClockFrequency()
 {

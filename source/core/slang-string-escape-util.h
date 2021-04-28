@@ -5,72 +5,69 @@
 
 namespace Slang {
 
-struct StringSpaceEscapeUtil
+class StringEscapeHandler
 {
+public:
+
         /// True if quoting is needed
-    static bool isQuotingNeeded(const UnownedStringSlice& slice);
-
-    static SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out);
-
-    static SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out);
-
-    static SlangResult appendUnquoted(const UnownedStringSlice& slice, StringBuilder& out);
-
-    static void appendMaybeQuoted(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// If the slice appears to be quoted for the style, unquote it, else just append to out
-    static SlangResult appendMaybeUnquoted(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Append with quotes (even if not needed)
-    static void appendQuoted(const UnownedStringSlice& slice, StringBuilder& out);
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) = 0;
+        /// True if any escaping is needed. If not slice can be used (assuming appropriate quoting) as is
+    virtual bool isEscapingNeeded(const UnownedStringSlice& slice) = 0;
+        /// Takes slice and adds any appropriate escaping (for example C++/C type escaping for special characters like '\', '"' and if not ascii will write out as hex sequence)
+        /// Does not append quotes
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) = 0;
+        /// Given a slice append it unescaped
+        /// Does not consume surrounding quotes
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) = 0;
 
         /// Lex quoted text.
         /// The first character of cursor should be the quoteCharacter. 
         /// cursor points to the string to be lexed - must typically be 0 terminated.
         /// outCursor on successful lex will be at the next character after was processed.
-    static SlangResult lexQuoted(const char* cursor, char quoteChar, const char** outCursor);
+    virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) = 0;
+
+    SLANG_FORCE_INLINE char getQuoteChar() const { return m_quoteChar; }
+
+    StringEscapeHandler(char quoteChar):
+        m_quoteChar(quoteChar)
+    {
+    }
+
+protected:
+    const char m_quoteChar;
 };
 
 /* A set of function that can be used for escaping/unescaping quoting/unquoting strings.
 
-The distinction between 'escaping' and 'quoting' here, is just that escaping is the 'payload' of quotes. 
+The distinction between 'escaping' and 'quoting' here, is just that escaping is the 'payload' of quotes.
 In *principal* the Style can determine different styles of escaping that can be used.
-
-TODO(JS): NOTE! Currently style is largely ignored. 
-
-Use CommandLine::kQuoteStyle for the quoting style that the command line for the current platform uses. 
 */
-struct StringCppEscapeUtil
+struct StringEscapeUtil
 {
-        /// True if quoting is needed
-    static bool isQuotingNeeded(const UnownedStringSlice& slice);
+    typedef StringEscapeHandler Handler;
 
-        /// If slice needs quoting for the specified style, append quoted to out
-    static void appendMaybeQuoted(const UnownedStringSlice& slice, StringBuilder& out);
+    enum class Style
+    {
+        Cpp,            ///< Cpp style quoting and escape handling
+        Space,          ///< Applies quotes if there are spaces. Does not escape.
+    };
+
+        /// Given a style returns a handler
+    static Handler* getHandler(Style style);
+
+        /// If quoting is needed appends to out quoted
+    static void appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// If the slice appears to be quoted for the style, unquote it, else just append to out
-    static SlangResult appendMaybeUnquoted(const UnownedStringSlice& slice, StringBuilder& out);
+    static SlangResult appendMaybeUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
+
+        /// Appends to out slice without quotes
+    static SlangResult appendUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// Append with quotes (even if not needed)
-    static void appendQuoted(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Append unquoted to out. 
-    static SlangResult appendUnquoted(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Takes slice and adds C++/C type escaping for special characters (like '\', '"' and if not ascii will write out as hex sequence)
-        /// Does not append double quotes around the output
-    static void appendEscaped(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Given a slice append it unescaped
-        /// Does not consume surrounding quotes
-    static SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Lex quoted text.
-        /// The first character of cursor should be the quoteCharacter. 
-        /// cursor points to the string to be lexed - must typically be 0 terminated.
-        /// outCursor on successful lex will be at the next character after was processed.
-    static SlangResult lexQuoted(const char* cursor, char quoteChar, const char** outCursor);
+    static void appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 };
+
 
 } // namespace Slang
 

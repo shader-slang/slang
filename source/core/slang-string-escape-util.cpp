@@ -5,15 +5,29 @@
 
 namespace Slang {
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!! StringSpaceEscapeUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!! SpaceStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+class SpaceStringEscapeHandler : public StringEscapeHandler
+{
+public:
+    typedef StringEscapeHandler Super;
 
-/* static */bool StringSpaceEscapeUtil::isQuotingNeeded(const UnownedStringSlice& slice)
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { return isEscapingNeeded(slice); }
+ 
+    virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
+
+    SpaceStringEscapeHandler() : Super('"') {}
+};
+
+bool SpaceStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
     return slice.indexOf(' ') >= 0;
 }
 
-/* static */SlangResult StringSpaceEscapeUtil::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult SpaceStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     if (slice.indexOf('"') >= 0)
     {
@@ -24,7 +38,7 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult StringSpaceEscapeUtil::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     if (slice.indexOf('"') >= 0)
     {
@@ -34,30 +48,11 @@ namespace Slang {
     return SLANG_OK;
 }
 
-void StringSpaceEscapeUtil::appendQuoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    out.appendChar('"');
-    appendEscaped(slice, out);
-    out.appendChar('"');
-}
-
-/* static */void StringSpaceEscapeUtil::appendMaybeQuoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    if (isQuotingNeeded(slice))
-    {
-        appendQuoted(slice, out);
-    }
-    else
-    {
-        out.append(slice);
-    }
-}
-
-/* static */SlangResult StringSpaceEscapeUtil::lexQuoted(const char* cursor, char quoteChar, const char** outCursor)
+/* static */SlangResult SpaceStringEscapeHandler::lexQuoted(const char* cursor, const char** outCursor)
 {
     *outCursor = cursor;
 
-    if (*cursor != quoteChar)
+    if (*cursor != m_quoteChar)
     {
         return SLANG_FAIL;
     }
@@ -66,7 +61,7 @@ void StringSpaceEscapeUtil::appendQuoted(const UnownedStringSlice& slice, String
     for (;;)
     {
         const char c = *cursor;
-        if (c == quoteChar)
+        if (c == m_quoteChar)
         {
             *outCursor = cursor + 1;
             return SLANG_OK;
@@ -89,32 +84,21 @@ void StringSpaceEscapeUtil::appendQuoted(const UnownedStringSlice& slice, String
     }
 }
 
-/* static */SlangResult StringSpaceEscapeUtil::appendMaybeUnquoted(const UnownedStringSlice& slice, StringBuilder& out)
+// !!!!!!!!!!!!!!!!!!!!!!!!!! CppStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+class CppStringEscapeHandler : public StringEscapeHandler
 {
-    const Index len = slice.getLength();
+public:
+    typedef StringEscapeHandler Super;
 
-    if (len >= 2 && slice[0] == '"' && slice[len - 1] == '"')
-    {
-        return appendUnquoted(slice, out);
-    }
-    else
-    {
-        out.append(slice);
-        return SLANG_OK;
-    }
-}
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
+    virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
 
-/* static */SlangResult StringSpaceEscapeUtil::appendUnquoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    const Index len = slice.getLength();
-
-    // Must have quote characters around if
-    SLANG_ASSERT(len >= 2 && slice[0] == '"' && slice[len - 1] == '"');
-
-    return appendUnescaped(slice.subString(1, len - 2), out);
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!! StringCppEscapeUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    CppStringEscapeHandler() : Super('"') {}
+};
 
 static char _getHexChar(int v)
 {
@@ -178,7 +162,7 @@ static char _getCppUnescapedChar(char c)
     }
 }
 
-/* static */bool StringCppEscapeUtil::isQuotingNeeded(const UnownedStringSlice& slice)
+/* static */bool CppStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
     const char* cur = slice.begin();
     const char*const end = slice.end();
@@ -209,51 +193,7 @@ static char _getCppUnescapedChar(char c)
     return false;
 }
 
-/* static */void StringCppEscapeUtil::appendQuoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    out.appendChar('"');
-    appendEscaped(slice, out);
-    out.appendChar('"');
-}
-
-/* static */SlangResult StringCppEscapeUtil::appendUnquoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    const Index len = slice.getLength();
-
-    // Must have quote characters around if
-    SLANG_ASSERT(len >= 2 && slice[0] == '"' && slice[len - 1] == '"');
-
-    return appendUnescaped(slice.subString(1, len - 2), out);
-}
-
-/* static */void StringCppEscapeUtil::appendMaybeQuoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    if (isQuotingNeeded(slice))
-    {
-        appendQuoted(slice, out);
-    }
-    else
-    {
-        out.append(slice);
-    }
-}
-
-/* static */SlangResult StringCppEscapeUtil::appendMaybeUnquoted(const UnownedStringSlice& slice, StringBuilder& out)
-{
-    const Index len = slice.getLength();
-
-    if (len >= 2 && slice[0] == '"' && slice[len - 1] == '"')
-    {
-        return appendUnquoted(slice, out);
-    }
-    else
-    {
-        out.append(slice);
-        return SLANG_OK;
-    }
-}
-
-/* static */void StringCppEscapeUtil::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult CppStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
@@ -299,9 +239,10 @@ static char _getCppUnescapedChar(char c)
     {
         out.append(start, end);
     }
+    return SLANG_OK;
 }
 
-/* static */SlangResult StringCppEscapeUtil::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char* start = slice.begin();
     const char* cur = start;
@@ -412,11 +353,11 @@ static char _getCppUnescapedChar(char c)
     return SLANG_OK;
 }
 
-/* static */SlangResult StringCppEscapeUtil::lexQuoted(const char* cursor, char quote, const char** outCursor)
+SlangResult CppStringEscapeHandler::lexQuoted(const char* cursor, const char** outCursor)
 {
     *outCursor = cursor;
 
-    if (*cursor != quote)
+    if (*cursor != m_quoteChar)
     {
         return SLANG_FAIL;
     }
@@ -425,7 +366,7 @@ static char _getCppUnescapedChar(char c)
     for (;;)
     {
         const char c = *cursor;
-        if (c == quote)
+        if (c == m_quoteChar)
         {
             *outCursor = cursor + 1;
             return SLANG_OK;
@@ -498,6 +439,71 @@ static char _getCppUnescapedChar(char c)
                 break;
             }
         }
+    }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!! StringEscapeUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+static CppStringEscapeHandler g_cppHandler;
+static SpaceStringEscapeHandler g_spaceHandler;
+
+StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
+{
+    switch (style)
+    {
+        case Style::Cpp:    return &g_cppHandler;
+        case Style::Space:  return &g_spaceHandler;
+        default:            return nullptr;
+    }
+}
+
+/* static */void StringEscapeUtil::appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const char quoteChar = handler->getQuoteChar();
+    out.appendChar(quoteChar);
+    handler->appendEscaped(slice, out);
+    out.appendChar(quoteChar);
+}
+
+/* static */SlangResult StringEscapeUtil::appendUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const Index len = slice.getLength();
+
+    const char quoteChar = handler->getQuoteChar();
+    SLANG_UNUSED(quoteChar);
+
+    // Must have quote characters around if
+    SLANG_ASSERT(len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar);
+
+    return handler->appendUnescaped(slice.subString(1, len - 2), out);
+}
+
+/* static */void StringEscapeUtil::appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    if (handler->isQuotingNeeded(slice))
+    {
+        appendQuoted(handler, slice, out);
+    }
+    else
+    {
+        out.append(slice);
+    }
+}
+
+/* static */SlangResult StringEscapeUtil::appendMaybeUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const char quoteChar = handler->getQuoteChar();
+
+    const Index len = slice.getLength();
+
+    if (len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar)
+    {
+        return appendUnquoted(handler, slice, out);
+    }
+    else
+    {
+        out.append(slice);
+        return SLANG_OK;
     }
 }
 
