@@ -23,6 +23,18 @@ struct StringEscapeUtil
         WinCmd,     ///< Windows command line style 
     };
 
+    static bool isWinQuotingNeeded(const UnownedStringSlice& slice);
+    static bool isCppQuotingNeeded(const UnownedStringSlice& slice);
+    static bool isUnixQuotingNeeded(const UnownedStringSlice& slice);
+
+    static SlangResult appendCppUnescaped(const UnownedStringSlice& slice, StringBuilder& out);
+    static SlangResult appendUnixUnescaped(const UnownedStringSlice& slice, StringBuilder& out);
+    static SlangResult appendWinUnescaped(const UnownedStringSlice& slice, StringBuilder& out);
+
+    static void appendWinEscaped(const UnownedStringSlice& slice, StringBuilder& out);
+    static void appendCppEscaped(const UnownedStringSlice& slice, StringBuilder& out);
+    static void appendUnixEscaped(const UnownedStringSlice& slice, StringBuilder& out);
+
         /// True if quoting is needed
     static bool isQuotingNeeded(Style style, const UnownedStringSlice& slice);
 
@@ -42,6 +54,7 @@ struct StringEscapeUtil
         /// Does not append double quotes around the output
     static void appendEscaped(Style style, const UnownedStringSlice& slice, StringBuilder& out);
 
+    
         /// Given a slice append it unescaped
         /// Does not consume surrounding quotes
     static SlangResult appendUnescaped(Style style, const UnownedStringSlice& slice, StringBuilder& out);

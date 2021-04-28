@@ -67,14 +67,24 @@ static char _getUnescapedChar(char c)
     }
 }
 
-/* static */bool StringEscapeUtil::isQuotingNeeded(Style style, const UnownedStringSlice& slice)
+/* static */bool StringEscapeUtil::isWinQuotingNeeded(const UnownedStringSlice& slice)
 {
-    if (style == Style::Cpp)
+    const char* cur = slice.begin();
+    const char*const end = slice.end();
+    for (; cur < end; ++cur)
     {
-        // In C/C++ we always need quotes
-        return true;
-    }
+        const char c = *cur;
 
+        if (c <= ' ' || c >= 0x7e)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* static */bool StringEscapeUtil::isCppQuotingNeeded(const UnownedStringSlice& slice)
+{
     const char* cur = slice.begin();
     const char*const end = slice.end();
 
@@ -84,8 +94,8 @@ static char _getUnescapedChar(char c)
 
         switch (c)
         {
-            case '\'':      
-            case '\"':      
+            case '\'':
+            case '\"':
             case '\\':
             {
                 // Strictly speaking ' shouldn't need a quote if in a C style string. 
@@ -102,6 +112,60 @@ static char _getUnescapedChar(char c)
         }
     }
     return false;
+}
+
+/* static */ bool StringEscapeUtil::isUnixQuotingNeeded(const UnownedStringSlice& slice)
+{
+    const char* cur = slice.begin();
+    const char*const end = slice.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+
+        switch (c)
+        {
+            case '\'':
+            case '\"':
+            case '\\':
+            {
+                // Strictly speaking ' shouldn't need a quote if in a C style string. 
+                return true;
+            }
+            default:
+            {
+                if (c < ' ' || c >= 0x7e)
+                {
+                    return true;
+                }
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+/* static */void StringEscapeUtil::appendWinEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    // TODO(JS): Better handling for escaping
+    out.append(slice);
+}
+
+/* static */void StringEscapeUtil::appendUnixEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    // TODO(JS): Better handling for escaping
+    out.append(slice);
+}
+
+/* static */bool StringEscapeUtil::isQuotingNeeded(Style style, const UnownedStringSlice& slice)
+{
+    switch (style)
+    {
+        case Style::Cpp:        return true;
+        case Style::WinCmd:     return isWinQuotingNeeded(slice);
+        case Style::UnixCmd:    return isUnixQuotingNeeded(slice);
+        default: return false;
+    }
 }
 
 /* static */void StringEscapeUtil::appendQuoted(Style style, const UnownedStringSlice& slice, StringBuilder& out)
@@ -148,10 +212,8 @@ static char _getUnescapedChar(char c)
     }
 }
 
-/* static */void StringEscapeUtil::appendEscaped(Style style, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */void StringEscapeUtil::appendCppEscaped(const UnownedStringSlice& slice, StringBuilder& out)
 {
-    SLANG_UNUSED(style);
-
     const char* start = slice.begin();
     const char* cur = start;
     const char*const end = slice.end();
@@ -166,19 +228,19 @@ static char _getUnescapedChar(char c)
             // Flush
             if (start < cur)
             {
-                out.append(start, end);
+                out.append(start, cur);
             }
             out.appendChar('\\');
             out.appendChar(escapedChar);
 
             start = cur + 1;
         }
-        else if ( c < ' ' || c > 126)
+        else if (c < ' ' || c > 126)
         {
             // Flush
             if (start < cur)
             {
-                out.append(start, end);
+                out.append(start, cur);
             }
 
             char buf[5] = "\\0x0";
@@ -198,10 +260,32 @@ static char _getUnescapedChar(char c)
     }
 }
 
-/* static */SlangResult StringEscapeUtil::appendUnescaped(Style style, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */void StringEscapeUtil::appendEscaped(Style style, const UnownedStringSlice& slice, StringBuilder& out)
 {
-    SLANG_UNUSED(style);
+    switch (style)
+    {
+        case Style::Cpp: return appendCppEscaped(slice, out);
+        case Style::WinCmd: return appendWinEscaped(slice, out);
+        case Style::UnixCmd: return appendUnixEscaped(slice, out);
+    }
+}
 
+/* static */SlangResult StringEscapeUtil::appendUnixUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    // TODO(JS): Add proper decoding
+    out.append(slice);
+    return SLANG_OK;
+}
+
+/* static */SlangResult StringEscapeUtil::appendWinUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    // TODO(JS): Add proper win decoding
+    out.append(slice);
+    return SLANG_OK;
+}
+
+/* static */SlangResult StringEscapeUtil::appendCppUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
     const char* start = slice.begin();
     const char* cur = start;
     const char*const end = slice.end();
@@ -288,7 +372,7 @@ static char _getUnescapedChar(char c)
                     const Index maxUtf8EncodeCount = 6;
 
                     char* chars = out.prepareForAppend(maxUtf8EncodeCount);
-          
+
                     int numChars = EncodeUnicodePointToUTF8(chars, int(value));
                     out.appendInPlace(chars, numChars);
 
@@ -309,6 +393,17 @@ static char _getUnescapedChar(char c)
     }
 
     return SLANG_OK;
+}
+
+/* static */SlangResult StringEscapeUtil::appendUnescaped(Style style, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    switch (style)
+    {
+        case Style::Cpp: return appendCppUnescaped(slice, out);
+        case Style::WinCmd: return appendWinUnescaped(slice, out);
+        case Style::UnixCmd: return appendUnixUnescaped(slice, out);
+        default: return SLANG_E_NOT_IMPLEMENTED;
+    }
 }
 
 /* static */SlangResult StringEscapeUtil::lexQuoted(Style style, const char* cursor, char quote, const char** outCursor)
