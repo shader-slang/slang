@@ -13,10 +13,31 @@
   <style>
     #centeringDiv {
       margin: auto;
-      max-width: 1000px;
-      padding-left: 350px;
+      max-width: 1200px;
     }
-
+    #navDiv
+    {
+      display: block;
+      box-sizing: border-box;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      border-bottom-width: 3px;
+      border-bottom-style: solid;
+      border-bottom-color: #F0F0F0;
+    }
+    #navDiv nav li::after
+    {
+      content: "/";
+      padding-left: 10px;
+      padding-right: 0px;
+      color: #808080;
+    }
+    #navDiv nav li
+    {
+      display:inline;
+      padding-left: 10px;
+      padding-right: 0px;
+    }
     #tocColumn {
       width: 350px;
       position: fixed;
@@ -31,12 +52,9 @@
     }
 
     #rightColumn {
-      padding-left: 40px;
+      padding-left: 390px;
       padding-right: 40px;
       padding-top: 20px;
-      border-left-width: 1.5px;
-      border-left-style: solid;
-      border-left-color: #C8C8C8;
     }
 
     .toc_root_list {
@@ -73,7 +91,7 @@
     }
     .toc_span:hover
     {
-      color: #303080
+      color: #3030BE
     }
     #btnToggleTOC {
       display: none;
@@ -85,13 +103,14 @@
       border-color: #808080;
       border-width: 1px;
     }
-    @media screen and (max-width: 850px) {
+    @media screen and (max-width: 900px) {
       #tocColumn {
         width: 300px;
         display: block;
       }
-      #centeringDiv {
-         padding-left: 300px;
+      #rightColumn {
+        padding-left: 320px;
+        padding-right: 20px;
       }
     }
 
@@ -100,6 +119,7 @@
         width: 100%;
         position: static;
         display: none;
+        border-right-style: none;
       }
       #tocInner {
         padding: 10px;
@@ -120,18 +140,21 @@
 </head>
 
 <body>
+  <div id="centeringDiv">
+    <div id="navDiv">
+    {% include_relative nav.html %}
+    </div>
     <button id="btnToggleTOC" onclick="toggleTOC()">Table of Contents</button>
     <div id="tocColumn">
       <div id="tocInner">
-        {% include_relative user-guide-toc.html %}
+        {% include_relative toc.html %}
       </div>
     </div>
-    <div id="centeringDiv">
-      <div id="rightColumn">
+    <div id="rightColumn">
         <section id="main_content">
           {% include anchor_headings.html html=content anchorBody="" %}
         </section>
-
+        <a href="javascript:;" id="_content_end_"></a>
         <footer>
           {% if site.github.is_project_page %}
           {{ site.title | default: site.github.repository_name }} is maintained by <a
@@ -144,18 +167,26 @@
   <script>
     var tocColumn = document.getElementById("tocColumn");
     var rightColumn = document.getElementById("rightColumn");
+    function updateScroll()
+    {
+      if (window.innerWidth < 700)
+        return;
+      var top = Math.max(0, rightColumn.getBoundingClientRect().top);
+      tocColumn.style.top = top + "px";
+      tocColumn.style.height = (window.innerHeight-top) + "px";
+    }
     function updatePosition()
     {
       if (window.innerWidth > 700)
         tocColumn.style.display = "";
-      tocColumn.style.left = (rightColumn.getBoundingClientRect().x - tocColumn.getBoundingClientRect().width) + "px";
+      tocColumn.style.left = rightColumn.getBoundingClientRect().left + "px";
+      updateScroll();
     }
     window.addEventListener("resize", updatePosition);
     updatePosition();
-  </script>
 
-  <script>
     var tocItemsArray = [];
+    var subSectionItems = [];
     var selectedItem = null;
     function toggleTOC() {
       var tocColumn = document.getElementById("tocColumn");
@@ -249,6 +280,56 @@
         curItem.getAttribute("class").startsWith("toc_root_list"))
         break;
     }
+
+    var subItems = selectedItem.getElementsByTagName("li");
+    var subSectionTitles = [];
+    var subSectionTitleStrs = [];
+    for (var i = 0; i < subItems.length; i++)
+    {
+      subSectionItems.push(subItems[i]);
+      var title = subItems[i].getAttribute("data-link");
+      var pos = title.lastIndexOf("#");
+      title = title.substr(pos + 1);
+      var element = document.getElementById(title);
+      subSectionTitles.push(element);
+      subSectionTitleStrs.push(title);
+    }
+    subSectionTitles.push(document.getElementById("_content_end_"));
+    function isSectionFullyVisible(id)
+    {
+      var titleElement = subSectionTitles[id];
+      var nextTitleElement = subSectionTitles[id+1];
+      return (titleElement.getBoundingClientRect().top >= 0 && nextTitleElement.getBoundingClientRect().top <= window.innerHeight);
+    }
+    function findCurrentSubsection()
+    {
+      var currentSubsectionID = -1;
+      for (var i = 0; i < subSectionItems.length; i++) {
+        var titleElement = subSectionTitles[i];
+        if (titleElement == null)
+          continue;
+        if (titleElement.getBoundingClientRect().top < window.innerHeight * 0.12)
+          currentSubsectionID = i;
+      }
+      return currentSubsectionID;
+    }
+    function updateCurrentSubsection(currentSubsectionID)
+    {
+      for (var i = 0; i < subSectionItems.length; i++)
+      {
+        if (i == currentSubsectionID || isSectionFullyVisible(i))
+          subSectionItems[i].getElementsByTagName("span")[0].style["font-weight"] = 600;
+        else
+          subSectionItems[i].getElementsByTagName("span")[0].style["font-weight"] = 400;
+      }
+    }
+    function windowScroll(e)
+    {
+      updateCurrentSubsection(findCurrentSubsection());
+      updateScroll();
+    }
+    window.addEventListener("scroll", windowScroll);
+    updateCurrentSubsection(findCurrentSubsection());
   </script>
 
   {% if site.google_analytics %}

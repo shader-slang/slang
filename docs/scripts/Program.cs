@@ -154,7 +154,7 @@ namespace toc
             if (root != null)
             {
                 var html = buildTOC(root);
-                var outPath = Path.Combine(path, "user-guide-toc.html");
+                var outPath = Path.Combine(path, "toc.html");
                 File.WriteAllText(outPath, html);
                 outputSB.AppendFormat("Output written to: {0}\n", outPath);
             }
