@@ -242,6 +242,8 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
 
                     if (!category)
                     {
+                        fprintf(stderr, "slang-test: unknown category '%s'\n", categoryName.getBuffer());
+
                         // Failure if we don't find the category
                         return SLANG_FAIL;
                     }
@@ -3422,7 +3424,9 @@ SlangResult innerMain(int argc, char** argv)
     auto waveActiveCategory = categorySet.add("wave-active", waveTestCategory);
 
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-        
+
+    auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
+
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
