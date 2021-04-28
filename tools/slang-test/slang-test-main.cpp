@@ -229,6 +229,11 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
 {
     char const* cursor = *ioCursor;
 
+    if (UnownedStringSlice(cursor).indexOf(UnownedStringSlice::fromLiteral("smoke")) >= 0)
+    {
+        SLANG_BREAKPOINT(0);
+    }
+
     // If don't have ( we don't have category list
     if (*cursor == '(')
     {
@@ -260,6 +265,8 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
                 out.isEnabled = false;
                 break;
             }
+
+            out.addCategory(category);
         }
     }
 
