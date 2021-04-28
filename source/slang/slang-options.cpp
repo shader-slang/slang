@@ -894,7 +894,7 @@ struct OptionsParser
                     
 #if SLANG_WINDOWS_FAMILY 
                     // The include path might be quoted, on windows so, we potentially have to decode.
-                    StringEscapeUtil::appendMaybeUnquoted(CommandLine::kQuoteStyle, UnownedStringSlice(includeDirStr), includeDir);
+                    ProcessUtil::EscapeUtil::appendMaybeUnquoted(UnownedStringSlice(includeDirStr), includeDir);
 #else
                     includeDir.append(includeDirStr);
 #endif

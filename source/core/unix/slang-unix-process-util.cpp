@@ -34,13 +34,13 @@ namespace Slang {
     // When outputting the command line we potentially need to escape the path to the
     // command and args - that aren't already explicitly marked as escaped. 
     StringBuilder cmd;
-    StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, commandLine.m_executable.getUnownedSlice(), cmd);
+    EscapeUtil::appendMaybeQuoted(commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
         if (arg.type == CommandLine::ArgType::Unescaped)
         {
-            StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, arg.value.getUnownedSlice(), cmd);
+            EscapeUtil::appendMaybeQuoted(arg.value.getUnownedSlice(), cmd);
         }
         else
         {

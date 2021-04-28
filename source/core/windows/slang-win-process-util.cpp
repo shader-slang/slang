@@ -158,14 +158,14 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
     StringBuilder cmd;
-    StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, commandLine.m_executable.getUnownedSlice(), cmd);
+    EscapeUtil::appendMaybeQuoted(commandLine.m_executable.getUnownedSlice(), cmd);
 
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
         if (arg.type == CommandLine::ArgType::Unescaped)
         {
-            StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, arg.value.getUnownedSlice(), cmd);
+            EscapeUtil::appendMaybeQuoted(arg.value.getUnownedSlice(), cmd);
         }
         else
         {
@@ -235,7 +235,7 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
         if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
         {
             StringBuilder cmd;
-            StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, commandLine.m_executable.getUnownedSlice(), cmd);
+            EscapeUtil::appendMaybeQuoted(commandLine.m_executable.getUnownedSlice(), cmd);
 
             pathBuffer = cmd.toWString();
             path = pathBuffer.begin();

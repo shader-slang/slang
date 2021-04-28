@@ -11,12 +11,6 @@ namespace Slang {
 
 struct CommandLine
 {
-#if SLANG_WINDOWS_FAMILY
-    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::WinCmd;
-#else
-    static const StringEscapeUtil::Style kQuoteStyle = StringEscapeUtil::Style::UnixCmd;
-#endif
-
     enum class ExecutableType
     {
         Unknown,                    ///< The executable is not specified 
@@ -88,6 +82,9 @@ struct ExecuteResult
 
 struct ProcessUtil
 {
+        /// The util that has escaping functionality that is appropriate for this platform
+    typedef StringSpaceEscapeUtil EscapeUtil;
+
         /// Get the suffix used on this platform
     static UnownedStringSlice getExecutableSuffix();
 
@@ -121,6 +118,8 @@ SLANG_INLINE Index CommandLine::findArgIndex(const UnownedStringSlice& slice) co
 // -----------------------------------------------------------------------
 SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix)
 {
+    typedef ProcessUtil::EscapeUtil EscapeUtil;
+
     StringBuilder builder;
     builder << prefix;
     if (pathPostfix)
@@ -128,11 +127,11 @@ SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String
         // Work out the path with the postfix
         StringBuilder fullPath;
         fullPath << path << pathPostfix;  
-        StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, fullPath.getUnownedSlice(), builder);
+        EscapeUtil::appendMaybeQuoted(fullPath.getUnownedSlice(), builder);
     }
     else
     {
-        StringEscapeUtil::appendMaybeQuoted(CommandLine::kQuoteStyle, path.getUnownedSlice(), builder);
+        EscapeUtil::appendMaybeQuoted(path.getUnownedSlice(), builder);
     } 
 
     // This arg doesn't need subsequent escaping
