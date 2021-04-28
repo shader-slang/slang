@@ -320,7 +320,7 @@ static SlangResult _gatherTestOptions(
 
     char const* cursor = *ioCursor;
 
-     if(*cursor == ':')
+    if(*cursor == ':')
         cursor++;
     else
     {
@@ -402,6 +402,31 @@ static void _combineOptions(
     }
 }
 
+static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& outCommand)
+{
+    const char* cursor = *ioCursor;
+    const char*const start = cursor;
+
+    while (true)
+    {
+        const char c = *cursor;
+
+        if (CharUtil::isAlpha(c) || c == '_')
+        {
+            cursor++;
+            continue;
+        }
+
+        if (c == ':' || c == '(' || c == 0)
+        {
+            *ioCursor = cursor;
+            outCommand = UnownedStringSlice(start, cursor);
+            return SLANG_OK;
+        }
+
+        return SLANG_FAIL;
+    }
+}
 
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
@@ -441,25 +466,43 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
+        UnownedStringSlice command;
+
+        if (SLANG_FAILED(_extractCommand(&cursor, command)))
+        {
+            // Couldn't find a command so skip
+            skipToEndOfLine(&cursor);
+            continue;
+        }
+
+
         // Look for a pattern that matches what we want
-        if (match(&cursor, "TEST_IGNORE_FILE"))
+        if (command == "TEST_IGNORE_FILE")
         {
             outTestResult = TestResult::Ignored;
             return SLANG_OK;
         }
 
+        const UnownedStringSlice disablePrefix = UnownedStringSlice::fromLiteral("DISABLE_");
+
         TestDetails testDetails;
-        if (match(&cursor, "DISABLE_"))
+
         {
-            testDetails.options.isEnabled = false;
+            if (command.startsWith(disablePrefix))
+            {
+                testDetails.options.isEnabled = false;
+                command = command.tail(disablePrefix.getLength());
+            }
         }
 
-        if (match(&cursor, "TEST_CATEGORY"))
+        if (command == "TEST_CATEGORY")
         {
             SLANG_RETURN_ON_FAIL(_parseCategories(categorySet, &cursor, fileOptions));
+            skipToEndOfLine(&cursor);
+            continue;
         }
 
-        if(match(&cursor, "TEST"))
+        if(command == "TEST")
         { 
             SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
@@ -472,7 +515,7 @@ static SlangResult _gatherTestsForFile(
 
             ioTestList->tests.add(testDetails);
         }
-        else if (match(&cursor, "DIAGNOSTIC_TEST"))
+        else if (command == "DIAGNOSTIC_TEST")
         {
             SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
