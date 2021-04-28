@@ -3367,7 +3367,17 @@ void runTestsInDirectory(
     //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
                 if (SLANG_FAILED(_runTestsOnFile(context, file)))
                 {
-                    fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
+                    auto reporter = context->reporter;
+
+                    {
+                        TestReporter::TestScope scope(reporter, file);
+                        reporter->message(TestMessageType::RunError, "slang-test: unable to parse test");
+
+                        reporter->addResult(TestResult::Fail);
+                    }
+
+                    // Output there was some kind of error trying to run the tests on this file
+                    // fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
                 }
             }
         }
