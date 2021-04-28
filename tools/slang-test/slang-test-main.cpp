@@ -260,6 +260,8 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
                 out.isEnabled = false;
                 break;
             }
+
+            out.addCategory(category);
         }
     }
 
