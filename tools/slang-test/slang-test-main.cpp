@@ -551,24 +551,6 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
     return res;
 }
 
-static const char* _getUnescaped(StringEscapeHandler* handler, const CommandLine::Arg& arg, MemoryArena& arena)
-{
-    if (arg.type == CommandLine::ArgType::Escaped)
-    {
-        StringBuilder buf;
-        StringEscapeUtil::unescapeShellLike(handler, arg.value.getUnownedSlice(), buf);
-
-        // We strictly only need to allocate if the result is different.
-        // That an arg marked as 'escaped' does not mean it produces a different result when decoding.
-        if (buf != arg.value)
-        {
-            return arena.allocateString(buf.getBuffer(), buf.getLength());
-        } 
-    }
-
-    return arg.value.getBuffer();
-}
-
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
@@ -616,19 +598,11 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 
         String exePath = Path::combine(context->exeDirectoryPath, exeName);
 
-        
-        // Use the arena to hold any unescaped strings
-        MemoryArena arena(1024);
         List<const char*> args;
-
         args.add(exePath.getBuffer());
-
+        for (const auto& cmdArg : cmdLine.m_args)
         {
-            auto escapeHandler = ProcessUtil::getEscapeHandler();
-            for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
-            {
-                args.add(_getUnescaped(escapeHandler, cmdLine.m_args[i], arena));
-            }
+            args.add(cmdArg.getBuffer());
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
@@ -654,7 +628,7 @@ static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName
 
     if (index >= 0 && index < cmdLine.getArgCount() - 1)
     {
-        outValue = cmdLine.m_args[index + 1].value;
+        outValue = cmdLine.m_args[index + 1];
         return SLANG_OK;
     }
     return SLANG_FAIL;
@@ -736,7 +710,7 @@ static SlangResult _extractRenderTestRequirements(const CommandLine& cmdLine, Te
 
         for (const auto& arg: args)
         {
-            Slang::UnownedStringSlice argSlice = arg.value.getUnownedSlice();
+            Slang::UnownedStringSlice argSlice = arg.getUnownedSlice();
             if (argSlice.getLength() && argSlice[0] == '-')
             {
                 // Look up the rendering API if set
@@ -1436,12 +1410,16 @@ TestResult runCompile(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     _initSlangCompiler(context, cmdLine);
 
+    StringEscapeHandler* escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+
     for (auto arg : input.testOptions->args)
     {
         // If there is a quote in the string, assume it is 'escaped'. 
-        if (arg.indexOf('"') >= 0)
+        if (arg.indexOf(escapeHandler->getQuoteChar()) >= 0)
         {
-            cmdLine.addEscapedArg(arg);
+            StringBuilder buf;
+            StringEscapeUtil::unescapeShellLike(escapeHandler, arg.getUnownedSlice(), buf);
+            cmdLine.addArg(buf.ProduceString());
         }
         else
         {
