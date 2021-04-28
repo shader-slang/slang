@@ -239,6 +239,7 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
         for (; !_isEndOfCategoryList(*cursor); ++cursor);
         if (*cursor != ')')
         {
+            *ioCursor = cursor;
             return SLANG_FAIL;
         }
         cursor++;
@@ -314,13 +315,12 @@ static SlangResult _gatherTestOptions(
 
     char const* cursor = *ioCursor;
 
-    if(*cursor == ':')
-        cursor++;
-    else
+    if(*cursor != ':')
     {
         return SLANG_FAIL;
     }
-
+    cursor++;
+    
     // Next scan for a sub-command name
     char const* commandStart = cursor;
     for(;;)
@@ -426,11 +426,9 @@ static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& ou
 static SlangResult _gatherTestsForFile(
     TestCategorySet*    categorySet,
     String				filePath,
-    FileTestList*       ioTestList,
-    TestResult&         outTestResult)
+    FileTestList*       outTestList)
 {
-    // Set a default of failure, until we determine some other result
-    outTestResult = TestResult::Fail;
+    outTestList->tests.clear();
 
     String fileContents;
     try
@@ -469,11 +467,10 @@ static SlangResult _gatherTestsForFile(
             continue;
         }
 
-
         // Look for a pattern that matches what we want
         if (command == "TEST_IGNORE_FILE")
         {
-            outTestResult = TestResult::Ignored;
+            outTestList->tests.clear();
             return SLANG_OK;
         }
 
@@ -511,7 +508,7 @@ static SlangResult _gatherTestsForFile(
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
 
-            ioTestList->tests.add(testDetails);
+            outTestList->tests.add(testDetails);
         }
         else if (command == "DIAGNOSTIC_TEST")
         {
@@ -522,7 +519,7 @@ static SlangResult _gatherTestsForFile(
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            ioTestList->tests.add(testDetails);
+            outTestList->tests.add(testDetails);
         }
         else
         {
@@ -533,7 +530,7 @@ static SlangResult _gatherTestsForFile(
     }
 
     // If we find any test that is enabled, then return that this can 'potentially' pass.
-    for (const auto& test : ioTestList->tests)
+    for (const auto& test : outTestList->tests)
     {
         if (test.options.isEnabled)
         {
@@ -3159,11 +3156,10 @@ static SlangResult _runTestsOnFile(
 {
     // Gather a list of tests to run
     FileTestList testList;
-    TestResult testResult = TestResult::Fail;
+    
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList));
 
-    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList, testResult));
-
-    if (testResult == TestResult::Ignored)
+    if (testList.tests.getCount() == 0)
     {
         // Test was explicitly ignored
         return SLANG_OK;
