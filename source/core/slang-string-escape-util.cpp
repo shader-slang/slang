@@ -3,6 +3,8 @@
 #include "slang-char-util.h"
 #include "slang-text-io.h"
 
+#include "../../slang-com-helper.h"
+
 namespace Slang {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!! SpaceStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -505,6 +507,42 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
         out.append(slice);
         return SLANG_OK;
     }
+}
+
+
+/* static */SlangResult StringEscapeUtil::unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+{
+    StringBuilder buf;
+    const char quoteChar = handler->getQuoteChar();
+
+    UnownedStringSlice remaining(slice);
+
+    while (remaining.getLength())
+    {
+        const Index index = remaining.indexOf(quoteChar);
+
+        if (index < 0)
+        {
+            out.append(remaining);
+            return SLANG_OK;
+        }
+
+        // Append the bit before
+        out.append(remaining.head(index));
+
+        // Okay we need to lex to the end
+
+        const char* quotedEnd = nullptr;
+        SLANG_RETURN_ON_FAIL(handler->lexQuoted(remaining.begin() + index, &quotedEnd));
+
+        // Unescape it
+        SLANG_RETURN_ON_FAIL(appendUnquoted(handler, UnownedStringSlice(remaining.begin() + index, quotedEnd), out));
+
+        // Fix up remaining
+        remaining = UnownedStringSlice(quotedEnd, remaining.end());
+    }
+
+    return SLANG_OK;
 }
 
 } // namespace Slang

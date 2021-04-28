@@ -5,6 +5,7 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
+#include "../../source/core/slang-memory-arena.h"
 
 #include "../../slang-com-helper.h"
 
@@ -511,6 +512,21 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
     return res;
 }
 
+static const char* _getUnescaped(StringEscapeHandler* handler, const CommandLine::Arg& arg, MemoryArena& arena)
+{
+    if (arg.type == CommandLine::ArgType::Unescaped)
+    {
+        return arg.value.getBuffer();
+    }
+    else
+    {
+        StringBuilder buf;
+        StringEscapeUtil::unescapeShellLike(handler, arg.value.getUnownedSlice(), buf);
+
+        return arena.allocateString(buf.getBuffer(), buf.getLength());
+    }
+}
+
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
@@ -558,11 +574,19 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 
         String exePath = Path::combine(context->exeDirectoryPath, exeName);
 
+        
+        // Use the arena to hold any unescaped strings
+        MemoryArena arena(1024);
         List<const char*> args;
+
         args.add(exePath.getBuffer());
-        for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
+
         {
-            args.add(cmdLine.m_args[i].value.getBuffer());
+            auto escapeHandler = ProcessUtil::getEscapeHandler();
+            for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
+            {
+                args.add(_getUnescaped(escapeHandler, cmdLine.m_args[i], arena));
+            }
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
@@ -1372,7 +1396,15 @@ TestResult runCompile(TestContext* context, TestInput& input)
 
     for (auto arg : input.testOptions->args)
     {
-        cmdLine.addArg(arg);
+        // If there is a quote in the string, assume it is 'escaped'. 
+        if (arg.indexOf('"') >= 0)
+        {
+            cmdLine.addEscapedArg(arg);
+        }
+        else
+        {
+            cmdLine.addArg(arg);
+        }
     }
 
     ExecuteResult exeRes;

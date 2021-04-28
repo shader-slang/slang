@@ -66,6 +66,9 @@ struct StringEscapeUtil
 
         /// Append with quotes (even if not needed)
     static void appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
+
+        /// Shells can have multiple quoted sections. This function makes a string with out quoting
+    static SlangResult unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 };
 
 
