@@ -419,7 +419,7 @@ static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& ou
             continue;
         }
 
-        if (c == ':' || c == '(' || c == 0)
+        if (c == ':' || c == '(' || c == 0 || c == '\n' || c == '\r')
         {
             *ioCursor = cursor;
             outCommand = UnownedStringSlice(start, cursor);
