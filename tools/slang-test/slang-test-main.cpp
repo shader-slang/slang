@@ -529,18 +529,6 @@ static SlangResult _gatherTestsForFile(
         }
     }
 
-    // If we find any test that is enabled, then return that this can 'potentially' pass.
-    for (const auto& test : outTestList->tests)
-    {
-        if (test.options.isEnabled)
-        {
-            outTestResult = TestResult::Pass;
-            return SLANG_OK;
-        }
-    }
-
-    // If all are not enabled, then it's effectively ignored
-    outTestResult = TestResult::Ignored;
     return SLANG_OK;
 }
 
