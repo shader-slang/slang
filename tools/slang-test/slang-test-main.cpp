@@ -530,6 +530,8 @@ static SlangResult _gatherTestsForFile(
         }
         else
         {
+            // Hmm we don't know what kind of test this actually is.
+            // Assume that's ok and this *isn't* a test and ignore.
             skipToEndOfLine(&cursor);
         }
     }
@@ -3411,11 +3413,11 @@ SlangResult innerMain(int argc, char** argv)
     // Set up our test categories here
     auto fullTestCategory = categorySet.add("full", nullptr);
     auto quickTestCategory = categorySet.add("quick", fullTestCategory);
-    /*auto smokeTestCategory = */categorySet.add("smoke", quickTestCategory);
+    auto smokeTestCategory = categorySet.add("smoke", quickTestCategory);
     auto renderTestCategory = categorySet.add("render", fullTestCategory);
     /*auto computeTestCategory = */categorySet.add("compute", fullTestCategory);
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
-    auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
+    auto unitTestCategory = categorySet.add("unit-test", fullTestCategory);
     auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
     auto optixTestCategory = categorySet.add("optix", cudaTestCategory);
 
@@ -3579,7 +3581,8 @@ SlangResult innerMain(int argc, char** argv)
                 filePath << "unit-tests/" << cur->m_name << ".internal";
 
                 TestOptions testOptions;
-                testOptions.categories.add(unitTestCatagory);
+                testOptions.categories.add(unitTestCategory);
+                testOptions.categories.add(smokeTestCategory);
                 testOptions.command = filePath;
 
                 if (shouldRunTest(&context, testOptions.command))
