@@ -210,63 +210,55 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
+static bool _isEndOfCategoryList(char c)
+{
+    switch (c)
+    {
+        case '\n':
+        case '\r':
+        case 0:
+        case ')':
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
 static SlangResult _parseCategories(TestCategorySet* categorySet, char const** ioCursor, TestOptions& out)
 {
     char const* cursor = *ioCursor;
 
-    // Right after the `TEST` keyword, the user may specify
-    // one or more categories for the test.
+    // If don't have ( we don't have category list
     if (*cursor == '(')
     {
         cursor++;
-        // optional test category
-        skipHorizontalSpace(&cursor);
-        char const* categoryStart = cursor;
-        for (;;)
+        const char*const start = cursor;
+
+        // Find the end
+        for (; !_isEndOfCategoryList(*cursor); ++cursor);
+        if (*cursor != ')')
         {
-            switch (*cursor)
+            return SLANG_FAIL;
+        }
+        cursor++;
+
+        List<UnownedStringSlice> slices;
+        StringUtil::split(UnownedStringSlice(start, cursor - 1), ',', slices);
+
+        for (auto& slice : slices)
+        {
+            // Trim any whitespace
+            auto categoryName = slice.trim();
+
+            TestCategory* category = categorySet->find(categoryName);
+
+            if (!category)
             {
-                default:
-                {
-                    cursor++;
-                    continue;
-                }
-                case ',':
-                case ')':
-                {
-                    char const* categoryEnd = cursor;
-                    cursor++;
-
-                    auto categoryName = getString(categoryStart, categoryEnd);
-                    TestCategory* category = categorySet->find(categoryName);
-
-                    if (!category)
-                    {
-                        fprintf(stderr, "slang-test: unknown category '%s'\n", categoryName.getBuffer());
-
-                        // Failure if we don't find the category
-                        return SLANG_FAIL;
-                    }
-
-                    out.addCategory(category);
-
-                    if (*categoryEnd == ',')
-                    {
-                        skipHorizontalSpace(&cursor);
-                        categoryStart = cursor;
-                        continue;
-                    }
-
-                    *ioCursor = cursor;
-                    return SLANG_OK;
-                }
-                case 0: case '\r': case '\n':
-                {
-                    return SLANG_FAIL;
-                }
+                // Mark this test as disabled, as we don't have all of the categories
+                out.isEnabled = false;
+                break;
             }
-
-            break;
         }
     }
 
@@ -499,13 +491,17 @@ static SlangResult _gatherTestsForFile(
 
         if (command == "TEST_CATEGORY")
         {
-            SLANG_RETURN_ON_FAIL(_parseCategories(categorySet, &cursor, fileOptions));
+            SlangResult res = _parseCategories(categorySet, &cursor, fileOptions);
+            
+            // If if failed we are done, unless it was just 'not available'
+            if (SLANG_FAILED(res) && res != SLANG_E_NOT_AVAILABLE) return res;
+
             skipToEndOfLine(&cursor);
             continue;
         }
 
         if(command == "TEST")
-        { 
+        {
             SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
             // See if the type of test needs certain APIs available
@@ -536,7 +532,18 @@ static SlangResult _gatherTestsForFile(
         }
     }
 
-    outTestResult = TestResult::Pass;
+    // If we find any test that is enabled, then return that this can 'potentially' pass.
+    for (const auto& test : ioTestList->tests)
+    {
+        if (test.options.isEnabled)
+        {
+            outTestResult = TestResult::Pass;
+            return SLANG_OK;
+        }
+    }
+
+    // If all are not enabled, then it's effectively ignored
+    outTestResult = TestResult::Ignored;
     return SLANG_OK;
 }
 
