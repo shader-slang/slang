@@ -514,17 +514,20 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
 
 static const char* _getUnescaped(StringEscapeHandler* handler, const CommandLine::Arg& arg, MemoryArena& arena)
 {
-    if (arg.type == CommandLine::ArgType::Unescaped)
-    {
-        return arg.value.getBuffer();
-    }
-    else
+    if (arg.type == CommandLine::ArgType::Escaped)
     {
         StringBuilder buf;
         StringEscapeUtil::unescapeShellLike(handler, arg.value.getUnownedSlice(), buf);
 
-        return arena.allocateString(buf.getBuffer(), buf.getLength());
+        // We strictly only need to allocate if the result is different.
+        // That an arg marked as 'escaped' does not mean it produces a different result when decoding.
+        if (buf != arg.value)
+        {
+            return arena.allocateString(buf.getBuffer(), buf.getLength());
+        } 
     }
+
+    return arg.value.getBuffer();
 }
 
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
