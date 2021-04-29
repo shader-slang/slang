@@ -2,6 +2,7 @@
 
 #include "slang-char-util.h"
 #include "slang-text-io.h"
+#include "slang-memory-arena.h"
 
 #include "../../slang-com-helper.h"
 
@@ -459,12 +460,13 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
-/* static */void StringEscapeUtil::appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */SlangResult StringEscapeUtil::appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char quoteChar = handler->getQuoteChar();
     out.appendChar(quoteChar);
-    handler->appendEscaped(slice, out);
+    SlangResult res = handler->appendEscaped(slice, out);
     out.appendChar(quoteChar);
+    return res;
 }
 
 /* static */SlangResult StringEscapeUtil::appendUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
@@ -480,15 +482,16 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return handler->appendUnescaped(slice.subString(1, len - 2), out);
 }
 
-/* static */void StringEscapeUtil::appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
+/* static */SlangResult StringEscapeUtil::appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
 {
     if (handler->isQuotingNeeded(slice))
     {
-        appendQuoted(handler, slice, out);
+        return appendQuoted(handler, slice, out);
     }
     else
     {
         out.append(slice);
+        return SLANG_OK;
     }
 }
 

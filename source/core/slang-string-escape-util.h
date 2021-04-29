@@ -2,6 +2,7 @@
 #define SLANG_CORE_STRING_ESCAPE_UTIL_H
 
 #include "slang-string.h"
+#include "slang-list.h"
 
 namespace Slang {
 
@@ -56,7 +57,7 @@ struct StringEscapeUtil
     static Handler* getHandler(Style style);
 
         /// If quoting is needed appends to out quoted
-    static void appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
+    static SlangResult appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// If the slice appears to be quoted for the style, unquote it, else just append to out
     static SlangResult appendMaybeUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
@@ -65,7 +66,7 @@ struct StringEscapeUtil
     static SlangResult appendUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// Append with quotes (even if not needed)
-    static void appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
+    static SlangResult appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
         /// Shells can have multiple quoted sections. This function makes a string with out quoting
     static SlangResult unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);

@@ -169,14 +169,7 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        if (arg.type == CommandLine::ArgType::Unescaped)
-        {
-            StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.value.getUnownedSlice(), cmd);
-        }
-        else
-        {
-            cmd << arg.value;
-        }
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
     }
     return cmd.ToString();
 }
