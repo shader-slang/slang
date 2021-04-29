@@ -38,8 +38,6 @@ protected:
     const char m_quoteChar;
 };
 
-class MemoryArena;
-
 /* A set of function that can be used for escaping/unescaping quoting/unquoting strings.
 
 The distinction between 'escaping' and 'quoting' here, is just that escaping is the 'payload' of quotes.
@@ -72,11 +70,6 @@ struct StringEscapeUtil
 
         /// Shells can have multiple quoted sections. This function makes a string with out quoting
     static SlangResult unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
-
-        /// Append args as zero terminated escaped (via hander) outArgs. All args are stored in the arena
-    static SlangResult appendMaybeQuoted(Handler* handler, const List<String>& args, MemoryArena& arena, List<const char*>& outArgs);
-
-    static SlangResult appendMaybeQuoted(Handler* handler, const UnownedStringSlice& arg, MemoryArena& arena, List<const char*>& outArgs);
 };
 
 

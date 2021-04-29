@@ -548,36 +548,4 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return SLANG_OK;
 }
 
-
-/* static */SlangResult StringEscapeUtil::appendMaybeQuoted(Handler* handler, const UnownedStringSlice& arg, MemoryArena& arena, List<const char*>& outArgs)
-{
-    if (handler->isQuotingNeeded(arg))
-    {
-        StringBuilder buf;
-
-        SLANG_RETURN_ON_FAIL(appendQuoted(handler, arg, buf));
-        outArgs.add(arena.allocateString(buf.getBuffer(), buf.getLength()));
-    }
-    else
-    {
-        outArgs.add(arena.allocateString(arg.begin(), arg.getLength()));
-    }
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult StringEscapeUtil::appendMaybeQuoted(Handler* handler, const List<String>& args, MemoryArena& arena, List<const char*>& outArgs)
-{
-    StringBuilder buf;
-
-    for (const auto& arg : args)
-    {
-        buf.Clear();
-        SLANG_RETURN_ON_FAIL(appendMaybeQuoted(handler, arg.getUnownedSlice(), buf));
-        outArgs.add(arena.allocateString(buf.getBuffer(), buf.getLength()));
-    }
-
-    return SLANG_OK;
-}
-
 } // namespace Slang
