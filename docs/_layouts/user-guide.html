@@ -102,6 +102,21 @@
     {
       color: #3030BE
     }
+    .tocIcon
+    {
+      vertical-align: -2.5px;
+    }
+    .editButton
+    {
+      float: right;
+      margin-right: 10px;
+      color:#808080;
+    }
+    .editIcon
+    {
+      fill: currentColor;
+      vertical-align: text-top;
+    }
     #btnToggleTOC {
       display: none;
       width: fit-content;
@@ -111,6 +126,13 @@
       border-style: solid;
       border-color: #808080;
       border-width: 1px;
+      background-color: #E8E8E8;
+    }
+    #btnToggleTOC:hover {
+      background-color: #F0F0E8;
+    }
+    #btnToggleTOC:active {
+      background-color: #D4D4D4;
     }
     @media screen and (max-width: 900px) {
       #tocColumn {
@@ -152,9 +174,21 @@
   <div id="centeringDiv">
     <div id="navDiv">
     {% include_relative nav.html %}
-    <a style="float:right;" title="Edit this page" href="https://github.com/{{ site.github.repository_nwo }}/edit/{{ site.branch }}/{{ page.path }}">&#x1F589;</a>
+    <a class="editButton" title="Edit this page" href="https://github.com/{{ site.github.repository_nwo }}/edit/{{ site.branch }}/docs/{{ page.path }}">
+      <svg class="editIcon" height="16" viewBox="0 0 16 16" version="1.1" width="16" aria-hidden="true">
+        <path fill-rule="evenodd"
+          d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25a1.75 1.75 0 01.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354l-1.086-1.086zM11.189 6.25L9.75 4.81l-6.286 6.287a.25.25 0 00-.064.108l-.558 1.953 1.953-.558a.249.249 0 00.108-.064l6.286-6.286z">
+        </path>
+      </svg>
+    </a>
     </div>
-    <button id="btnToggleTOC" onclick="toggleTOC()">Table of Contents</button>
+    <button id="btnToggleTOC" onclick="toggleTOC()">
+      <svg height="16" class="tocIcon" viewBox="0 0 16 16" version="1.1" width="16" aria-hidden="true">
+        <path fill-rule="evenodd"
+          d="M2 4a1 1 0 100-2 1 1 0 000 2zm3.75-1.5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zm0 5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zm0 5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm-1 6a1 1 0 100-2 1 1 0 000 2z">
+        </path>
+      </svg>
+      Table of Contents</button>
     <div id="tocColumn">
       <div id="tocInner">
         {% include_relative toc.html %}
