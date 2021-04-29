@@ -10,6 +10,21 @@
 
 namespace Slang {
 
+
+
+void CUDAExtensionTracker::finalize()
+{
+    if (isBaseTypeRequired(BaseType::Half))
+    {
+        // The cuda_fp16.hpp header indicates the need is for version 5.3, but when this is tried
+        // NVRTC says it cannot load builtins.
+        // The lowest version that this does work for is 6.0, so that's what we use here.
+
+        // https://docs.nvidia.com/cuda/nvrtc/index.html#group__options
+        requireSMVersion(SemanticVersion(6, 0));
+    }
+}
+
 static bool _isSingleNameBasicType(IROp op)
 {
     switch (op)
@@ -46,18 +61,7 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
 
         case kIROp_HalfType:
         {
-            if (!m_extensionTracker->isBaseTypeRequired(BaseType::Half))
-            {
-                m_extensionTracker->requireBaseType(BaseType::Half);
-
-                // The cuda_fp16.hpp header indicates the need is for version 5.3, but when this is tried
-                // NVRTC says it cannot load builtins.
-                // The lowest version that this does work for is 6.0, so that's what we use here.
-                // https://docs.nvidia.com/cuda/nvrtc/index.html#group__options
-
-                m_extensionTracker->requireSMVersion(SemanticVersion(6, 0));
-            }
-
+            m_extensionTracker->requireBaseType(BaseType::Half);
             return UnownedStringSlice("__half");
         }
 
@@ -166,6 +170,36 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
 void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
 {
     typedef HLSLIntrinsic::Op Op;
+
+    if (auto vecType = as <IRVectorType>(specOp->returnType))
+    {
+        if (auto baseType = as<IRBasicType>(vecType->getElementType()))
+        {
+            if (baseType->getBaseType() == BaseType::Half)
+            {
+                switch (specOp->op)
+                {
+                    case Op::Init:
+                    case Op::Add:
+                    case Op::Mul:
+                    case Op::Div:
+
+                    case Op::Neg:
+
+                    case Op::Leq:
+                    case Op::Less:
+                    case Op::Greater:
+                    case Op::Geq:
+                    case Op::Neq:
+                    case Op::Eql:
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
     switch (specOp->op)
     {
         case Op::Init:
@@ -177,8 +211,7 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
             {
                 if (auto baseType = as<IRBasicType>(vecType->getElementType()))
                 {
-                    if (baseType->getBaseType() == BaseType::Half &&
-                        getIntVal(vecType->getElementCount()) == 2)
+                    if (baseType->getBaseType() == BaseType::Half)
                     {
                         // Seems it's already defined
                         return;

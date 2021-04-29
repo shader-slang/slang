@@ -21,7 +21,11 @@ public:
         /// Ensure that the generated code is compiled for at least CUDA SM `version`
     void requireSMVersion(const SemanticVersion& smVersion) { m_smVersion = (smVersion > m_smVersion) ? smVersion : m_smVersion; }
 
+        /// Should be called before reading out values. 
+    void finalize();
+
 protected:
+
     static BaseTypeFlags _getFlag(BaseType baseType) { return BaseTypeFlags(1) << int(baseType); }
 
     BaseTypeFlags m_baseTypeFlags = 0; 

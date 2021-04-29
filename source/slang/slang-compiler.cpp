@@ -1413,6 +1413,8 @@ SlangResult dissassembleDXILUsingDXC(
             // Look for the version
             if (auto cudaTracker = as<CUDAExtensionTracker>(source.extensionTracker))
             {
+                cudaTracker->finalize();
+
                 if (cudaTracker->m_smVersion.isSet())
                 {
                     DownstreamCompiler::CapabilityVersion version;
