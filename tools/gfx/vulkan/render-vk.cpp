@@ -3983,11 +3983,19 @@ VKDevice::~VKDevice()
 VkBool32 VKDevice::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject,
     size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg)
 {
+    DebugMessageType msgType = DebugMessageType::Info;
+
     char const* severity = "message";
     if (flags & VK_DEBUG_REPORT_WARNING_BIT_EXT)
+    {
         severity = "warning";
+        msgType = DebugMessageType::Warning;
+    }
     if (flags & VK_DEBUG_REPORT_ERROR_BIT_EXT)
+    {
         severity = "error";
+        msgType = DebugMessageType::Error;
+    }
 
     // pMsg can be really big (it can be assembler dump for example)
     // Use a dynamic buffer to store
@@ -4004,11 +4012,7 @@ VkBool32 VKDevice::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReport
         msgCode,
         pMsg);
 
-    fprintf(stderr, "%s", buffer);
-    fflush(stderr);
-#ifdef _WIN32
-    OutputDebugStringA(buffer);
-#endif
+    getDebugCallback()->handleMessage(msgType, DebugMessageSource::Driver, buffer);
     return VK_FALSE;
 }
 
@@ -5512,7 +5516,10 @@ Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
-            // TODO: report compile error.
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         shaderProgram->m_codeBlobs.add(kernelCode);
