@@ -6,7 +6,6 @@
 
 #include "slang.h"
 #include "slang-com-ptr.h"
-#include "slang-com-helper.h"
 
 
 #if defined(SLANG_GFX_DYNAMIC)
