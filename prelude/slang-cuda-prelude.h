@@ -5,7 +5,7 @@
 // are passed down. 
 
 #ifdef SLANG_CUDA_ENABLE_HALF
-#include <cuda_fp16.h>
+#   include <cuda_fp16.h>
 #endif
 
 #ifdef SLANG_CUDA_ENABLE_OPTIX

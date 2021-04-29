@@ -49,7 +49,13 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
             if (!m_extensionTracker->isBaseTypeRequired(BaseType::Half))
             {
                 m_extensionTracker->requireBaseType(BaseType::Half);
-                m_extensionTracker->requireSMVersion(SemanticVersion(5, 3));
+
+                // The cuda_fp16.hpp header indicates the need is for version 5.3, but when this is tried
+                // NVRTC says it cannot load builtins.
+                // The lowest version that this does work for is 6.0, so that's what we use here.
+                // https://docs.nvidia.com/cuda/nvrtc/index.html#group__options
+
+                m_extensionTracker->requireSMVersion(SemanticVersion(6, 0));
             }
 
             return UnownedStringSlice("__half");
