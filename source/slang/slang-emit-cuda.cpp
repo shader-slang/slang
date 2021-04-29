@@ -163,17 +163,43 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
     return Super::calcScalarFuncName(op, type, outBuilder);
 }
 
+void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
+{
+    typedef HLSLIntrinsic::Op Op;
+    switch (specOp->op)
+    {
+        case Op::Init:
+        {
+            // Special case handling
+            auto returnType = specOp->returnType;
+
+            if (auto vecType = as <IRVectorType>(returnType))
+            {
+                if (auto baseType = as<IRBasicType>(vecType->getElementType()))
+                {
+                    if (baseType->getBaseType() == BaseType::Half &&
+                        getIntVal(vecType->getElementCount()) == 2)
+                    {
+                        // Seems it's already defined
+                        return;
+                    }
+                }
+            }
+
+            break;
+        }
+        default: break;
+    }
+
+    Super::emitSpecializedOperationDefinition(specOp);
+}
+
 SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     SLANG_UNUSED(target);
 
-    if (target == CodeGenTarget::CSource)
-    {
-        return Super::calcTypeName(type, target, out);
-    }
-
-    // We allow C source, because if we need a name 
-    SLANG_ASSERT(target == CodeGenTarget::CUDASource);
+    // The names CUDA produces are all compatible with 'C' (ie they aren't templated types)
+    SLANG_ASSERT(target == CodeGenTarget::CUDASource || target == CodeGenTarget::CSource);
 
     switch (type->getOp())
     {
@@ -191,30 +217,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << prefix << vecCount;
             return SLANG_OK;
         }
-
-#if 0
-        case kIROp_MatrixType:
-        {
-            auto matType = static_cast<IRMatrixType*>(type);
-
-            auto elementType = matType->getElementType();
-            const auto rowCount = int(getIntVal(matType->getRowCount()));
-            const auto colCount = int(getIntVal(matType->getColumnCount()));
-
-            out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
-            return SLANG_OK;
-        }
-        case kIROp_UnsizedArrayType:
-        {
-            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
-            auto elementType = arrayType->getElementType();
-
-            out << "Array<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
-            out << ">";
-            return SLANG_OK;
-        }
-#endif
         default:
         {
             if (isNominalOp(type->getOp()))
