@@ -279,7 +279,7 @@ namespace Slang
     {
     public:
         UnownedTerminatedStringSlice(char const* b)
-            : UnownedStringSlice(b, b + strlen(b))
+            : UnownedStringSlice(b, b + (b?strlen(b):0))
         {}
     };
 

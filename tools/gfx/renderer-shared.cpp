@@ -291,6 +291,30 @@ ShaderComponentID ShaderCache::getComponentId(slang::TypeReflection* type)
     switch (type->getKind())
     {
     case slang::TypeReflection::Kind::Specialized:
+        {
+            auto baseType = type->getElementType();
+
+            StringBuilder builder;
+            builder.append(UnownedTerminatedStringSlice(baseType->getName()));
+
+            auto rawType = (SlangReflectionType*) type;
+
+            builder.appendChar('<');
+            SlangInt argCount = spReflectionType_getSpecializedTypeArgCount(rawType);
+            for(SlangInt a = 0; a < argCount; ++a)
+            {
+                if(a != 0) builder.appendChar(',');
+                if(auto rawArgType = spReflectionType_getSpecializedTypeArgType(rawType, a))
+                {
+                    auto argType = (slang::TypeReflection*) rawArgType;
+                    builder.append(argType->getName());
+                }
+            }
+            builder.appendChar('>');
+            key.typeName = builder.getUnownedSlice();
+            key.updateHash();
+            return getComponentId(key);
+        }
         // TODO: collect specialization arguments and append them to `key`.
         SLANG_UNIMPLEMENTED_X("specialized type");
     default:
@@ -442,7 +466,8 @@ Result RendererBase::maybeSpecializePipeline(
             specializedPipelineState->unspecializedPipelineState = currentPipeline;
             shaderCache.addSpecializedPipeline(pipelineKey, specializedPipelineState);
         }
-        outNewPipeline = static_cast<PipelineStateBase*>(specializedPipelineState.Ptr());
+        auto specializedPipelineStateBase = static_cast<PipelineStateBase*>(specializedPipelineState.Ptr());
+        outNewPipeline = specializedPipelineStateBase;
     }
     return SLANG_OK;
 }
