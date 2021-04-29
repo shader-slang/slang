@@ -215,7 +215,7 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
                 {
                     if (baseType->getBaseType() == BaseType::Half)
                     {
-                        // Seems it's already defined
+                        // Defined already in cuda-prelude.h
                         return;
                     }
                 }
@@ -630,37 +630,34 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     {
                         const Index vecElementCount = Index(getIntVal(vecType->getElementCount()));
 
-                        if (vecElementCount > 2)
+                        const Index elementCount = Index(swizzleInst->getElementCount());
+                        if (elementCount == 1)
                         {
-                            const Index elementCount = Index(swizzleInst->getElementCount());
-                            if (elementCount == 1)
-                            {
-                                const Index index = getIntVal(swizzleInst->getElementIndex(0));
-                                _emitGetHalfVectorElement(baseInst, index, vecElementCount, inOuterPrec);
-                            }
-                            else
-                            {
-                                auto outerPrec = getInfo(EmitOp::General);
+                            const Index index = getIntVal(swizzleInst->getElementIndex(0));
+                            _emitGetHalfVectorElement(baseInst, index, vecElementCount, inOuterPrec);
+                        }
+                        else
+                        {
+                            auto outerPrec = getInfo(EmitOp::General);
 
-                                m_writer->emit("make___half");
-                                m_writer->emitInt64(elementCount);
-                                m_writer->emit("(");
+                            m_writer->emit("make___half");
+                            m_writer->emitInt64(elementCount);
+                            m_writer->emit("(");
 
-                                for (Index i = 0; i < elementCount; ++i)
+                            for (Index i = 0; i < elementCount; ++i)
+                            {
+                                if (i)
                                 {
-                                    if (i)
-                                    {
-                                        m_writer->emit(", ");
-                                    }
-
-                                    const Index index = getIntVal(swizzleInst->getElementIndex(0));
-                                    _emitGetHalfVectorElement(baseInst, index, vecElementCount, outerPrec);
+                                    m_writer->emit(", ");
                                 }
 
-                                m_writer->emit(")");
+                                const Index index = getIntVal(swizzleInst->getElementIndex(i));
+                                _emitGetHalfVectorElement(baseInst, index, vecElementCount, outerPrec);
                             }
-                            return true;
+
+                            m_writer->emit(")");
                         }
+                        return true;
                     }
                 }
             }

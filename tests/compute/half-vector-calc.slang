@@ -19,12 +19,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half3 v1 = half3(x * 2.0f, x * 0.5f, x - 1.0f);
     half4 v2 = half4(x + 1, x - 1, x + 2 , x - 2);
     
+    v1 += v0.yxy;
+    v1 += v2.wzy;
+    v2 += v0.xyxy;
     
     v0 = v0 + v0 * v0;
     v1 = v1 + v1 * v1;
     v2 = v2 + v2 * v2;
     
-   
     half o2 = v2.x + v2.y + v2.z + v2.w;
     half o1 = v1.x + v1.y + v1.z;
     half o0 = v0.x + v0.y;
