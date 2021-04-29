@@ -5,6 +5,8 @@
 #include "slang-string.h"
 #include "slang-list.h"
 
+#include "slang-string-escape-util.h"
+
 namespace Slang {
 
 struct CommandLine
@@ -80,6 +82,10 @@ struct ExecuteResult
 
 struct ProcessUtil
 {
+        /// The quoting style used for the command line on this target. Currently just uses Space,
+        /// but in future may take into account platform sec
+    static StringEscapeHandler* getEscapeHandler();
+
         /// Get the suffix used on this platform
     static UnownedStringSlice getExecutableSuffix();
 
@@ -88,9 +94,6 @@ struct ProcessUtil
 
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
-
-        /// Append text escaped for using on a command line
-    static void appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out);
 
     static uint64_t getClockFrequency();
 
@@ -116,6 +119,8 @@ SLANG_INLINE Index CommandLine::findArgIndex(const UnownedStringSlice& slice) co
 // -----------------------------------------------------------------------
 SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix)
 {
+    auto escapeHandler = ProcessUtil::getEscapeHandler();
+
     StringBuilder builder;
     builder << prefix;
     if (pathPostfix)
@@ -123,12 +128,12 @@ SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String
         // Work out the path with the postfix
         StringBuilder fullPath;
         fullPath << path << pathPostfix;  
-        ProcessUtil::appendCommandLineEscaped(fullPath.getUnownedSlice(), builder);
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, fullPath.getUnownedSlice(), builder);
     }
     else
     {
-        ProcessUtil::appendCommandLineEscaped(path.getUnownedSlice(), builder);
-    }
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, path.getUnownedSlice(), builder);
+    } 
 
     // This arg doesn't need subsequent escaping
     addEscapedArg(builder);

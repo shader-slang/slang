@@ -210,6 +210,7 @@
     <ClInclude Include="..\..\..\source\core\slang-smart-pointer.h" />
     <ClInclude Include="..\..\..\source\core\slang-std-writers.h" />
     <ClInclude Include="..\..\..\source\core\slang-stream.h" />
+    <ClInclude Include="..\..\..\source\core\slang-string-escape-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-slice-pool.h" />
     <ClInclude Include="..\..\..\source\core\slang-string-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-string.h" />
@@ -245,6 +246,7 @@
     <ClCompile Include="..\..\..\source\core\slang-shared-library.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-std-writers.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-stream.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-slice-pool.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string.cpp" />

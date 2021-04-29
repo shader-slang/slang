@@ -824,7 +824,7 @@ SlangResult NVRTCDownstreamCompiler::compile(const CompileOptions& options, RefP
     }
     ScopeProgram scope(this, program);
 
-    List<const  char*> dstOptions;
+    List<const char*> dstOptions;
     dstOptions.setCount(cmdLine.m_args.getCount());
     for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
     {

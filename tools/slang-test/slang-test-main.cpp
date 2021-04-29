@@ -5,14 +5,18 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-hex-dump-util.h"
 #include "../../source/core/slang-type-text-util.h"
+#include "../../source/core/slang-memory-arena.h"
 
 #include "../../slang-com-helper.h"
 
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string-escape-util.h"
+
 #include "../../source/core/slang-byte-encode-util.h"
 #include "../../source/core/slang-char-util.h"
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-render-api-util.h"
+
 
 #include "directory-util.h"
 #include "test-context.h"
@@ -206,61 +210,58 @@ String collectRestOfLine(char const** ioCursor)
     return getString(textBegin, textEnd);
 }
 
+static bool _isEndOfCategoryList(char c)
+{
+    switch (c)
+    {
+        case '\n':
+        case '\r':
+        case 0:
+        case ')':
+        {
+            return true;
+        }
+        default: return false;
+    }
+}
+
 static SlangResult _parseCategories(TestCategorySet* categorySet, char const** ioCursor, TestOptions& out)
 {
     char const* cursor = *ioCursor;
 
-    // Right after the `TEST` keyword, the user may specify
-    // one or more categories for the test.
+    // If don't have ( we don't have category list
     if (*cursor == '(')
     {
         cursor++;
-        // optional test category
-        skipHorizontalSpace(&cursor);
-        char const* categoryStart = cursor;
-        for (;;)
+        const char*const start = cursor;
+
+        // Find the end
+        for (; !_isEndOfCategoryList(*cursor); ++cursor);
+        if (*cursor != ')')
         {
-            switch (*cursor)
+            *ioCursor = cursor;
+            return SLANG_FAIL;
+        }
+        cursor++;
+
+        List<UnownedStringSlice> slices;
+        StringUtil::split(UnownedStringSlice(start, cursor - 1), ',', slices);
+
+        for (auto& slice : slices)
+        {
+            // Trim any whitespace
+            auto categoryName = slice.trim();
+
+            TestCategory* category = categorySet->find(categoryName);
+
+            if (!category)
             {
-                default:
-                {
-                    cursor++;
-                    continue;
-                }
-                case ',':
-                case ')':
-                {
-                    char const* categoryEnd = cursor;
-                    cursor++;
-
-                    auto categoryName = getString(categoryStart, categoryEnd);
-                    TestCategory* category = categorySet->find(categoryName);
-
-                    if (!category)
-                    {
-                        // Failure if we don't find the category
-                        return SLANG_FAIL;
-                    }
-
-                    out.addCategory(category);
-
-                    if (*categoryEnd == ',')
-                    {
-                        skipHorizontalSpace(&cursor);
-                        categoryStart = cursor;
-                        continue;
-                    }
-
-                    *ioCursor = cursor;
-                    return SLANG_OK;
-                }
-                case 0: case '\r': case '\n':
-                {
-                    return SLANG_FAIL;
-                }
+                // Mark this test as disabled, as we don't have all of the categories
+                out.isEnabled = false;
+                break;
             }
 
-            break;
+            out.addCategory(category);
         }
     }
 
@@ -268,26 +269,60 @@ static SlangResult _parseCategories(TestCategorySet* categorySet, char const** i
     return SLANG_OK;
 }
 
+static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
+{
+    const char* cursor = *ioCursor;
+    const char*const argBegin = cursor;
+    
+    // Let's try to read one option
+    for (;;)
+    {
+        switch (*cursor)
+        {
+            default:
+            {
+                ++cursor;
+                break;
+            }
+            case '"':
+            {
+                // If we have quotes let's just parse them as is and make output
+                auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+                SLANG_RETURN_ON_FAIL(escapeHandler->lexQuoted(cursor, &cursor));
+                break;
+            }
+            case 0:
+            case '\r':
+            case '\n':
+            case ' ':
+            case '\t':
+            {
+                char const* argEnd = cursor;
+                assert(argBegin != argEnd);
 
-static TestResult _gatherTestOptions(
+                outArg = UnownedStringSlice(argBegin, argEnd);
+                *ioCursor = cursor;
+                return SLANG_OK;
+            }
+        }
+    }
+}
+
+static SlangResult _gatherTestOptions(
     TestCategorySet*    categorySet, 
     char const**    ioCursor,
     TestOptions&    outOptions)
 {
-    if (SLANG_FAILED(_parseCategories(categorySet, ioCursor, outOptions)))
-    {
-        return TestResult::Fail;
-    }
+    SLANG_RETURN_ON_FAIL(_parseCategories(categorySet, ioCursor, outOptions));
 
     char const* cursor = *ioCursor;
 
-     if(*cursor == ':')
-        cursor++;
-    else
+    if(*cursor != ':')
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
-
+    cursor++;
+    
     // Next scan for a sub-command name
     char const* commandStart = cursor;
     for(;;)
@@ -302,7 +337,7 @@ static TestResult _gatherTestOptions(
             break;
         
         case 0: case '\r': case '\n':
-            return TestResult::Fail;
+            return SLANG_FAIL;
         }
 
         break;
@@ -315,12 +350,11 @@ static TestResult _gatherTestOptions(
         cursor++;
     else
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
 
     // Now scan for arguments. For now we just assume that
     // any whitespace separation indicates a new argument
-    // (we don't support quoting)
     for(;;)
     {
         skipHorizontalSpace(&cursor);
@@ -332,32 +366,17 @@ static TestResult _gatherTestOptions(
             skipToEndOfLine(&cursor);
 
             *ioCursor = cursor;
-            return TestResult::Pass;
+            return SLANG_OK;
 
         default:
             break;
         }
 
         // Let's try to read one option
-        char const* argBegin = cursor;
-        for(;;)
-        {
-            switch( *cursor )
-            {
-            default:
-                cursor++;
-                continue;
+        UnownedStringSlice arg;
+        SLANG_RETURN_ON_FAIL(_parseArg(&cursor, arg));
 
-            case 0: case '\r': case '\n': case ' ': case '\t':
-                break;
-            }
-
-            break;
-        }
-        char const* argEnd = cursor;
-        assert(argBegin != argEnd);
-
-        outOptions.args.add(getString(argBegin, argEnd));
+        outOptions.args.add(arg);
     }
 }
 
@@ -379,12 +398,40 @@ static void _combineOptions(
     }
 }
 
+static SlangResult _extractCommand(const char** ioCursor, UnownedStringSlice& outCommand)
+{
+    const char* cursor = *ioCursor;
+    const char*const start = cursor;
+
+    while (true)
+    {
+        const char c = *cursor;
+
+        if (CharUtil::isAlpha(c) || c == '_')
+        {
+            cursor++;
+            continue;
+        }
+
+        if (c == ':' || c == '(' || c == 0 || c == '\n' || c == '\r')
+        {
+            *ioCursor = cursor;
+            outCommand = UnownedStringSlice(start, cursor);
+            return SLANG_OK;
+        }
+
+        return SLANG_FAIL;
+    }
+}
+
 // Try to read command-line options from the test file itself
-TestResult gatherTestsForFile(
+static SlangResult _gatherTestsForFile(
     TestCategorySet*    categorySet,
     String				filePath,
-    FileTestList*       testList)
+    FileTestList*       outTestList)
 {
+    outTestList->tests.clear();
+
     String fileContents;
     try
     {
@@ -392,7 +439,7 @@ TestResult gatherTestsForFile(
     }
     catch (const Slang::IOException&)
     {
-        return TestResult::Fail;
+        return SLANG_FAIL;
     }
 
     // Walk through the lines of the file, looking for test commands
@@ -413,30 +460,48 @@ TestResult gatherTestsForFile(
             continue;
         }
 
-        // Look for a pattern that matches what we want
-        if (match(&cursor, "TEST_IGNORE_FILE"))
+        UnownedStringSlice command;
+
+        if (SLANG_FAILED(_extractCommand(&cursor, command)))
         {
-            return TestResult::Ignored;
+            // Couldn't find a command so skip
+            skipToEndOfLine(&cursor);
+            continue;
         }
+
+        // Look for a pattern that matches what we want
+        if (command == "TEST_IGNORE_FILE")
+        {
+            outTestList->tests.clear();
+            return SLANG_OK;
+        }
+
+        const UnownedStringSlice disablePrefix = UnownedStringSlice::fromLiteral("DISABLE_");
 
         TestDetails testDetails;
-        if (match(&cursor, "DISABLE_"))
-        {
-            testDetails.options.isEnabled = false;
-        }
 
-        if (match(&cursor, "TEST_CATEGORY"))
         {
-            if (SLANG_FAILED(_parseCategories(categorySet, &cursor, fileOptions)))
+            if (command.startsWith(disablePrefix))
             {
-                return TestResult::Fail;
+                testDetails.options.isEnabled = false;
+                command = command.tail(disablePrefix.getLength());
             }
         }
 
-        if(match(&cursor, "TEST"))
-        { 
-            if(_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
-                return TestResult::Fail;
+        if (command == "TEST_CATEGORY")
+        {
+            SlangResult res = _parseCategories(categorySet, &cursor, fileOptions);
+            
+            // If if failed we are done, unless it was just 'not available'
+            if (SLANG_FAILED(res) && res != SLANG_E_NOT_AVAILABLE) return res;
+
+            skipToEndOfLine(&cursor);
+            continue;
+        }
+
+        if(command == "TEST")
+        {
+            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
             // See if the type of test needs certain APIs available
             const RenderApiFlags testRequiredApis = _getRequiredRenderApisByCommand(testDetails.options.command.getUnownedSlice());
@@ -445,27 +510,28 @@ TestResult gatherTestsForFile(
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
 
-            testList->tests.add(testDetails);
+            outTestList->tests.add(testDetails);
         }
-        else if (match(&cursor, "DIAGNOSTIC_TEST"))
+        else if (command == "DIAGNOSTIC_TEST")
         {
-            if (_gatherTestOptions(categorySet, &cursor, testDetails.options) != TestResult::Pass)
-                return TestResult::Fail;
+            SLANG_RETURN_ON_FAIL(_gatherTestOptions(categorySet, &cursor, testDetails.options));
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
-            testList->tests.add(testDetails);
+            outTestList->tests.add(testDetails);
         }
         else
         {
+            // Hmm we don't know what kind of test this actually is.
+            // Assume that's ok and this *isn't* a test and ignore.
             skipToEndOfLine(&cursor);
         }
     }
 
-    return TestResult::Pass;
+    return SLANG_OK;
 }
 
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
@@ -485,6 +551,24 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
         context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
     }
     return res;
+}
+
+static const char* _getUnescaped(StringEscapeHandler* handler, const CommandLine::Arg& arg, MemoryArena& arena)
+{
+    if (arg.type == CommandLine::ArgType::Escaped)
+    {
+        StringBuilder buf;
+        StringEscapeUtil::unescapeShellLike(handler, arg.value.getUnownedSlice(), buf);
+
+        // We strictly only need to allocate if the result is different.
+        // That an arg marked as 'escaped' does not mean it produces a different result when decoding.
+        if (buf != arg.value)
+        {
+            return arena.allocateString(buf.getBuffer(), buf.getLength());
+        } 
+    }
+
+    return arg.value.getBuffer();
 }
 
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
@@ -534,11 +618,19 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 
         String exePath = Path::combine(context->exeDirectoryPath, exeName);
 
+        
+        // Use the arena to hold any unescaped strings
+        MemoryArena arena(1024);
         List<const char*> args;
+
         args.add(exePath.getBuffer());
-        for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
+
         {
-            args.add(cmdLine.m_args[i].value.getBuffer());
+            auto escapeHandler = ProcessUtil::getEscapeHandler();
+            for (Index i = 0; i < cmdLine.m_args.getCount(); ++i)
+            {
+                args.add(_getUnescaped(escapeHandler, cmdLine.m_args[i], arena));
+            }
         }
 
         SlangResult res = func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
@@ -1348,7 +1440,15 @@ TestResult runCompile(TestContext* context, TestInput& input)
 
     for (auto arg : input.testOptions->args)
     {
-        cmdLine.addArg(arg);
+        // If there is a quote in the string, assume it is 'escaped'. 
+        if (arg.indexOf('"') >= 0)
+        {
+            cmdLine.addEscapedArg(arg);
+        }
+        else
+        {
+            cmdLine.addArg(arg);
+        }
     }
 
     ExecuteResult exeRes;
@@ -3040,24 +3140,26 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
-void runTestsOnFile(
+static SlangResult _runTestsOnFile(
     TestContext*    context,
     String          filePath)
 {
     // Gather a list of tests to run
     FileTestList testList;
+    
+    SLANG_RETURN_ON_FAIL(_gatherTestsForFile(&context->categorySet, filePath, &testList));
 
-    if( gatherTestsForFile(&context->categorySet, filePath, &testList) == TestResult::Ignored )
+    if (testList.tests.getCount() == 0)
     {
         // Test was explicitly ignored
-        return;
+        return SLANG_OK;
     }
 
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.getCount() == 0 )
     {
         context->reporter->addTest(filePath, TestResult::Ignored);
-        return;
+        return SLANG_OK;
     }
 
     RenderApiFlags apiUsedFlags = 0;
@@ -3187,6 +3289,8 @@ void runTestsOnFile(
             // Could determine if to continue or not here... based on result
         }        
     }
+
+    return SLANG_OK;
 }
 
 
@@ -3254,10 +3358,24 @@ void runTestsInDirectory(
             if( shouldRunTest(context, file) )
             {
     //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-                runTestsOnFile(context, file);
+                if (SLANG_FAILED(_runTestsOnFile(context, file)))
+                {
+                    auto reporter = context->reporter;
+
+                    {
+                        TestReporter::TestScope scope(reporter, file);
+                        reporter->message(TestMessageType::RunError, "slang-test: unable to parse test");
+
+                        reporter->addResult(TestResult::Fail);
+                    }
+
+                    // Output there was some kind of error trying to run the tests on this file
+                    // fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
+                }
             }
         }
     }
+
     {
         List<String> subDirs;
         DirectoryUtil::findDirectories(directoryPath, subDirs);
@@ -3298,11 +3416,11 @@ SlangResult innerMain(int argc, char** argv)
     // Set up our test categories here
     auto fullTestCategory = categorySet.add("full", nullptr);
     auto quickTestCategory = categorySet.add("quick", fullTestCategory);
-    /*auto smokeTestCategory = */categorySet.add("smoke", quickTestCategory);
+    auto smokeTestCategory = categorySet.add("smoke", quickTestCategory);
     auto renderTestCategory = categorySet.add("render", fullTestCategory);
     /*auto computeTestCategory = */categorySet.add("compute", fullTestCategory);
     auto vulkanTestCategory = categorySet.add("vulkan", fullTestCategory);
-    auto unitTestCatagory = categorySet.add("unit-test", fullTestCategory);
+    auto unitTestCategory = categorySet.add("unit-test", fullTestCategory);
     auto cudaTestCategory = categorySet.add("cuda", fullTestCategory);
     auto optixTestCategory = categorySet.add("optix", cudaTestCategory);
 
@@ -3311,7 +3429,9 @@ SlangResult innerMain(int argc, char** argv)
     auto waveActiveCategory = categorySet.add("wave-active", waveTestCategory);
 
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
-        
+
+    auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
+
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
 #endif
@@ -3464,7 +3584,8 @@ SlangResult innerMain(int argc, char** argv)
                 filePath << "unit-tests/" << cur->m_name << ".internal";
 
                 TestOptions testOptions;
-                testOptions.categories.add(unitTestCatagory);
+                testOptions.categories.add(unitTestCategory);
+                testOptions.categories.add(smokeTestCategory);
                 testOptions.command = filePath;
 
                 if (shouldRunTest(&context, testOptions.command))
