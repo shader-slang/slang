@@ -60,13 +60,16 @@ namespace Slang {
     
     List<char const*> argPtrs;
 
-    StringEscapeHandler* escapeHandler = getEscapeHandler();
-    MemoryArena arena(1024);
-
     // Add the command
-    SLANG_RETURN_ON_FAIL(StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), arena, argPtrs));
-    // Add the args    
-    SLANG_RETURN_ON_FAIL(StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_args, arena, argPtrs));
+    argPtrs.add(commandLine.m_executable.getBuffer());
+
+    // Add all the args - they don't need any explicit escaping 
+    for (auto arg : commandLine.m_args)
+    {
+        // All args for this target must be unescaped (as they are in CommandLine)
+        argPtrs.add(arg.getBuffer());
+    }
+
     // Terminate with a null
     argPtrs.add(nullptr);
 
