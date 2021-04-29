@@ -101,6 +101,7 @@ protected:
     void _emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
+    void _emitGetHalfVectorElement(IRInst* baseInst, Index index, Index vecSize, const EmitOpInfo& inOuterPrec);
     
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };

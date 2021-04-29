@@ -186,6 +186,8 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
 
                     case Op::Neg:
 
+                    case Op::ConstructFromScalar:
+
                     case Op::Leq:
                     case Op::Less:
                     case Op::Greater:
@@ -565,10 +567,105 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     m_writer->emit("\n}");
 }
 
+void CUDASourceEmitter::_emitGetHalfVectorElement(IRInst* base, Index index, Index vecSize, const EmitOpInfo& inOuterPrec)
+{
+    SLANG_ASSERT(index < vecSize);
+
+    EmitOpInfo outerPrec = inOuterPrec;
+    
+    auto prec = getInfo(EmitOp::Postfix);
+    const bool needClose = maybeEmitParens(outerPrec, prec);
+
+    emitOperand(base, leftSide(outerPrec, prec));
+
+    m_writer->emit(".");
+
+    switch (vecSize)
+    {
+        default: 
+        {
+            char const* kComponents[] = { "x", "y", "z", "w" };
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+        case 3:
+        {
+            char const* kComponents[] = { "xy.x", "xy.y", "z"};
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+        case 4:
+        {
+            char const* kComponents[] = { "xy.x", "xy.y", "zw.x", "zw.y" };
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+    }
+
+     maybeCloseParens(needClose);
+}
+
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch(inst->getOp())
     {
+        case kIROp_swizzle:
+        {
+            // We need to special case for half types.
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+
+            IRInst* baseInst = swizzleInst->getBase();
+            IRType* baseType = baseInst->getDataType();
+
+            // If we are swizzling from a built in type, 
+            if (as<IRBasicType>(baseType))
+            {
+                // Just use the default behavior
+            }
+            else if (auto vecType = as<IRVectorType>(baseType))
+            {
+                if (auto basicType = as<IRBasicType>(vecType->getElementType()))
+                {
+                    if (basicType->getBaseType() == BaseType::Half)
+                    {
+                        const Index vecElementCount = Index(getIntVal(vecType->getElementCount()));
+
+                        if (vecElementCount > 2)
+                        {
+                            const Index elementCount = Index(swizzleInst->getElementCount());
+                            if (elementCount == 1)
+                            {
+                                const Index index = getIntVal(swizzleInst->getElementIndex(0));
+                                _emitGetHalfVectorElement(baseInst, index, vecElementCount, inOuterPrec);
+                            }
+                            else
+                            {
+                                auto outerPrec = getInfo(EmitOp::General);
+
+                                m_writer->emit("make___half");
+                                m_writer->emitInt64(elementCount);
+                                m_writer->emit("(");
+
+                                for (Index i = 0; i < elementCount; ++i)
+                                {
+                                    if (i)
+                                    {
+                                        m_writer->emit(", ");
+                                    }
+
+                                    const Index index = getIntVal(swizzleInst->getElementIndex(0));
+                                    _emitGetHalfVectorElement(baseInst, index, vecElementCount, outerPrec);
+                                }
+
+                                m_writer->emit(")");
+                            }
+                            return true;
+                        }
+                    }
+                }
+            }
+            break;
+        }
         case kIROp_Construct:
         {
             // Simple constructor call

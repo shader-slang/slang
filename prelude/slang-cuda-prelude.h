@@ -68,6 +68,10 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 make___half2(__half x, __half y) { re
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 make___half3(__half x, __half y, __half z) { return __half3{ __halves2half2(x, y), z }; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 make___half4(__half x, __half y, __half z, __half w) { return __half4{ __halves2half2(x, y), __halves2half2(z, w)}; }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 constructFromScalar___half2(half x) { return __half2half2(x); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 constructFromScalar___half3(half x) { return __half3{__half2half2(x), x}; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 constructFromScalar___half4(half x) { const __half2 v = __half2half2(x); return __half4{v, v}; }
+
 // Half3 maths ops
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator+(const __half3 &lh, const __half3 &rh) { return __half3{__hadd2(lh.xy, rh.xy), __hadd(lh.z, rh.z)}; }
@@ -92,7 +96,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator<=(const __half3 &lh, const __ha
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4 &lh, const __half4 &rh) { return __half4{__hadd2(lh.xy, rh.xy), __hadd2(lh.zw, rh.zw)}; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4 &lh, const __half4 &rh) { return __half4{__hsub2(lh.xy, rh.xy), __hsub2(lh.zw, rh.zw)}; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator*(const __half4 &lh, const __half4 &rh) { return __half4{__hmul2(lh.xy, rh.xy), __hmul2(lh.zw, rh.zw)}; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(const __half4 &lh, const __half4 &rh) { return __half4{__hdiv2(lh.xy, rh.xy), __hdiv2(lh.zw, rh.zw)}; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(const __half4 &lh, const __half4 &rh) { return __half4{__h2div(lh.xy, rh.xy), __h2div(lh.zw, rh.zw)}; }
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4 &h) { return __half4{__hneg2(h.xy), __hneg2(h.zw)}; }
 
