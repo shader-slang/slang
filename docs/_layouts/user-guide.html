@@ -25,6 +25,15 @@
       border-bottom-style: solid;
       border-bottom-color: #F0F0F0;
     }
+    #navDiv nav
+    {
+      float:left;
+    }
+    #navDiv::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
     #navDiv nav li::after
     {
       content: "/";
@@ -143,6 +152,7 @@
   <div id="centeringDiv">
     <div id="navDiv">
     {% include_relative nav.html %}
+    <a style="float:right;" title="Edit this page" href="https://github.com/{{ site.github.repository_nwo }}/edit/{{ site.branch }}/{{ page.path }}">&#x1F589;</a>
     </div>
     <button id="btnToggleTOC" onclick="toggleTOC()">Table of Contents</button>
     <div id="tocColumn">
@@ -165,6 +175,15 @@
       </div>
     </div>
   <script>
+    // Fix for IE. Make sure String has `startsWith` method.
+    if (!String.prototype.startsWith)
+    {
+      String.prototype.startsWith = function (searchString, position) {
+        position = position || 0;
+        return this.indexOf(searchString, position) === position;
+      };
+    }
+
     var tocColumn = document.getElementById("tocColumn");
     var rightColumn = document.getElementById("rightColumn");
     function updateScroll()

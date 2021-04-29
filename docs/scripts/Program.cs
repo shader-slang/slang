@@ -25,14 +25,16 @@ namespace toc
         {
             public List<string> fileNamePrefix = new List<string>();
             public string title;
+            public string shortTitle;
             public string fileID;
             public List<string> sections = new List<string>();
+            public List<string> sectionShortTitles = new List<string>();
             public List<Node> children = new List<Node>();
         }
 
         public static void buildTOC(StringBuilder sb, Node n)
         {
-            sb.AppendFormat("<li data-link=\"{0}\"><span>{1}</span>\n", n.fileID, n.title);
+            sb.AppendFormat("<li data-link=\"{0}\"><span>{1}</span>\n", n.fileID, n.shortTitle);
             if (n.children.Count != 0)
             {
                 sb.AppendLine("<ul class=\"toc_list\">");
@@ -43,9 +45,11 @@ namespace toc
             else if (n.sections.Count != 0)
             {
                 sb.AppendLine("<ul class=\"toc_list\">");
-                foreach (var s in n.sections)
+                for (int i = 0; i < n.sections.Count; i++)
                 {
-                    sb.AppendFormat("<li data-link=\"{0}#{1}\"><span>{2}</span></li>\n", n.fileID, getAnchorId(s), s);
+                    var s = n.sections[i];
+                    var shortTitle = n.sectionShortTitles[i];
+                    sb.AppendFormat("<li data-link=\"{0}#{1}\"><span>{2}</span></li>\n", n.fileID, getAnchorId(s), shortTitle);
                 }
                 sb.AppendLine("</ul>");
             }
@@ -77,6 +81,29 @@ namespace toc
             }
             return false;
         }
+
+        public static string getNextNonEmptyLine(string[] lines, int i)
+        {
+            i++;
+            while (i < lines.Length)
+            {
+                if (lines[i].Trim().Length != 0)
+                    return lines[i];
+                i++;
+            }
+            return "";
+        }
+        const string shortTitlePrefix = "[//]: # (ShortTitle: ";
+
+        public static string maybeGetShortTitle(string originalTitle, string[] lines, int line)
+        {
+            string nextLine = getNextNonEmptyLine(lines, line);
+            if (nextLine.StartsWith(shortTitlePrefix))
+            {
+                return nextLine.Substring(shortTitlePrefix.Length, nextLine.Length - shortTitlePrefix.Length - 1).Trim();
+            }
+            return originalTitle;
+        }
         public static string Run(string path)
         {
             StringBuilder outputSB = new StringBuilder();
@@ -89,18 +116,34 @@ namespace toc
                 Node node = new Node();
                 node.fileID = Path.GetFileNameWithoutExtension(f);
                 outputSB.AppendFormat("  {0}.md\n", node.fileID);
+                bool mainTitleFound = false;
                 for (int i = 1; i < content.Length; i++)
                 {
-                    if (content[i-1].StartsWith("layout: "))
-                        continue;
                     if (content[i].StartsWith("==="))
+                    {
+                        mainTitleFound = true;
                         node.title = content[i-1];
+                        node.shortTitle = maybeGetShortTitle(node.title, content, i);
+                    }
                     if (content[i].StartsWith("---"))
+                    {
+                        if (!mainTitleFound) continue;
                         node.sections.Add(content[i-1]);
+                        node.sectionShortTitles.Add(maybeGetShortTitle(content[i - 1], content, i));
+                    }
                     if (content[i].StartsWith("#") && !content[i].StartsWith("##") && node.title == null)
+                    {
+                        mainTitleFound = true;
                         node.title = content[i].Substring(1, content[i].Length - 1).Trim();
+                        node.shortTitle = maybeGetShortTitle(node.title, content, i);
+                    }
                     if (content[i].StartsWith("##") && !content[i].StartsWith("###"))
-                        node.sections.Add(content[i].Substring(2, content[i].Length - 2).Trim());
+                    {
+                        if (!mainTitleFound) continue;
+                        var sectionStr = content[i].Substring(2, content[i].Length - 2).Trim();
+                        node.sections.Add(sectionStr);
+                        node.sectionShortTitles.Add(maybeGetShortTitle(sectionStr, content, i));
+                    }
                 }
                 if (node.title == null)
                 {
