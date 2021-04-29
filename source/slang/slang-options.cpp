@@ -890,7 +890,7 @@ struct OptionsParser
                         SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &includeDirStr));
                     }
 
-                    compileRequest->addSearchPath(String(includeDirStr).begin());
+                    compileRequest->addSearchPath(includeDirStr);
                 }
                 //
                 // A `-o` option is used to specify a desired output file.

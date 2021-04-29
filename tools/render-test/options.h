@@ -73,7 +73,7 @@ struct Options
 
     Slang::List<Slang::String> renderFeatures;          /// Required render features for this test to run
 
-    Slang::List<Slang::CommandLine::Arg> compileArgs;
+    Slang::List<Slang::String> compileArgs;
 
     Slang::String adapter;                              ///< The adapter to use either name or index
 

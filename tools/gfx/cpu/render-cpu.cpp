@@ -1136,7 +1136,17 @@ private:
         auto entryPointObject = m_currentRootObject->getEntryPoint(entryPointIndex);
 
         ComPtr<ISlangSharedLibrary> sharedLibrary;
-        program->slangProgram->getEntryPointHostCallable(entryPointIndex, targetIndex, sharedLibrary.writeRef());
+        ComPtr<ISlangBlob> diagnostics;
+        auto compileResult = program->slangProgram->getEntryPointHostCallable(
+            entryPointIndex, targetIndex, sharedLibrary.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        if (SLANG_FAILED(compileResult)) return;
 
         auto func = (slang_prelude::ComputeFunc) sharedLibrary->findSymbolAddressByName(entryPointName);
 

@@ -3849,7 +3849,6 @@ Result D3D12Device::initialize(const Desc& desc)
                 debug1->SetEnableGPUBasedValidation(true);
             }
 #endif
-
             m_dxDebug->EnableDebugLayer();
         }
     }
@@ -4824,8 +4823,10 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
-            printf("%s\n", (char*)diagnostics->getBufferPointer());
-            // TODO: report compile error.
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         List<uint8_t>* shaderCodeDestBuffer = nullptr;
