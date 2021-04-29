@@ -18,6 +18,9 @@ public:
     void requireBaseType(BaseType baseType) { m_baseTypeFlags |= _getFlag(baseType); }
     bool isBaseTypeRequired(BaseType baseType) { return (m_baseTypeFlags & _getFlag(baseType)) != 0; }
 
+        /// Ensure that the generated code is compiled for at least CUDA SM `version`
+    void requireSMVersion(const SemanticVersion& smVersion) { m_smVersion = (smVersion > m_smVersion) ? smVersion : m_smVersion; }
+
 protected:
     static BaseTypeFlags _getFlag(BaseType baseType) { return BaseTypeFlags(1) << int(baseType); }
 
@@ -92,9 +95,7 @@ protected:
     void _emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);
 
-        /// Ensure that the generated code is compiled for at least CUDA SM `version`
-    void _requireCUDASMVersion(SemanticVersion const& version);
-
+    
     RefPtr<CUDAExtensionTracker> m_extensionTracker;
 };
 
