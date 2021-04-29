@@ -93,7 +93,7 @@ void ShaderCompilerUtil::Output::reset()
         List<const char*> args;
         for (const auto& arg : request.compileArgs)
         {
-            args.add(arg.value.getBuffer());
+            args.add(arg.getBuffer());
         }
         SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, args.getBuffer(), int(args.getCount())));
     }

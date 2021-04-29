@@ -18,31 +18,12 @@ struct CommandLine
         Filename,                   ///< The executable is set as a filename
     };
 
-    enum class ArgType
-    {
-        Escaped,
-        Unescaped,
-    };
-
-    struct Arg
-    {
-        ArgType type;               ///< How to interpret the argument value
-        String value;               ///< The argument value
-    };
-
         /// Add args - assumed unescaped
-    void addArg(const String& in) { m_args.add(Arg{ArgType::Unescaped, in}); }
+    void addArg(const String& in) { m_args.add(in); }
     void addArgs(const String* args, Int argsCount) { for (Int i = 0; i < argsCount; ++i) addArg(args[i]); }
 
-        /// Add args - all assumed unescaped
-    void addArgs(const Arg* args, Int argCount) { m_args.addRange(args, argCount); }
-
-        /// Add an escaped arg
-    void addEscapedArg(const String& in) { m_args.add(Arg{ArgType::Escaped, in}); }
-    void addEscapedArgs(const String* args, Int argsCount) { for (Int i = 0; i < argsCount; ++i) addEscapedArg(args[i]); }
-
         /// Find the index of an arg which is exact match for slice
-    SLANG_INLINE Index findArgIndex(const UnownedStringSlice& slice) const;
+    SLANG_INLINE Index findArgIndex(const UnownedStringSlice& slice) const { return m_args.indexOf(slice); }
 
         /// Set the executable path
     void setExecutablePath(const String& path) { m_executableType = ExecutableType::Path; m_executable = path; }
@@ -62,7 +43,7 @@ struct CommandLine
 
     ExecutableType m_executableType;    ///< How the executable is specified
     String m_executable;                ///< Executable to run. Note that the executable is never escaped.
-    List<Arg> m_args;                   ///< The arguments  
+    List<String> m_args;                ///< The arguments (Stored *unescaped*)
 };
 
 struct ExecuteResult
@@ -101,42 +82,16 @@ struct ProcessUtil
 };
 
 // -----------------------------------------------------------------------
-SLANG_INLINE Index CommandLine::findArgIndex(const UnownedStringSlice& slice) const
-{
-    const Index count = m_args.getCount();
-
-    for (Index i = 0; i < count; ++i)
-    {
-        const auto& arg = m_args[i];
-        if (arg.value == slice)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
-// -----------------------------------------------------------------------
 SLANG_INLINE void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix)
 {
-    auto escapeHandler = ProcessUtil::getEscapeHandler();
-
     StringBuilder builder;
-    builder << prefix;
+    builder << prefix << path;
     if (pathPostfix)
     {
         // Work out the path with the postfix
-        StringBuilder fullPath;
-        fullPath << path << pathPostfix;  
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, fullPath.getUnownedSlice(), builder);
+        builder << pathPostfix;  
     }
-    else
-    {
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, path.getUnownedSlice(), builder);
-    } 
-
-    // This arg doesn't need subsequent escaping
-    addEscapedArg(builder);
+    addArg(builder.ProduceString());
 }
 
 }
