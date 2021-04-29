@@ -168,10 +168,8 @@ static SlangResult _setRendererType(DeviceType type, const char* arg, Slang::Wri
                 return SLANG_FAIL;
             }
 
-            CommandLine::Arg arg;
-            arg.type = CommandLine::ArgType::Escaped;
-            arg.value = *argCursor++;
-            outOptions.compileArgs.add(arg);
+            const char* compileArg = *argCursor++;
+            outOptions.compileArgs.add(compileArg);
         }
         else if (strcmp(arg, "-performance-profile") == 0)
         {
