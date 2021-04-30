@@ -1008,6 +1008,10 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         }
     }
 
+#ifdef _DEBUG
+    gfxEnableDebugLayer();
+#endif
+
     // Use the profile name set on options if set
     input.profile = options.profileName ? options.profileName : input.profile;
 

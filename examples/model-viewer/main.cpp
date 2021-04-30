@@ -151,7 +151,7 @@ struct SimpleMaterial : Material
 {
     glm::vec3   diffuseColor;
     glm::vec3   specularColor;
-    float       specularity;
+    float       specularity = 1.0f;
 
     // Create a shader object that contains the type info and parameter values
     // that represent an instance of `SimpleMaterial`.
@@ -282,16 +282,17 @@ RefPtr<Model> loadModel(
 
 struct Light : RefObject
 {
-    // A light must be able to create a shader object defining its
-    // corresponding shader type and parameter values.
-    virtual IShaderObject* createShaderObject(RendererContext* context) = 0;
+    // A light must be able to write its state into a shader parameters
+    // of the matching Slang type.
+    //
+    virtual void writeTo(ShaderCursor const& cursor) = 0;
 
     // Retrieves the shader type for this light object.
     virtual slang::TypeReflection* getShaderType(RendererContext* context) = 0;
 
     // The shader object for a light will be stashed here
     // after it is created.
-    ComPtr<IShaderObject> shaderObject;
+//    ComPtr<IShaderObject> shaderObject;
 };
 
 // Helper function to retrieve the underlying shader type of `T`.
@@ -314,14 +315,10 @@ struct DirectionalLight : Light
 
     static const char* getTypeName() { return "DirectionalLight"; }
 
-    virtual IShaderObject* createShaderObject(RendererContext* context) override
+    virtual void writeTo(ShaderCursor const& cursor)
     {
-        auto shaderType = ::getShaderType<DirectionalLight>(context);
-        shaderObject = context->device->createShaderObject(shaderType);
-        gfx::ShaderCursor cursor(shaderObject);
         cursor["direction"].setData(&direction, sizeof(direction));
         cursor["intensity"].setData(&intensity, sizeof(intensity));
-        return shaderObject.get();
     }
 
     virtual slang::TypeReflection* getShaderType(RendererContext* context) override
@@ -337,14 +334,10 @@ struct PointLight : Light
 
     static const char* getTypeName() { return "PointLight"; }
 
-    virtual IShaderObject* createShaderObject(RendererContext* context) override
+    virtual void writeTo(ShaderCursor const& cursor)
     {
-        auto shaderType = ::getShaderType<PointLight>(context);
-        shaderObject = context->device->createShaderObject(shaderType);
-        gfx::ShaderCursor cursor(shaderObject);
         cursor["position"].setData(&position, sizeof(position));
         cursor["intensity"].setData(&intensity, sizeof(intensity));
-        return shaderObject.get();
     }
 
     virtual slang::TypeReflection* getShaderType(RendererContext* context) override
@@ -588,8 +581,7 @@ struct LightEnv : public RefObject
 
                 if (lightCount > 0)
                 {
-                    lightTypeCursor.setObject(
-                        lightTypeArray->lights[0]->createShaderObject(context));
+                    lightTypeArray->lights[0]->writeTo(lightTypeCursor);
                 }
                 else
                 {
@@ -614,8 +606,7 @@ struct LightEnv : public RefObject
                 auto arrayCursor = lightTypeCursor["lights"];
                 for (size_t ii = 0; ii < lightCount; ++ii)
                 {
-                    arrayCursor[ii].setObject(
-                        lightTypeArray->lights[ii]->createShaderObject(context));
+                    lightTypeArray->lights[ii]->writeTo(arrayCursor[ii]);
                 }
             }
         }
@@ -781,7 +772,11 @@ Result initialize()
     lightEnvLayout->addLightType<DirectionalLight>(&context, 2);
 
     lightEnv = new LightEnv(lightEnvLayout, &context);
-    lightEnv->add(new PointLight());
+
+    RefPtr<PointLight> pointLight = new PointLight();
+    pointLight->position = glm::vec3(5, 3, 1);
+    pointLight->intensity = glm::vec3(10);
+    lightEnv->add(pointLight);
 
     // Once we have created all our graphcis API and application resources,
     // we can start to load models. For now we are keeping things extremely

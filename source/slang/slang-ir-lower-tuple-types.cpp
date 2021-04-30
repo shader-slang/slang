@@ -121,6 +121,18 @@ namespace Slang
             inst->removeAndDeallocate();
         }
 
+        void processTupleType(IRTupleType* inst)
+        {
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedBuilderStorage;
+            builder->setInsertBefore(inst);
+
+            auto loweredTupleInfo = getLoweredTupleType(builder, inst);
+            SLANG_ASSERT(loweredTupleInfo);
+            SLANG_UNUSED(loweredTupleInfo);
+        }
+
         void processInst(IRInst* inst)
         {
             switch (inst->getOp())
@@ -130,6 +142,9 @@ namespace Slang
                 break;
             case kIROp_GetTupleElement:
                 processGetTupleElement((IRGetTupleElement*)inst);
+                break;
+            case kIROp_TupleType:
+                processTupleType((IRTupleType*)inst);
                 break;
             default:
                 break;

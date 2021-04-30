@@ -2435,7 +2435,7 @@ static LegalVal legalizeGlobalVar(
 
     default:
         {
-            context->insertBeforeGlobal = irGlobalVar->getNextInst();
+            context->insertBeforeGlobal = irGlobalVar;
 
             IRGlobalNameInfo globalNameInfo;
             globalNameInfo.globalVar = irGlobalVar;
@@ -2480,7 +2480,7 @@ static LegalVal legalizeGlobalParam(
 
     default:
         {
-            context->insertBeforeGlobal = irGlobalParam->getNextInst();
+            context->insertBeforeGlobal = irGlobalParam;
 
             LegalVarChainLink varChain(LegalVarChain(), varLayout);
 

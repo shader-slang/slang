@@ -4013,6 +4013,12 @@ static TypeLayoutResult _createTypeLayout(
         typeLayout->type = type;
         typeLayout->rules = rules;
 
+        for( auto resInfo : baseTypeLayoutResult.layout->resourceInfos )
+        {
+            if(resInfo.kind != LayoutResourceKind::Uniform)
+                typeLayout->addResourceUsage(resInfo);
+        }
+
         RefPtr<VarLayout> pendingDataVarLayout = new VarLayout();
         if(auto pendingDataTypeLayout = baseTypeLayoutResult.layout->pendingDataTypeLayout)
         {
@@ -4033,6 +4039,7 @@ static TypeLayoutResult _createTypeLayout(
                 {
                     if(auto primaryResInfo = baseTypeLayoutResult.layout->FindResourceInfo(kind))
                         index = primaryResInfo->count.getFiniteValue();
+                    typeLayout->addResourceUsage(pendingResInfo);
                 }
                 pendingDataVarLayout->AddResourceInfo(kind)->index = index;
             }
@@ -4040,6 +4047,12 @@ static TypeLayoutResult _createTypeLayout(
 
         typeLayout->baseTypeLayout = baseTypeLayoutResult.layout;
         typeLayout->pendingDataVarLayout = pendingDataVarLayout;
+
+        typeLayout->uniformAlignment = info.alignment;
+        if( info.size != 0 )
+        {
+            typeLayout->addResourceUsage(LayoutResourceKind::Uniform, info.size);
+        }
 
         return makeTypeLayoutResult(typeLayout);
     }
