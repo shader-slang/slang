@@ -52,7 +52,6 @@
       position: fixed;
       overflow-y: auto;
       box-sizing: border-box;
-      max-height: 100vh;
       display: block;
     }
 
@@ -100,7 +99,7 @@
     }
     .toc_span:hover
     {
-      color: #3030BE
+      color: #d5000d;
     }
     .tocIcon
     {
@@ -138,6 +137,7 @@
       #tocColumn {
         width: 300px;
         display: block;
+        box-sizing: border-box;
       }
       #rightColumn {
         padding-left: 320px;
@@ -151,6 +151,7 @@
         position: static;
         display: none;
         border-right-style: none;
+        box-sizing: content-box;
       }
       #tocInner {
         padding: 10px;
