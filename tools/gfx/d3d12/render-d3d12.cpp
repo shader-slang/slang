@@ -636,7 +636,6 @@ public:
 
         void allocate(uint32_t count)
         {
-            SLANG_ASSERT(m_heap);
             m_offset = m_heap.allocate(count);
             m_count = count;
         }
