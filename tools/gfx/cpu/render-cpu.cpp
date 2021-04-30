@@ -1136,7 +1136,17 @@ private:
         auto entryPointObject = m_currentRootObject->getEntryPoint(entryPointIndex);
 
         ComPtr<ISlangSharedLibrary> sharedLibrary;
-        program->slangProgram->getEntryPointHostCallable(entryPointIndex, targetIndex, sharedLibrary.writeRef());
+        ComPtr<ISlangBlob> diagnostics;
+        auto compileResult = program->slangProgram->getEntryPointHostCallable(
+            entryPointIndex, targetIndex, sharedLibrary.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        if (SLANG_FAILED(compileResult)) return;
 
         auto func = (slang_prelude::ComputeFunc) sharedLibrary->findSymbolAddressByName(entryPointName);
 
@@ -1196,13 +1206,11 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
-        IResource::Usage initialUsage,
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override
     {
-        TextureResource::Desc srcDesc(desc);
-        srcDesc.setDefaults(initialUsage);
+        TextureResource::Desc srcDesc = fixupTextureDesc(desc);
 
         RefPtr<CPUTextureResource> texture = new CPUTextureResource(srcDesc);
 
@@ -1213,11 +1221,11 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
-        IResource::Usage initialUsage,
-        const IBufferResource::Desc& desc,
+        const IBufferResource::Desc& descIn,
         const void* initData,
         IBufferResource** outResource) override
     {
+        auto desc = fixupBufferDesc(descIn);
         RefPtr<CPUBufferResource> resource = new CPUBufferResource(desc);
         SLANG_RETURN_ON_FAIL(resource->init());
         if (initData)

@@ -2,6 +2,7 @@
 #include "slang-source-loc.h"
 
 #include "../core/slang-string-util.h"
+#include "../core/slang-string-escape-util.h"
 
 namespace Slang {
 
@@ -66,10 +67,7 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
         case Type::FromString:
         case Type::FoundPath:
         {
-            
-            out.appendChar('"');
-            StringUtil::appendEscaped(foundPath.getUnownedSlice(), out);    
-            out.appendChar('"');
+            StringEscapeUtil::appendQuoted(StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp), foundPath.getUnownedSlice(), out);    
             break;
         }
         default: break;

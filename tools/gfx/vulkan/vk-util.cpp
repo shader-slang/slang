@@ -77,6 +77,36 @@ VkPipelineBindPoint VulkanUtil::getPipelineBindPoint(PipelineType pipelineType)
     }
 }
 
+VkImageLayout VulkanUtil::getImageLayoutFromState(ResourceState state)
+{
+    switch (state)
+    {
+    case ResourceState::ShaderResource:
+        return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    case ResourceState::UnorderedAccess:
+        return VK_IMAGE_LAYOUT_GENERAL;
+    case ResourceState::Present:
+        return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    case ResourceState::CopySource:
+        return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    case ResourceState::CopyDestination:
+        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    case ResourceState::RenderTarget:
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    case ResourceState::DepthWrite:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    case ResourceState::DepthRead:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case ResourceState::ResolveSource:
+        return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    case ResourceState::ResolveDestination:
+        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    default:
+        return VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+    return VkImageLayout();
+}
+
 /* static */Slang::Result VulkanUtil::handleFail(VkResult res)
 {
     if (res != VK_SUCCESS)

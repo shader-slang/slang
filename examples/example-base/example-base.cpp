@@ -25,6 +25,10 @@ Slang::Result WindowedAppBase::initializeBase(const char* title, int width, int 
     gWindow->events.sizeChanged = Slang::Action<>(this, &WindowedAppBase::windowSizeChanged);
 
     // Initialize the rendering layer.
+#ifdef _DEBUG
+    // Enable debug layer in debug config.
+    gfxEnableDebugLayer();
+#endif
     IDevice::Desc deviceDesc = {};
     // deviceDesc.slang.targetFlags = SLANG_TARGET_FLAG_DUMP_IR;
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
@@ -105,16 +109,16 @@ void WindowedAppBase::createSwapchainFramebuffers()
     for (uint32_t i = 0; i < kSwapchainImageCount; i++)
     {
         gfx::ITextureResource::Desc depthBufferDesc;
-        depthBufferDesc.setDefaults(gfx::IResource::Usage::DepthWrite);
-        depthBufferDesc.init2D(
-            gfx::IResource::Type::Texture2D,
-            gfx::Format::D_Float32,
-            gSwapchain->getDesc().width,
-            gSwapchain->getDesc().height,
-            0);
-
-        ComPtr<gfx::ITextureResource> depthBufferResource = gDevice->createTextureResource(
-            gfx::IResource::Usage::DepthWrite, depthBufferDesc, nullptr);
+        depthBufferDesc.type = IResource::Type::Texture2D;
+        depthBufferDesc.size.width = gSwapchain->getDesc().width;
+        depthBufferDesc.size.height = gSwapchain->getDesc().height;
+        depthBufferDesc.size.depth = 1;
+        depthBufferDesc.format = gfx::Format::D_Float32;
+        depthBufferDesc.defaultState = ResourceState::DepthWrite;
+        depthBufferDesc.allowedStates = ResourceStateSet(ResourceState::DepthWrite);
+        
+        ComPtr<gfx::ITextureResource> depthBufferResource =
+            gDevice->createTextureResource(depthBufferDesc, nullptr);
         ComPtr<gfx::ITextureResource> colorBuffer;
         gSwapchain->getImage(i, colorBuffer.writeRef());
 
@@ -169,6 +173,53 @@ void WindowedAppBase::windowSizeChanged()
 int64_t getCurrentTime() { return std::chrono::high_resolution_clock::now().time_since_epoch().count(); }
 
 int64_t getTimerFrequency() { return std::chrono::high_resolution_clock::period::den; }
+
+class DebugCallback : public IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) override
+    {
+        const char* typeStr = "";
+        switch (type)
+        {
+        case DebugMessageType::Info:
+            typeStr = "INFO: ";
+            break;
+        case DebugMessageType::Warning:
+            typeStr = "WARNING: ";
+            break;
+        case DebugMessageType::Error:
+            typeStr = "ERROR: ";
+            break;
+        default:
+            break;
+        }
+        const char* sourceStr = "[GraphicsLayer]: ";
+        switch (source)
+        {
+        case DebugMessageSource::Slang:
+            sourceStr = "[Slang]: ";
+            break;
+        case DebugMessageSource::Driver:
+            sourceStr = "[Driver]: ";
+            break;
+        }
+        printf("%s%s%s\n", sourceStr, typeStr, message);
+#ifdef _WIN32
+        OutputDebugStringA(sourceStr);
+        OutputDebugStringA(typeStr);
+        OutputDebugStringW(String(message).toWString());
+        OutputDebugStringW(L"\n");
+#endif
+    }
+};
+
+void initDebugCallback()
+{
+    static DebugCallback callback = {};
+    gfxSetDebugCallback(&callback);
+}
 
 #ifdef _WIN32
 void _Win32OutputDebugString(const char* str) { OutputDebugStringW(Slang::String(str).toWString().begin()); }

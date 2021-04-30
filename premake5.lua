@@ -719,7 +719,7 @@ tool "slang-cpp-extractor"
     uuid "CA8A30D1-8FA9-4330-B7F7-84709246D8DC"
     includedirs { "." }
     
-    links { "core", "compiler-core" }
+    links { "compiler-core", "core" }
     
 --
 -- `slang-generate` is a tool we use for source code generation on

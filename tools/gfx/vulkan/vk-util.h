@@ -42,6 +42,8 @@ struct VulkanUtil
     static VkShaderStageFlags getShaderStage(SlangStage stage);
 
     static VkPipelineBindPoint getPipelineBindPoint(PipelineType pipelineType);
+
+    static VkImageLayout getImageLayoutFromState(ResourceState state);
 };
 
 } // renderer_test

@@ -5,6 +5,8 @@
 #include "core/slang-basic.h"
 #include "core/slang-com-object.h"
 
+#include "resource-desc-utils.h"
+
 namespace gfx
 {
 
@@ -23,7 +25,7 @@ struct GfxGUID
     static const Slang::Guid IID_IBufferResource;
     static const Slang::Guid IID_ITextureResource;
     static const Slang::Guid IID_IInputLayout;
-    static const Slang::Guid IID_IRenderer;
+    static const Slang::Guid IID_IDevice;
     static const Slang::Guid IID_IShaderObjectLayout;
     static const Slang::Guid IID_IShaderObject;
     static const Slang::Guid IID_IRenderPassLayout;
@@ -604,4 +606,18 @@ public:
     Slang::Dictionary<slang::TypeReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
 };
 
+IDebugCallback*& _getDebugCallback();
+IDebugCallback* _getNullDebugCallback();
+inline IDebugCallback* getDebugCallback()
+{
+    auto rs = _getDebugCallback();
+    if (rs)
+    {
+        return rs;
+    }
+    else
+    {
+        return _getNullDebugCallback();
+    }
+}
 }
