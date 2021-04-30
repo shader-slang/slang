@@ -633,7 +633,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                         const Index elementCount = Index(swizzleInst->getElementCount());
                         if (elementCount == 1)
                         {
-                            const Index index = getIntVal(swizzleInst->getElementIndex(0));
+                            const Index index = Index(getIntVal(swizzleInst->getElementIndex(0)));
                             _emitGetHalfVectorElement(baseInst, index, vecElementCount, inOuterPrec);
                         }
                         else
@@ -651,7 +651,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                                     m_writer->emit(", ");
                                 }
 
-                                const Index index = getIntVal(swizzleInst->getElementIndex(i));
+                                const Index index = Index(getIntVal(swizzleInst->getElementIndex(i)));
                                 _emitGetHalfVectorElement(baseInst, index, vecElementCount, outerPrec);
                             }
 
