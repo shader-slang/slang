@@ -233,8 +233,23 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 case kIROp_SamplerComparisonStateType:          out << "SamplerComparisonState"; return SLANG_OK;
                 default: break;
             }
-
             break;
+        }
+    }
+
+    if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type)) {
+        switch (untypedBufferType->getOp())
+        {
+            case kIROp_RaytracingAccelerationStructureType:
+            {
+                m_writer->emit("OptixTraversableHandle");
+                return SLANG_OK;
+                break;
+            }
+
+            default:
+                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
+                break;
         }
     }
 
