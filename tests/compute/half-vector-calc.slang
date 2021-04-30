@@ -23,6 +23,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     v1 += v2.wzy;
     v2 += v0.xyxy;
     
+    // Unary
+    v2 = +v2.yxwz;
+    v2 = -v2.zwxy;
+    
     v0 = v0 + v0 * v0;
     v1 = v1 + v1 * v1;
     v2 = v2 + v2 * v2;
