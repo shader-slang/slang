@@ -248,9 +248,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 break;
             }
 
-            default:
-                SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
-                break;
+            default: break;
         }
     }
 
