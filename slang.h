@@ -1968,6 +1968,7 @@ extern "C"
     SLANG_API SlangReflectionType* spReflectionTypeLayout_GetType(SlangReflectionTypeLayout* type);
     SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout* type);
     SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* type, SlangParameterCategory category);
+    SLANG_API size_t spReflectionTypeLayout_GetStride(SlangReflectionTypeLayout* type, SlangParameterCategory category);
     SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* type, SlangParameterCategory category);
 
     SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* type, unsigned index);
@@ -2417,6 +2418,11 @@ namespace slang
         size_t getSize(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
         {
             return spReflectionTypeLayout_GetSize((SlangReflectionTypeLayout*) this, category);
+        }
+
+        size_t getStride(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)
+        {
+            return spReflectionTypeLayout_GetStride((SlangReflectionTypeLayout*) this, category);
         }
 
         int32_t getAlignment(SlangParameterCategory category = SLANG_PARAMETER_CATEGORY_UNIFORM)

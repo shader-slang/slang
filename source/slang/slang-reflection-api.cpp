@@ -819,6 +819,35 @@ namespace
 
         return SLANG_UNBOUNDED_SIZE;
     }
+
+    static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
+    {
+        if( category == SLANG_PARAMETER_CATEGORY_UNIFORM )
+        {
+            return int32_t(typeLayout->uniformAlignment);
+        }
+        else
+        {
+            return 1;
+        }
+    }
+
+    static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
+    {
+        auto info = typeLayout->FindResourceInfo(LayoutResourceKind(category));
+        if(!info) return 0;
+
+        auto size = info->count;
+        if(size.isInfinite())
+            return SLANG_UNBOUNDED_SIZE;
+
+        size_t finiteSize = size.getFiniteValue();
+        size_t alignment = getAlignment(typeLayout, category);
+        SLANG_ASSERT(alignment >= 1);
+
+        auto stride = (finiteSize + (alignment-1)) & ~(alignment-1);
+        return stride;
+    }
 }
 
 SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
@@ -832,19 +861,20 @@ SLANG_API size_t spReflectionTypeLayout_GetSize(SlangReflectionTypeLayout* inTyp
     return getReflectionSize(info->count);
 }
 
+SLANG_API size_t spReflectionTypeLayout_GetStride(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
+{
+    auto typeLayout = convert(inTypeLayout);
+    if(!typeLayout) return 0;
+
+    return getStride(typeLayout, category);
+}
+
 SLANG_API int32_t spReflectionTypeLayout_getAlignment(SlangReflectionTypeLayout* inTypeLayout, SlangParameterCategory category)
 {
     auto typeLayout = convert(inTypeLayout);
     if(!typeLayout) return 0;
 
-    if( category == SLANG_PARAMETER_CATEGORY_UNIFORM )
-    {
-        return int32_t(typeLayout->uniformAlignment);
-    }
-    else
-    {
-        return 1;
-    }
+    return getAlignment(typeLayout, category);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(SlangReflectionTypeLayout* inTypeLayout, unsigned index)

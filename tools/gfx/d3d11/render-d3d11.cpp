@@ -550,6 +550,18 @@ protected:
             }
         }
 
+            /// Create an offset based on size/stride information in the given Slang `typeLayout`
+        SimpleBindingOffset(slang::TypeLayoutReflection* typeLayout)
+        {
+            if(typeLayout)
+            {
+                cbv     = (uint32_t) typeLayout->getSize(SLANG_PARAMETER_CATEGORY_CONSTANT_BUFFER);
+                srv     = (uint32_t) typeLayout->getSize(SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE);
+                uav     = (uint32_t) typeLayout->getSize(SLANG_PARAMETER_CATEGORY_UNORDERED_ACCESS);
+                sampler = (uint32_t) typeLayout->getSize(SLANG_PARAMETER_CATEGORY_SAMPLER_STATE);
+            }
+        }
+
             /// Add any values in the given `offset`
         void operator+=(SimpleBindingOffset const& offset)
         {
@@ -592,6 +604,12 @@ protected:
         BindingOffset(slang::VariableLayoutReflection* varLayout)
             : SimpleBindingOffset(varLayout)
             , pending(varLayout->getPendingDataLayout())
+        {}
+
+            /// Create an offset based on size/stride information in the given Slang `typeLayout`
+        BindingOffset(slang::TypeLayoutReflection* typeLayout)
+            : SimpleBindingOffset(typeLayout)
+            , pending(typeLayout->getPendingDataTypeLayout())
         {}
 
             /// Add any values in the given `offset`
@@ -673,16 +691,17 @@ protected:
         };
 
             /// Stride information for a sub-object range
-        struct SubObjectRangeStride
+        struct SubObjectRangeStride : BindingOffset
         {
             SubObjectRangeStride()
             {}
 
             SubObjectRangeStride(slang::TypeLayoutReflection* typeLayout)
+                : BindingOffset(typeLayout)
             {
                 if(auto pendingLayout = typeLayout->getPendingDataTypeLayout())
                 {
-                    pendingOrdinaryData = (uint32_t) pendingLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+                    pendingOrdinaryData = (uint32_t) typeLayout->getStride();
                 }
             }
 
@@ -1747,6 +1766,11 @@ protected:
                 BindingOffset rangeOffset = offset;
                 rangeOffset += subObjectRange.offset;
 
+                // Similarly, the "stride" between consecutive objects in
+                // the range was also pre-computed.
+                //
+                BindingOffset rangeStride = subObjectRange.stride;
+
                 switch(bindingRange.bindingType)
                 {
                 // For D3D11-compatible compilation targets, the Slang compiler
@@ -1765,8 +1789,7 @@ protected:
                             //
                             subObject->bindAsConstantBuffer(context, objOffset, subObjectLayout);
 
-                            // TODO: We need to update `objOffset` by the stride for
-                            // this range.
+                            objOffset += rangeStride;
                         }
                     }
                     break;
@@ -1782,15 +1805,15 @@ protected:
                         // As a result, the offset for the first object in the range
                         // will come from the `pending` part of the range's offset.
                         //
-                        BindingOffset objOffset = BindingOffset(rangeOffset.pending);
+                        SimpleBindingOffset objOffset = rangeOffset.pending;
+                        SimpleBindingOffset objStride = rangeStride.pending;
 
                         for(Index i = 0; i < count; ++i)
                         {
                             auto subObject = m_objects[ baseIndex + i ];
-                            subObject->bindAsValue(context, objOffset, subObjectLayout);
+                            subObject->bindAsValue(context, BindingOffset(objOffset), subObjectLayout);
 
-                            // TODO: We need to update `objOffset` by the stride for
-                            // this range.
+                            objOffset += objStride;
                         }
                     }
                     break;

@@ -853,7 +853,7 @@ public:
         };
 
             /// Stride information for a sub-object range
-        struct SubObjectRangeStride
+        struct SubObjectRangeStride : BindingOffset
         {
             SubObjectRangeStride()
             {}
@@ -862,7 +862,7 @@ public:
             {
                 if(auto pendingLayout = typeLayout->getPendingDataTypeLayout())
                 {
-                    pendingOrdinaryData = (uint32_t) pendingLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
+                    pendingOrdinaryData = (uint32_t) pendingLayout->getStride();
                 }
             }
 
@@ -3095,6 +3095,8 @@ public:
                 BindingOffset rangeOffset = offset;
                 rangeOffset += subObjectRange.offset;
 
+                BindingOffset rangeStride = subObjectRange.stride;
+
                 switch( bindingRangeInfo.bindingType )
                 {
                 case slang::BindingType::ConstantBuffer:
@@ -3114,12 +3116,7 @@ public:
                             // sure to increment the offset for each subsequent object
                             // by the appropriate stride.
                             //
-                            // TODO: We should pre-compute these and simply have
-                            // `subObjectRange.stride` to go with `subObjectRange.offset`.
-                            //
-                            objOffset.binding += subObjectLayout->getTotalBindingCount();
-                            objOffset.childSet += subObjectLayout->getChildDescriptorSetCount();
-                            objOffset.pushConstantRange += subObjectLayout->getTotalPushConstantRangeCount();
+                            objOffset += rangeStride;
                         }
                     }
                     break;
@@ -3135,12 +3132,7 @@ public:
                             ShaderObjectImpl* subObject = m_objects[baseIndex + i];
                             subObject->bindAsParameterBlock(encoder, context, objOffset, subObjectLayout);
 
-                            // The logic for striding from one sub-object to another is also
-                            // different, given the differences in how constant buffers and
-                            // parameter blocks are allocated.
-                            //
-                            objOffset.childSet += subObjectLayout->getChildDescriptorSetCount();
-                            objOffset.pushConstantRange += subObjectLayout->getTotalPushConstantRangeCount();
+                            objOffset += rangeStride;
                         }
                     }
                     break;
@@ -3153,14 +3145,15 @@ public:
                     //
                     if( subObjectLayout )
                     {
-                        // Second, the offset where we want to start bindign for existential-type
+                        // Second, the offset where we want to start binding for existential-type
                         // ranges is a bit different, because we don't wnat to bind at the "primary"
                         // offset that got passed down, but instead at the "pending" offset.
                         //
                         // For the purposes of nested binding, what used to be the pending offset
                         // will now be used as the primary offset.
                         //
-                        BindingOffset objOffset = BindingOffset(rangeOffset.pending);
+                        SimpleBindingOffset objOffset = rangeOffset.pending;
+                        SimpleBindingOffset objStride = rangeStride.pending;
                         for (uint32_t i = 0; i < count; ++i)
                         {
                             // An existential-type sub-object is always bound just as a value,
@@ -3170,11 +3163,8 @@ public:
                             // already.
                             //
                             ShaderObjectImpl* subObject = m_objects[baseIndex + i];
-                            subObject->bindAsValue(encoder, context, objOffset, subObjectLayout);
-
-                            objOffset.binding += subObjectLayout->getTotalBindingCount();
-                            objOffset.childSet += subObjectLayout->getChildDescriptorSetCount();
-                            objOffset.pushConstantRange += subObjectLayout->getTotalPushConstantRangeCount();
+                            subObject->bindAsValue(encoder, context, BindingOffset(objOffset), subObjectLayout);
+                            objOffset += objStride;
                         }
                     }
                     break;
