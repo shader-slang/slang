@@ -27,6 +27,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     v2 = +v2.yxwz;
     v2 = -v2.zwxy;
     
+    // Scalar vector 
+    v1 = v1 + v2.x;
+    v2 = v2 * half(2.0f);
+    v0 = half(2.0f) * v0;
+    v2 = v2 / half(2.0f);
+    
     v0 = v0 + v0 * v0;
     v1 = v1 + v1 * v1;
     v2 = v2 + v2 * v2;
