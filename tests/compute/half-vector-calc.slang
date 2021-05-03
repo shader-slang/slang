@@ -33,15 +33,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     v0 = half(2.0f) * v0;
     v2 = v2 / half(2.0f);
     
-    // This causes lot of errors(!)
-    // tests/compute/half-vector-calc.slang(36): error 30047: argument passed to parameter '0' must be l-value.
-    // v0 *= 2.0f;
-    // ^~
-    /// tests/compute/half-vector-calc.slang(36): note 30048: argument was implicitly cast from 'vector<half,2>' to 'vector<float,2>', and Slang does not support using an implicit cast as an l-value
-    // 
-    // v0 *= 2.0f;
-    
-    v0 = v0 * 2.0f;
+    v0 *= half(2.0f);
     
     v0 = v0 + v0 * v0;
     v1 = v1 + v1 * v1;
