@@ -6,7 +6,6 @@
 
 #include "slang.h"
 #include "slang-com-ptr.h"
-#include "slang-com-helper.h"
 
 
 #if defined(SLANG_GFX_DYNAMIC)
@@ -1061,6 +1060,21 @@ struct DeviceInfo
     const char* adapterName = nullptr;
 };
 
+enum class DebugMessageType
+{
+    Info, Warning, Error
+};
+enum class DebugMessageSource
+{
+    Layer, Driver, Slang
+};
+class IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
+};
+
 class IDevice: public ISlangUnknown
 {
 public:
@@ -1084,13 +1098,21 @@ public:
 
     struct Desc
     {
-        DeviceType deviceType = DeviceType::Default;    // The underlying API/Platform of the device.
-        const char* adapter = nullptr;                  // Name to identify the adapter to use
-        int requiredFeatureCount = 0;                   // Number of required features.
-        const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
-        int nvapiExtnSlot = -1;                         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
-        ISlangFileSystem* shaderCacheFileSystem = nullptr; // The file system for loading cached shader kernels.
-        SlangDesc slang = {};                           // Configurations for Slang.
+        // The underlying API/Platform of the device.
+        DeviceType deviceType = DeviceType::Default;
+        // Name to identify the adapter to use
+        const char* adapter = nullptr;
+        // Number of required features.
+        int requiredFeatureCount = 0;
+        // Array of required feature names, whose size is `requiredFeatureCount`.
+        const char** requiredFeatures = nullptr;
+        // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
+        int nvapiExtnSlot = -1;
+        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
+        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
+        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // Configurations for Slang compiler.
+        SlangDesc slang = {};
     };
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
@@ -1308,7 +1330,7 @@ public:
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const = 0;
 };
 
-#define SLANG_UUID_IRenderer                                                             \
+#define SLANG_UUID_IDevice                                                             \
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
@@ -1323,6 +1345,15 @@ extern "C"
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL
         gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
+    /// Sets a callback for receiving debug messages.
+    /// The layer does not hold a strong reference to the callback object.
+    /// The user is responsible for holding the callback object alive.
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxSetDebugCallback(IDebugCallback* callback);
+
+    /// Enables debug layer. The debug layer will check all `gfx` calls and verify that uses are valid.
+    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer();
 
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }

@@ -2,7 +2,32 @@
 ---
 
 @import "{{ site.theme }}";
+a:hover {
+    text-decoration: underline;
+}
+h3 {
+    color: #363636;
+}
+h4 {
+    color: #363636;
+}
+blockquote {
+    background-color: #f2f2f2;
+    padding-top: 10px;
+    padding-bottom: 5px;
+}
 blockquote p {
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 400;
+    margin-bottom: 5px;
+    color: #202020;
+}
+body {
+    color: initial;
+    text-shadow: none;
+    background: none;
+}
+#container 
+{
+    background:none;
 }

@@ -66,6 +66,7 @@ struct HelloWorldExample
 
 int main()
 {
+    initDebugCallback();
     HelloWorldExample example;
     return example.run();
 }
