@@ -173,6 +173,33 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
 
     if (auto vecType = as <IRVectorType>(specOp->returnType))
     {
+        // Converting to or from half vector types is implemented prelude as convert___half functions
+        // Get the from type -> if it's half we ignore
+
+        if (specOp->op == Op::ConstructConvert)
+        {
+            auto signatureType = specOp->signatureType;
+
+            // Need to have impl of convert_float, double, int, uint, in prelude
+
+            const auto paramCount = signatureType->getParamCount();
+            SLANG_UNUSED(paramCount);
+
+            // We have 2 'params' and param 1 is the source type
+            SLANG_ASSERT(paramCount == 2);
+            IRType* paramType = signatureType->getParamType(1);
+
+            auto vecParamType = as<IRVectorType>(paramType);
+
+            if (auto baseType = as<IRBasicType>(vecParamType->getElementType()))
+            {
+                if (baseType->getBaseType() == BaseType::Half)
+                {
+                    return;
+                }
+            }
+        }
+
         if (auto baseType = as<IRBasicType>(vecType->getElementType()))
         {
             if (baseType->getBaseType() == BaseType::Half)
@@ -187,6 +214,7 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
                     case Op::Neg:
 
                     case Op::ConstructFromScalar:
+                    case Op::ConstructConvert:
 
                     case Op::Leq:
                     case Op::Less:

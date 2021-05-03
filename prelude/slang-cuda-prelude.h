@@ -155,6 +155,47 @@ union Union64
 struct __half3 { __half2 xy; __half z; };
 struct __half4 { __half2 xy; __half2 zw; };
 
+
+// half -> other
+
+// float
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 convert_float2(const __half2& v) { return __half22float2(v); } 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float3 convert_float3(const __half3& v) { const float2 xy = __half22float2(v.xy); return float3{xy.x, xy.y, __half2float(v.z)}; } 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 convert_float4(const __half4& v) { const float2 xy = __half22float2(v.xy); const float2 zw = __half22float2(v.zw); return float4{xy.x, xy.y, zw.x, zw.y}; }
+
+// double
+SLANG_FORCE_INLINE SLANG_CUDA_CALL double2 convert_double2(const __half2& v) { const float2 xy = __half22float2(v); return double2{ xy.x, xy.y }; } 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL double3 convert_double3(const __half3& v) { const float2 xy = __half22float2(v.xy); return double3{ xy.x, xy.y, __half2float(v.z)}; } 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL double4 convert_double4(const __half4& v) { const float2 xy = __half22float2(v.xy); const float2 zw = __half22float2(v.zw); return double4{xy.x, xy.y, zw.x, zw.y}; }
+
+// int
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 convert_int2(const __half2& v) { return int2 { __half2int_rz(v.x), __half2int_rz(v.y) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int3 convert_int3(const __half3& v) { return int3 { __half2int_rz(v.xy.x), __half2int_rz(v.xy.y), __half2int_rz(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 convert_int4(const __half4& v) { return int4 { __half2int_rz(v.xy.x), __half2int_rz(v.xy.y), __half2int_rz(v.zw.x), __half2int_rz(v.zw.y)}; }
+
+// uint
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint2 convert_uint2(const __half2& v) { return uint2 { __half2uint_rz(v.x), __half2uint_rz(v.y) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint3 convert_uint3(const __half3& v) { return uint3 { __half2uint_rz(v.xy.x), __half2uint_rz(v.xy.y), __half2uint_rz(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 convert_uint4(const __half4& v) { return uint4 { __half2uint_rz(v.xy.x), __half2uint_rz(v.xy.y), __half2uint_rz(v.zw.x), __half2uint_rz(v.zw.y)}; }
+
+// other -> half
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const float2& v) { return __float22half2_rn(v); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const float3& v) { return __half3{ __float22half2_rn(float2{v.x, v.y}), __float2half_rn(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const float4& v) { return __half4{ __float22half2_rn(float2{v.x, v.y}), __float22half2_rn(float2{v.z, v.w}) }; }
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const int2& v) { return __half2{ __int2half_rz(v.x), __int2half_rz(v.y) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const int3& v) { return __half3{ __half2{__int2half_rz(v.x), __int2half_rz(v.y)}, __int2half_rz(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const int4& v) { return __half4{ __half2{__int2half_rz(v.x), __int2half_rz(v.y)}, __half2{__int2half_rz(v.z),  __int2half_rz(v.w)} }; }
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const uint2& v) { return __half2{ __uint2half_rz(v.x), __uint2half_rz(v.y) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const uint3& v) { return __half3{ __half2{__uint2half_rz(v.x), __uint2half_rz(v.y)}, __uint2half_rz(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const uint4& v) { return __half4{ __half2{__uint2half_rz(v.x), __uint2half_rz(v.y)}, __half2{__uint2half_rz(v.z),  __uint2half_rz(v.w)} }; }
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 convert___half2(const double2& v) { return __float22half2_rn(float2{v.x, v.y}); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 convert___half3(const double3& v) { return __half3{ __float22half2_rn(float2{v.x, v.y}), __float2half_rn(v.z) }; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 convert___half4(const double4& v) { return __half4{ __float22half2_rn(float2{v.x, v.y}), __float22half2_rn(float2{v.z, v.w}) }; }
+
 // half2
 
 // vec op scalar
