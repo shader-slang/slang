@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2 -render-features half -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cuda -compute -render-features half -shaderobj
+
 //Disable on Dx12 for now - because writing to structured buffer produces unexpected results
 //TEST_DISABLED(compute):COMPARE_COMPUTE:-dx12 -compute -use-dxil -profile cs_6_2 -render-features half -shaderobj
 
