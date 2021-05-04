@@ -10,6 +10,21 @@
 
 namespace Slang {
 
+
+
+void CUDAExtensionTracker::finalize()
+{
+    if (isBaseTypeRequired(BaseType::Half))
+    {
+        // The cuda_fp16.hpp header indicates the need is for version 5.3, but when this is tried
+        // NVRTC says it cannot load builtins.
+        // The lowest version that this does work for is 6.0, so that's what we use here.
+
+        // https://docs.nvidia.com/cuda/nvrtc/index.html#group__options
+        requireSMVersion(SemanticVersion(6, 0));
+    }
+}
+
 static bool _isSingleNameBasicType(IROp op)
 {
     switch (op)
@@ -152,17 +167,74 @@ SlangResult CUDASourceEmitter::calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicT
     return Super::calcScalarFuncName(op, type, outBuilder);
 }
 
+void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* specOp)
+{
+    typedef HLSLIntrinsic::Op Op;
+
+    if (auto vecType = as <IRVectorType>(specOp->returnType))
+    {
+        if (auto baseType = as<IRBasicType>(vecType->getElementType()))
+        {
+            if (baseType->getBaseType() == BaseType::Half)
+            {
+                switch (specOp->op)
+                {
+                    case Op::Init:
+                    case Op::Add:
+                    case Op::Mul:
+                    case Op::Div:
+
+                    case Op::Neg:
+
+                    case Op::ConstructFromScalar:
+
+                    case Op::Leq:
+                    case Op::Less:
+                    case Op::Greater:
+                    case Op::Geq:
+                    case Op::Neq:
+                    case Op::Eql:
+                    {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    switch (specOp->op)
+    {
+        case Op::Init:
+        {
+            // Special case handling
+            auto returnType = specOp->returnType;
+
+            if (auto vecType = as <IRVectorType>(returnType))
+            {
+                if (auto baseType = as<IRBasicType>(vecType->getElementType()))
+                {
+                    if (baseType->getBaseType() == BaseType::Half)
+                    {
+                        // Defined already in cuda-prelude.h
+                        return;
+                    }
+                }
+            }
+
+            break;
+        }
+        default: break;
+    }
+
+    Super::emitSpecializedOperationDefinition(specOp);
+}
+
 SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out)
 {
     SLANG_UNUSED(target);
 
-    if (target == CodeGenTarget::CSource)
-    {
-        return Super::calcTypeName(type, target, out);
-    }
-
-    // We allow C source, because if we need a name 
-    SLANG_ASSERT(target == CodeGenTarget::CUDASource);
+    // The names CUDA produces are all compatible with 'C' (ie they aren't templated types)
+    SLANG_ASSERT(target == CodeGenTarget::CUDASource || target == CodeGenTarget::CSource);
 
     switch (type->getOp())
     {
@@ -180,30 +252,6 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << prefix << vecCount;
             return SLANG_OK;
         }
-
-#if 0
-        case kIROp_MatrixType:
-        {
-            auto matType = static_cast<IRMatrixType*>(type);
-
-            auto elementType = matType->getElementType();
-            const auto rowCount = int(getIntVal(matType->getRowCount()));
-            const auto colCount = int(getIntVal(matType->getColumnCount()));
-
-            out << "Matrix<" << getBuiltinTypeName(elementType->op) << ", " << rowCount << ", " << colCount << ">";
-            return SLANG_OK;
-        }
-        case kIROp_UnsizedArrayType:
-        {
-            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
-            auto elementType = arrayType->getElementType();
-
-            out << "Array<";
-            SLANG_RETURN_ON_FAIL(_calcTypeName(elementType, target, out));
-            out << ">";
-            return SLANG_OK;
-        }
-#endif
         default:
         {
             if (isNominalOp(type->getOp()))
@@ -533,10 +581,102 @@ void CUDASourceEmitter::_emitInitializerList(IRType* elementType, IRUse* operand
     m_writer->emit("\n}");
 }
 
+void CUDASourceEmitter::_emitGetHalfVectorElement(IRInst* base, Index index, Index vecSize, const EmitOpInfo& inOuterPrec)
+{
+    SLANG_ASSERT(index < vecSize);
+
+    EmitOpInfo outerPrec = inOuterPrec;
+    
+    auto prec = getInfo(EmitOp::Postfix);
+    const bool needClose = maybeEmitParens(outerPrec, prec);
+
+    emitOperand(base, leftSide(outerPrec, prec));
+
+    m_writer->emit(".");
+
+    switch (vecSize)
+    {
+        default: 
+        {
+            char const* kComponents[] = { "x", "y", "z", "w" };
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+        case 3:
+        {
+            char const* kComponents[] = { "xy.x", "xy.y", "z"};
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+        case 4:
+        {
+            char const* kComponents[] = { "xy.x", "xy.y", "zw.x", "zw.y" };
+            m_writer->emit(kComponents[index]);
+            break;
+        }
+    }
+
+     maybeCloseParens(needClose);
+}
+
 bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
     switch(inst->getOp())
     {
+        case kIROp_swizzle:
+        {
+            // We need to special case for half types.
+            auto swizzleInst = static_cast<IRSwizzle*>(inst);
+
+            IRInst* baseInst = swizzleInst->getBase();
+            IRType* baseType = baseInst->getDataType();
+
+            // If we are swizzling from a built in type, 
+            if (as<IRBasicType>(baseType))
+            {
+                // Just use the default behavior
+            }
+            else if (auto vecType = as<IRVectorType>(baseType))
+            {
+                if (auto basicType = as<IRBasicType>(vecType->getElementType()))
+                {
+                    if (basicType->getBaseType() == BaseType::Half)
+                    {
+                        const Index vecElementCount = Index(getIntVal(vecType->getElementCount()));
+
+                        const Index elementCount = Index(swizzleInst->getElementCount());
+                        if (elementCount == 1)
+                        {
+                            const Index index = Index(getIntVal(swizzleInst->getElementIndex(0)));
+                            _emitGetHalfVectorElement(baseInst, index, vecElementCount, inOuterPrec);
+                        }
+                        else
+                        {
+                            auto outerPrec = getInfo(EmitOp::General);
+
+                            m_writer->emit("make___half");
+                            m_writer->emitInt64(elementCount);
+                            m_writer->emit("(");
+
+                            for (Index i = 0; i < elementCount; ++i)
+                            {
+                                if (i)
+                                {
+                                    m_writer->emit(", ");
+                                }
+
+                                const Index index = Index(getIntVal(swizzleInst->getElementIndex(i)));
+                                _emitGetHalfVectorElement(baseInst, index, vecElementCount, outerPrec);
+                            }
+
+                            m_writer->emit(")");
+                        }
+                        return true;
+                    }
+                }
+            }
+            break;
+        }
         case kIROp_Construct:
         {
             // Simple constructor call
@@ -572,7 +712,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_WaveMaskBallot:
         {
-            _requireCUDASMVersion(SemanticVersion(7, 0));
+             m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
 
             m_writer->emit("__ballot_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -583,7 +723,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         case kIROp_WaveMaskMatch:
         {
-            _requireCUDASMVersion(SemanticVersion(7, 0));
+             m_extensionTracker->requireSMVersion(SemanticVersion(7, 0));
 
             m_writer->emit("__match_any_sync(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
@@ -598,14 +738,6 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     return Super::tryEmitInstExprImpl(inst, inOuterPrec);
 }
 
-void CUDASourceEmitter::_requireCUDASMVersion(SemanticVersion const& version)
-{
-    if (version > m_extensionTracker->m_smVersion)
-    {
-        m_extensionTracker->m_smVersion = version;
-    }
-}
-
 void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
 {
     // Does this function declare any requirements on CUDA capabilities
@@ -617,7 +749,7 @@ void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         {
             SemanticVersion version;
             version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
-            _requireCUDASMVersion(version);
+            m_extensionTracker->requireSMVersion(version);
         }
     }
 }
