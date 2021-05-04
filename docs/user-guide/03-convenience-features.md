@@ -8,17 +8,17 @@ This topic covers a series of nice-to-have language features in Slang. These fea
 
 ## Type Inference in Variable Definitions
 Slang supports automatic variable type inference:
-```C#
+```csharp
 var a = 1; // OK, `a` is an `int`.
 var b = float3(0, 1, 2); // OK, `b` is a `float3`.
 ```
 Automatic type inference require an initialization expression to present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result a compiler error:
-```C#
+```csharp
 var a; // Error, cannot infer the type of `a`.
 ```
 
 You may use the `var` keyword to define a variable in a modern syntax:
-```C#
+```csharp
 var a : int = 1; // OK.
 var b : int; // OK.
 ```
@@ -107,7 +107,7 @@ void test()
 ## Properties
 
 Properties provide a convienient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift. 
-```C#
+```csharp
 struct MyType
 {
     uint flag;
@@ -122,7 +122,7 @@ struct MyType
 
 Or equivalently in a "modern" syntax:
 
-```C#
+```csharp
 struct MyType
 {
     uint flag;
@@ -136,7 +136,7 @@ struct MyType
 ```
 
 You may also use an explicit parameter for the setter method:
-```C#
+```csharp
 property uint highBits
 {
     set(uint x) { flag = (flag & 0xFF) + (x << 16);  }
@@ -156,7 +156,7 @@ property uint highBits
 
 
 Slang supports defining initializers in `struct` types. You can write:
-```C#
+```csharp
 struct MyType
 {
     int myVal;
@@ -168,18 +168,18 @@ struct MyType
 ```
 
 You can use an initializer to construct a new instance by using the type name in a function call expression:
-```C#
+```csharp
 MyType instance = MyType(1,2);  // instance.myVal is 3.
 ```
 
 You may also use C++ style initializer list to invoke an initializer:
-```C#
+```csharp
 MyType instance = {1, 2};
 ```
 
 If an initializer does not define any parameters, it will be recognized as *default* initializer that will be automatically called at the definition of a variable:
 
-```C#
+```csharp
 struct MyType
 {
     int myVal;
@@ -199,7 +199,7 @@ int test()
 ## Operator Overloading
 
 Slang allows defining operator overloads as global methods:
-```C#
+```csharp
 struct MyType
 {
     int val;
@@ -224,7 +224,7 @@ Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`
 
 Slang supports a limited form of inheritance. A derived `struct` type has all the members defined in the base type it is inherited from:
 
-```C#
+```csharp
 struct Base
 {
     int a;
@@ -243,7 +243,7 @@ void test()
 ```
 
 A derived type can be implicitly casted to its base type:
-```C#
+```csharp
 void acceptBase(Base b) { ... }
 void test()
 {
@@ -263,7 +263,7 @@ Extensions
 --------------------
 Slang allows defining additional members for a type outside its initial definition. For example, suppose we already have a type defined:
 
-```C#
+```csharp
 struct MyType
 {
     int field;
@@ -272,7 +272,7 @@ struct MyType
 ```
 
 You can extend `MyType` with new members:
-```C#
+```csharp
 extension MyType
 {
     float newField;
@@ -282,7 +282,7 @@ extension MyType
 
 All locations that sees the definition of the `extension` can access the new members:
 
-```C#
+```csharp
 void test()
 {
     MyType t;

@@ -11,7 +11,7 @@ Interfaces
 ----------
 
 Interfaces are used to define the methods and services a type should provide. You can define a interface as the following example:
-```C#
+```csharp
 interface IFoo
 {
     int myMethod(float arg);
@@ -21,7 +21,7 @@ interface IFoo
 Slang's syntax for defining interfaces are similar to `interface`s in C# and `protocal`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
 
 A `struct` type may declare its conformance to an `interface` via the following syntax:
-```C#
+```csharp
 struct MyType : IFoo
 {
     int myMethod(float arg)
@@ -33,7 +33,7 @@ struct MyType : IFoo
 By declaring the conformance to `IFoo`, the definition of `MyType` must include a method named `myMethod` with a matching signature to that defined in the `IFoo` interface to satisfy the declared conformance. If a type misses any methods required by the interface, the Slang compiler will generate an error message.
 
 A `struct` type may declare multiple interface conformances:
-```C#
+```csharp
 interface IBar { uint myMethod2(uint2 x); }
 
 struct MyType : IFoo, IBar
@@ -49,7 +49,7 @@ Generics
 
 Generics can be used to eliminate duplicate code for shared logic that operates on different types. The following example shows how to define a generic method in Slang.
 
-```C#
+```csharp
 int myGenericMethod<T: IFoo>(T arg)
 {
     return arg.myMethod(1.0);
@@ -59,7 +59,7 @@ int myGenericMethod<T: IFoo>(T arg)
 The above listing defines a generic method named `myGenericMethod`, which accepts an argument that can be of any type `T` as long as `T` conforms to the `IFoo` interface. The `T` here is called a _generic type parameter_, and it is associated with an _type constraint_ that any type represented by `T` must conform to the interface `IFoo`.
 
 The following listing shows how to invoke a generic method:
-```C#
+```csharp
 MyType obj;
 int a = myGenericMethod<MyType>(obj); // OK, explicit type argument
 int b = myGenericMethod(obj); // OK, automatic type deduction
@@ -101,7 +101,7 @@ Slang supports many other constructs in addition to ordinary methods as a part o
 
 ### Properties
 
-```C#
+```csharp
 interface IFoo
 {
     property int count {get; set;}
@@ -111,7 +111,7 @@ The above listing declares that any conforming type must define a property named
 
 ### Generic Methods
 
-```C#
+```csharp
 interface IFoo
 {
     int compute<T:IBar>(T val);
@@ -121,7 +121,7 @@ The above listing declares that any conforming type must define a generic method
 
 ### Static Methods
 
-```C#
+```csharp
 interface IFoo
 {
     static int compute(int val);
@@ -129,7 +129,7 @@ interface IFoo
 ```
 
 The above listing declares that any conforming type must define a static method named `compute`. This allows the following generic method to pass type-checking:
-```C#
+```csharp
 void f<T:IFoo>()
 {
     T.compute(5); // OK, T has a static method `compute`.
@@ -139,7 +139,7 @@ void f<T:IFoo>()
 ### `This` Type
 
 You may use a special keyword `This` in interface definitions to refer to the type that is conforming to the interface. The following examples demonstrate a use of `This` type:
-```C#
+```csharp
 interface IComparable
 {
     int comparesTo(This other);
@@ -158,21 +158,21 @@ In this example, the `IComparable` interface declares that any conforming type m
 ### Initializers
 
 Consider a generic method that wants to create and initialize a new instance of generic type `T`:
-```C#
+```csharp
 void f<T:IFoo>()
 {
     T obj = /*a newly initialized T*/
 }
 ```
 One way to implement this is to introduce a static method requirement in `IFoo`:
-```C#
+```csharp
 interface IFoo
 {
     static This create();
 }
 ```
 With this interface definition, we can define `f` as following:
-```C#
+```csharp
 void f<T:IFoo>()
 {
     T obj = T.create();
@@ -180,16 +180,16 @@ void f<T:IFoo>()
 ```
 
 This solution works just fine, but it would be nicer if you can just write:
-```C#
+```csharp
 T obj = T();
 ```
 Or simply
-```C#
+```csharp
 T obj;
 ```
 And let the compiler invoke the default initializer defined in the type.
 To enable this, you can include an initializer requirement in the interface definition:
-```C#
+```csharp
 interface IFoo
 {
     __init();
@@ -197,7 +197,7 @@ interface IFoo
 ```
 
 Initializers with parameters are supported as well. For example:
-```C#
+```csharp
 interface IFoo
 {
     __init(int a, int b);
@@ -212,7 +212,7 @@ Associated Types
 -------------------------
 
 When writing code using interfaces and generics, there are some situations where the an interface method needs to return an object whose type is implementation-dependent. For example, consider the following `IFloatContainer` interface that represents a container of `float` values:
-```C#
+```csharp
 // Represents a container of float values.
 interface IFloatContainer
 {
@@ -227,7 +227,7 @@ interface IFloatContainer
 }
 ```
 An implementation of the `IFloatContainer` interface may use different types of iterators. For example, an implementation that is simply an array of `float`s can expose `Iterator` as a simple integer index:
-```C#
+```csharp
 struct ArrayFloatContainer : IFloatContainer
 {
     float content[10];
@@ -238,7 +238,7 @@ struct ArrayFloatContainer : IFloatContainer
 }
 ```
 On the other hand, an implementation that uses multiple buffers as the backing storage may use a more complex type to locate an element:
-```C#
+```csharp
 // Exposes values in two `StructuredBuffer`s as a single container.
 struct MultiArrayFloatContainer : IFloatContainer
 {
@@ -258,7 +258,7 @@ struct MultiArrayFloatContainer : IFloatContainer
 ```
 
 Ideally, a generic function that wishes to enumerate values in a `IFloatContainer` shouldn't need to care about the implementation details on what the concrete type of `Iterator` is, and we would like to be able to write the following:
-```C#
+```csharp
 float sum<T:IFloatContainer>(T container)
 {
     float result = 0.0f;
@@ -275,7 +275,7 @@ Here the `sum` function simply wants to access all the elements and sum them up.
 The problem is that the `IFloatContainer` interface definition requires methods like `begin()`, `end()` and `getElementAt()` to refer to a iterator type that is implementation dependent. How should the signature of these methods be defined in the interface? The answer is to use _associated types_.
 
 In addition to constructs listed in the previous section, Slang also supports defining associated types in an `interface` definition. An associated type can be defined as following.
-```C#
+```csharp
 // The interface for an iterator type.
 interface IIterator
 {
@@ -301,7 +301,7 @@ interface IFloatContainer
 ```
 
 This `associatedtype` definition in `IFloatContainer` requires that all types conforming to this interface must also define a type in its scope named `Iterator`, and this iterator type must conform to the `IIterator` interface. An implementation to the `IFloatContainer` interface by using either a `typedef` declaration or a `struct` definition inside its scope to satisfy the associated type requirement. For example, the `ArrayFloatContainer` can be implemented as following:
-```C#
+```csharp
 struct ArrayIterator : IIterator
 {
     uint index;
@@ -326,7 +326,7 @@ struct ArrayFloatContainer : IFloatContainer
 ```
 
 Alternatively, you may also define the `Iterator` type directly inside a `struct` implementation, as in the following definition for `MultiArrayFloatContainer`:
-```C#
+```csharp
 // Exposes values in two `StructuredBuffer`s as a single container.
 struct MultiArrayFloatContainer : IFloatContainer
 {
@@ -428,7 +428,7 @@ Generic Value Parameters
 
 So far we have demonstrated generics with _type parameters_. Additionally, Slang also supports generic _value_ parameters.
 The following listing shows an example of generic value parameters.
-```C#
+```csharp
 struct Array<T, let N : int>
 {
     T arrayContent[N];
@@ -449,7 +449,7 @@ Interface-typed Values
 
 So far we have been using interfaces as constraints to generic type parameters. For example, the following listing defines a generic function with a type parameter `TTransform` constrained by interface `ITransform`:
 
-```C#
+```csharp
 interface ITransform
 {
     int compute(MyObject obj);
@@ -464,7 +464,7 @@ int apply<TTransform : ITransform>(TTransform transform, MyObject object)
 
 While Slang's syntax for defining generic methods bears similarity to generics in C#/Java and templates in C++ and should be easy to users who are familiar with these languages, codebases that make heavy use of generics can quickly become verbose and difficult to read. To reduce the amount of boilerplate, Slang supports an alternate way to define the `apply` method by using the interface type `ITransform` as parameter type directly:
 
-```C#
+```csharp
 // A method that is equivalent to `apply` but uses simpler syntax:
 int apply_simple(ITransform transform, MyObject object)
 {
@@ -475,7 +475,7 @@ int apply_simple(ITransform transform, MyObject object)
 Instead of defining a generic type parameter `TTransform` and a method parameter `transform` that has `TTransform` type, you can simply define the same `apply` function like a normal method, with a `transform` parameter whose type is an interface. From the Slang compiler's view, `apply` and `apply_simple` will be compiled to the same target code.
 
 In addition to parameters, Slang allows variables, and function return values to have an interface type as well:
-```C#
+```csharp
 ITransform test(ITransform arg)
 {
     ITransform v = arg;
@@ -486,7 +486,7 @@ ITransform test(ITransform arg)
 ### Restrictions and Caveats
 
 The Slang compiler always attempts to determine the actual type of an interface-typed value at compile time and specialize the code with the actual type. As long as the compiler can successfully determine the actual type, code that uses interface-typed values are equivalent to code written in the generics syntax. However, when interface types are used in function return values, the compiler will not be able to trivially propagate type information. For example:
-```C#
+```csharp
 ITransform getTransform(int x)
 {
     if (x == 0)
@@ -503,7 +503,7 @@ ITransform getTransform(int x)
 ```
 In this example, the actual type of the return value is dependent on the value of `x`, which may not be known at compile time. This means that the concrete type of the return value at invocation sites of `getTransform` may not be statically determinable. When the Slang compiler cannot infer the concrete type of an interface-type value, it will generate code that performs a dynamic dispatch based on the concrete type of the value at runtime, which may introduce performance overhead. Note that this behavior applies to function return values in the form of `out` parameters as well:
 
-```C#
+```csharp
 void getTransform(int x, out ITransform transform)
 {
     if (x == 0)
@@ -521,7 +521,7 @@ void getTransform(int x, out ITransform transform)
 This `getTransform` definition can also result in dynamic dispatch code since the type of `transform` may not be statically determinable.
 
 When the compiler is generating dynamic dispatch code for interface-typed values, it requires the concrete type of the interface-typed value to be free of any opaque-typed fields (e.g. resources and buffer types). A compiler error will generated upon such attempts:
-```C#
+```csharp
 struct MyTransform : ITransform
 {
     StructuredBuffer<int> buffer;
@@ -540,7 +540,7 @@ ITransform getTransform(int x)
 ```
 
 Assigning different values to a mutable interface-typed variable also undermines the compiler's ability to statically determine the type of the variable, and is not supported by the Slang compiler today:
-```C#
+```csharp
 void test(int x)
 {
     ITransform t = Type1Transform();
@@ -561,7 +561,7 @@ In the previous chapter, we introduced the `extension` feature that lets you def
 
 `extensions` can be used to make an existing type conform to additional interfaces. Suppose we have an interface `IFoo` and a type `MyObject` that implements the interface:
 
-```C#
+```csharp
 interface IFoo
 {
     int foo();
@@ -574,7 +574,7 @@ struct MyObject : IFoo
 ```
 
 Now we introduce another interface, `IBar`:
-```C#
+```csharp
 interface IBar
 {
     float bar();
@@ -582,7 +582,7 @@ interface IBar
 ```
 
 We can define an `extension` to make `MyObject` conform to `IBar` as well:
-```C#
+```csharp
 extension MyObject : IBar
 {
     float bar() { return 1.0f }
@@ -590,7 +590,7 @@ extension MyObject : IBar
 ```
 
 With this extension, we can use `MyObject` in places that expects an `IBar` as well:
-```C#
+```csharp
 void use(IBar b)
 {
     b.bar();
@@ -604,7 +604,7 @@ void test()
 ```
 
 You may define more than one interface conformances in a single `extension`:
-```C#
+```csharp
 interface IBar2
 {
     float bar2();
@@ -620,7 +620,7 @@ Extensions to Interfaces
 -----------------------------
 
 In addtion to extending ordinary types, you can define extensions on interfaces as well:
-```C#
+```csharp
 // An example interface.
 interface IFoo
 {
@@ -643,7 +643,7 @@ int use(IFoo foo)
 ```
 
 Although the syntax of above listing suggests that we are extending an interface with additional requirements, this interpretation does not make logical sense in many ways. Consider a type `MyType` that exists before the extension is defined:
-```C#
+```csharp
 struct MyType : IFoo
 {
     int foo() { return 0; }
@@ -652,7 +652,7 @@ struct MyType : IFoo
 
 If we extend the `IFoo` with new requirements, the existing `MyType` definition would become invalid since `MyType` no longer provides implementations to all interface requirements. Instead, what an `extension` on an interface `IFoo` means is that for all types that conforms to the `IFoo` interface and does not have a `bar` method defined, add a `bar` method defined in this extension to that type so that all `IFoo` typed values have a `bar` method defined. If a type already defines a matching `bar` method, then the existing method will always override the default method provided in the extension:
 
-```C#
+```csharp
 interface IFoo
 {
     int foo();
