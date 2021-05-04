@@ -29,5 +29,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     v += half(1.0f);
     v += offset;
     
+    v++;
+    --v;
+    v--;
+    
     outputBuffer[tid] = v;
 }

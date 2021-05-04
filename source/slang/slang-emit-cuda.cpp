@@ -207,9 +207,11 @@ void CUDASourceEmitter::emitSpecializedOperationDefinition(const HLSLIntrinsic* 
                 switch (specOp->op)
                 {
                     case Op::Init:
+
                     case Op::Add:
                     case Op::Mul:
                     case Op::Div:
+                    case Op::Sub:
 
                     case Op::Neg:
 
