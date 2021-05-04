@@ -314,6 +314,20 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     }
 
+    if (auto untypedBufferType = as<IRUntypedBufferResourceType>(type)) {
+        switch (untypedBufferType->getOp())
+        {
+            case kIROp_RaytracingAccelerationStructureType:
+            {
+                m_writer->emit("OptixTraversableHandle");
+                return SLANG_OK;
+                break;
+            }
+
+            default: break;
+        }
+    }
+
     return Super::calcTypeName(type, target, out);
 }
 
