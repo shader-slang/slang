@@ -172,6 +172,12 @@ enum class Format
     CountOf,
 };
 
+struct FormatInfo
+{
+    uint8_t channelCount;       ///< The amount of channels in the format. Only set if the channelType is set 
+    uint8_t channelType;        ///< One of SlangScalarType None if type isn't made up of elements of type.
+};
+
 struct InputElementDesc
 {
     char const* semanticName;
@@ -1367,6 +1373,9 @@ extern "C"
 {
     /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
+
+    /// Gets information about the format 
+    SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format);
 
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL
