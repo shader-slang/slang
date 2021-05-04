@@ -19,23 +19,29 @@ static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-static const uint8_t s_formatSize[] = {
-    0, // Unknown,
+#define GFX_FORMAT_SIZE(name, size) uint8_t(size),
 
-    uint8_t(sizeof(float) * 4), // RGBA_Float32,
-    uint8_t(sizeof(float) * 3), // RGB_Float32,
-    uint8_t(sizeof(float) * 2), // RG_Float32,
-    uint8_t(sizeof(float) * 1), // R_Float32,
-
-    uint8_t(sizeof(uint32_t)), // RGBA_Unorm_UInt8,
-    uint8_t(sizeof(uint32_t)), // BGRA_Unorm_UInt8,
-
-    uint8_t(sizeof(uint16_t)), // R_UInt16,
-    uint8_t(sizeof(uint32_t)), // R_UInt32,
-
-    uint8_t(sizeof(float)), // D_Float32,
-    uint8_t(sizeof(uint32_t)), // D_Unorm24_S8,
+static const uint8_t s_formatSize[] =
+{
+    GFX_FORMAT(GFX_FORMAT_SIZE)
 };
+
+static bool _checkFormat()
+{
+    Index value = 0;
+    Index count = 0;
+
+    // Check the values are in the same order
+#define GFX_FORMAT_CHECK(name, size) count += Index(Index(Format::name) == value++);
+    GFX_FORMAT(GFX_FORMAT_CHECK)
+
+    const bool r = (count == Index(Format::CountOf));
+    SLANG_ASSERT(r);
+    return r;
+}
+
+// We don't make static because we will get a warning that it's unused
+static const bool _checkFormatResult = _checkFormat();
 
 static void _compileTimeAsserts()
 {

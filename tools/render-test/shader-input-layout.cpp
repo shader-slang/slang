@@ -16,6 +16,15 @@ namespace renderer_test
     x("uint", UINT32) \
     x("float", FLOAT32)
 
+
+    Format _getFormatFromName(const UnownedStringSlice& slice)
+    {
+#define SLANG_FORMAT_CASE(name, size) if (slice == #name) return Format::name; else 
+
+        GFX_FORMAT(SLANG_FORMAT_CASE)
+        return Format::Unknown;
+    }
+
     struct TypeInfo
     {
         UnownedStringSlice name;
@@ -111,6 +120,11 @@ namespace renderer_test
             else if(word == "format")
             {
                 val->textureDesc.format = parseFormatOption(parser);
+
+                if (val->textureDesc.format == Format::Unknown)
+                {
+                    return SLANG_FAIL;
+                }
             }
             else
             {
@@ -334,27 +348,10 @@ namespace renderer_test
 
         Format parseFormatOption(TokenReader& parser)
         {
-            Format format = Format::Unknown;
-
             parser.Read("=");
             auto formatWord = parser.ReadWord();
-            if(formatWord == "R_UInt32")
-            {
-                format = Format::R_UInt32;
-            }
-            else if (formatWord == "R_Float32")
-            {
-                format = Format::R_Float32;
-            }
-            else if (formatWord == "RGBA_Unorm_UInt8")
-            {
-                format = Format::RGBA_Unorm_UInt8;
-            }
-            else
-            {
-                // TODO: an error message here
-            }
-            return format;
+
+            return _getFormatFromName(formatWord.getUnownedSlice());
         }
 
         template<typename T>

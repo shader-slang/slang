@@ -123,8 +123,30 @@ public:
         0x9d32d0ad, 0x915c, 0x4ffd, { 0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 } \
     }
 
+// Dont' change without keeping in sync with Format
+#define GFX_FORMAT(x) \
+    x( Unknown, 0) \
+    \
+    x(RGBA_Float32, sizeof(float) * 4) \
+    x(RGB_Float32, sizeof(float) * 3) \
+    x(RG_Float32, sizeof(float) * 2) \
+    x(R_Float32, sizeof(float)) \
+    \
+    x(RGBA_Float16, sizeof(uint16_t) * 4) \
+    x(RG_Float16, sizeof(uint16_t) * 2) \
+    x(R_Float16, sizeof(uint16_t)) \
+    \
+    x(RGBA_Unorm_UInt8, sizeof(uint32_t)) \
+    x(BGRA_Unorm_UInt8, sizeof(uint32_t)) \
+    \
+    x(R_UInt16, sizeof(uint16_t)) \
+    x(R_UInt32, sizeof(uint32_t)) \
+    \
+    x(D_Float32, sizeof(float)) \
+    x(D_Unorm24_S8, sizeof(uint32_t))
+
 /// Different formats of things like pixels or elements of vertices
-/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil
+/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
 enum class Format
 {
     Unknown,
@@ -133,6 +155,10 @@ enum class Format
     RGB_Float32,
     RG_Float32,
     R_Float32,
+
+    RGBA_Float16,
+    RG_Float16,
+    R_Float16,
 
     RGBA_Unorm_UInt8,
     BGRA_Unorm_UInt8,
