@@ -317,6 +317,25 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
+const UnownedStringSlice* CUDASourceEmitter::getVectorElementNames(BaseType baseType, Index elemCount)
+{
+    static const UnownedStringSlice normal[] = { UnownedStringSlice::fromLiteral("x"), UnownedStringSlice::fromLiteral("y"),  UnownedStringSlice::fromLiteral("z"), UnownedStringSlice::fromLiteral("w") };
+    static const UnownedStringSlice half3[] = { UnownedStringSlice::fromLiteral("xy.x"), UnownedStringSlice::fromLiteral("xy.y"), UnownedStringSlice::fromLiteral("z") };
+    static const UnownedStringSlice half4[] = { UnownedStringSlice::fromLiteral("xy.x"), UnownedStringSlice::fromLiteral("xy.y"), UnownedStringSlice::fromLiteral("zw.x"),  UnownedStringSlice::fromLiteral("zw.y")};
+
+    if (baseType == BaseType::Half)
+    {
+        switch (elemCount)
+        {
+            default: break;
+            case 3: return half3;
+            case 4: return half4;
+        }
+    }
+
+    return normal;
+}
+
 void CUDASourceEmitter::emitLayoutSemanticsImpl(IRInst* inst, char const* uniformSemanticSpelling)
 {
     Super::emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
