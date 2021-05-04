@@ -272,17 +272,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator-(__half lh, const __half3& r
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator*(__half lh, const __half3& rh) { return __half3{__hmul2(__half2half2(lh), rh.xy), __hmul(lh, rh.z)}; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 operator/(__half lh, const __half3& rh) { return __half3{__h2div(__half2half2(lh), rh.xy), __hdiv(lh, rh.z)}; }
 
-
-#if 0
-// We need to return the vector<bool> type
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator==(const __half3& lh, const __half3& rh) { return __hbeq2(lh.xy, rh.xy) && __heq(lh.z, rh.z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator!=(const __half3& lh, const __half3& rh) { return __hbneu2(lh.xy, rh.xy) && __hneu(lh.z, rh.z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator>(const __half3& lh, const __half3& rh) { return __hbgt2(lh.xy, rh.xy) && __hgt(lh.z, rh.z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator<(const __half3& lh, const __half3& rh) { return __hblt2(lh.xy, rh.xy) && __hlt(lh.z, rh.z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator>=(const __half3& lh, const __half3& rh) { return __hbge2(lh.xy, rh.xy) && __hge(lh.z, rh.z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator<=(const __half3& lh, const __half3& rh) { return __hble2(lh.xy, rh.xy) && __hle(lh.z, rh.z); }
-#endif
-
 // *** half4 ***
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& lh, const __half4& rh) { return __half4{__hadd2(lh.xy, rh.xy), __hadd2(lh.zw, rh.zw)}; }
@@ -304,30 +293,6 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(__half lh, const __half4& r
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4& h) { return __half4{__hneg2(h.xy), __hneg2(h.zw)}; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& h) { return h; }
-
-#if 0
-// We need to return vector<bool> type
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator==(const __half4& lh, const __half4& rh) { return __hbeq2(lh.xy, rh.xy) && __hbeq2(lh.zw, rh.zw); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator!=(const __half4& lh, const __half4& rh) { return __hbneu2(lh.xy, rh.xy) && __hbneu2(lh.zw, rh.zw); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator>(const __half4& lh, const __half4& rh) { return __hbgt2(lh.xy, rh.xy) && __hbgt2(lh.zw, rh.zw); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator<(const __half4& lh, const __half4& rh) { return __hblt2(lh.xy, rh.xy) && __hblt2(lh.zw, rh.zw); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator>=(const __half4& lh, const __half4& rh) { return __hbge2(lh.xy, rh.xy) && __hbge2(lh.zw, rh.zw); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL bool operator<=(const __half4& lh, const __half4& rh) { return __hble2(lh.xy, rh.xy) && __hble2(lh.zw, rh.zw); }
-#endif
-
-#if 0
-// Use the round nearest as the default - it is the only one defined
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __float22half2(const float2 a) { return __float22half2_rn(a); }
-
-// Implement the vector versions
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __float2half(float2 a) { return __float22half2(a); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 __float2half(float3 a) { __half3 o; o.xy = __float22half2(make_float2(a.x, a.y)); o.z = __float2half(a.z); return o; }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 __float2half(float4 a) { __half4 o; o.xy = __float22half2(make_float2(a.x, a.y)); o.zw = __float22half2(make_float2(a.z, a.w)); return o; }
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 __half2float(__half2 a) { return __half22float2(a); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float3 __half2float(__half3 a) { float2 xy = __half22float2(a.xy); float z = __half2float(a.z); return make_float3(xy.x, xy.y, z); }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 __half2float(__half4 a) { float2 xy = __half22float2(a.xy); float2 zw = __half22float2(a.zw); return make_float4(xy.x, xy.y, zw.x, zw.y); }
-#endif
 
 #endif
 
