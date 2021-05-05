@@ -1028,10 +1028,15 @@ void CPPSourceEmitter::_emitGetAtDefinition(const UnownedStringSlice& funcName, 
             writer->emit("SLANG_PRELUDE_ASSERT(b >= 0 && b < ");
             writer->emit(vecSize);
             writer->emit(");\n");
+
+            writer->emit("return ((");
+            emitType(specOp->returnType);
+            writer->emit("*)");
+
             if (lValue)
-                writer->emit("return (&a->x) + b;\n");
+                writer->emit("a) + b;\n");
             else
-                writer->emit("return (&a.x)[b];\n");
+                writer->emit("&a)[b];\n");
         }
         else if (auto matrixType = as<IRMatrixType>(srcType))
         {
