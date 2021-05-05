@@ -509,7 +509,7 @@ struct LegalVal
     }
 
     static LegalVal implicitDeref(LegalVal const& val);
-    LegalVal getImplicitDeref();
+    LegalVal getImplicitDeref() const;
 
     static LegalVal pair(RefPtr<PairPseudoVal> pairInfo);
     static LegalVal pair(
@@ -568,6 +568,30 @@ struct WrappedBufferPseudoVal : LegalValImpl
 
 //
 
+    /// Information about a function that has been legalized
+    ///
+    /// This type is used to track any information about the function
+    /// and its signature that might be relevant to the legalization
+    /// of instructions inside the function body.
+    ///
+struct LegalFuncInfo : RefObject
+{
+        /// Any parameters that were added to the function signature
+        /// to represent the function result after legalization.
+        ///
+        /// It is possible that the result type of a function needed
+        /// to be split into multiple types, and as a result a single
+        /// function result couldn't return all of them.
+        ///
+        /// This array is a list of `out` parameters created to represent
+        /// additional function results. Because they are `out` parameters,
+        /// each is a *pointer* to a value of the relevant type.
+        ///
+    List<IRInst*> resultParamVals;
+};
+
+//
+
     /// Context that drives type legalization
     ///
     /// This type is an abstract base class, and there are
@@ -600,6 +624,14 @@ struct IRTypeLegalizationContext
     List<IRInst*> replacedInstructions;
 
     Dictionary<IRType*, LegalType> mapTypeToLegalType;
+
+        /// Map a function to information about how it was legalized.
+        ///
+        /// Note that entries are only created if there is somehting for them
+        /// to represent, so many functions may lack entries in this map even
+        /// after legalization.
+        ///
+    Dictionary<IRFunc*, RefPtr<LegalFuncInfo>> mapFuncToInfo;
 
     IRBuilder* getBuilder() { return builder; }
 
