@@ -336,13 +336,6 @@ SLANG_SURFACE_READ(surf2DLayeredread, (int x, int y, int layer), (x, y, layer))
 SLANG_SURFACE_READ(surfCubemapread, (int x, int y, int face), (x, y, face))
 SLANG_SURFACE_READ(surfCubemapLayeredread, (int x, int y, int layerFace), (x, y, layerFace))
 
-// <__half>
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite(__half data, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode) 
-{ 
-    surf2Dwrite<ushort>(__half_as_ushort(data), surfObj, x, y, boundaryMode);  
-} 
-
 // The following doesn't quite work, for reasons currently not determined
 #if 0
 #define SLANG_SURFACE_WRITE(FUNC_NAME, TYPE_ARGS, ARGS) \
