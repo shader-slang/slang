@@ -294,6 +294,33 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator/(__half lh, const __half4& r
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator-(const __half4& h) { return __half4{__hneg2(h.xy), __hneg2(h.zw)}; }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 operator+(const __half4& h) { return h; }
 
+// Convenience functions to work on the vector types
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 __ushort_as_half(const ushort2& i) { __halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)); }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half3 __ushort_as_half(const ushort3& i) { return __half3{__halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)), __ushort_as_half(i.z)}; }
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 __ushort_as_half(const ushort4& i) { return __half4{ __halves2half2(__ushort_as_half(i.x), __ushort_as_half(i.y)), __halves2half2(__ushort_as_half(i.z), __ushort_as_half(i.w)) }; }
+
+//
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half surf2Dread<__half>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    return __ushort_as_half(surf2Dread<ushort>(surfObj, x, y, boundaryMode));
+}
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 surf2Dread<__half2>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    return __ushort_as_half(__surf2Dread<ushort2>(surfObj, x, y, boundaryMode));
+}
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half4 surf2Dread<__half4>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    return __ushort_as_half(surf2Dread<ushort4>(surfObj, x, y, boundaryMode));
+}
+
+              
 #endif
 
 // ----------------------------- F32 -----------------------------------------
