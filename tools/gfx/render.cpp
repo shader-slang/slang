@@ -19,23 +19,69 @@ static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-static const uint8_t s_formatSize[] = {
-    0, // Unknown,
+#define GFX_FORMAT_SIZE(name, size) uint8_t(size),
 
-    uint8_t(sizeof(float) * 4), // RGBA_Float32,
-    uint8_t(sizeof(float) * 3), // RGB_Float32,
-    uint8_t(sizeof(float) * 2), // RG_Float32,
-    uint8_t(sizeof(float) * 1), // R_Float32,
-
-    uint8_t(sizeof(uint32_t)), // RGBA_Unorm_UInt8,
-    uint8_t(sizeof(uint32_t)), // BGRA_Unorm_UInt8,
-
-    uint8_t(sizeof(uint16_t)), // R_UInt16,
-    uint8_t(sizeof(uint32_t)), // R_UInt32,
-
-    uint8_t(sizeof(float)), // D_Float32,
-    uint8_t(sizeof(uint32_t)), // D_Unorm24_S8,
+static const uint8_t s_formatSize[] =
+{
+    GFX_FORMAT(GFX_FORMAT_SIZE)
 };
+
+static bool _checkFormat()
+{
+    Index value = 0;
+    Index count = 0;
+
+    // Check the values are in the same order
+#define GFX_FORMAT_CHECK(name, size) count += Index(Index(Format::name) == value++);
+    GFX_FORMAT(GFX_FORMAT_CHECK)
+
+    const bool r = (count == Index(Format::CountOf));
+    SLANG_ASSERT(r);
+    return r;
+}
+
+// We don't make static because we will get a warning that it's unused
+static const bool _checkFormatResult = _checkFormat();
+
+struct FormatInfoMap
+{
+    FormatInfoMap()
+    {
+        // Set all to nothing initially
+        for (auto& info : m_infos)
+        {
+            info.channelCount = 0;
+            info.channelType = SLANG_SCALAR_TYPE_NONE;
+        }
+
+        set(Format::RGBA_Float16, SLANG_SCALAR_TYPE_FLOAT16, 4);
+        set(Format::RG_Float16, SLANG_SCALAR_TYPE_FLOAT16, 2);
+        set(Format::R_Float16, SLANG_SCALAR_TYPE_FLOAT16, 1);
+
+        set(Format::RGBA_Float32, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RGB_Float32, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::RG_Float32, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::R_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
+        set(Format::R_UInt32, SLANG_SCALAR_TYPE_UINT32, 1);
+
+        set(Format::D_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
+    }
+
+    void set(Format format, SlangScalarType type, Index channelCount)
+    {
+        FormatInfo& info = m_infos[Index(format)];
+        info.channelCount = uint8_t(channelCount);
+        info.channelType = uint8_t(type);
+    }
+
+    const FormatInfo& get(Format format) const { return m_infos[Index(format)]; }
+
+    FormatInfo m_infos[Index(Format::CountOf)];
+};
+
+static const FormatInfoMap s_formatInfoMap;
 
 static void _compileTimeAsserts()
 {
@@ -47,6 +93,11 @@ extern "C"
     size_t SLANG_MCALL gfxGetFormatSize(Format format)
     {
         return s_formatSize[int(format)];
+    }
+
+    SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format)
+    {
+        return s_formatInfoMap.get(format);
     }
 
     SlangResult _createDevice(const IDevice::Desc* desc, IDevice** outDevice)

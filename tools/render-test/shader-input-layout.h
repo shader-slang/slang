@@ -65,10 +65,75 @@ struct InputSamplerDesc
 
 struct TextureData
 {
-    Slang::List<Slang::List<unsigned int>> dataBuffer;
-    int textureSize;
-    int mipLevels;
-    int arraySize;
+    struct Slice
+    {
+        static Slice make(void* values, size_t size)
+        {
+            Slice slice;
+            slice.values = values;
+            slice.valuesCount = size;
+            return slice;
+        }
+
+        void* values = nullptr;           ///< Values of the type format
+        size_t valuesCount = 0;
+    };
+
+    void addSlice(const void* data, size_t elemCount)
+    {
+        const size_t totalSize = m_formatSize * elemCount;
+        void* dst = ::malloc(totalSize);
+        ::memcpy(dst, data, totalSize);
+        m_slices.add(Slice::make(dst, elemCount));
+    }
+    void* addSlice(size_t elemCount)
+    {
+        void* dst = ::malloc(m_formatSize * elemCount);
+        m_slices.add(Slice::make(dst, elemCount));
+        return dst;
+    }
+
+        /// Set the size of the slice in count of format sized elements
+    void* setSliceCount(Slang::Index sliceIndex, size_t count)
+    {
+        auto& slice = m_slices[sliceIndex];
+        if (count != slice.valuesCount)
+        {
+            slice.values = ::realloc(slice.values, count * m_formatSize);
+            slice.valuesCount = count;
+        }
+        return slice.values;
+    }
+
+    void init(Format format)
+    {
+        clearSlices();
+
+        m_formatSize = uint8_t(gfxGetFormatSize(format));
+        m_format = format;
+    }
+
+    ~TextureData() { clearSlices(); }
+
+    void clearSlices()
+    {
+        for (auto& slice : m_slices)
+        {
+            if (slice.values)
+            {
+                ::free(slice.values);
+            }
+        }
+        m_slices.clear();
+    }
+
+    gfx::Format m_format = gfx::Format::Unknown;
+    uint8_t m_formatSize = 0;
+
+    Slang::List<Slice> m_slices;
+    int m_textureSize;
+    int m_mipLevels;
+    int m_arraySize;
 };
 
 class ShaderInputLayout

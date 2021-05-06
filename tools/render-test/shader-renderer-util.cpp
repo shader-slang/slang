@@ -33,7 +33,7 @@ using Slang::Result;
     const Format format = (inputDesc.format == Format::Unknown) ? Format::RGBA_Unorm_UInt8 : inputDesc.format;
 
     textureResourceDesc.format = format;
-    textureResourceDesc.numMipLevels = texData.mipLevels;
+    textureResourceDesc.numMipLevels = texData.m_mipLevels;
     textureResourceDesc.arraySize = inputDesc.arrayLength;
     textureResourceDesc.allowedStates =
         ResourceStateSet(defaultState, ResourceState::CopyDestination, ResourceState::CopySource);
@@ -86,7 +86,7 @@ using Slang::Result;
             auto strideZ = mipHeight * strideY;
 
             ITextureResource::SubresourceData subresourceData;
-            subresourceData.data = texData.dataBuffer[subResourceIndex].getBuffer();
+            subresourceData.data = texData.m_slices[subResourceIndex].values;
             subresourceData.strideY = strideY;
             subresourceData.strideZ = strideZ;
 
