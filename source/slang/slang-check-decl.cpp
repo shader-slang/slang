@@ -2062,6 +2062,7 @@ namespace Slang
         // expression.
         //
         auto synBase = m_astBuilder->create<OverloadedExpr>();
+        synBase->name = requiredMemberDeclRef.getDecl()->getName();
         synBase->lookupResult2 = lookupResult;
 
         // If `synThis` is non-null, then we will use it as the base of

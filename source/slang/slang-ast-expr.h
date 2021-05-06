@@ -35,7 +35,7 @@ class OverloadedExpr : public Expr
     SLANG_AST_CLASS(OverloadedExpr)
 
     // The name that was looked up and found to be overloaded
-    Name* name;
+    Name* name = nullptr;
 
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
