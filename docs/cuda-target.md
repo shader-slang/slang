@@ -196,6 +196,25 @@ void setDownstreamCompilerPrelude(SlangPassThrough passThrough, const char* prel
 
 The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
+Half Support
+============
+
+Slang supports the half/float16 types on CUDA. To do so NVRTC must have access to the `cuda_fp16.h` and `cuda_fp16.hpp` files that are typically distributed as part of the CUDA SDK. When Slang detects the use of half in source, it will define `SLANG_CUDA_ENABLE_HALF` when `slang-cuda-prelude.h` is included. This will in turn try to include `cuda_fp16.h` and enable extra functionality within the prelude for half support. 
+
+Slang tries several mechanisms to locate `cuda_fp16.h` when NVRTC is initiated. The first mechanism is to look in the include paths that are passed to Slang. If `cuda_fp16.h` can be found in one of these paths, no more searching will be performed. 
+
+If this fails, the path where NVRTC is located will be searched. In that path "include" and "CUDA/include" paths will be searched. This is probably most suitable for Windows based targets, where NVRTC dll is placed along with other binaries. The "CUDA/include" path is used to try and make clear in this scenario what the contained files are for. 
+
+If this fails Slang will look for the CUDA_PATH environmental variable, as is typically set during a CUDA SDK installation. 
+
+If this fails - the prelude include of `cuda_fp16.h` will most likely fail on NVRTC invocation.
+
+CUDA has the `__half` and `__half2` types defined in `cuda_fp16.h`. The `__half2` can produce results just as quickly as doing the same operation on `__half` - in essence for some operations `__half2` is [SIMD](https://en.wikipedia.org/wiki/SIMD) like. The half implementation in Slang tries to take advantage of this optimization. 
+
+Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half support. The types _`_half3` and `__half4` are implemented in `slang-cuda-prelude.h` for this reason. It is worth noting that `__half3` is made up of a `__half2` and a `__half`. As `__half2` is 4 byte aligned, this means `__half3` is actually 8 bytes, rather than 6 bytes that might be expected.
+
+One area where this optimization isn't fully used is in comparisons - as in effect Slang treats all the vector/matrix half comparisons as if they are scalar. This could be perhaps be improved on in the future. Doing so would require using features that are not directly available in the CUDA headers. 
+
 Wave Intrinsics
 ===============
 
