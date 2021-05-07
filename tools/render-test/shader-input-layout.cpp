@@ -16,6 +16,15 @@ namespace renderer_test
     x("uint", UINT32) \
     x("float", FLOAT32)
 
+
+    Format _getFormatFromName(const UnownedStringSlice& slice)
+    {
+#define SLANG_FORMAT_CASE(name, size) if (slice == #name) return Format::name; else 
+
+        GFX_FORMAT(SLANG_FORMAT_CASE)
+        return Format::Unknown;
+    }
+
     struct TypeInfo
     {
         UnownedStringSlice name;
@@ -111,6 +120,11 @@ namespace renderer_test
             else if(word == "format")
             {
                 val->textureDesc.format = parseFormatOption(parser);
+
+                if (val->textureDesc.format == Format::Unknown)
+                {
+                    return SLANG_FAIL;
+                }
             }
             else
             {
@@ -334,27 +348,10 @@ namespace renderer_test
 
         Format parseFormatOption(TokenReader& parser)
         {
-            Format format = Format::Unknown;
-
             parser.Read("=");
             auto formatWord = parser.ReadWord();
-            if(formatWord == "R_UInt32")
-            {
-                format = Format::R_UInt32;
-            }
-            else if (formatWord == "R_Float32")
-            {
-                format = Format::R_Float32;
-            }
-            else if (formatWord == "RGBA_Unorm_UInt8")
-            {
-                format = Format::RGBA_Unorm_UInt8;
-            }
-            else
-            {
-                // TODO: an error message here
-            }
-            return format;
+
+            return _getFormatFromName(formatWord.getUnownedSlice());
         }
 
         template<typename T>
@@ -991,6 +988,9 @@ namespace renderer_test
 
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
+        const gfx::FormatInfo formatInfo = gfxGetFormatInfo(desc.format);
+
+
         switch (desc.format)
         {
             case Format::RGBA_Unorm_UInt8:
@@ -998,35 +998,155 @@ namespace renderer_test
                 generateTextureDataRGB8(output, desc);
                 break;
             }
-            case Format::R_Float32:
+            case Format::R_Float16:
+            case Format::RG_Float16:
+            case Format::RGBA_Float16:
             {
                 TextureData work;
                 generateTextureDataRGB8(work, desc);
 
-                output.textureSize = work.textureSize;
-                output.mipLevels = work.mipLevels;
-                output.arraySize = work.arraySize;
+                output.init(desc.format);
 
-                List<List<unsigned int>>& dstBuffer = output.dataBuffer;
+                output.m_textureSize = work.m_textureSize;
+                output.m_mipLevels = work.m_mipLevels;
+                output.m_arraySize = work.m_arraySize;
 
-                Index numMips = work.dataBuffer.getCount();
-                dstBuffer.setCount(numMips);
+                List<TextureData::Slice>& dstSlices = output.m_slices;
 
-                for (int i = 0; i < numMips; ++i)
+                Index numSlices = work.m_slices.getCount();
+                dstSlices.setCount(numSlices);
+
+                for (int i = 0; i < numSlices; ++i)
                 {
-                    const Index numPixels = work.dataBuffer[i].getCount();
-                    const unsigned int* srcPixels = work.dataBuffer[i].getBuffer();
+                    const TextureData::Slice& srcSlice = work.m_slices[i];
 
-                    dstBuffer[i].setCount(numPixels);
+                    const Index pixelCount = srcSlice.valuesCount;
+                    const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
 
-                    float* dstPixels = (float*)dstBuffer[i].getBuffer();
-
-                    for (Index j = 0; j < numPixels; ++j)
+                    int16_t* dstPixels = (int16_t*)output.setSliceCount(i, pixelCount);
+                    
+                    switch (formatInfo.channelCount)
                     {
-                        // Copy out red
-                        const unsigned int srcPixel = srcPixels[j];
-                        const float value = (srcPixel & 0xff) * 1.0f / 255;
-                        dstPixels[j] = value;
+                        case 1:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 1)
+                            {
+                                // Copy out r
+                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
+                            }
+                            break;
+                        }
+                        case 2:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
+                            {
+                                // Copy out rg
+                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
+                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
+                            }
+                            break;
+                        }
+                        case 3:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
+                            {
+                                // Copy out rgb
+                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
+                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
+                                dstPixels[2] = FloatToHalf(srcPixels[2] * (1.0f / 255));
+                            }
+                            break;
+                        }
+                        case 4:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
+                            {
+                                // Copy out rgba
+                                dstPixels[0] = FloatToHalf(srcPixels[0] * (1.0f / 255));
+                                dstPixels[1] = FloatToHalf(srcPixels[1] * (1.0f / 255));
+                                dstPixels[2] = FloatToHalf(srcPixels[2] * (1.0f / 255));
+                                dstPixels[3] = FloatToHalf(srcPixels[3] * (1.0f / 255));
+                            }
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
+            case Format::R_Float32:
+            case Format::RG_Float32:
+            case Format::RGB_Float32:
+            case Format::RGBA_Float32:
+            case Format::D_Float32:
+            {
+                TextureData work;
+                generateTextureDataRGB8(work, desc);
+
+                output.init(desc.format);
+
+                output.m_textureSize = work.m_textureSize;
+                output.m_mipLevels = work.m_mipLevels;
+                output.m_arraySize = work.m_arraySize;
+
+                List<TextureData::Slice>& dstSlices = output.m_slices;
+
+                Index numSlices = work.m_slices.getCount();
+                dstSlices.setCount(numSlices);
+
+                for (int i = 0; i < numSlices; ++i)
+                {
+                    const TextureData::Slice& srcSlice = work.m_slices[i];
+
+                    const Index pixelCount = srcSlice.valuesCount;
+                    const uint8_t* srcPixels = (const uint8_t*)srcSlice.values;
+
+                    float* dstPixels = (float*)output.setSliceCount(i, pixelCount);
+
+                    switch (formatInfo.channelCount)
+                    {
+                        case 1:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels++)
+                            {
+                                // Copy out r
+                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
+                            }
+                            break;
+                        }
+                        case 2:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 2)
+                            {
+                                // Copy out rg
+                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
+                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
+                            }
+                            break;
+                        }
+                        case 3:
+                        {
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 3)
+                            {
+                                // Copy out rgb
+                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
+                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
+                                dstPixels[2] = srcPixels[2] * (1.0f / 255);
+                            }
+                            break;
+                        }
+                        case 4:
+                        {
+
+                            for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
+                            {
+                                // Copy out rgba
+                                dstPixels[0] = FloatToHalf(srcPixels[0] * 1.0f / 255);
+                                dstPixels[1] = FloatToHalf(srcPixels[1] * 1.0f / 255);
+                                dstPixels[2] = FloatToHalf(srcPixels[2] * 1.0f / 255);
+                                dstPixels[3] = FloatToHalf(srcPixels[3] * 1.0f / 255);
+                            }
+                            break;
+                        }
                     }
                 }
                 break;
@@ -1061,34 +1181,38 @@ namespace renderer_test
         int arrLen = inputDesc.arrayLength;
         if (arrLen == 0)
             arrLen = 1;
-        List<List<unsigned int>>& dataBuffer = output.dataBuffer;
+
+        output.init(Format::RGBA_Unorm_UInt8);
+
+        //List<List<unsigned int>>& dataBuffer = output.dataBuffer;
         int arraySize = arrLen;
         if (inputDesc.isCube)
             arraySize *= 6;
-        output.arraySize = arraySize;
-        output.textureSize = inputDesc.size;
+        output.m_arraySize = arraySize;
+        output.m_textureSize = inputDesc.size;
 
-        const Index maxMipLevels = Math::Log2Floor(output.textureSize) + 1;
+        const Index maxMipLevels = Math::Log2Floor(output.m_textureSize) + 1;
         Index mipLevels = (inputDesc.mipMapCount <= 0) ? maxMipLevels : inputDesc.mipMapCount;
         mipLevels = (mipLevels > maxMipLevels) ? maxMipLevels : mipLevels;
 
-        output.mipLevels = int(mipLevels); 
-        output.dataBuffer.setCount(output.mipLevels * output.arraySize);
+        output.m_mipLevels = int(mipLevels); 
+        output.m_slices.setCount(output.m_mipLevels * output.m_arraySize);
 
         int slice = 0;
         for (int i = 0; i < arraySize; i++)
         {
-            for (int j = 0; j < output.mipLevels; j++)
+            for (int j = 0; j < output.m_mipLevels; j++)
             {
-                int size = output.textureSize >> j;
+                int size = output.m_textureSize >> j;
                 int bufferLen = size;
                 if (inputDesc.dimension == 2)
                     bufferLen *= size;
                 else if (inputDesc.dimension == 3)
                     bufferLen *= size*size;
-                dataBuffer[slice].setCount(bufferLen);
 
-                _iteratePixels(inputDesc.dimension, size, dataBuffer[slice].getBuffer(), [&](int x, int y, int z) -> unsigned int
+                uint32_t* dst = (uint32_t*)output.setSliceCount(slice, bufferLen);
+
+                _iteratePixels(inputDesc.dimension, size, dst, [&](int x, int y, int z) -> unsigned int
                 {
                     if (inputDesc.content == InputTextureContent::Zero)
                     {

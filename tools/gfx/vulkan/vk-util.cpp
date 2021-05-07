@@ -14,6 +14,11 @@ namespace gfx {
         case Format::RGB_Float32:       return VK_FORMAT_R32G32B32_SFLOAT;
         case Format::RG_Float32:        return VK_FORMAT_R32G32_SFLOAT;
         case Format::R_Float32:         return VK_FORMAT_R32_SFLOAT;
+
+        case Format::RGBA_Float16:      return VK_FORMAT_R16G16B16A16_SFLOAT;
+        case Format::RG_Float16:        return VK_FORMAT_R16G16_SFLOAT;
+        case Format::R_Float16:         return VK_FORMAT_R16_SFLOAT;
+
         case Format::RGBA_Unorm_UInt8:  return VK_FORMAT_R8G8B8A8_UNORM;
         case Format::BGRA_Unorm_UInt8:  return VK_FORMAT_B8G8R8A8_UNORM;
         case Format::R_UInt32:          return VK_FORMAT_R32_UINT;

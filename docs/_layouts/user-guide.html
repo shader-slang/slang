@@ -13,16 +13,45 @@
   <style>
     #centeringDiv {
       margin: auto;
-      max-width: 1000px;
-      padding-left: 350px;
+      max-width: 1200px;
     }
-
+    #navDiv
+    {
+      display: block;
+      box-sizing: border-box;
+      padding-top: 5px;
+      padding-bottom: 5px;
+      border-bottom-width: 3px;
+      border-bottom-style: solid;
+      border-bottom-color: #F0F0F0;
+    }
+    #navDiv nav
+    {
+      float:left;
+    }
+    #navDiv::after {
+      content: "";
+      clear: both;
+      display: table;
+    }
+    #navDiv nav li::after
+    {
+      content: "/";
+      padding-left: 10px;
+      padding-right: 0px;
+      color: #808080;
+    }
+    #navDiv nav li
+    {
+      display:inline;
+      padding-left: 10px;
+      padding-right: 0px;
+    }
     #tocColumn {
       width: 350px;
       position: fixed;
       overflow-y: auto;
       box-sizing: border-box;
-      max-height: 100vh;
       display: block;
     }
 
@@ -31,12 +60,9 @@
     }
 
     #rightColumn {
-      padding-left: 40px;
+      padding-left: 390px;
       padding-right: 40px;
       padding-top: 20px;
-      border-left-width: 1.5px;
-      border-left-style: solid;
-      border-left-color: #C8C8C8;
     }
 
     .toc_root_list {
@@ -73,7 +99,22 @@
     }
     .toc_span:hover
     {
-      color: #303080
+      color: #d5000d;
+    }
+    .tocIcon
+    {
+      vertical-align: -2.5px;
+    }
+    .editButton
+    {
+      float: right;
+      margin-right: 10px;
+      color:#808080;
+    }
+    .editIcon
+    {
+      fill: currentColor;
+      vertical-align: text-top;
     }
     #btnToggleTOC {
       display: none;
@@ -84,14 +125,23 @@
       border-style: solid;
       border-color: #808080;
       border-width: 1px;
+      background-color: #E8E8E8;
     }
-    @media screen and (max-width: 850px) {
+    #btnToggleTOC:hover {
+      background-color: #F0F0E8;
+    }
+    #btnToggleTOC:active {
+      background-color: #D4D4D4;
+    }
+    @media screen and (max-width: 900px) {
       #tocColumn {
         width: 300px;
         display: block;
+        box-sizing: border-box;
       }
-      #centeringDiv {
-         padding-left: 300px;
+      #rightColumn {
+        padding-left: 320px;
+        padding-right: 20px;
       }
     }
 
@@ -100,6 +150,8 @@
         width: 100%;
         position: static;
         display: none;
+        border-right-style: none;
+        box-sizing: content-box;
       }
       #tocInner {
         padding: 10px;
@@ -120,18 +172,34 @@
 </head>
 
 <body>
-    <button id="btnToggleTOC" onclick="toggleTOC()">Table of Contents</button>
+  <div id="centeringDiv">
+    <div id="navDiv">
+    {% include_relative nav.html %}
+    <a class="editButton" title="Edit this page" href="https://github.com/{{ site.github.repository_nwo }}/edit/master/docs/{{ page.path }}">
+      <svg class="editIcon" height="16" viewBox="0 0 16 16" version="1.1" width="16" aria-hidden="true">
+        <path fill-rule="evenodd"
+          d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25a1.75 1.75 0 01.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 000-.354l-1.086-1.086zM11.189 6.25L9.75 4.81l-6.286 6.287a.25.25 0 00-.064.108l-.558 1.953 1.953-.558a.249.249 0 00.108-.064l6.286-6.286z">
+        </path>
+      </svg>
+    </a>
+    </div>
+    <button id="btnToggleTOC" onclick="toggleTOC()">
+      <svg height="16" class="tocIcon" viewBox="0 0 16 16" version="1.1" width="16" aria-hidden="true">
+        <path fill-rule="evenodd"
+          d="M2 4a1 1 0 100-2 1 1 0 000 2zm3.75-1.5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zm0 5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zm0 5a.75.75 0 000 1.5h8.5a.75.75 0 000-1.5h-8.5zM3 8a1 1 0 11-2 0 1 1 0 012 0zm-1 6a1 1 0 100-2 1 1 0 000 2z">
+        </path>
+      </svg>
+      Table of Contents</button>
     <div id="tocColumn">
       <div id="tocInner">
-        {% include_relative user-guide-toc.html %}
+        {% include_relative toc.html %}
       </div>
     </div>
-    <div id="centeringDiv">
-      <div id="rightColumn">
+    <div id="rightColumn">
         <section id="main_content">
           {% include anchor_headings.html html=content anchorBody="" %}
         </section>
-
+        <a href="javascript:;" id="_content_end_"></a>
         <footer>
           {% if site.github.is_project_page %}
           {{ site.title | default: site.github.repository_name }} is maintained by <a
@@ -142,20 +210,40 @@
       </div>
     </div>
   <script>
+    // Fix for IE. Make sure String has `startsWith` method.
+    if (!String.prototype.startsWith)
+    {
+      String.prototype.startsWith = function (searchString, position) {
+        position = position || 0;
+        return this.indexOf(searchString, position) === position;
+      };
+    }
+
     var tocColumn = document.getElementById("tocColumn");
     var rightColumn = document.getElementById("rightColumn");
+    function updateScroll()
+    {
+      if (window.innerWidth < 700)
+      {
+        tocColumn.style.height = "";
+        return;
+      }
+      var top = Math.max(0, rightColumn.getBoundingClientRect().top);
+      tocColumn.style.top = top + "px";
+      tocColumn.style.height = (window.innerHeight-top) + "px";
+    }
     function updatePosition()
     {
       if (window.innerWidth > 700)
         tocColumn.style.display = "";
-      tocColumn.style.left = (rightColumn.getBoundingClientRect().x - tocColumn.getBoundingClientRect().width) + "px";
+      tocColumn.style.left = rightColumn.getBoundingClientRect().left + "px";
+      updateScroll();
     }
     window.addEventListener("resize", updatePosition);
     updatePosition();
-  </script>
 
-  <script>
     var tocItemsArray = [];
+    var subSectionItems = [];
     var selectedItem = null;
     function toggleTOC() {
       var tocColumn = document.getElementById("tocColumn");
@@ -249,6 +337,56 @@
         curItem.getAttribute("class").startsWith("toc_root_list"))
         break;
     }
+
+    var subItems = selectedItem.getElementsByTagName("li");
+    var subSectionTitles = [];
+    var subSectionTitleStrs = [];
+    for (var i = 0; i < subItems.length; i++)
+    {
+      subSectionItems.push(subItems[i]);
+      var title = subItems[i].getAttribute("data-link");
+      var pos = title.lastIndexOf("#");
+      title = title.substr(pos + 1);
+      var element = document.getElementById(title);
+      subSectionTitles.push(element);
+      subSectionTitleStrs.push(title);
+    }
+    subSectionTitles.push(document.getElementById("_content_end_"));
+    function isSectionFullyVisible(id)
+    {
+      var titleElement = subSectionTitles[id];
+      var nextTitleElement = subSectionTitles[id+1];
+      return (titleElement.getBoundingClientRect().top >= 0 && nextTitleElement.getBoundingClientRect().top <= window.innerHeight);
+    }
+    function findCurrentSubsection()
+    {
+      var currentSubsectionID = -1;
+      for (var i = 0; i < subSectionItems.length; i++) {
+        var titleElement = subSectionTitles[i];
+        if (titleElement == null)
+          continue;
+        if (titleElement.getBoundingClientRect().top < window.innerHeight * 0.12)
+          currentSubsectionID = i;
+      }
+      return currentSubsectionID;
+    }
+    function updateCurrentSubsection(currentSubsectionID)
+    {
+      for (var i = 0; i < subSectionItems.length; i++)
+      {
+        if (i == currentSubsectionID || isSectionFullyVisible(i))
+          subSectionItems[i].getElementsByTagName("span")[0].style["font-weight"] = 600;
+        else
+          subSectionItems[i].getElementsByTagName("span")[0].style["font-weight"] = 400;
+      }
+    }
+    function windowScroll(e)
+    {
+      updateCurrentSubsection(findCurrentSubsection());
+      updateScroll();
+    }
+    window.addEventListener("scroll", windowScroll);
+    updateCurrentSubsection(findCurrentSubsection());
   </script>
 
   {% if site.google_analytics %}

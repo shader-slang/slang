@@ -33,6 +33,7 @@ public:
     {
         bool isScalar() const { return rowCount <= 1 && colCount <= 1; }
 
+        BaseType elemType;
         int rowCount;
         int colCount;
     };
@@ -74,10 +75,14 @@ protected:
 
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
 
+    virtual const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
+    
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
     virtual SlangResult calcFuncName(const HLSLIntrinsic* specOp, StringBuilder& out);
     virtual SlangResult calcScalarFuncName(HLSLIntrinsic::Op op, IRBasicType* type, StringBuilder& outBuilder);
+
+    const UnownedStringSlice* getVectorElementNames(IRVectorType* vectorType);
 
     void _maybeEmitSpecializedOperationDefinition(const HLSLIntrinsic* specOp);
 
@@ -96,10 +101,12 @@ protected:
 
     void _emitInOutParamType(IRType* type, String const& name, IRType* valueType);
 
+
     UnownedStringSlice _getAndEmitSpecializedOperationDefinition(HLSLIntrinsic::Op op, IRType*const* argTypes, Int argCount, IRType* retType);
 
     static TypeDimension _getTypeDimension(IRType* type, bool vecSwap);
-    static void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
+
+    void _emitAccess(const UnownedStringSlice& name, const TypeDimension& dimension, int row, int col, SourceWriter* writer);
 
     UnownedStringSlice _getScalarFuncName(HLSLIntrinsic::Op operation, IRBasicType* scalarType);
 

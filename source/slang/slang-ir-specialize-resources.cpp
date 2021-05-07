@@ -171,7 +171,7 @@ struct ResourceOutputSpecializationPass
             oldFunc,
             newFunc);
 
-        // At first `newFunc` is a directclone of `oldFunc`, and thus doesn't
+        // At first `newFunc` is a direct clone of `oldFunc`, and thus doesn't
         // solve any of our problems. We will traverse `oldFunc` and specialize
         // it as needed, while also collecting information that will allow
         // us to rewrite call sites.
@@ -468,8 +468,29 @@ struct ResourceOutputSpecializationPass
         //
         // Any failures along the way cause the whole process to fail.
 
-        for( auto param : func->getParams() )
+        // Note: We are introducing new parameters at the same time as we
+        // iterate over the parameter list, so we cannot just use the
+        // `func->getParams()` convenience accessor. Instead, we manually
+        // iterate over the parameters in a way that avoids invalidation
+        // if we remove the `param` we are working on.
+        //
+        // Note: it might seem odd that we are modifying `func` but will
+        // still bail out on any errors. You might ask: isn't there a chance
+        // that we will end up with the function in a partially-modified state?
+        //
+        // The important thing to remember is that `func` is  *copy* of the
+        // original function, so any modifications we make to it do not
+        // affect the original, so that if we *do* have to bail out we can
+        // leave any call sites intact as calls to the original. The result
+        // is that bailing out here may leave the new/copied function in
+        // a state where it isn't useful, but it also won't have any uses,
+        // and can be eliminated later.
+        //
+        IRParam* nextParam = nullptr;
+        for( IRParam* param = func->getFirstParam(); param; param = nextParam )
         {
+            nextParam = param->getNextParam();
+
             ParamInfo paramInfo;
             SLANG_RETURN_ON_FAIL(maybeSpecializeParam(param, paramInfo, outFuncInfo));
             outFuncInfo.oldParams.add(paramInfo);

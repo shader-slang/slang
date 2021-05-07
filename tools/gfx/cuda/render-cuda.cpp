@@ -1432,12 +1432,26 @@ public:
 
             switch (desc.format)
             {
+            case Format::RGBA_Float32:
+            case Format::RGB_Float32:
+            case Format::RG_Float32:
             case Format::R_Float32:
             case Format::D_Float32:
                 {
+                    const FormatInfo info = gfxGetFormatInfo(desc.format);
                     format = CU_AD_FORMAT_FLOAT;
-                    numChannels = 1;
+                    numChannels = info.channelCount;
                     elementSize = sizeof(float);
+                    break;
+                }
+            case Format::RGBA_Float16:
+            case Format::RG_Float16:
+            case Format::R_Float16:
+                {
+                    const FormatInfo info = gfxGetFormatInfo(desc.format);
+                    format = CU_AD_FORMAT_HALF;
+                    numChannels = info.channelCount;
+                    elementSize = sizeof(uint16_t);
                     break;
                 }
             case Format::RGBA_Unorm_UInt8:
@@ -1883,7 +1897,10 @@ public:
             (SlangInt)0, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
-            // TODO: report compile error.
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         

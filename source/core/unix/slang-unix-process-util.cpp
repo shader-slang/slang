@@ -3,6 +3,8 @@
 
 #include "../slang-common.h"
 #include "../slang-string-util.h"
+#include "../slang-string-escape-util.h"
+#include "../slang-memory-arena.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,57 +31,25 @@ namespace Slang {
 #endif
 }
 
-/* static */void ProcessUtil::appendCommandLineEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
 {
-   // TODO(JS): This escaping is not complete... !
-    if (slice.indexOf(' ') >= 0 || slice.indexOf('"') >= 0)
-    {
-        out << "\"";
-
-        const char* cur = slice.begin();
-        const char* end = slice.end();
-
-        while (cur < end)
-        {
-            char c = *cur++;
-            switch (c)
-            {
-                case '\"':
-                {
-                    // Escape quotes.
-                    out << "\\\"";
-                    break;
-                }
-                default:
-                    out.append(c);
-            }
-        }
-
-        out << "\"";
-
-        return;
-    }
-
-    out << slice;
+    return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
 /* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
 {
+    auto escapeHandler = getEscapeHandler();
+
     // When outputting the command line we potentially need to escape the path to the
-    // command and args - that aren't already explicitly marked as escaped. 
+    // command and args - that aren't already explicitly marked as escaped.
+
     StringBuilder cmd;
-    appendCommandLineEscaped(commandLine.m_executable.getUnownedSlice(), cmd);
+    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
     for (const auto& arg : commandLine.m_args)
     {
         cmd << " ";
-        if (arg.type == CommandLine::ArgType::Unescaped)
-        {
-            appendCommandLineEscaped(arg.value.getUnownedSlice(), cmd);
-        }
-        else
-        {
-            cmd << arg.value;
-        }
+
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
     }
     return cmd.ToString();
 }
@@ -89,16 +59,17 @@ namespace Slang {
     outExecuteResult.init();
     
     List<char const*> argPtrs;
+
     // Add the command
     argPtrs.add(commandLine.m_executable.getBuffer());
 
-    // Add all the args - they don't need any explicit escaping
+    // Add all the args - they don't need any explicit escaping 
     for (auto arg : commandLine.m_args)
     {
-        // All args for this target must be unescaped
-        SLANG_ASSERT(arg.type == CommandLine::ArgType::Unescaped);
-        argPtrs.add(arg.value.getBuffer());
+        // All args for this target must be unescaped (as they are in CommandLine)
+        argPtrs.add(arg.getBuffer());
     }
+
     // Terminate with a null
     argPtrs.add(nullptr);
 
@@ -259,7 +230,6 @@ namespace Slang {
 
     return SLANG_FAIL;
 }
-
 
 /* static */uint64_t ProcessUtil::getClockFrequency()
 {

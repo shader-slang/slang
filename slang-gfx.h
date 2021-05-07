@@ -6,7 +6,6 @@
 
 #include "slang.h"
 #include "slang-com-ptr.h"
-#include "slang-com-helper.h"
 
 
 #if defined(SLANG_GFX_DYNAMIC)
@@ -124,8 +123,30 @@ public:
         0x9d32d0ad, 0x915c, 0x4ffd, { 0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 } \
     }
 
+// Dont' change without keeping in sync with Format
+#define GFX_FORMAT(x) \
+    x( Unknown, 0) \
+    \
+    x(RGBA_Float32, sizeof(float) * 4) \
+    x(RGB_Float32, sizeof(float) * 3) \
+    x(RG_Float32, sizeof(float) * 2) \
+    x(R_Float32, sizeof(float)) \
+    \
+    x(RGBA_Float16, sizeof(uint16_t) * 4) \
+    x(RG_Float16, sizeof(uint16_t) * 2) \
+    x(R_Float16, sizeof(uint16_t)) \
+    \
+    x(RGBA_Unorm_UInt8, sizeof(uint32_t)) \
+    x(BGRA_Unorm_UInt8, sizeof(uint32_t)) \
+    \
+    x(R_UInt16, sizeof(uint16_t)) \
+    x(R_UInt32, sizeof(uint32_t)) \
+    \
+    x(D_Float32, sizeof(float)) \
+    x(D_Unorm24_S8, sizeof(uint32_t))
+
 /// Different formats of things like pixels or elements of vertices
-/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes to RendererUtil
+/// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
 enum class Format
 {
     Unknown,
@@ -134,6 +155,10 @@ enum class Format
     RGB_Float32,
     RG_Float32,
     R_Float32,
+
+    RGBA_Float16,
+    RG_Float16,
+    R_Float16,
 
     RGBA_Unorm_UInt8,
     BGRA_Unorm_UInt8,
@@ -145,6 +170,12 @@ enum class Format
     D_Unorm24_S8,
 
     CountOf,
+};
+
+struct FormatInfo
+{
+    uint8_t channelCount;       ///< The amount of channels in the format. Only set if the channelType is set 
+    uint8_t channelType;        ///< One of SlangScalarType None if type isn't made up of elements of type.
 };
 
 struct InputElementDesc
@@ -1061,6 +1092,21 @@ struct DeviceInfo
     const char* adapterName = nullptr;
 };
 
+enum class DebugMessageType
+{
+    Info, Warning, Error
+};
+enum class DebugMessageSource
+{
+    Layer, Driver, Slang
+};
+class IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        handleMessage(DebugMessageType type, DebugMessageSource source, const char* message) = 0;
+};
+
 class IDevice: public ISlangUnknown
 {
 public:
@@ -1084,13 +1130,21 @@ public:
 
     struct Desc
     {
-        DeviceType deviceType = DeviceType::Default;    // The underlying API/Platform of the device.
-        const char* adapter = nullptr;                  // Name to identify the adapter to use
-        int requiredFeatureCount = 0;                   // Number of required features.
-        const char** requiredFeatures = nullptr;        // Array of required feature names, whose size is `requiredFeatureCount`.
-        int nvapiExtnSlot = -1;                         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
-        ISlangFileSystem* shaderCacheFileSystem = nullptr; // The file system for loading cached shader kernels.
-        SlangDesc slang = {};                           // Configurations for Slang.
+        // The underlying API/Platform of the device.
+        DeviceType deviceType = DeviceType::Default;
+        // Name to identify the adapter to use
+        const char* adapter = nullptr;
+        // Number of required features.
+        int requiredFeatureCount = 0;
+        // Array of required feature names, whose size is `requiredFeatureCount`.
+        const char** requiredFeatures = nullptr;
+        // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
+        int nvapiExtnSlot = -1;
+        // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
+        // instead the user is responsible for holding the object alive during the lifetime of an `IDevice`.
+        ISlangFileSystem* shaderCacheFileSystem = nullptr;
+        // Configurations for Slang compiler.
+        SlangDesc slang = {};
     };
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
@@ -1308,7 +1362,7 @@ public:
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const = 0;
 };
 
-#define SLANG_UUID_IRenderer                                                             \
+#define SLANG_UUID_IDevice                                                             \
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
@@ -1320,9 +1374,21 @@ extern "C"
     /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
     SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
 
+    /// Gets information about the format 
+    SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format);
+
     /// Given a type returns a function that can construct it, or nullptr if there isn't one
     SLANG_GFX_API SlangResult SLANG_MCALL
         gfxCreateDevice(const IDevice::Desc* desc, IDevice** outDevice);
+
+    /// Sets a callback for receiving debug messages.
+    /// The layer does not hold a strong reference to the callback object.
+    /// The user is responsible for holding the callback object alive.
+    SLANG_GFX_API SlangResult SLANG_MCALL
+        gfxSetDebugCallback(IDebugCallback* callback);
+
+    /// Enables debug layer. The debug layer will check all `gfx` calls and verify that uses are valid.
+    SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer();
 
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }

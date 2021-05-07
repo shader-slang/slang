@@ -620,12 +620,6 @@ public:
             slang::BindingType bindingType;
             Index count;
             Index baseIndex;
-
-            // Returns true if this binding range consumes a specialization argument slot.
-            bool isSpecializationArg() const
-            {
-                return bindingType == slang::BindingType::ExistentialValue;
-            }
         };
 
         struct SubObjectRangeInfo
@@ -1340,8 +1334,8 @@ public:
                 // contiguous array with a single stride; we need to carefully consider what the layout
                 // logic does for complex cases with multiple layers of nested arrays and structures.
                 //
-                size_t subObjectRangePendingDataOffset = _getSubObjectRangePendingDataOffset(specializedLayout, subObjectRangeIndex);
-                size_t subObjectRangePendingDataStride = _getSubObjectRangePendingDataStride(specializedLayout, subObjectRangeIndex);
+                size_t subObjectRangePendingDataOffset = 0; //subObjectRangeInfo.offset.pendingOrdinaryData;
+                size_t subObjectRangePendingDataStride = 0; //subObjectRangeInfo.stride.pendingOrdinaryData;
 
                 // If the range doesn't actually need/use the "pending" allocation at all, then
                 // we need to detect that case and skip such ranges.
@@ -1368,12 +1362,6 @@ public:
 
             return SLANG_OK;
         }
-
-        // As discussed in `_writeOrdinaryData()`, these methods are just stubs waiting for
-        // the "flat" Slang refelction information to provide access to the relevant data.
-        //
-        size_t _getSubObjectRangePendingDataOffset(ShaderObjectLayoutImpl* specializedLayout, Index subObjectRangeIndex) { return 0; }
-        size_t _getSubObjectRangePendingDataStride(ShaderObjectLayoutImpl* specializedLayout, Index subObjectRangeIndex) { return 0; }
 
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
         Result _ensureOrdinaryDataBufferCreatedIfNeeded(GLDevice* device)
@@ -1789,17 +1777,16 @@ SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outR
 
 void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
 {
-    ::OutputDebugStringA("GL: ");
-    ::OutputDebugStringA(message);
-    ::OutputDebugStringA("\n");
-
-    switch (type)
+    DebugMessageType msgType = DebugMessageType::Info;
+    switch(type)
     {
-        case GL_DEBUG_TYPE_ERROR:
-            break;
-        default:
-            break;
+    case GL_DEBUG_TYPE_ERROR:
+        msgType = DebugMessageType::Error;
+        break;
+    default:
+        break;
     }
+    getDebugCallback()->handleMessage(msgType, DebugMessageSource::Driver, message);
 }
 
 /* static */void APIENTRY GLDevice::staticDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
@@ -2862,7 +2849,16 @@ Result GLDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
     {
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        SLANG_RETURN_ON_FAIL(desc.slangProgram->getEntryPointCode(i, 0, kernelCode.writeRef(), diagnostics.writeRef()));
+        auto compileResult = desc.slangProgram->getEntryPointCode(
+            i, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        SLANG_RETURN_ON_FAIL(compileResult);
         GLenum glShaderType = 0;
         auto stage = programLayout->getEntryPointByIndex(i)->getStage();
         switch (stage)

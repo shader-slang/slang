@@ -89,6 +89,18 @@ void _unpackFloatTexel(void const* texelData, void* outData, size_t outSize)
     memcpy(outData, temp, outSize);
 }
 
+template<int N>
+void _unpackFloat16Texel(void const* texelData, void* outData, size_t outSize)
+{
+    auto input = (int16_t const*)texelData;
+
+    float temp[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    for (int i = 0; i < N; ++i)
+        temp[i] = HalfToFloat(input[i]);
+
+    memcpy(outData, temp, outSize);
+}
+
 static inline float _unpackUnorm8Value(uint8_t value)
 {
     return value / 255.0f;
@@ -143,42 +155,45 @@ void _unpackUInt32Texel(void const* texelData, void* outData, size_t outSize)
     memcpy(outData, temp, outSize);
 }
 
-#define TEXTURE_FORMAT_INFO(FORMAT) static const CPUTextureFormatInfo kCPUTextureFormatInfo_##FORMAT
+struct CPUFormatInfoMap
+{
+    CPUFormatInfoMap()
+    {
+        memset(m_infos, 0, sizeof(m_infos));
 
-TEXTURE_FORMAT_INFO(RGBA_Float32)      = { &_unpackFloatTexel<4> };
-TEXTURE_FORMAT_INFO(RGB_Float32)       = { &_unpackFloatTexel<3> };
-TEXTURE_FORMAT_INFO(RG_Float32)        = { &_unpackFloatTexel<2> };
-TEXTURE_FORMAT_INFO(R_Float32)         = { &_unpackFloatTexel<1> };
-TEXTURE_FORMAT_INFO(RGBA_Unorm_UInt8)  = { &_unpackUnorm8Texel<4> };
-TEXTURE_FORMAT_INFO(BGRA_Unorm_UInt8)  = { &_unpackUnormBGRA8Texel };
-TEXTURE_FORMAT_INFO(R_UInt16)          = { &_unpackUInt16Texel<1> };
-TEXTURE_FORMAT_INFO(R_UInt32)          = { &_unpackUInt32Texel<1> };
-TEXTURE_FORMAT_INFO(D_Float32)         = { &_unpackFloatTexel<1> };
+        set(Format::RGBA_Float32, &_unpackFloatTexel<4>);
+        set(Format::RGB_Float32, &_unpackFloatTexel<3>);
 
-#undef TEXTURE_FORMAT_INFO
+        set(Format::RG_Float32, &_unpackFloatTexel<2>);
+        set(Format::R_Float32, &_unpackFloatTexel<1>);
+
+        set(Format::RGBA_Float16, &_unpackFloat16Texel<4>);
+        set(Format::RG_Float16, &_unpackFloat16Texel<2>);
+        set(Format::R_Float16, &_unpackFloat16Texel<1>);
+
+        set(Format::RGBA_Unorm_UInt8, &_unpackUnorm8Texel<4>);
+        set(Format::BGRA_Unorm_UInt8, &_unpackUnormBGRA8Texel);
+        set(Format::R_UInt16, &_unpackUInt16Texel<1>);
+        set(Format::R_UInt32, &_unpackUInt32Texel<1>);
+        set(Format::D_Float32, &_unpackFloatTexel<1>);
+    }
+
+    void set(Format format, CPUTextureUnpackFunc func)
+    {
+        auto& info = m_infos[Index(format)];
+        info.unpackFunc = func;
+    }
+    SLANG_FORCE_INLINE const CPUTextureFormatInfo& get(Format format) const { return m_infos[Index(format)]; }
+
+    CPUTextureFormatInfo m_infos[Index(Format::CountOf)];
+};
+
+static const CPUFormatInfoMap g_formatInfoMap;
 
 static CPUTextureFormatInfo const* _getFormatInfo(Format format)
 {
-    switch(format)
-    {
-    case Format::D_Unorm24_S8:
-    default:
-        return nullptr;
-
-
-#define CASE(FORMAT) case Format::FORMAT: return &kCPUTextureFormatInfo_##FORMAT;
-    CASE(RGBA_Float32)
-    CASE(RGB_Float32)
-    CASE(RG_Float32)
-    CASE(R_Float32)
-    CASE(RGBA_Unorm_UInt8)
-    CASE(BGRA_Unorm_UInt8)
-    CASE(R_UInt16)
-    CASE(R_UInt32)
-    CASE(D_Float32)
-
-#undef CASE
-    }
+    const CPUTextureFormatInfo& info = g_formatInfoMap.get(format);
+    return info.unpackFunc ? &info : nullptr;
 }
 
 class CPUTextureResource : public TextureResource
@@ -1136,7 +1151,17 @@ private:
         auto entryPointObject = m_currentRootObject->getEntryPoint(entryPointIndex);
 
         ComPtr<ISlangSharedLibrary> sharedLibrary;
-        program->slangProgram->getEntryPointHostCallable(entryPointIndex, targetIndex, sharedLibrary.writeRef());
+        ComPtr<ISlangBlob> diagnostics;
+        auto compileResult = program->slangProgram->getEntryPointHostCallable(
+            entryPointIndex, targetIndex, sharedLibrary.writeRef(), diagnostics.writeRef());
+        if (diagnostics)
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        if (SLANG_FAILED(compileResult)) return;
 
         auto func = (slang_prelude::ComputeFunc) sharedLibrary->findSymbolAddressByName(entryPointName);
 

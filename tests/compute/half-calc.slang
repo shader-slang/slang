@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-dx12 -compute -use-dxil -profile cs_6_2 -render-features half -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -compute -profile cs_6_2 -render-features half -shaderobj
-
+//TEST(compute):COMPARE_COMPUTE:-cuda -compute -render-features half -shaderobj
 
 // Test for doing a calculation using half
 
@@ -28,6 +28,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     v *= half(3.0f);
     v += half(1.0f);
     v += offset;
+    
+    v++;
+    --v;
+    v--;
     
     outputBuffer[tid] = v;
 }
