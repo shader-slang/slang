@@ -1186,38 +1186,40 @@ Module* getModule(Decl* decl)
     return moduleDecl->module;
 }
 
-bool findImageFormatByName(char const* name, ImageFormat* outFormat)
+static const ImageFormatInfo kImageFormatInfos[] =
 {
-    static const struct
-    {
-        char const* name;
-        ImageFormat format;
-    } kFormats[] =
-    {
-#define FORMAT(NAME) { #NAME, ImageFormat::NAME },
+#define SLANG_IMAGE_FORMAT_INFO(TYPE, COUNT, SIZE) SLANG_SCALAR_TYPE_##TYPE, uint8_t(COUNT), uint8_t(SIZE)
+#define FORMAT(NAME, OTHER) \
+    { SLANG_IMAGE_FORMAT_INFO OTHER, UnownedStringSlice::fromLiteral(#NAME) },
 #include "slang-image-format-defs.h"
-    };
+#undef FORMAT
+#undef SLANG_IMAGE_FORMAT_INFO
+};
 
-    for( auto item : kFormats )
+bool findImageFormatByName(char const* inName, ImageFormat* outFormat)
+{
+    const UnownedStringSlice name(inName);
+
+    for (Index i = 0; i < SLANG_COUNT_OF(kImageFormatInfos); ++i)
     {
-        if( strcmp(item.name, name) == 0 )
+        const auto& info = kImageFormatInfos[i];
+        if (info.name == name)
         {
-            *outFormat = item.format;
+            *outFormat = ImageFormat(i);
             return true;
         }
     }
-
     return false;
 }
 
 char const* getGLSLNameForImageFormat(ImageFormat format)
 {
-    switch( format )
-    {
-    default: return "unhandled";
-#define FORMAT(NAME) case ImageFormat::NAME: return #NAME;
-#include "slang-image-format-defs.h"
-    }
+    return kImageFormatInfos[Index(format)].name.begin();
 }
+
+ const ImageFormatInfo& getImageFormatInfo(ImageFormat format)
+ {
+     return kImageFormatInfos[Index(format)];
+ }
 
 } // namespace Slang

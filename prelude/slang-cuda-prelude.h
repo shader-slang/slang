@@ -371,8 +371,30 @@ SLANG_SURFACE_WRITE(surf1DLayeredwrite, (int x, int layer), (x, layer))
 SLANG_SURFACE_WRITE(surf2DLayeredwrite, (int x, int y, int layer), (x, y, layer))
 SLANG_SURFACE_WRITE(surfCubemapwrite, (int x, int y, int face), (x, y, face))
 SLANG_SURFACE_WRITE(surfCubemapLayeredwrite, (int x, int y, int layerFace), (x, y, layerFace))
-     
+
 #endif
+
+// Support for doing format conversion when writing to a surface/RWTexture
+
+template <typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode);
+template <typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
+
+// https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
+// https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#surface-instructions-sust
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode)
+{
+    asm volatile ( "{sust.p.1d.b32.trap [%0, {%1}], {%2};}\n\t" :: "l"(surfObj),"r"(x),"f"(v));     
+}
+ 
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    asm volatile ( "{sust.p.2d.b32.trap [%0, {%1,%2}], {%3};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(v));
+}
 
 // ----------------------------- F32 -----------------------------------------
 

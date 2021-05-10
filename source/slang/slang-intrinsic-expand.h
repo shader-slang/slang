@@ -24,6 +24,7 @@ protected:
 
     SourceWriter* m_writer;
     UnownedStringSlice m_text;
+    IRCall* m_callInst;
     IRUse* m_args = nullptr;
     Int m_argCount = 0;
     Index m_openParenCount = 0;

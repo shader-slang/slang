@@ -8,6 +8,7 @@ void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const
     m_args = args;
     m_argCount = argCount;
     m_text = intrinsicText;
+    m_callInst = inst;
 
     const auto returnType = inst->getDataType();
 
@@ -56,6 +57,26 @@ void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const
     for (Index i = 0; i < m_openParenCount; ++i)
     {
         m_writer->emit(")");
+    }
+}
+
+static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
+{
+    switch (type)
+    {
+        case SLANG_SCALAR_TYPE_INT32:       return BaseType::Int;
+        case SLANG_SCALAR_TYPE_UINT32:      return BaseType::UInt;
+        case SLANG_SCALAR_TYPE_INT16:       return BaseType::Int16;
+        case SLANG_SCALAR_TYPE_UINT16:      return BaseType::UInt16;
+        case SLANG_SCALAR_TYPE_INT64:       return BaseType::Int64;
+        case SLANG_SCALAR_TYPE_UINT64:      return BaseType::UInt64;
+        case SLANG_SCALAR_TYPE_INT8:        return BaseType::Int8;
+        case SLANG_SCALAR_TYPE_UINT8:       return BaseType::UInt8;
+        case SLANG_SCALAR_TYPE_FLOAT16:     return BaseType::Half;
+        case SLANG_SCALAR_TYPE_FLOAT32:     return BaseType::Float;
+        case SLANG_SCALAR_TYPE_FLOAT64:     return BaseType::Double;
+        case SLANG_SCALAR_TYPE_BOOL:        return BaseType::Bool;
+        default:                            return BaseType::Void;
     }
 }
 
@@ -168,6 +189,79 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
+        case 'C':
+        {
+            if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
+            {
+                // Let's look at the target variables type
+                //IRInst* callee = m_callInst->getCallee();
+
+                // TODO(JS):
+                //
+                // This is a bit of a hack. The following code is assuming that the 'object' being
+                // called on, is held in some structure as a field. This is the case for CUDA and C++
+                // but may not be on other targets.
+                //
+                // Fortunately the C mechanism is only being used for CUDA targets, so this is ok.
+
+                // This will be the object the call is taking place on.
+                IRInst* arg0 = m_callInst->getArg(0);
+
+                IRLoad* load = as<IRLoad>(arg0);
+
+                if (load)
+                {
+                    IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0));
+                    if (fieldAddress)
+                    {
+                        IRInst* inst = fieldAddress->getField();
+                        auto formatDecoration = inst->findDecoration<IRFormatDecoration>();
+
+                        const ImageFormat imageFormat = formatDecoration->getFormat();
+
+                        // First try the return type (if it's a read)
+                        IRType* dataType = m_callInst->getDataType();
+                        if (as<IRVoidType>(dataType))
+                        {
+                            // If that's void try the last arg
+                            // Lets get the last arg. If it's a write this is
+                            IRInst* lastArg = m_callInst->getArg(m_callInst->getArgCount() - 1);
+                            dataType = lastArg->getDataType();
+                        }
+
+                        int numElems = 1;
+                        if (auto vecType = as<IRVectorType>(dataType))
+                        {
+                            numElems = int(getIntVal(vecType->getElementCount()));
+                            dataType = vecType->getElementType();
+                        }
+
+                        BaseType baseType = BaseType::Void;
+                        if (auto basicType = as<IRBasicType>(dataType))
+                        {
+                            baseType = basicType->getBaseType();
+                        }
+
+                        const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
+
+                        BaseType formatBaseType = _getBaseTypeFromScalarType(imageFormatInfo.scalarType);
+
+                        if (numElems != imageFormatInfo.channelCount)
+                        {
+                            SLANG_ASSERT(!"Format doesn't match channel count");
+                            break;
+                        }
+
+                        if (formatBaseType != baseType)
+                        {
+                            // Output _convert for now
+                            m_writer->emit("_convert");
+                        }
+                    }
+                }
+            }
+            break;
+        }
         case 'c':
         {
             // When doing texture access in glsl the result may need to be cast.

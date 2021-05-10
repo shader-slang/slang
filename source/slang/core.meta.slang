@@ -1132,7 +1132,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             }
 
                             sb << (isArray ? "Layered" : "");
-                            sb << "write<$T0>($2, $0";
+                            sb << "write$C<$T0>($2, $0";
                             for (int i = 0; i < vecCount; ++i)
                             {
                                 sb << ", ($1)";
