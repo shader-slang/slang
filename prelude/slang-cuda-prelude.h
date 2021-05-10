@@ -405,6 +405,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 surf2Dread_convert<float4>(cudaSurface
 
 // Support for doing format conversion when writing to a surface/RWTexture
 
+// NOTE! For normal surface access x values are *byte* addressed.
+// For the _convert versions they are *not*. They don't need to be because sust.p does not require it.
+
 template <typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode);
 template <typename T>

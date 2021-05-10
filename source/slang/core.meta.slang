@@ -1091,6 +1091,11 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                 if (vecCount > 1)
                                 {
                                     sb << '.' << char(i + 'x');
+                                    // Surface access is *byte* addressed in x in CUDA
+                                    if (i == 0)
+                                    {
+                                        sb << " * $E";
+                                    }
                                 }
                             }
 
@@ -1139,6 +1144,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                 if (vecCount > 1)
                                 {
                                     sb << '.' << char(i + 'x');
+                                }
+
+                                // Surface access is *byte* addressed in x in CUDA
+                                if (i == 0)
+                                {
+                                    sb << " * $E";
                                 }
                             }
 
