@@ -80,6 +80,73 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
     }
 }
 
+// TODO(JS): There is an inherent problem here:
+// 
+// TimF: The big gotcha you'd have with trying to look up the IRVar or whatever from an intrinsic is that it is very easy for the user to "smuggle" a resource-type value through an intermediate function:
+//
+// ```
+// Imagine this is user code...
+// void f(RWTexture2D t) { t.YourOpThatYouAdded(...); }[attributeYouCareAbout(...)]
+// RWTexture2D gTex;
+// ...
+// f(gTex);
+//
+// ```
+// 
+// So when emitting IR code for f, there is no way to trace t back to gTex and get at[attributeYouCareAbout(...)]
+// Structurally, you can get back to the IRParam for t and that's it.
+// And even if there was some magic way to trace back through the call site, you would run into the problem that some call sites
+// might call f(gTex) and other might call f(gSomeOtherTex) and there is no guarantee the attributes on those two textures would match.
+//
+// The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to do for resources means that there wouldn't be a single f() function any more.
+// But for CUDA and C++ that's not the case or generally desirable.
+
+IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
+{
+    // JS(TODO):
+    // There could perhaps be other situations, that need to be covered
+
+    // If this is a load, we need to get the decoration from the field key
+    if (IRLoad* load = as<IRLoad>(inst))
+    {
+        if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
+        {
+            IRInst* field = fieldAddress->getField();
+            return field->findDecoration<IRFormatDecoration>();
+        }
+    }
+    // Otherwise just try on the instruction
+    return inst->findDecoration<IRFormatDecoration>();
+}
+
+bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
+{
+    int numElems = 1;
+
+    if (auto vecType = as<IRVectorType>(dataType))
+    {
+        numElems = int(getIntVal(vecType->getElementCount()));
+        dataType = vecType->getElementType();
+    }
+
+    BaseType baseType = BaseType::Void;
+    if (auto basicType = as<IRBasicType>(dataType))
+    {
+        baseType = basicType->getBaseType();
+    }
+
+    const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
+    const BaseType formatBaseType = _getBaseTypeFromScalarType(imageFormatInfo.scalarType);
+
+    if (numElems != imageFormatInfo.channelCount)
+    {
+        SLANG_ASSERT(!"Format doesn't match channel count");
+        return false;
+    }
+
+    return formatBaseType == baseType;
+}
+
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 {
     const char*const end = m_text.end();
@@ -191,73 +258,26 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
         case 'C':
         {
+            // The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format
+            // conversion required between the type associated by the resource and the backing ImageFormat.
+            // Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture
+            // writes that will do a format conversion.
             if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
             {
-                // Let's look at the target variables type
-                //IRInst* callee = m_callInst->getCallee();
-
-                // TODO(JS):
-                //
-                // This is a bit of a hack. The following code is assuming that the 'object' being
-                // called on, is held in some structure as a field. This is the case for CUDA and C++
-                // but may not be on other targets.
-                //
-                // Fortunately the C mechanism is only being used for CUDA targets, so this is ok.
-
-                // This will be the object the call is taking place on.
                 IRInst* arg0 = m_callInst->getArg(0);
 
-                IRLoad* load = as<IRLoad>(arg0);
-
-                if (load)
+                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(arg0))
                 {
-                    IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0));
-                    if (fieldAddress)
+                    const ImageFormat imageFormat = formatDecoration->getFormat();
+                    auto textureType = as<IRTextureTypeBase>(arg0->getDataType());
+                    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
+
+                    if (elementType && ! _isImageFormatCompatible(imageFormat, elementType))
                     {
-                        IRInst* inst = fieldAddress->getField();
-                        auto formatDecoration = inst->findDecoration<IRFormatDecoration>();
-
-                        const ImageFormat imageFormat = formatDecoration->getFormat();
-
-                        // First try the return type (if it's a read)
-                        IRType* dataType = m_callInst->getDataType();
-                        if (as<IRVoidType>(dataType))
-                        {
-                            // If that's void try the last arg
-                            // Lets get the last arg. If it's a write this is
-                            IRInst* lastArg = m_callInst->getArg(m_callInst->getArgCount() - 1);
-                            dataType = lastArg->getDataType();
-                        }
-
-                        int numElems = 1;
-                        if (auto vecType = as<IRVectorType>(dataType))
-                        {
-                            numElems = int(getIntVal(vecType->getElementCount()));
-                            dataType = vecType->getElementType();
-                        }
-
-                        BaseType baseType = BaseType::Void;
-                        if (auto basicType = as<IRBasicType>(dataType))
-                        {
-                            baseType = basicType->getBaseType();
-                        }
-
-                        const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
-
-                        BaseType formatBaseType = _getBaseTypeFromScalarType(imageFormatInfo.scalarType);
-
-                        if (numElems != imageFormatInfo.channelCount)
-                        {
-                            SLANG_ASSERT(!"Format doesn't match channel count");
-                            break;
-                        }
-
-                        if (formatBaseType != baseType)
-                        {
-                            // Output _convert for now
-                            m_writer->emit("_convert");
-                        }
-                    }
+                        // Append _convert on the name to signify we need to use a code path, that will automatically
+                        // do the format conversion.
+                        m_writer->emit("_convert");
+                    }                    
                 }
             }
             break;

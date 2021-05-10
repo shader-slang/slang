@@ -63,6 +63,15 @@
  
 #ifndef SLANG_CUDA_BOUNDARY_MODE
 #   define SLANG_CUDA_BOUNDARY_MODE cudaBoundaryModeZero
+
+// Can be one of SLANG_CUDA_PTX_BOUNDARY_MODE. Only applies *PTX* emitted CUDA operations
+// which currently is just RWTextureRW format writes
+// 
+// .trap         causes an execution trap on out-of-bounds addresses
+// .clamp        stores data at the nearest surface location (sized appropriately)
+// .zero         drops stores to out-of-bounds addresses 
+
+#   define SLANG_PTX_BOUNDARY_MODE "zero"
 #endif
 
 struct TypeInfo
@@ -387,13 +396,13 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(T, cudaSurfaceObject
 template <>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode)
 {
-    asm volatile ( "{sust.p.1d.b32.trap [%0, {%1}], {%2};}\n\t" :: "l"(surfObj),"r"(x),"f"(v));     
+    asm volatile ( "{sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2};}\n\t" :: "l"(surfObj),"r"(x),"f"(v));     
 }
  
 template <>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
 {
-    asm volatile ( "{sust.p.2d.b32.trap [%0, {%1,%2}], {%3};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(v));
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(v));
 }
 
 // ----------------------------- F32 -----------------------------------------
