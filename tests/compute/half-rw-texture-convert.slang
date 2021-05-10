@@ -41,14 +41,27 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     
-    float val = idx;
+    float val = 0;
  
     // Do a format converting write!
-    rwt2D[uint2(idx, idx)] = val;    
+    rwt2D_4[uint2(idx, idx)] = float4(idx + 99, idx + 8, idx + 16, idx + 24);    
+    
+    AllMemoryBarrierWithGroupSync();
+    
+    // We have a hack to make this work
+    float4 v = rwt2D_4[uint2(idx, idx)];
+    
+    val += v.x;
+    
+    // HACK! To make sure HALF is available
+    val += half(0);
+    
+#if 0  
     
     rwt2D_2[uint2(idx, idx)] = float2(val * 2, val * 3);    
     
     rwt2D_4[uint2(idx, idx)] = float4(val + 1, val - 1, val * 4, val * -4);    
+#endif 
     
     outputBuffer[idx] = val;
 }

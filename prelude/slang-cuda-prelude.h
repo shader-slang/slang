@@ -383,6 +383,26 @@ SLANG_SURFACE_WRITE(surfCubemapLayeredwrite, (int x, int y, int layerFace), (x, 
 
 #endif
 
+// ! Hack to test out reading !!!
+
+template <typename T> 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_convert(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
+
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float surf2Dread_convert<float>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode) 
+{ 
+    // Read as uint16_t, convert to half and then implicitly to float.
+    return __ushort_as_half(surf2Dread<uint16_t>(surfObj, x * sizeof(uint16_t), y, boundaryMode));
+} 
+
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 surf2Dread_convert<float4>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode) 
+{ 
+    // Read as short4, convert to half and then implicitly to float.
+    const __half4 v = __ushort_as_half(surf2Dread<ushort4>(surfObj, x * sizeof(short4), y, boundaryMode));
+    return float4{v.xy.x, v.xy.y, v.zw.x, v.zw.y};
+}
+
 // Support for doing format conversion when writing to a surface/RWTexture
 
 template <typename T>
@@ -391,7 +411,6 @@ template <typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
 template <typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, int y, int z, cudaSurfaceBoundaryMode boundaryMode);
-
 
 // https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
 // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#surface-instructions-sust
