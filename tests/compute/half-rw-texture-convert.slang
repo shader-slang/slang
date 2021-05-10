@@ -25,14 +25,6 @@
 [format("r16f")]
 RWTexture2D<float> rwt2D;
 
-//TEST_INPUT: RWTexture2D(format=RG_Float16, size=4, content = one, mipMaps = 1):name rwt2D_2
-[format("rg16f")]
-RWTexture2D<float2> rwt2D_2;
-
-//TEST_INPUT: RWTexture2D(format=RGBA_Float16, size=4, content = one, mipMaps = 1):name rwt2D_4
-[format("rgba16f")]
-RWTexture2D<float4> rwt2D_4;
-
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -41,27 +33,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     
-    float val = 0;
+    float val = idx;
  
     // Do a format converting write!
-    rwt2D_4[uint2(idx, idx)] = float4(idx + 99, idx + 8, idx + 16, idx + 24);    
-    
-    AllMemoryBarrierWithGroupSync();
-    
-    // We have a hack to make this work
-    float4 v = rwt2D_4[uint2(idx, idx)];
-    
-    val += v.x;
-    
-    // HACK! To make sure HALF is available
-    val += half(0);
-    
-#if 0  
-    
-    rwt2D_2[uint2(idx, idx)] = float2(val * 2, val * 3);    
-    
-    rwt2D_4[uint2(idx, idx)] = float4(val + 1, val - 1, val * 4, val * -4);    
-#endif 
+    rwt2D[uint2(idx, idx)] = val;    
     
     outputBuffer[idx] = val;
 }
