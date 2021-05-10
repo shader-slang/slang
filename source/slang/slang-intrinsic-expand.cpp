@@ -119,6 +119,8 @@ static IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
     return inst->findDecoration<IRFormatDecoration>();
 }
 
+// Returns true if dataType and imageFormat are compatible - that they have the same representation,
+// and no conversion is required.
 static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
 {
     int numElems = 1;
@@ -147,12 +149,27 @@ static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
     return formatBaseType == baseType;
 }
 
+static bool _isConvertRequired(ImageFormat imageFormat, IRInst* resourceVar)
+{
+    auto textureType = as<IRTextureTypeBase>(resourceVar->getDataType());
+    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
+    return elementType && !_isImageFormatCompatible(imageFormat, elementType);
+}
+
 static size_t _calcBackingElementSizeInBytes(IRInst* resourceVar)
 {
     // First see if there is a format associated with the resource
     if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceVar))
     {
         const ImageFormat imageFormat = formatDecoration->getFormat();
+
+        if (_isConvertRequired(imageFormat, resourceVar))
+        {
+            // If the access is a converting access then the x coordinate is *NOT* scaled
+            // This is a CUDA specific issue(!).
+            return 1;
+        }
+
         const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
         return imageFormatInfo.sizeInBytes;
     }
@@ -311,10 +328,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(arg0))
                 {
                     const ImageFormat imageFormat = formatDecoration->getFormat();
-                    auto textureType = as<IRTextureTypeBase>(arg0->getDataType());
-                    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
-
-                    if (elementType && ! _isImageFormatCompatible(imageFormat, elementType))
+                    if (_isConvertRequired(imageFormat, arg0))
                     {
                         // Append _convert on the name to signify we need to use a code path, that will automatically
                         // do the format conversion.
