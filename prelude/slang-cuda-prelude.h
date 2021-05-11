@@ -381,27 +381,42 @@ SLANG_SURFACE_WRITE(surf2DLayeredwrite, (int x, int y, int layer), (x, y, layer)
 SLANG_SURFACE_WRITE(surfCubemapwrite, (int x, int y, int face), (x, y, face))
 SLANG_SURFACE_WRITE(surfCubemapLayeredwrite, (int x, int y, int layerFace), (x, y, layerFace))
 
-#endif
-
 // ! Hack to test out reading !!!
+// Only works converting *from* half 
+ 
+//template <typename T> 
+//SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_convert(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
 
-template <typename T> 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_convert(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
-
+#define SLANG_SURFACE_READ_HALF_CONVERT(FUNC_NAME, TYPE_ARGS, ARGS) \
+\
+template <typename T>  \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T FUNC_NAME##_convert(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode); \
+\
 template <> \
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float surf2Dread_convert<float>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode) 
-{ 
-    // Read as uint16_t, convert to half and then implicitly to float.
-    return __ushort_as_half(surf2Dread<uint16_t>(surfObj, x * sizeof(uint16_t), y, boundaryMode));
-} 
-
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float FUNC_NAME<float>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode)  \
+{ \
+    return __ushort_as_half(FUNC_NAME<uint16_t>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+} \
+\
 template <> \
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 surf2Dread_convert<float4>(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode) 
-{ 
-    // Read as short4, convert to half and then implicitly to float.
-    const __half4 v = __ushort_as_half(surf2Dread<ushort4>(surfObj, x * sizeof(short4), y, boundaryMode));
-    return float4{v.xy.x, v.xy.y, v.zw.x, v.zw.y};
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 FUNC_NAME##_convert<float2>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
+{ \
+    const __half2 v = __ushort_as_half(FUNC_NAME<ushort2>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+    return float2{v.x, v.y}; \
+} \
+\
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 FUNC_NAME##_convert<float4>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
+{ \
+    const __half4 v = __ushort_as_half(FUNC_NAME<ushort4>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+    return float4{v.xy.x, v.xy.y, v.zw.x, v.zw.y}; \
 }
+
+SLANG_SURFACE_READ_HALF_CONVERT(surf1Dread, (int x), (x)) 
+SLANG_SURFACE_READ_HALF_CONVERT(surf2Dread, (int x, int y), (x, y)) 
+SLANG_SURFACE_READ_HALF_CONVERT(surf3Dread, (int x, int y, int z), (x, y, z))
+
+#endif
 
 // Support for doing format conversion when writing to a surface/RWTexture
 
