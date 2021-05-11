@@ -1,7 +1,6 @@
 Slang Target Compatibility 
 ==========================
 
-
 Shader Model (SM) numbers are D3D Shader Model versions, unless explicitly stated otherwise.
 OpenGL compatibility is not listed here, because OpenGL isn't an officially supported target. 
 
@@ -203,8 +202,6 @@ uint64_t RWByteAddressBuffer::InterlockedMinU64(uint byteAddress, uint64_t value
 uint64_t RWByteAddressBuffer::InterlockedAndU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedOrU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedXorU64(uint byteAddress, uint64_t value);
-
-
 ```
 
 On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). Support for NVAPI is described
