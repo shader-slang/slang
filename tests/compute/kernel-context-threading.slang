@@ -17,7 +17,7 @@ ConstantBuffer<float4x4> matrixBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0  0 0 0 0  0 0 0 0  0 0 0 0], stride=4):out,name rowOrderMatrixOutput
 RWStructuredBuffer<float> rowOrderMatrixOutput;
 
-void writeRow(float4 v, int rowIndex)
+void writeRow2(float4 v, int rowIndex)
 {
     int baseIndex = rowIndex * 4;
     
@@ -25,6 +25,12 @@ void writeRow(float4 v, int rowIndex)
     rowOrderMatrixOutput[baseIndex + 1] = v.y;
     rowOrderMatrixOutput[baseIndex + 2] = v.z;
     rowOrderMatrixOutput[baseIndex + 3] = v.w;
+}
+
+// Just to test threading works through multiple levels of functions.
+void writeRow(float4 v, int rowIndex)
+{
+    writeRow2(v, rowIndex);
 }
 
 [numthreads(1, 1, 1)]
