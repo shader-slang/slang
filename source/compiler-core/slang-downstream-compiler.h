@@ -342,6 +342,9 @@ public:
         /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
     virtual SlangResult dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
 
+        /// True if underlying compiler uses file system to pass source
+    virtual bool isFileBased() = 0;
+
         /// Get info for a compiler type
     static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
         /// True if this compiler can compile the specified language
@@ -394,7 +397,8 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    
+    virtual bool isFileBased() SLANG_OVERRIDE { return true; }
+
     // Functions to be implemented for a specific CommandLine
 
         /// Given the compilation options and the module name, determines the actual file name used for output
@@ -430,6 +434,7 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE { SLANG_UNUSED(options); SLANG_UNUSED(outResult); return SLANG_E_NOT_IMPLEMENTED; }
+    virtual bool isFileBased() SLANG_OVERRIDE { return true; }
     virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_library; }
 
     SharedLibraryDownstreamCompiler(const Desc& desc, ISlangSharedLibrary* library):

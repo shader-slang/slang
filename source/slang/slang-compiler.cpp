@@ -996,8 +996,6 @@ SlangResult dissassembleDXILUsingDXC(
 
         auto session = slangRequest->getSession();
 
-        const String originalSourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
-
         CodeGenTarget sourceTarget = CodeGenTarget::None;
         SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
@@ -1124,21 +1122,38 @@ SlangResult dissassembleDXILUsingDXC(
 
             // Special case if we have a single file, so that we pass the path, and the contents
             const auto& sourceFiles = translationUnit->getSourceFiles();
+
+            if (compiler->isFileBased())
+            {
+                // The *assumption* here is that if it's file based that assuming it can find the file with the same contents
+                // it can compile directly without having to save off as a file
+                if (sourceFiles.getCount() == 1)
+                {
+                    const SourceFile* sourceFile = sourceFiles[0];
+                    const PathInfo& pathInfo = sourceFile->getPathInfo();
+                    if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
+                    {
+                        options.sourceContentsPath = pathInfo.foundPath;
+                    }
+                }
+            }
+            else
+            {
+                // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
+                // exist on the file system
+                const String originalSourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
+                options.sourceContentsPath = originalSourcePath;
+            }
+
             if (sourceFiles.getCount() == 1)
             {
                 const SourceFile* sourceFile = sourceFiles[0];
-                const PathInfo& pathInfo = sourceFile->getPathInfo();
-                if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
-                {
-                    options.sourceContentsPath = pathInfo.foundPath;
-                }
                 options.sourceContents = sourceFile->getContent();
             }
             else
             {
                 SourceResult source;
                 SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, source));
-
                 options.sourceContents = source.source;
             }
         }
@@ -1175,7 +1190,7 @@ SlangResult dissassembleDXILUsingDXC(
         // Set the file sytem and source manager, as *may* be used by downstream compiler
         options.fileSystemExt = slangRequest->getFileSystemExt();
         options.sourceManager = slangRequest->getSourceManager();
-        
+
         // Set the source type
         options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
         
