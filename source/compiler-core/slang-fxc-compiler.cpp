@@ -417,7 +417,7 @@ SlangResult FXCDownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTar
 /* static */SlangResult FXCDownstreamCompilerUtil::locateCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(path);
-    SLANG_UNUSED(load);
+    SLANG_UNUSED(loader);
     SLANG_UNUSED(set);
     return SLANG_E_NOT_AVAILABLE;
 }
