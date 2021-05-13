@@ -23,17 +23,17 @@ namespace Slang
 
     switch (options.targetType)
     {
-        case TargetType::SharedLibrary:
+        case SLANG_SHARED_LIBRARY:
         {
             outPath << options.modulePath << ".dll";
             return SLANG_OK;
         }
-        case TargetType::Executable:
+        case SLANG_EXECUTABLE:
         {
             outPath << options.modulePath << ".exe";
             return SLANG_OK;
         }
-        case TargetType::Object:
+        case SLANG_OBJECT_CODE:
         {
             outPath << options.modulePath << ".obj";
             return SLANG_OK;
@@ -60,7 +60,7 @@ namespace Slang
     {
         outPaths.add(options.modulePath + ".ilk");
 
-        if (options.targetType == TargetType::SharedLibrary)
+        if (options.targetType == SLANG_SHARED_LIBRARY)
         {
             outPaths.add(options.modulePath + ".exp");
             outPaths.add(options.modulePath + ".lib");
@@ -190,7 +190,7 @@ namespace Slang
 
     switch (options.targetType)
     {
-        case TargetType::SharedLibrary:
+        case SLANG_SHARED_LIBRARY:
         {
             // Create dynamic link library
             if (options.debugInfoType == DebugInfoType::None)
@@ -205,7 +205,7 @@ namespace Slang
             cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".dll");
             break;
         }
-        case TargetType::Executable:
+        case SLANG_EXECUTABLE:
         {
             cmdLine.addPrefixPathArg("/Fe", options.modulePath, ".exe");
             break;
