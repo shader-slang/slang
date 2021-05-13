@@ -125,7 +125,7 @@ public:
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
     virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_sharedLibrary; }
-    virtual SlangResult dissassemble(SlangCompileTarget compileTarget, const void* blob, size_t blobSize, ISlangBlob** out);
+    virtual SlangResult dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
 
         /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -149,6 +149,8 @@ SlangResult FXCDownstreamCompiler::init(ISlangSharedLibrary* library)
     {
         return SLANG_FAIL;
     }
+
+    m_sharedLibrary = library;
 
     // It's not clear how to query for a version, but we can get a version number from the header
     m_desc = Desc(SLANG_PASS_THROUGH_FXC, D3D_COMPILER_VERSION);
@@ -271,7 +273,10 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     FxcIncludeHandler fxcIncludeHandlerStorage(&searchDirectories, options.fileSystemExt, options.sourceManager);
     if (options.fileSystemExt)
     {
-        fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(options.sourceContentsPath);
+        if (options.sourceContentsPath.getLength() > 0)
+        {
+            fxcIncludeHandlerStorage.m_rootPathInfo = PathInfo::makePath(options.sourceContentsPath);
+        }
         includeHandler = &fxcIncludeHandlerStorage;
     }
 
@@ -363,9 +368,10 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     return SLANG_OK;
 }
 
-SlangResult FXCDownstreamCompiler::dissassemble(SlangCompileTarget compileTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult FXCDownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
 {
-    if (compileTarget != SLANG_DXBC)
+    // Can only disassemble blobs that are DXBC
+    if (sourceBlobTarget != SLANG_DXBC)
     {
         return SLANG_FAIL;
     }

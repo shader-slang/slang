@@ -522,7 +522,8 @@ namespace Slang
 
     bool isPassThroughEnabled(
         EndToEndCompileRequest* endToEndReq)
-    {        // If there isn't an end-to-end compile going on,
+    {
+        // If there isn't an end-to-end compile going on,
         // there can be no pass-through.
         //
         if (!endToEndReq) return false;
@@ -556,23 +557,11 @@ namespace Slang
         return nullptr;
     }
 
-    static void _appendEscapedPath(const UnownedStringSlice& path, StringBuilder& outBuilder)
-    {
-        for (auto c : path)
-        {
-            // TODO(JS): Probably want more sophisticated handling... 
-            if (c == '\\')
-            {
-                outBuilder.appendChar(c);
-            }
-            outBuilder.appendChar(c);
-        }
-    }
-
     static void _appendCodeWithPath(const UnownedStringSlice& filePath, const UnownedStringSlice& fileContent, StringBuilder& outCodeBuilder)
     {
         outCodeBuilder << "#line 1 \"";
-        _appendEscapedPath(filePath, outCodeBuilder);
+        auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+        handler->appendEscaped(filePath, outCodeBuilder);
         outCodeBuilder << "\"\n";
         outCodeBuilder << fileContent << "\n";
     }
@@ -997,6 +986,7 @@ SlangResult dissassembleDXILUsingDXC(
         BackEndCompileRequest*  slangRequest,
         const List<Int>&        entryPointIndices,
         TargetRequest*          targetReq,
+        CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
         RefPtr<DownstreamCompileResult>& outResult)
     {
@@ -1016,7 +1006,6 @@ SlangResult dissassembleDXILUsingDXC(
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
         {
-            auto target = targetReq->getTarget();
             switch (target)
             {
                 case CodeGenTarget::PTX:
@@ -1037,28 +1026,30 @@ SlangResult dissassembleDXILUsingDXC(
                 {
                     sourceTarget = CodeGenTarget::HLSL;
                     sourceLanguage = SourceLanguage::HLSL;
+                    downstreamCompiler = PassThroughMode::Fxc;
                     break;
                 }
                 default: break;
             }
 
-            downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage)));
+            // Try looking up based on the language if one isn't set
+            if (downstreamCompiler == PassThroughMode::None)
+            {
+                downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage)));
+            }
         }
         
+
+        // We should have a downstream compiler set at this point
+        SLANG_ASSERT(downstreamCompiler != PassThroughMode::None);
+
         // Get the required downstream compiler
         DownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(downstreamCompiler, sink);
 
         if (!compiler)
         {
             auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)downstreamCompiler);
-            if (downstreamCompiler != PassThroughMode::None)
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
-            }
-            else
-            {
-                sink->diagnose(SourceLoc(), Diagnostics::cppCompilerNotFound, compilerName);
-            }
+            sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
             return SLANG_FAIL;
         }
 
@@ -1120,6 +1111,15 @@ SlangResult dissassembleDXILUsingDXC(
 
             // We are just passing thru, so it's whatever it originally was
             sourceLanguage = translationUnit->sourceLanguage;
+
+            // TODO(JS): This seems like a bit of a hack
+            // That if a pass-through is being performed and the source language is Slang
+            // no downstream compiler knows how to deal with that, so probably means 'HLSL'
+            if (sourceLanguage == SourceLanguage::Slang)
+            {
+                sourceLanguage = SourceLanguage::HLSL;
+            }
+
             sourceTarget = CodeGenTarget(DownstreamCompiler::getCompileTarget(SlangSourceLanguage(sourceLanguage)));
 
             // Special case if we have a single file, so that we pass the path, and the contents
@@ -1172,6 +1172,16 @@ SlangResult dissassembleDXILUsingDXC(
             maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
         }
 
+        // Set the file sytem and source manager, as *may* be used by downstream compiler
+        options.fileSystemExt = slangRequest->getFileSystemExt();
+        options.sourceManager = slangRequest->getSourceManager();
+        
+        // Set the source type
+        options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
+        
+        // Disable exceptions and security checks
+        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
+
         if (downstreamCompiler == PassThroughMode::Fxc)
         {
             if (entryPointIndices.getCount() != 1)
@@ -1192,26 +1202,13 @@ SlangResult dissassembleDXILUsingDXC(
             options.entryPointName = getText(entryPoint->getName());
         }
 
-        // Set the file sytem and source manager, as *may* be used by downstream compiler
-        options.fileSystemExt = slangRequest->getFileSystemExt();
-        options.sourceManager = slangRequest->getSourceManager();
-        
-        // Set the source type
-        options.sourceLanguage = SlangSourceLanguage(sourceLanguage);
-
-        // Disable exceptions and security checks
-        options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
-
-        // Set what kind of target we should build
-        SlangCompileTarget target = (SlangCompileTarget)targetReq->getTarget();
-
         // For host callable we want downstream compile to produce a shared library
-        if (target == SLANG_HOST_CALLABLE)
+        if (target == CodeGenTarget::HostCallable)
         {
-            target = SLANG_SHARED_LIBRARY;
+            target = CodeGenTarget::SharedLibrary;
         }
 
-        options.targetType = (SlangCompileTarget)targetReq->getTarget();
+        options.targetType = (SlangCompileTarget)target;
 
         // Need to configure for the compilation
 
@@ -1316,6 +1313,7 @@ SlangResult dissassembleDXILUsingDXC(
         
         const auto& diagnostics = downstreamCompileResult->getDiagnostics();
 
+        if (diagnostics.diagnostics.getCount())
         {
             StringBuilder compilerText;
             compiler->getDesc().appendAsText(compilerText);
@@ -1548,16 +1546,34 @@ SlangResult dissassembleDXILUsingDXC(
 
         auto target = targetReq->getTarget();
 
-        if (target == CodeGenTarget::DXBytecode ||
-            target == CodeGenTarget::DXBytecodeAssembly)
-        {
-            SLANG_BREAKPOINT(0);
-        }
-
         switch (target)
         {
-        case CodeGenTarget::DXBytecode:
         case CodeGenTarget::DXBytecodeAssembly:
+            {
+                RefPtr<DownstreamCompileResult> downstreamResult;
+                const CodeGenTarget intermediateTarget = CodeGenTarget::DXBytecode;
+
+                if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
+                    program,
+                    compileRequest,
+                    entryPointIndices,
+                    targetReq,
+                    intermediateTarget,
+                    endToEndReq,
+                    downstreamResult)))
+                {
+                    maybeDumpIntermediate(compileRequest, downstreamResult, target);
+
+                    ComPtr<ISlangBlob> disassemblyBlob;
+                    if (SLANG_SUCCEEDED(dissassembleWithDownstream(compileRequest, intermediateTarget, downstreamResult, disassemblyBlob.writeRef())))
+                    {
+                        // Return the disassembly blob
+                        result = CompileResult(disassemblyBlob);
+                    }
+                }
+            }
+            break;
+        case CodeGenTarget::DXBytecode:
         case CodeGenTarget::PTX:
         case CodeGenTarget::HostCallable:
         case CodeGenTarget::SharedLibrary:
@@ -1570,25 +1586,12 @@ SlangResult dissassembleDXILUsingDXC(
                     compileRequest,
                     entryPointIndices,
                     targetReq,
+                    target,
                     endToEndReq,
                     downstreamResult)))
                 {
                     maybeDumpIntermediate(compileRequest, downstreamResult, target);
-                
-                    // Put through disassembler 
-                    if (target == CodeGenTarget::DXBytecodeAssembly)
-                    {
-                        ComPtr<ISlangBlob> disassemblyBlob;
-                        if (SLANG_SUCCEEDED(dissassembleWithDownstream(compileRequest, target, downstreamResult, disassemblyBlob.writeRef())))
-                        {
-                            // Return the disassembly blob
-                            result = CompileResult(disassemblyBlob);
-                        }
-                    }
-                    else
-                    {
-                        result = CompileResult(downstreamResult);
-                    }
+                    result = CompileResult(downstreamResult);
                 }
             }
             break;
@@ -1872,6 +1875,12 @@ SlangResult dissassembleDXILUsingDXC(
 
                     switch (targetReq->getTarget())
                     {
+                    case CodeGenTarget::DXBytecodeAssembly:
+                        {
+                            const UnownedStringSlice disassembly = StringUtil::getSlice(blob);
+                            writeOutputToConsole(writer, disassembly);
+                        }
+                        break;
                     case CodeGenTarget::DXBytecode:
                         {
                             ComPtr<ISlangBlob> disassemblyBlob;

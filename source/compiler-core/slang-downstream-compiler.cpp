@@ -18,6 +18,7 @@
 #include "slang-visual-studio-compiler-util.h"
 #include "slang-gcc-compiler-util.h"
 #include "slang-nvrtc-compiler.h"
+#include "slang-fxc-compiler.h"
 
 namespace Slang
 {
@@ -111,9 +112,9 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult DownstreamCompiler::dissassemble(SlangCompileTarget compileTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult DownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
 {
-    SLANG_UNUSED(compileTarget);
+    SLANG_UNUSED(sourceBlobTarget);
     SLANG_UNUSED(blob);
     SLANG_UNUSED(blobSize);
     SLANG_UNUSED(out);
@@ -137,6 +138,7 @@ SlangResult DownstreamCompiler::dissassemble(SlangCompileTarget compileTarget, c
         case SLANG_SOURCE_LANGUAGE_C:       return SLANG_C_SOURCE;
         case SLANG_SOURCE_LANGUAGE_CPP:     return SLANG_CPP_SOURCE;
         case SLANG_SOURCE_LANGUAGE_CUDA:    return SLANG_CUDA_SOURCE;
+        
         default:                            return SLANG_TARGET_UNKNOWN;
     }
 }
@@ -668,19 +670,6 @@ static SlangResult _locateDXCCompilers(const String& path, ISlangSharedLibraryLo
     return SLANG_OK;
 }
 
-static SlangResult _locateFXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
-{
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "d3dcompiler_47", sharedLibrary.writeRef())))
-    {
-        // Can we determine the version?
-        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_FXC);
-        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
-        set->addCompiler(compiler);
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
 #if SLANG_UNIX_FAMILY
@@ -706,7 +695,7 @@ static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibra
     outFuncs[int(SLANG_PASS_THROUGH_GCC)] = &GCCDownstreamCompilerUtil::locateGCCCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &_locateDXCCompilers;
-    outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &_locateFXCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &_locateGlslangCompilers;
 }
 
