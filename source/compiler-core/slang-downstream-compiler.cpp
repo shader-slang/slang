@@ -92,15 +92,18 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
 
             UnownedStringSlice slices[2];
             const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
-            Int locationIndex[2] = { 0, 0 };
 
-            for (Index i = 0; i < numSlices; ++i)
+            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column position
+            // We don't need to parse here, because we only care about the line number
+
+            Int lineNumber = 0;
+            if (numSlices > 0)
             {
-                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[i], locationIndex[i]));
+                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[0], lineNumber));
             }
 
             // Store the line
-            outDiagnostic.fileLine = locationIndex[0];
+            outDiagnostic.fileLine = lineNumber;
         }
     }
     else
