@@ -15,34 +15,6 @@
 
 using namespace Slang;
 
-/* static */SlangResult ParseDiagnosticUtil::parseDXCLine(const UnownedStringSlice& line,  List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
-{
-    /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
-    if (lineSlices.getCount() < 5)
-    {
-        return SLANG_FAIL;
-    }
-
-    outDiagnostic.filePath = lineSlices[0];
-
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.fileLine));
-
-    Int lineCol;
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
-
-    UnownedStringSlice severitySlice = lineSlices[3].trim();
-
-    outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
-    if (severitySlice == UnownedStringSlice::fromLiteral("warning"))
-    {
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
-    }
-
-    // The rest of the line
-    outDiagnostic.text = UnownedStringSlice(lineSlices[4].begin(), line.end());
-    return SLANG_OK;
-}
-
 /* static */ SlangResult ParseDiagnosticUtil::parseGlslangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
     /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
@@ -290,7 +262,6 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     {
         switch (compilerIdentity.m_downstreamCompiler)
         {
-            case SLANG_PASS_THROUGH_DXC:        return &parseDXCLine;
             case SLANG_PASS_THROUGH_GLSLANG:    return &parseGlslangLine;
             default:                            return &parseGenericLine;
         }

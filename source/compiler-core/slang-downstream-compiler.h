@@ -93,6 +93,9 @@ struct DownstreamDiagnostics
         /// Add a note
     void addNote(const UnownedStringSlice& in);
 
+        /// If there are no error diagnostics, adds a generic error diagnostic
+    void requireErrorDiagnostic();
+
     static void addNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& ioDiagnostics);
 
     String rawDiagnostics;
@@ -219,15 +222,6 @@ public:
         Precise,
     };
 
-#if 0
-    enum TargetType
-    {
-        Executable,         ///< Produce an executable
-        SharedLibrary,      ///< Produce a shared library object/dll 
-        Object,             ///< Produce an object file
-    };
-#endif
-
     enum PipelineType
     {
         Unknown,
@@ -272,6 +266,7 @@ public:
         SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
         PipelineType pipelineType = PipelineType::Unknown;
+        SlangMatrixLayoutMode matrixLayout = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
         Flags flags = Flag::EnableExceptionHandling;
 

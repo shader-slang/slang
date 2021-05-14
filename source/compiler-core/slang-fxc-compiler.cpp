@@ -348,7 +348,10 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     {
         UnownedStringSlice diagnosticText = _getSlice(diagnosticsBlob);
         diagnostics.rawDiagnostics = diagnosticText;
-        _parseDiagnostics(diagnosticText, diagnostics.diagnostics);
+        
+        SlangResult diagnosticParseRes = _parseDiagnostics(diagnosticText, diagnostics.diagnostics);
+        SLANG_UNUSED(diagnosticParseRes);
+        SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
     }
 
     // ID3DBlob is compatible with ISlangBlob, so just cast away...

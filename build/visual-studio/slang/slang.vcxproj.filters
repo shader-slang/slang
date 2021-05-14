@@ -446,9 +446,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-dxc-support.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
