@@ -922,6 +922,13 @@ namespace Slang
                     downstreamCompiler = PassThroughMode::Dxc;
                     break;
                 }
+                case CodeGenTarget::SPIRV:
+                {
+                    sourceTarget = CodeGenTarget::GLSL;
+                    sourceLanguage = SourceLanguage::GLSL;
+                    downstreamCompiler = PassThroughMode::Glslang;
+                    break;
+                }
                 default: break;
             }
 
