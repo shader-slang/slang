@@ -1392,7 +1392,7 @@ namespace Slang
 
                 // Compile the intermediate target
                 const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
-                SLANG_RETURN_ON_FAIL(_emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, target, endToEndReq, code));
+                SLANG_RETURN_ON_FAIL(_emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, intermediateTarget, endToEndReq, code));
 
                 maybeDumpIntermediate(compileRequest, code, intermediateTarget);
 
