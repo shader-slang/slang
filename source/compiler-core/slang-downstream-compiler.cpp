@@ -159,6 +159,26 @@ Index DownstreamDiagnostics::getCountBySeverity(Diagnostic::Severity severity) c
     return count;
 }
 
+void DownstreamDiagnostics::requireErrorDiagnostic()
+{
+    // If we find an error, we don't need to add a generic diagnostic
+    for (const auto& msg : diagnostics)
+    {
+        if (Index(msg.severity) >= Index(DownstreamDiagnostic::Severity::Error))
+        {
+            return;
+        }
+    }
+
+    DownstreamDiagnostic diagnostic;
+    diagnostic.reset();
+    diagnostic.severity = DownstreamDiagnostic::Severity::Error;
+    diagnostic.text = "Generic error during compilation";
+
+    // Add the diagnostic
+    diagnostics.add(diagnostic);
+}
+
 Int DownstreamDiagnostics::countByStage(Diagnostic::Stage stage, Index counts[Int(Diagnostic::Severity::CountOf)]) const
 {
     Int count = 0;
