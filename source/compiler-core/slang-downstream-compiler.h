@@ -59,6 +59,14 @@ struct DownstreamDiagnostic
         /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
     static SlangResult splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic);
 
+        /// Split the line (separated by :), where a path is at pathIndex 
+    static SlangResult splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices);
+
+    typedef SlangResult (*LineParser)(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic);
+
+        /// Given diagnostics in inText that are colon delimited, use lineParser to do per line parsing.
+    static SlangResult parseColonDelimitedDiagnostics(const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<DownstreamDiagnostic>& outDiagnostics);
+
     Severity severity;              ///< The severity of error
     Stage stage;                    ///< The stage the error came from
     String text;                    ///< The text of the error
@@ -241,6 +249,7 @@ public:
         enum class Kind
         {
             CUDASM,                     ///< What the version is for
+            SPIRV,
         };
         Kind kind;
         SemanticVersion version;
@@ -296,7 +305,10 @@ public:
         String entryPointName;
             /// Profile name to use, only required for compiles that need to compile against a a specific profiles.
             /// Profile names are tied to compilers and targets.
-        String profileName; 
+        String profileName;
+
+            /// The stage being compiled for 
+        SlangStage stage = SLANG_STAGE_NONE;
 
             /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
         ISlangFileSystemExt* fileSystemExt = nullptr;

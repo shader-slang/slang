@@ -27,15 +27,6 @@
 #include "slang-serialize-container.h"
 //
 
-// Enable calling through to `glslang` on
-// all platforms.
-#ifndef SLANG_ENABLE_GLSLANG_SUPPORT
-    #define SLANG_ENABLE_GLSLANG_SUPPORT 1
-#endif
-
-#if SLANG_ENABLE_GLSLANG_SUPPORT
-#include "../slang-glslang/slang-glslang.h"
-#endif
 
 // Includes to allow us to control console
 // output when writing assembly dumps.
@@ -49,10 +40,6 @@
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)
 #endif
-
-//#ifdef CreateDirectory
-//#undef CreateDirectory
-//#endif
 
 namespace Slang
 {
@@ -841,95 +828,6 @@ namespace Slang
         return *entryPointIndices.begin();
     }
 
-#if SLANG_ENABLE_GLSLANG_SUPPORT
-    SlangResult invokeGLSLCompiler(
-        BackEndCompileRequest*      slangCompileRequest,
-        glslang_CompileRequest_1_1&     request)
-    {
-        Session* session = slangCompileRequest->getSession();
-        auto sink = slangCompileRequest->getSink();
-        auto linkage = slangCompileRequest->getLinkage();
-
-        auto glslang_compile_1_0 = (glslang_CompileFunc_1_0)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_0, nullptr);
-        auto glslang_compile_1_1 = (glslang_CompileFunc_1_1)session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_1, nullptr);
-
-        if(glslang_compile_1_0 == nullptr && glslang_compile_1_1 == nullptr)
-        {
-            // Try again and put diagnostic to the sink
-            session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_0, sink);
-            session->getSharedLibraryFunc(Session::SharedLibraryFuncType::Glslang_Compile_1_1, sink);
-            return SLANG_FAIL;
-        }
-
-        StringBuilder diagnosticOutput;
-        
-        auto diagnosticOutputFunc = [](void const* data, size_t size, void* userData)
-        {
-            (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
-        };
-
-        request.diagnosticFunc = diagnosticOutputFunc;
-        request.diagnosticUserData = &diagnosticOutput;
-
-        request.optimizationLevel = (unsigned)linkage->optimizationLevel;
-        request.debugInfoType = (unsigned)linkage->debugInfoLevel;
-
-        int err = 1;
-        if (glslang_compile_1_1)
-        {
-            err = glslang_compile_1_1(&request);   
-        }
-        else if (glslang_compile_1_0)
-        {
-            glslang_CompileRequest_1_0 request_1_0;
-            request_1_0.set(request);
-            err = glslang_compile_1_0(&request_1_0);   
-        }
-
-        if (err)
-        {
-            reportExternalCompileError("glslang", SLANG_FAIL, diagnosticOutput.getUnownedSlice(), sink);
-            return SLANG_FAIL;
-        }
-
-        return SLANG_OK;
-    }
-
-    SlangResult dissassembleSPIRV(
-        BackEndCompileRequest*  slangRequest,
-        void const*             data,
-        size_t                  size, 
-        String&                 stringOut)
-    {
-        stringOut = String();
-
-        String output;
-        auto outputFunc = [](void const* data, size_t size, void* userData)
-        {
-            (*(String*)userData).append((char const*)data, (char const*)data + size);
-        };
-
-        glslang_CompileRequest_1_1 request;
-        memset(&request, 0, sizeof(request));
-        request.sizeInBytes = sizeof(request);
-
-            
-        request.action = GLSLANG_ACTION_DISSASSEMBLE_SPIRV;
-
-        request.sourcePath = nullptr;
-
-        request.inputBegin = data;
-        request.inputEnd = (char*)data + size;
-
-        request.outputFunc = outputFunc;
-        request.outputUserData = &output;
-
-        SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
-
-        stringOut = output;
-        return SLANG_OK;
-    }
-
         // True if the downstream compiler will need to emit source to make compilation work
         // That it may be desirable to not emit source if it is available as is on the file system
         // and the downstream compiler accesses files through the file system. 
@@ -1165,6 +1063,14 @@ namespace Slang
                     options.flags |= CompileOptions::Flag::EnableFloat16;
                 }
             }
+            else if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
+            {
+                DownstreamCompiler::CapabilityVersion version;
+                version.kind = DownstreamCompiler::CapabilityVersion::Kind::SPIRV;
+                version.version = tracker->getSPIRVVersion();
+
+                options.requiredCapabilityVersions.add(version);
+            }
 
             options.sourceContents = source.source;
             
@@ -1182,7 +1088,8 @@ namespace Slang
         options.flags &= ~(CompileOptions::Flag::EnableExceptionHandling | CompileOptions::Flag::EnableSecurityChecks);
 
         if (downstreamCompiler == PassThroughMode::Fxc ||
-            downstreamCompiler == PassThroughMode::Dxc)
+            downstreamCompiler == PassThroughMode::Dxc ||
+            downstreamCompiler == PassThroughMode::Glslang)
         {
             if (entryPointIndices.getCount() != 1)
             {
@@ -1195,6 +1102,8 @@ namespace Slang
 
             auto entryPoint = program->getEntryPoint(entryPointIndex);
             auto profile = getEffectiveProfile(entryPoint, targetReq);
+
+            options.stage = SlangStage(profile.getStage());
 
             // Set the entry point name
             options.entryPointName = getText(entryPoint->getName());
@@ -1218,7 +1127,7 @@ namespace Slang
                 }
 
                 // Only set the profile if the stage is set
-                if (profile.getStage() != Stage::Unknown)
+                if (options.stage != SLANG_STAGE_NONE)
                 {
                     options.profileName = GetHLSLProfileName(profile);
                 }
@@ -1452,111 +1361,86 @@ namespace Slang
         TargetRequest*          targetReq,
         List<uint8_t>&          spirvOut);
 
-    SlangResult emitSPIRVForEntryPointsViaGLSL(
-        ComponentType*                  program,
-        BackEndCompileRequest*          slangRequest,
-        const List<Int>&                entryPointIndices,
-        TargetRequest*                  targetReq,
-        EndToEndCompileRequest*         endToEndReq,
-        List<uint8_t>&                  spirvOut)
+    static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     {
-        spirvOut.clear();
-
-        SourceResult source;
-
-        SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, CodeGenTarget::GLSL, endToEndReq, source));
-
-        const auto& rawGLSL = source.source;
-
-        maybeDumpIntermediate(slangRequest, rawGLSL.getBuffer(), CodeGenTarget::GLSL);
-
-        auto outputFunc = [](void const* data, size_t size, void* userData)
+        switch (target)
         {
-            ((List<uint8_t>*)userData)->addRange((uint8_t*)data, size);
-        };
-
-        const String sourcePath = calcSourcePathForEntryPoint(endToEndReq, assertSingleEntryPoint(entryPointIndices));
-
-        glslang_CompileRequest_1_1 request;
-        memset(&request, 0, sizeof(request));
-        request.sizeInBytes = sizeof(request);
-
-        request.action = GLSLANG_ACTION_COMPILE_GLSL_TO_SPIRV;
-        request.sourcePath = sourcePath.getBuffer();
-        auto entryPoint = program->getEntryPoint(assertSingleEntryPoint(entryPointIndices));
-        request.slangStage = (SlangStage)entryPoint->getStage();
-
-        request.inputBegin = rawGLSL.begin();
-        request.inputEnd = rawGLSL.end();
-
-        if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
-        {
-            request.spirvTargetName = nullptr;
-            auto spirvLanguageVersion = tracker->getSPIRVVersion();
-
-            request.spirvVersion.major = spirvLanguageVersion.m_major;
-            request.spirvVersion.minor = spirvLanguageVersion.m_minor;
-            request.spirvVersion.patch = spirvLanguageVersion.m_patch;
-        }
-
-        request.outputFunc = outputFunc;
-        request.outputUserData = &spirvOut;
-
-        SLANG_RETURN_ON_FAIL(invokeGLSLCompiler(slangRequest, request));
-        return SLANG_OK;
-    }
-
-    SlangResult emitSPIRVForEntryPoints(
-        ComponentType*                  program,
-        BackEndCompileRequest*          slangRequest,
-        const List<Int>&                entryPointIndices,
-        TargetRequest*                  targetReq,
-        EndToEndCompileRequest*         endToEndReq,
-        List<uint8_t>&                  spirvOut)
-    {
-        if( slangRequest->shouldEmitSPIRVDirectly )
-        {
-            return emitSPIRVForEntryPointsDirectly(
-                slangRequest,
-                entryPointIndices,
-                targetReq,
-                spirvOut);
-        }
-        else
-        {
-            return emitSPIRVForEntryPointsViaGLSL(
-                program,
-                slangRequest,
-                entryPointIndices,
-                targetReq,
-                endToEndReq,
-                spirvOut);
+            case CodeGenTarget::DXBytecodeAssembly: return CodeGenTarget::DXBytecode;
+            case CodeGenTarget::DXILAssembly:       return CodeGenTarget::DXIL;
+            case CodeGenTarget::SPIRVAssembly:      return CodeGenTarget::SPIRV;
+            default:    return CodeGenTarget::None;
         }
     }
 
-    SlangResult emitSPIRVAssemblyForEntryPoints(
+        /// Function to simplify the logic around emitting, and dissassembling
+    static SlangResult _emitEntryPoints(
         ComponentType*                  program,
-        BackEndCompileRequest*          slangRequest,
+        BackEndCompileRequest*          compileRequest,
         const List<Int>&                entryPointIndices,
         TargetRequest*                  targetReq,
+        CodeGenTarget                   target,
         EndToEndCompileRequest*         endToEndReq,
-        String&                         assemblyOut)
+        RefPtr<DownstreamCompileResult>& outDownstreamResult)
     {
-        List<uint8_t> spirv;
-        SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPoints(
-            program,
-            slangRequest,
-            entryPointIndices,
-            targetReq,
-            endToEndReq,
-            spirv));
+        switch (target)
+        {
+            case CodeGenTarget::SPIRVAssembly:
+            case CodeGenTarget::DXBytecodeAssembly:
+            case CodeGenTarget::DXILAssembly:
+            {
+                RefPtr<DownstreamCompileResult> code;
 
-        if (spirv.getCount() == 0)
-            return SLANG_FAIL;
+                // Compile the intermediate target
+                const CodeGenTarget intermediateTarget = _getIntermediateTarget(target);
+                SLANG_RETURN_ON_FAIL(_emitEntryPoints(program, compileRequest, entryPointIndices, targetReq, target, endToEndReq, code));
 
-        return dissassembleSPIRV(slangRequest, spirv.begin(), spirv.getCount(), assemblyOut);
+                maybeDumpIntermediate(compileRequest, code, intermediateTarget);
+
+                // Output the disassembly
+                ComPtr<ISlangBlob> disassemblyBlob;
+                SLANG_RETURN_ON_FAIL(dissassembleWithDownstream(compileRequest, intermediateTarget, code, disassemblyBlob.writeRef()));
+
+                outDownstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), disassemblyBlob);
+                return SLANG_OK;
+            }
+            case CodeGenTarget::SPIRV:
+            case CodeGenTarget::DXIL:
+            case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::PTX:
+            case CodeGenTarget::HostCallable:
+            case CodeGenTarget::SharedLibrary:
+            case CodeGenTarget::Executable:
+            {
+                RefPtr<DownstreamCompileResult> downstreamResult;
+
+                if (target == CodeGenTarget::SPIRV && compileRequest->shouldEmitSPIRVDirectly)
+                {
+                    List<uint8_t> spirv;
+                    SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(compileRequest, entryPointIndices, targetReq, spirv));
+                    auto spirvBlob = ListBlob::moveCreate(spirv);
+                    downstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(
+                        program,
+                        compileRequest,
+                        entryPointIndices,
+                        targetReq,
+                        target,
+                        endToEndReq,
+                        downstreamResult));
+                }
+    
+                outDownstreamResult = downstreamResult;
+                return SLANG_OK;
+            }
+
+            default: break;
+        }
+
+        return SLANG_FAIL;
     }
-#endif
 
     // Do emit logic for a zero or more entry points
     CompileResult emitEntryPoints(
@@ -1572,33 +1456,10 @@ namespace Slang
 
         switch (target)
         {
+        case CodeGenTarget::SPIRVAssembly:
         case CodeGenTarget::DXBytecodeAssembly:
         case CodeGenTarget::DXILAssembly:
-            {
-                RefPtr<DownstreamCompileResult> downstreamResult;
-
-                const CodeGenTarget intermediateTarget = (target == CodeGenTarget::DXBytecodeAssembly) ? CodeGenTarget::DXBytecode : CodeGenTarget::DXIL;
-
-                if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
-                    program,
-                    compileRequest,
-                    entryPointIndices,
-                    targetReq,
-                    intermediateTarget,
-                    endToEndReq,
-                    downstreamResult)))
-                {
-                    maybeDumpIntermediate(compileRequest, downstreamResult, target);
-
-                    ComPtr<ISlangBlob> disassemblyBlob;
-                    if (SLANG_SUCCEEDED(dissassembleWithDownstream(compileRequest, intermediateTarget, downstreamResult, disassemblyBlob.writeRef())))
-                    {
-                        // Return the disassembly blob
-                        result = CompileResult(disassemblyBlob);
-                    }
-                }
-            }
-            break;
+        case CodeGenTarget::SPIRV:
         case CodeGenTarget::DXIL:
         case CodeGenTarget::DXBytecode:
         case CodeGenTarget::PTX:
@@ -1608,14 +1469,13 @@ namespace Slang
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
-                if (SLANG_SUCCEEDED(emitWithDownstreamForEntryPoints(
-                    program,
-                    compileRequest,
-                    entryPointIndices,
-                    targetReq,
-                    target,
-                    endToEndReq,
-                    downstreamResult)))
+                if (SLANG_SUCCEEDED(_emitEntryPoints(program,
+                        compileRequest,
+                        entryPointIndices,
+                        targetReq,
+                        target,
+                        endToEndReq,
+                        downstreamResult)))
                 {
                     maybeDumpIntermediate(compileRequest, downstreamResult, target);
                     result = CompileResult(downstreamResult);
@@ -1638,40 +1498,6 @@ namespace Slang
                 const auto& code = source.source;
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
-            }
-            break;
-
-        case CodeGenTarget::SPIRV:
-            {
-                List<uint8_t> code;
-                if (SLANG_SUCCEEDED(emitSPIRVForEntryPoints(
-                    program,
-                    compileRequest,
-                    entryPointIndices,
-                    targetReq,
-                    endToEndReq,
-                    code)))
-                {
-                    maybeDumpIntermediate(compileRequest, code.getBuffer(), code.getCount(), target);
-                    result = CompileResult(ListBlob::moveCreate(code));
-                }
-            }
-            break;
-
-        case CodeGenTarget::SPIRVAssembly:
-            {
-                String code;
-                if (SLANG_SUCCEEDED(emitSPIRVAssemblyForEntryPoints(
-                    program,
-                    compileRequest,
-                    entryPointIndices,
-                    targetReq,
-                    endToEndReq,
-                    code)))
-                {
-                    maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
-                    result = CompileResult(code);
-                }
             }
             break;
 
@@ -1857,6 +1683,7 @@ namespace Slang
 
                     switch (targetReq->getTarget())
                     {
+                    case CodeGenTarget::SPIRVAssembly:
                     case CodeGenTarget::DXBytecodeAssembly:
                     case CodeGenTarget::DXILAssembly:
                         {
@@ -1864,6 +1691,7 @@ namespace Slang
                             writeOutputToConsole(writer, disassembly);
                         }
                         break;
+                    case CodeGenTarget::SPIRV:
                     case CodeGenTarget::DXIL:
                     case CodeGenTarget::DXBytecode:
                         {
@@ -1876,15 +1704,6 @@ namespace Slang
                             }
                         }
                         break;
-          
-                    case CodeGenTarget::SPIRV:
-                        {
-                            String assembly;
-                            dissassembleSPIRV(backEndReq, blobData, blobSize, assembly);
-                            writeOutputToConsole(writer, assembly);
-                        }
-                        break;
-
                     case CodeGenTarget::PTX:
                         // For now we just dump PTX out as hex
 
@@ -2393,6 +2212,30 @@ namespace Slang
         }
     }
 
+    static const char* _getTargetExtension(CodeGenTarget target)
+    {
+        switch (target)
+        {
+            case CodeGenTarget::HLSL:               return ".hlsl";
+            case CodeGenTarget::GLSL:               return ".glsl";
+            case CodeGenTarget::SPIRV:              return ".spv";
+            case CodeGenTarget::DXBytecode:         return ".dxbc";
+            case CodeGenTarget::DXIL:               return ".dxil";
+            case CodeGenTarget::SPIRVAssembly:      return ".spv.asm";
+            case CodeGenTarget::DXBytecodeAssembly: return ".dxbc.asm";
+            case CodeGenTarget::DXILAssembly:       return ".dxil.asm";
+            case CodeGenTarget::CSource:            return ".c";
+            case CodeGenTarget::CPPSource:          return ".cpp";
+                // What these should be called is target specific, but just use these exts to make clear for now
+                // for now
+            case CodeGenTarget::Executable:         return ".exe";
+            case CodeGenTarget::HostCallable:
+            case CodeGenTarget::SharedLibrary:      return ".shared-lib";
+            default: break;
+        }
+        return nullptr;
+    }
+
     void maybeDumpIntermediate(
         BackEndCompileRequest* compileRequest,
         void const*     data,
@@ -2403,84 +2246,53 @@ namespace Slang
             return;
 
         switch (target)
-        {
-        default:
-            break;
-
-        case CodeGenTarget::HLSL:
-            dumpIntermediateText(compileRequest, data, size, ".hlsl");
-            break;
-
-        case CodeGenTarget::GLSL:
-            dumpIntermediateText(compileRequest, data, size, ".glsl");
-            break;
-
-        case CodeGenTarget::SPIRVAssembly:
-            dumpIntermediateText(compileRequest, data, size, ".spv.asm");
-            break;
+        {    
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CSource:
+            case CodeGenTarget::DXILAssembly:
+            case CodeGenTarget::DXBytecodeAssembly:
+            case CodeGenTarget::SPIRVAssembly:
+            case CodeGenTarget::GLSL:
+            case CodeGenTarget::HLSL:
+            {
+                dumpIntermediateText(compileRequest, data, size, _getTargetExtension(target));
+                break;
+            }
 
 #if 0
-        case CodeGenTarget::SlangIRAssembly:
-            dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
-            break;
+            case CodeGenTarget::SlangIRAssembly:
+            {
+                dumpIntermediateText(compileRequest, data, size, ".slang-ir.asm");
+                break;
+            }
 #endif
 
-        case CodeGenTarget::SPIRV:
-            dumpIntermediateBinary(compileRequest, data, size, ".spv");
+            case CodeGenTarget::DXIL:
+            case CodeGenTarget::DXBytecode:
+            case CodeGenTarget::SPIRV:
             {
-                String spirvAssembly;
-                dissassembleSPIRV(compileRequest, data, size, spirvAssembly);
-                dumpIntermediateText(compileRequest, spirvAssembly.begin(), spirvAssembly.getLength(), ".spv.asm");
-            }
-            break;
+                const char* ext = _getTargetExtension(target);
+                SLANG_ASSERT(ext);
 
-        case CodeGenTarget::DXBytecodeAssembly:
-            dumpIntermediateText(compileRequest, data, size, ".dxbc.asm");
-            break;
-
-        case CodeGenTarget::DXBytecode:
-            dumpIntermediateBinary(compileRequest, data, size, ".dxbc");
-            {
+                dumpIntermediateBinary(compileRequest, data, size, ext);
                 ComPtr<ISlangBlob> disassemblyBlob;
                 if (SLANG_SUCCEEDED(dissassembleWithDownstream(compileRequest, target, data, size, disassemblyBlob.writeRef())))
                 {
-                    dumpIntermediateText(compileRequest, disassemblyBlob->getBufferPointer(), disassemblyBlob->getBufferSize(), ".dxbc.asm");
+                    StringBuilder buf;
+                    buf << ext << ".asm";
+                    dumpIntermediateText(compileRequest, disassemblyBlob->getBufferPointer(), disassemblyBlob->getBufferSize(), buf.getBuffer());
                 }
+                break;
             }
-            break;
 
-        case CodeGenTarget::DXILAssembly:
-            dumpIntermediateText(compileRequest, data, size, ".dxil.asm");
-            break;
-
-        case CodeGenTarget::DXIL:
-            dumpIntermediateBinary(compileRequest, data, size, ".dxil");
+            case CodeGenTarget::HostCallable:
+            case CodeGenTarget::SharedLibrary:
+            case CodeGenTarget::Executable:
             {
-                String dxilAssembly;
-                ComPtr<ISlangBlob> disassemblyBlob;
-                if (SLANG_SUCCEEDED(dissassembleWithDownstream(compileRequest, target, data, size, disassemblyBlob.writeRef())))
-                {
-                    dumpIntermediateText(compileRequest, disassemblyBlob->getBufferPointer(), disassemblyBlob->getBufferSize(), ".dxil.asm");
-                }
+                dumpIntermediateBinary(compileRequest, data, size, _getTargetExtension(target));
+                break;
             }
-            break;
-
-        case CodeGenTarget::CSource:
-            dumpIntermediateText(compileRequest, data, size, ".c");
-            break;
-        case CodeGenTarget::CPPSource:
-            dumpIntermediateText(compileRequest, data, size, ".cpp");
-            break;
-
-        case CodeGenTarget::Executable:
-            // What these should be called is target specific, but just use these exts to make clear for now
-            // for now
-            dumpIntermediateBinary(compileRequest, data, size, ".exe");
-            break;
-        case CodeGenTarget::HostCallable:
-        case CodeGenTarget::SharedLibrary:
-            dumpIntermediateBinary(compileRequest, data, size, ".shared-lib");
-            break;
+            default:    break;
         }
     }
 

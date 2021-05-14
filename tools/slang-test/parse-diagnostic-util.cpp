@@ -15,30 +15,7 @@
 
 using namespace Slang;
 
-/* static */ SlangResult ParseDiagnosticUtil::parseGlslangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
-{
-    /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
 
-    if (lineSlices.getCount() < 4)
-    {
-        return SLANG_FAIL;
-    }
-    {
-        const UnownedStringSlice severitySlice = lineSlices[0].trim();
-
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        if (severitySlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
-        {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
-        }
-    }
-
-    outDiagnostic.filePath = lineSlices[1];
-
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.fileLine));
-    outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
-    return SLANG_OK;
-}
 
 /* static */SlangResult ParseDiagnosticUtil::parseGenericLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {

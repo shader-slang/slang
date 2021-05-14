@@ -176,60 +176,6 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
     return SLANG_OK;
 }
 
-static SlangResult _splitDiagnosticLine(const UnownedStringSlice& line, List<UnownedStringSlice>& outSlices)
-{
-    StringUtil::split(line, ':', outSlices);
-
-    /*
-    tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@'
-    */
-
-    const Int pathIndex = 0;
-
-    // Now we want to fix up a path as might have drive letter, and therefore :
-    // If this is the situation then we need to have a slice after the one at the index
-    if (outSlices.getCount() > pathIndex + 1)
-    {
-        const UnownedStringSlice pathStart = outSlices[pathIndex].trim();
-        if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
-        {
-            // Splice back together
-            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
-            outSlices.removeAt(pathIndex + 1);
-        }
-    }
-
-    return SLANG_OK;
-}
-
-static SlangResult _parseDiagnostics(const UnownedStringSlice& inText, List<DownstreamDiagnostic>& outDiagnostics)
-{
-    List<UnownedStringSlice> splitLine;
-
-    UnownedStringSlice text(inText), line;
-    while (StringUtil::extractLine(text, line))
-    {
-        SLANG_RETURN_ON_FAIL(_splitDiagnosticLine(line, splitLine));
-
-        DownstreamDiagnostic diagnostic;
-        diagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        diagnostic.stage = DownstreamDiagnostic::Stage::Compile;
-        diagnostic.fileLine = 0;
-
-        if (SLANG_SUCCEEDED(_parseDiagnosticLine(line, splitLine, diagnostic)))
-        {
-            outDiagnostics.add(diagnostic);
-        }
-        else
-        {
-            // If couldn't parse, just add as a note
-            DownstreamDiagnostics::addNote(line, outDiagnostics);
-        }
-    }
-
-    return SLANG_OK;
-}
-
 SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult)
 {
     // This compiler doesn't read files, they should be read externally and stored in sourceContents/sourceContentsPath
@@ -348,8 +294,8 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     {
         UnownedStringSlice diagnosticText = _getSlice(diagnosticsBlob);
         diagnostics.rawDiagnostics = diagnosticText;
-        
-        SlangResult diagnosticParseRes = _parseDiagnostics(diagnosticText, diagnostics.diagnostics);
+
+        SlangResult diagnosticParseRes = DownstreamDiagnostic::parseColonDelimitedDiagnostics(diagnosticText, 0, _parseDiagnosticLine, diagnostics.diagnostics);
         SLANG_UNUSED(diagnosticParseRes);
         SLANG_ASSERT(SLANG_SUCCEEDED(diagnosticParseRes));
     }
