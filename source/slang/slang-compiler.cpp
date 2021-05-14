@@ -412,12 +412,6 @@ namespace Slang
                 // If no pass through -> that will always work!
                 return SLANG_OK;
             }
-#if !SLANG_ENABLE_DXIL_SUPPORT
-            case PassThroughMode::Dxc: return SLANG_E_NOT_IMPLEMENTED;
-#endif
-#if !SLANG_ENABLE_DXBC_SUPPORT
-            case PassThroughMode::Fxc: return SLANG_E_NOT_IMPLEMENTED;
-#endif
 #if !SLANG_ENABLE_GLSLANG_SUPPORT
             case PassThroughMode::Glslang: return SLANG_E_NOT_IMPLEMENTED;
 #endif

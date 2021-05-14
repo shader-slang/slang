@@ -19,6 +19,7 @@
 #include "slang-gcc-compiler-util.h"
 #include "slang-nvrtc-compiler.h"
 #include "slang-fxc-compiler.h"
+#include "slang-dxc-compiler.h"
 
 namespace Slang
 {
@@ -655,24 +656,6 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     }
 }
 
-static SlangResult _locateDXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
-{
-    // First try dxil, so it's loaded from the same path if it's there
-    ComPtr<ISlangSharedLibrary> dxil;
-    DefaultSharedLibraryLoader::load(loader, path, "dxil", dxil.writeRef());
-
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "dxcompiler", sharedLibrary.writeRef())))
-    {
-        // Can we determine the version?
-        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_DXC);
-        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
-
-        set->addCompiler(compiler);
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
 #if SLANG_UNIX_FAMILY
@@ -697,7 +680,7 @@ static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibra
     outFuncs[int(SLANG_PASS_THROUGH_CLANG)] = &GCCDownstreamCompilerUtil::locateClangCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GCC)] = &GCCDownstreamCompilerUtil::locateGCCCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
-    outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &_locateDXCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &_locateGlslangCompilers;
 }
