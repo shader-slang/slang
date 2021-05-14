@@ -168,8 +168,8 @@ static SlangResult _parseDiagnosticLine(const UnownedStringSlice& line, List<Uno
 
     SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[1], outDiagnostic.fileLine));
 
-    Int lineCol;
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
+    //Int lineCol;
+    //SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], lineCol));
 
     UnownedStringSlice severitySlice = lineSlices[3].trim();
 

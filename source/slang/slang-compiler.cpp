@@ -960,6 +960,17 @@ namespace Slang
         return true;
     }
 
+    static Severity _getDiagnosticSeverity(DownstreamDiagnostic::Severity severity)
+    {
+        typedef DownstreamDiagnostic::Severity DownstreamSeverity;
+        switch (severity)
+        {
+            case DownstreamSeverity::Warning:   return Severity::Warning;
+            case DownstreamSeverity::Info:      return Severity::Note;
+            default: return Severity::Error;
+        }
+    }
+
     SlangResult emitWithDownstreamForEntryPoints(
         ComponentType*          program,
         BackEndCompileRequest*  slangRequest,
@@ -1340,48 +1351,41 @@ namespace Slang
 
             StringBuilder builder;
 
-            typedef DownstreamDiagnostic Diagnostic;
-
             for (const auto& diagnostic : diagnostics.diagnostics)
             {
                 builder.Clear();
 
-                builder << diagnostic.filePath << "(" << diagnostic.fileLine <<"): ";
-
-                if (diagnostic.stage == Diagnostic::Stage::Link)
-                {
-                    builder << "link ";
-                }
-
-                // 
-                Severity severity = Severity::Error;
+                const Severity severity = _getDiagnosticSeverity(diagnostic.severity);
                 
-                switch (diagnostic.severity)
+                if (diagnostic.filePath.getLength() == 0 && diagnostic.fileLine == 0 && severity == Severity::Note)
                 {
-                    case Diagnostic::Severity::Unknown:
-                    case Diagnostic::Severity::Error:
+                    // If theres no filePath line number and it's info, output severity and text alone
+                    builder << getSeverityName(severity) << " : ";
+                }
+                else
+                {
+                    if (diagnostic.filePath.getLength())
                     {
-                        severity = Severity::Error;
-                        builder << "error";
-                        break;
+                        builder << diagnostic.filePath;
                     }
-                    case Diagnostic::Severity::Warning:
+
+                    if (diagnostic.fileLine)
                     {
-                        severity = Severity::Warning;
-                        builder << "warning";
-                        break;
+                        builder << "(" << diagnostic.fileLine <<")";
                     }
-                    case Diagnostic::Severity::Info:
+
+                    builder << ": ";
+
+                    if (diagnostic.stage == DownstreamDiagnostic::Stage::Link)
                     {
-                        severity = Severity::Note;
-                        builder << "info";
-                        break;
+                        builder << "link ";
                     }
-                    default: break;
+
+                    builder << getSeverityName(severity);
+                    builder << " " << diagnostic.code << ": ";
                 }
 
-                builder << " " << diagnostic.code << ": " << diagnostic.text;
-
+                builder << diagnostic.text;
                 reportExternalCompileError(compilerText.getBuffer(), severity, SLANG_OK, builder.getUnownedSlice(), sink);
             }
         }
