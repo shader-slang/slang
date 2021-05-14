@@ -144,7 +144,18 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
 
 ShaderCursor ShaderCursor::getElement(SlangInt index) const
 {
-    // TODO: need to auto-dereference various buffer types...
+    if (m_containerType != ShaderObjectContainerType::None)
+    {
+        ShaderCursor elementCursor;
+        elementCursor.m_baseObject = m_baseObject;
+        elementCursor.m_typeLayout = m_typeLayout->getElementTypeLayout();
+        elementCursor.m_containerType = m_containerType;
+        elementCursor.m_offset.uniformOffset = index * m_typeLayout->getStride();
+        elementCursor.m_offset.bindingRangeIndex = 0;
+        elementCursor.m_offset.bindingArrayIndex = index;
+        return elementCursor;
+    }
+
     switch( m_typeLayout->getKind() )
     {
     case slang::TypeReflection::Kind::Array:

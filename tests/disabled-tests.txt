@@ -19,16 +19,6 @@ like it currently does.
 
 * compute/dynamic-dispatch-12.slang
 
-### `StructuredBuffer<ISomething>`
-
-These tests require support for structured buffers where the element type either is an interface type or transitively contains one.
-
-* compute/dynamic-dispatch-13.slang
-* compute/dynamic-dispatch-14.slang
-* compute/dynamic-dispatch-bindless-texture.slang
-* compute/interface-func-param-in-struct.slang
-* compute/interface-assoc-type-param.slang
-
 ### Generic Specialization Parameters
 
 These tests make use of generic specialization parameters in ways that don't easily align with the implementation approach that is more focused on existential parameters.
@@ -51,6 +41,14 @@ They will need to wait until the shader object implementation(s) are updated to 
 
 * compute/interface-shader-param-in-struct.slang
 * compute/interface-shader-param-legalization.slang
+
+### Gfx Limitation
+
+These tests are disabled due to other limitations of gfx layer.
+
+* compute/half-rw-texture-convert.slang
+* compute/half-rw-texture-simple.slang
+
 
 ### Uncategorized
 

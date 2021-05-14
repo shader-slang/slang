@@ -47,6 +47,8 @@ public:
     void emitName(Name* name, const SourceLoc& loc);
     void emitName(Name* name);
 
+    void supressLineDirective() { m_supressLineDirective = true; }
+    void resumeLineDirective() { m_supressLineDirective = false; }
 
         /// Indent the text
     void indent();
@@ -102,6 +104,8 @@ protected:
     HumaneSourceLoc m_nextHumaneSourceLocation;
     
     bool m_needToUpdateSourceLocation = false;
+
+    bool m_supressLineDirective = false;
    
     // Are we at the start of a line, so that we should indent
     // before writing any other text?
