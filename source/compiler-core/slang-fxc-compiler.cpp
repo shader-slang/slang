@@ -55,17 +55,7 @@ namespace Slang
 
 #if SLANG_ENABLE_DXBC_SUPPORT
 
-static UnownedStringSlice _getSlice(ID3DBlob* blob)
-{
-    if (blob)
-    {
-        const char* chars = (const char*)blob->GetBufferPointer();
-        size_t len = blob->GetBufferSize();
-        len -= size_t(len > 0 && chars[len - 1] == 0);
-        return UnownedStringSlice(chars, len);
-    }
-    return UnownedStringSlice();
-}
+static UnownedStringSlice _getSlice(ID3DBlob* blob) { return StringUtil::getSlice((ISlangBlob*)blob);  }
 
 struct FxcIncludeHandler : ID3DInclude
 {
@@ -194,7 +184,6 @@ static SlangResult _splitDiagnosticLine(const UnownedStringSlice& line, List<Uno
     tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@'
     */
 
-    // Once we removed prefix, it's offset is 0
     const Int pathIndex = 0;
 
     // Now we want to fix up a path as might have drive letter, and therefore :
