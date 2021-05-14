@@ -981,6 +981,36 @@ SlangResult dissassembleDXILUsingDXC(
         return SLANG_OK;
     }
 
+        // True if the downstream compiler will need to emit source to make compilation work
+        // That it may be desirable to not emit source if it is available as is on the file system
+        // and the downstream compiler accesses files through the file system. 
+    static bool _isEmittedSourceRequired(DownstreamCompiler* compiler, TranslationUnitRequest* translationUnit)
+    {
+        // We only bother if it's a file based compiler.
+        if (compiler->isFileBased())
+        {
+            // It can only have *one* source file as otherwise we have to combine to make a new source file anyway
+            const auto& sourceFiles = translationUnit->getSourceFiles();
+
+            // The *assumption* here is that if it's file based that assuming it can find the file with the same contents
+            // it can compile directly without having to save off as a file
+            if (sourceFiles.getCount() == 1)
+            {
+                const SourceFile* sourceFile = sourceFiles[0];
+                // We need the path to be found and set
+                // 
+                // NOTE! That the downstream compiler can determine if the path and contents match such that it can be used
+                // without writing file
+                const PathInfo& pathInfo = sourceFile->getPathInfo();
+                if ((pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal) && pathInfo.foundPath.getLength())
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     SlangResult emitWithDownstreamForEntryPoints(
         ComponentType*          program,
         BackEndCompileRequest*  slangRequest,
@@ -1120,41 +1150,28 @@ SlangResult dissassembleDXILUsingDXC(
 
             sourceTarget = CodeGenTarget(DownstreamCompiler::getCompileTarget(SlangSourceLanguage(sourceLanguage)));
 
-            // Special case if we have a single file, so that we pass the path, and the contents
-            const auto& sourceFiles = translationUnit->getSourceFiles();
-
-            if (compiler->isFileBased())
-            {
-                // The *assumption* here is that if it's file based that assuming it can find the file with the same contents
-                // it can compile directly without having to save off as a file
-                if (sourceFiles.getCount() == 1)
-                {
-                    const SourceFile* sourceFile = sourceFiles[0];
-                    const PathInfo& pathInfo = sourceFile->getPathInfo();
-                    if (pathInfo.type == PathInfo::Type::FoundPath || pathInfo.type == PathInfo::Type::Normal)
-                    {
-                        options.sourceContentsPath = pathInfo.foundPath;
-                    }
-                }
-            }
-            else
+            // If emitted source is required, emit and set the path            
+            if (_isEmittedSourceRequired(compiler, translationUnit))
             {
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
                 const String originalSourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
                 options.sourceContentsPath = originalSourcePath;
-            }
 
-            if (sourceFiles.getCount() == 1)
-            {
-                const SourceFile* sourceFile = sourceFiles[0];
-                options.sourceContents = sourceFile->getContent();
-            }
-            else
-            {
                 SourceResult source;
                 SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, source));
                 options.sourceContents = source.source;
+            }
+            else
+            {
+                // Special case if we have a single file, so that we pass the path, and the contents
+                const auto& sourceFiles = translationUnit->getSourceFiles();
+                SLANG_ASSERT(sourceFiles.getCount() == 1);
+
+                const SourceFile* sourceFile = sourceFiles[0];
+                
+                options.sourceContentsPath = sourceFile->getPathInfo().foundPath;
+                options.sourceContents = sourceFile->getContent();
             }
         }
         else
