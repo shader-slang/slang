@@ -35,18 +35,12 @@
     #undef WIN32_LEAN_AND_MEAN
     #undef NOMINMAX
     #include <d3dcompiler.h>
-    #ifndef SLANG_ENABLE_DXBC_SUPPORT
-        #define SLANG_ENABLE_DXBC_SUPPORT 1
-    #endif
     #ifndef SLANG_ENABLE_DXIL_SUPPORT
         #define SLANG_ENABLE_DXIL_SUPPORT 1
     #endif
 #endif
 //
-// Otherwise, don't enable DXBC/DXIL by default:
-#ifndef SLANG_ENABLE_DXBC_SUPPORT
-    #define SLANG_ENABLE_DXBC_SUPPORT 0
-#endif
+// Otherwise, don't enable DXIL by default:
 #ifndef SLANG_ENABLE_DXIL_SUPPORT
     #define SLANG_ENABLE_DXIL_SUPPORT 0
 #endif
@@ -414,9 +408,6 @@ namespace Slang
             }
 #if !SLANG_ENABLE_DXIL_SUPPORT
             case PassThroughMode::Dxc: return SLANG_E_NOT_IMPLEMENTED;
-#endif
-#if !SLANG_ENABLE_DXBC_SUPPORT
-            case PassThroughMode::Fxc: return SLANG_E_NOT_IMPLEMENTED;
 #endif
 #if !SLANG_ENABLE_GLSLANG_SUPPORT
             case PassThroughMode::Glslang: return SLANG_E_NOT_IMPLEMENTED;

@@ -378,7 +378,7 @@ SlangResult FXCDownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTar
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    // If the user supplies a path to their preferred version of NVRTC,
+    // If the user supplies a path to their preferred version of FXC,
     // we just use this.
     if (path.getLength() != 0)
     {
