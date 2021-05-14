@@ -15,68 +15,6 @@
 
 using namespace Slang;
 
-/* static */SlangResult ParseDiagnosticUtil::splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic)
-{
-    const Index lineStartIndex = pathLocation.lastIndexOf('(');
-    if (lineStartIndex >= 0)
-    {
-        outDiagnostic.filePath = UnownedStringSlice(pathLocation.head(lineStartIndex).trim());
-
-        const UnownedStringSlice tail = pathLocation.tail(lineStartIndex + 1);
-        const Index lineEndIndex = tail.indexOf(')');
-
-        if (lineEndIndex >= 0)
-        {            
-            // Extract the location info
-            UnownedStringSlice locationSlice(tail.begin(), tail.begin() + lineEndIndex);
-
-            UnownedStringSlice slices[2];
-            const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
-            Int locationIndex[2] = { 0, 0 };
-
-            for (Index i = 0; i < numSlices; ++i)
-            {
-                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[i], locationIndex[i]));
-            }
-
-            // Store the line
-            outDiagnostic.fileLine = locationIndex[0];
-        }
-    }
-    else
-    {
-        outDiagnostic.filePath = pathLocation;
-    }
-    return SLANG_OK;
-}
-
-/* static */SlangResult ParseDiagnosticUtil::parseFXCLine(const UnownedStringSlice& line,  List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
-{
-    /* tests/diagnostics/syntax-error-intrinsic.slang(14,2): error X3000: syntax error: unexpected token '@' */
-    if (lineSlices.getCount() < 3)
-    {
-        return SLANG_FAIL;
-    }
-
-    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
-
-    {
-        const UnownedStringSlice severityAndCodeSlice = lineSlices[1].trim();
-        const UnownedStringSlice severitySlice = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 0);
-
-        outDiagnostic.code = StringUtil::getAtInSplit(severityAndCodeSlice, ' ', 1);
-
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        if (severitySlice == "warning")
-        {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
-        }
-    }
-
-    outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
-    return SLANG_OK;
-}
-
 /* static */SlangResult ParseDiagnosticUtil::parseDXCLine(const UnownedStringSlice& line,  List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
     /* tests/diagnostics/syntax-error-intrinsic.slang:14:2: error: expected expression */
@@ -157,7 +95,7 @@ using namespace Slang;
     }
 
     // Get the location info
-    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(DownstreamDiagnostic::splitPathLocation(lineSlices[0], outDiagnostic));
 
     outDiagnostic.text = UnownedStringSlice(lineSlices[2].begin(), line.end());
     return SLANG_OK;
@@ -238,7 +176,7 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
         return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(splitPathLocation(lineSlices[0], outDiagnostic));
+    SLANG_RETURN_ON_FAIL(DownstreamDiagnostic::splitPathLocation(lineSlices[0], outDiagnostic));
     Int code;
     SLANG_RETURN_ON_FAIL(_getSlangDiagnosticSeverity(lineSlices[1], outDiagnostic.severity, code));
 
@@ -290,29 +228,6 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     }
 
     return SLANG_OK;
-}
-
-static void _addDiagnosticNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& outDiagnostics)
-{
-    // Don't bother adding an empty line
-    if (in.trim().getLength() == 0)
-    {
-        return;
-    }
-
-    // If there's nothing previous, we'll ignore too, as note should be in addition to
-    // a pre-existing error/warning
-    if (outDiagnostics.getCount() == 0)
-    {
-        return;
-    }
-
-    // Make it a note on the output
-    DownstreamDiagnostic diagnostic;
-    diagnostic.reset();
-    diagnostic.severity = DownstreamDiagnostic::Severity::Info;
-    diagnostic.text = in;
-    outDiagnostics.add(diagnostic);
 }
 
 static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, SlangPassThrough& outDownstreamCompiler)
@@ -375,7 +290,6 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
     {
         switch (compilerIdentity.m_downstreamCompiler)
         {
-            case SLANG_PASS_THROUGH_FXC:        return &parseFXCLine;
             case SLANG_PASS_THROUGH_DXC:        return &parseDXCLine;
             case SLANG_PASS_THROUGH_GLSLANG:    return &parseGlslangLine;
             default:                            return &parseGenericLine;
@@ -458,7 +372,7 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         // If we don't have a valid split then just assume it's a note
         if (!isValidSplit)
         {
-            _addDiagnosticNote(line, outDiagnostics);
+            DownstreamDiagnostics::addNote(line, outDiagnostics);
             continue;
         }
 
@@ -474,7 +388,7 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         else
         {
             // If couldn't parse, just add as a note
-            _addDiagnosticNote(line, outDiagnostics);
+             DownstreamDiagnostics::addNote(line, outDiagnostics);
         }
     }
 

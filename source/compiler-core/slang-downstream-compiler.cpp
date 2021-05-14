@@ -18,6 +18,7 @@
 #include "slang-visual-studio-compiler-util.h"
 #include "slang-gcc-compiler-util.h"
 #include "slang-nvrtc-compiler.h"
+#include "slang-fxc-compiler.h"
 
 namespace Slang
 {
@@ -74,7 +75,55 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
     }
 }
 
+/* static */SlangResult DownstreamDiagnostic::splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic)
+{
+    const Index lineStartIndex = pathLocation.lastIndexOf('(');
+    if (lineStartIndex >= 0)
+    {
+        outDiagnostic.filePath = UnownedStringSlice(pathLocation.head(lineStartIndex).trim());
+
+        const UnownedStringSlice tail = pathLocation.tail(lineStartIndex + 1);
+        const Index lineEndIndex = tail.indexOf(')');
+
+        if (lineEndIndex >= 0)
+        {
+            // Extract the location info
+            UnownedStringSlice locationSlice(tail.begin(), tail.begin() + lineEndIndex);
+
+            UnownedStringSlice slices[2];
+            const Index numSlices = StringUtil::split(locationSlice, ',', 2, slices);
+
+            // NOTE! FXC actually outputs a range of columns in the form of START-END in the column position
+            // We don't need to parse here, because we only care about the line number
+
+            Int lineNumber = 0;
+            if (numSlices > 0)
+            {
+                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(slices[0], lineNumber));
+            }
+
+            // Store the line
+            outDiagnostic.fileLine = lineNumber;
+        }
+    }
+    else
+    {
+        outDiagnostic.filePath = pathLocation;
+    }
+    return SLANG_OK;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+SlangResult DownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+{
+    SLANG_UNUSED(sourceBlobTarget);
+    SLANG_UNUSED(blob);
+    SLANG_UNUSED(blobSize);
+    SLANG_UNUSED(out);
+
+    return SLANG_E_NOT_AVAILABLE;
+}
 
 
 /* static */bool DownstreamCompiler::canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage)
@@ -92,6 +141,7 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
         case SLANG_SOURCE_LANGUAGE_C:       return SLANG_C_SOURCE;
         case SLANG_SOURCE_LANGUAGE_CPP:     return SLANG_CPP_SOURCE;
         case SLANG_SOURCE_LANGUAGE_CUDA:    return SLANG_CUDA_SOURCE;
+        
         default:                            return SLANG_TARGET_UNKNOWN;
     }
 }
@@ -194,6 +244,34 @@ void DownstreamDiagnostics::removeBySeverity(Diagnostic::Severity severity)
             count--;
         }
     }
+}
+
+/* static */void DownstreamDiagnostics::addNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& ioDiagnostics)
+{
+    // Don't bother adding an empty line
+    if (in.trim().getLength() == 0)
+    {
+        return;
+    }
+
+    // If there's nothing previous, we'll ignore too, as note should be in addition to
+    // a pre-existing error/warning
+    if (ioDiagnostics.getCount() == 0)
+    {
+        return;
+    }
+
+    // Make it a note on the output
+    DownstreamDiagnostic diagnostic;
+    diagnostic.reset();
+    diagnostic.severity = DownstreamDiagnostic::Severity::Info;
+    diagnostic.text = in;
+    ioDiagnostics.add(diagnostic);
+}
+
+void DownstreamDiagnostics::addNote(const UnownedStringSlice& in)
+{
+    addNote(in, diagnostics);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompileResult !!!!!!!!!!!!!!!!!!!!!!*/
@@ -595,19 +673,6 @@ static SlangResult _locateDXCCompilers(const String& path, ISlangSharedLibraryLo
     return SLANG_OK;
 }
 
-static SlangResult _locateFXCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
-{
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "d3dcompiler_47", sharedLibrary.writeRef())))
-    {
-        // Can we determine the version?
-        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_FXC);
-        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
-        set->addCompiler(compiler);
-    }
-    return SLANG_OK;
-}
-
 static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
 #if SLANG_UNIX_FAMILY
@@ -633,7 +698,7 @@ static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibra
     outFuncs[int(SLANG_PASS_THROUGH_GCC)] = &GCCDownstreamCompilerUtil::locateGCCCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &_locateDXCCompilers;
-    outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &_locateFXCCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &_locateGlslangCompilers;
 }
 

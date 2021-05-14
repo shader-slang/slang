@@ -16,6 +16,8 @@
 namespace Slang
 {
 
+struct SourceManager;
+
 struct DownstreamDiagnostic
 {
     typedef DownstreamDiagnostic ThisType;
@@ -54,6 +56,9 @@ struct DownstreamDiagnostic
 
     static UnownedStringSlice getSeverityText(Severity severity);
 
+        /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
+    static SlangResult splitPathLocation(const UnownedStringSlice& pathLocation, DownstreamDiagnostic& outDiagnostic);
+
     Severity severity;              ///< The severity of error
     Stage stage;                    ///< The stage the error came from
     String text;                    ///< The text of the error
@@ -84,6 +89,11 @@ struct DownstreamDiagnostics
 
         /// Remove all diagnostics of the type
     void removeBySeverity(Diagnostic::Severity severity);
+
+        /// Add a note
+    void addNote(const UnownedStringSlice& in);
+
+    static void addNote(const UnownedStringSlice& in, List<DownstreamDiagnostic>& ioDiagnostics);
 
     String rawDiagnostics;
 
@@ -209,12 +219,14 @@ public:
         Precise,
     };
 
+#if 0
     enum TargetType
     {
         Executable,         ///< Produce an executable
         SharedLibrary,      ///< Produce a shared library object/dll 
         Object,             ///< Produce an object file
     };
+#endif
 
     enum PipelineType
     {
@@ -256,7 +268,7 @@ public:
 
         OptimizationLevel optimizationLevel = OptimizationLevel::Default;
         DebugInfoType debugInfoType = DebugInfoType::Standard;
-        TargetType targetType = TargetType::Executable;
+        SlangCompileTarget targetType = SLANG_EXECUTABLE;
         SlangSourceLanguage sourceLanguage = SLANG_SOURCE_LANGUAGE_CPP;
         FloatingPointMode floatingPointMode = FloatingPointMode::Default;
         PipelineType pipelineType = PipelineType::Unknown;
@@ -284,6 +296,16 @@ public:
         List<String> libraryPaths;
 
         List<CapabilityVersion> requiredCapabilityVersions;
+
+            /// For compilers/compiles that require an entry point name, else can be empty
+        String entryPointName;
+            /// Profile name to use, only required for compiles that need to compile against a a specific profiles.
+            /// Profile names are tied to compilers and targets.
+        String profileName; 
+
+            /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
+        ISlangFileSystemExt* fileSystemExt = nullptr;
+        SourceManager* sourceManager = nullptr;
     };
 
     typedef uint32_t ProductFlags;
@@ -316,6 +338,12 @@ public:
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
         /// Some downstream compilers are backed by a shared library. This allows access to the shared library to access internal functions. 
     virtual ISlangSharedLibrary* getSharedLibrary() { return nullptr; }
+
+        /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
+    virtual SlangResult dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
+
+        /// True if underlying compiler uses file system to pass source
+    virtual bool isFileBased() = 0;
 
         /// Get info for a compiler type
     static const Info& getInfo(SlangPassThrough compiler) { return s_infos.infos[int(compiler)]; }
@@ -369,7 +397,8 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
-    
+    virtual bool isFileBased() SLANG_OVERRIDE { return true; }
+
     // Functions to be implemented for a specific CommandLine
 
         /// Given the compilation options and the module name, determines the actual file name used for output
@@ -405,6 +434,7 @@ public:
 
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE { SLANG_UNUSED(options); SLANG_UNUSED(outResult); return SLANG_E_NOT_IMPLEMENTED; }
+    virtual bool isFileBased() SLANG_OVERRIDE { return true; }
     virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_library; }
 
     SharedLibraryDownstreamCompiler(const Desc& desc, ISlangSharedLibrary* library):
@@ -461,7 +491,6 @@ struct DownstreamCompilerBaseUtil
 {
     typedef DownstreamCompiler::CompileOptions CompileOptions;
     typedef DownstreamCompiler::OptimizationLevel OptimizationLevel;
-    typedef DownstreamCompiler::TargetType TargetType;
     typedef DownstreamCompiler::DebugInfoType DebugInfoType;
     
     typedef DownstreamDiagnostics::Diagnostic Diagnostic;
