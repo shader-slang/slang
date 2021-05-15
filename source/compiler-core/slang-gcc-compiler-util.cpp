@@ -377,18 +377,18 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.targetType)
     {
-        case TargetType::SharedLibrary:
+        case SLANG_SHARED_LIBRARY:
         {
             outPath << SharedLibrary::calcPlatformPath(options.modulePath.getUnownedSlice());
             return SLANG_OK;
         }
-        case TargetType::Executable:
+        case SLANG_EXECUTABLE:
         {
             outPath << options.modulePath;
             outPath << ProcessUtil::getExecutableSuffix();
             return SLANG_OK;
         }
-        case TargetType::Object:
+        case SLANG_OBJECT_CODE:
         {
 #if __CYGWIN__
             outPath << options.modulePath << ".obj";
@@ -509,7 +509,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
     switch (options.targetType)
     {
-        case TargetType::SharedLibrary:
+        case SLANG_SHARED_LIBRARY:
         {
             // Shared library
             cmdLine.addArg("-shared");
@@ -521,11 +521,11 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
             }
             break;
         }
-        case TargetType::Executable:
+        case SLANG_EXECUTABLE:
         {
             break;
         }
-        case TargetType::Object:
+        case SLANG_OBJECT_CODE:
         {
             // Don't link, just produce object file
             cmdLine.addArg("-c");
@@ -563,7 +563,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         //cmdLine.addArg(linkOptions);
     }
 
-    if (options.targetType == TargetType::SharedLibrary)
+    if (options.targetType == SLANG_SHARED_LIBRARY)
     {
         if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind))
         {

@@ -173,7 +173,10 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-dxc-compiler.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-fxc-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-gcc-compiler-util.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-include-system.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-misc-diagnostic-defs.h" />
@@ -190,7 +193,10 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-dxc-compiler.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-fxc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-gcc-compiler-util.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-include-system.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />

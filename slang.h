@@ -526,7 +526,8 @@ extern "C"
         SLANG_SHARED_LIBRARY,       ///< A shared library/Dll (for hosting CPU/OS)
         SLANG_HOST_CALLABLE,        ///< A CPU target that makes the compiled code available to be run immediately
         SLANG_CUDA_SOURCE,          ///< Cuda source
-        SLANG_PTX,                  ///< PTX 
+        SLANG_PTX,                  ///< PTX
+        SLANG_OBJECT_CODE,          ///< Object code that can be used for later linking
         SLANG_TARGET_COUNT_OF,
     };
 

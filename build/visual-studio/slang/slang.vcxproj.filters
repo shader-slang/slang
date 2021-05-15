@@ -111,9 +111,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\slang\slang-include-system.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -449,9 +446,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-dxc-support.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -483,9 +477,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\slang\slang-include-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp">

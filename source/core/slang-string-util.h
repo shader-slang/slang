@@ -69,6 +69,7 @@ struct StringUtil
         /// Given a string held in a blob, returns as a String
         /// Returns an empty string if blob is nullptr 
     static String getString(ISlangBlob* blob);
+    static UnownedStringSlice getSlice(ISlangBlob* blob);
 
         /// Given a string or slice, replaces all instances of fromChar with toChar
     static String calcCharReplaced(const UnownedStringSlice& slice, char fromChar, char toChar);

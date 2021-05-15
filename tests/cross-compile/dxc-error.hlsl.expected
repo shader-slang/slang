@@ -1,8 +1,8 @@
 result code = -1
 standard error = {
-dxc: tests/cross-compile/dxc-error.hlsl:8:2: error: use of undeclared identifier 'gOutputBuffer'
-        gOutputBuffer[tid] = dispatchThreadID.x * 0.5f;
-        ^
+dxc: tests/cross-compile/dxc-error.hlsl(8): error :  use of undeclared identifier 'gOutputBuffer'
+dxc: note :         gOutputBuffer[tid] = dispatchThreadID.x * 0.5f;
+dxc: note :         ^
 }
 standard output = {
 }
