@@ -6,7 +6,8 @@ Texture2DArray<uint> t_0;
 SamplerState s_0;
 RWBuffer<uint4> b_0;
 
-[shader("compute")]
+// Attribute not understood by fxc
+//[shader("compute")]
 [numthreads(32, 1, 1)]
 void main(uint3 tid : SV_DISPATCHTHREADID)
 {

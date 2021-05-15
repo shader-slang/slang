@@ -60,12 +60,6 @@ struct ParseDiagnosticUtil
         /// Given a compiler identity returns a line parsing function.
     static LineParser getLineParser(const CompilerIdentity& compilerIdentity);
 
-        /// Given a path, that holds line number and potentially column number in () after path, writes result into outDiagnostic
-    static SlangResult splitPathLocation(const Slang::UnownedStringSlice& pathLocation, Slang::DownstreamDiagnostic& outDiagnostic);
-
-        /// For FXC lines
-    static SlangResult parseFXCLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
-
         /// For DXC lines
     static SlangResult parseDXCLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
 
