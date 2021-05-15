@@ -828,10 +828,15 @@ namespace Slang
         return *entryPointIndices.begin();
     }
 
-        // True if the downstream compiler will need to emit source to make compilation work
-        // That it may be desirable to not emit source if it is available as is on the file system
-        // and the downstream compiler accesses files through the file system. 
-    static bool _isEmittedSourceRequired(DownstreamCompiler* compiler, TranslationUnitRequest* translationUnit)
+        // True if it's best to use 'emitted' source for complication. For a downstream compiler
+        // that is not file based, this is always ok.
+        /// 
+        /// If the downstream compiler is file system based, we may want to just use the file that was passed to be compiled.
+        /// That the downstream compiler can determine if it will then save the file or not based on if it's a match -
+        /// and generally there will not be a match with emitted source.
+        ///
+        /// This test is only used for pass through mode. 
+    static bool _useEmittedSource(DownstreamCompiler* compiler, TranslationUnitRequest* translationUnit)
     {
         // We only bother if it's a file based compiler.
         if (compiler->isFileBased())
@@ -1023,12 +1028,11 @@ namespace Slang
             sourceTarget = CodeGenTarget(DownstreamCompiler::getCompileTarget(SlangSourceLanguage(sourceLanguage)));
 
             // If emitted source is required, emit and set the path            
-            if (_isEmittedSourceRequired(compiler, translationUnit))
+            if (_useEmittedSource(compiler, translationUnit))
             {
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
-                const String originalSourcePath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
-                options.sourceContentsPath = originalSourcePath;
+                options.sourceContentsPath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
 
                 SourceResult source;
                 SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, source));
@@ -1036,7 +1040,7 @@ namespace Slang
             }
             else
             {
-                // Special case if we have a single file, so that we pass the path, and the contents
+                // Special case if we have a single file, so that we pass the path, and the contents as is.
                 const auto& sourceFiles = translationUnit->getSourceFiles();
                 SLANG_ASSERT(sourceFiles.getCount() == 1);
 
@@ -1344,7 +1348,7 @@ namespace Slang
         }
 
         ComPtr<ISlangBlob> dissassemblyBlob;
-        SLANG_RETURN_ON_FAIL(compiler->dissassemble(SlangCompileTarget(target), data, dataSizeInBytes, dissassemblyBlob.writeRef()));
+        SLANG_RETURN_ON_FAIL(compiler->disassemble(SlangCompileTarget(target), data, dataSizeInBytes, dissassemblyBlob.writeRef()));
 
         *outBlob = dissassemblyBlob.detach();
         return SLANG_OK;
