@@ -8,6 +8,7 @@ void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const
     m_args = args;
     m_argCount = argCount;
     m_text = intrinsicText;
+    m_callInst = inst;
 
     const auto returnType = inst->getDataType();
 
@@ -57,6 +58,93 @@ void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const
     {
         m_writer->emit(")");
     }
+}
+
+static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
+{
+    switch (type)
+    {
+        case SLANG_SCALAR_TYPE_INT32:       return BaseType::Int;
+        case SLANG_SCALAR_TYPE_UINT32:      return BaseType::UInt;
+        case SLANG_SCALAR_TYPE_INT16:       return BaseType::Int16;
+        case SLANG_SCALAR_TYPE_UINT16:      return BaseType::UInt16;
+        case SLANG_SCALAR_TYPE_INT64:       return BaseType::Int64;
+        case SLANG_SCALAR_TYPE_UINT64:      return BaseType::UInt64;
+        case SLANG_SCALAR_TYPE_INT8:        return BaseType::Int8;
+        case SLANG_SCALAR_TYPE_UINT8:       return BaseType::UInt8;
+        case SLANG_SCALAR_TYPE_FLOAT16:     return BaseType::Half;
+        case SLANG_SCALAR_TYPE_FLOAT32:     return BaseType::Float;
+        case SLANG_SCALAR_TYPE_FLOAT64:     return BaseType::Double;
+        case SLANG_SCALAR_TYPE_BOOL:        return BaseType::Bool;
+        default:                            return BaseType::Void;
+    }
+}
+
+// TODO(JS): There is an inherent problem here:
+// 
+// TimF: The big gotcha you'd have with trying to look up the IRVar or whatever from an intrinsic is that it is very easy for the user to "smuggle" a resource-type value through an intermediate function:
+//
+// ```
+// Imagine this is user code...
+// void f(RWTexture2D t) { t.YourOpThatYouAdded(...); }[attributeYouCareAbout(...)]
+// RWTexture2D gTex;
+// ...
+// f(gTex);
+//
+// ```
+// 
+// So when emitting IR code for f, there is no way to trace t back to gTex and get at[attributeYouCareAbout(...)]
+// Structurally, you can get back to the IRParam for t and that's it.
+// And even if there was some magic way to trace back through the call site, you would run into the problem that some call sites
+// might call f(gTex) and other might call f(gSomeOtherTex) and there is no guarantee the attributes on those two textures would match.
+//
+// The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to do for resources means that there wouldn't be a single f() function any more.
+// But for CUDA and C++ that's not the case or generally desirable.
+
+IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
+{
+    // JS(TODO):
+    // There could perhaps be other situations, that need to be covered
+
+    // If this is a load, we need to get the decoration from the field key
+    if (IRLoad* load = as<IRLoad>(inst))
+    {
+        if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
+        {
+            IRInst* field = fieldAddress->getField();
+            return field->findDecoration<IRFormatDecoration>();
+        }
+    }
+    // Otherwise just try on the instruction
+    return inst->findDecoration<IRFormatDecoration>();
+}
+
+bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
+{
+    int numElems = 1;
+
+    if (auto vecType = as<IRVectorType>(dataType))
+    {
+        numElems = int(getIntVal(vecType->getElementCount()));
+        dataType = vecType->getElementType();
+    }
+
+    BaseType baseType = BaseType::Void;
+    if (auto basicType = as<IRBasicType>(dataType))
+    {
+        baseType = basicType->getBaseType();
+    }
+
+    const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
+    const BaseType formatBaseType = _getBaseTypeFromScalarType(imageFormatInfo.scalarType);
+
+    if (numElems != imageFormatInfo.channelCount)
+    {
+        SLANG_ASSERT(!"Format doesn't match channel count");
+        return false;
+    }
+
+    return formatBaseType == baseType;
 }
 
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
@@ -168,6 +256,32 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
+        case 'C':
+        {
+            // The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format
+            // conversion required between the type associated by the resource and the backing ImageFormat.
+            // Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture
+            // writes that will do a format conversion.
+            if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
+            {
+                IRInst* arg0 = m_callInst->getArg(0);
+
+                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(arg0))
+                {
+                    const ImageFormat imageFormat = formatDecoration->getFormat();
+                    auto textureType = as<IRTextureTypeBase>(arg0->getDataType());
+                    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
+
+                    if (elementType && ! _isImageFormatCompatible(imageFormat, elementType))
+                    {
+                        // Append _convert on the name to signify we need to use a code path, that will automatically
+                        // do the format conversion.
+                        m_writer->emit("_convert");
+                    }                    
+                }
+            }
+            break;
+        }
         case 'c':
         {
             // When doing texture access in glsl the result may need to be cast.
