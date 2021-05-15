@@ -70,8 +70,6 @@ namespace Slang
         {
             case FuncType::Glslang_Compile_1_0:   return { "glslang_compile", PassThroughMode::Glslang} ;
             case FuncType::Glslang_Compile_1_1:   return { "glslang_compile_1_1", PassThroughMode::Glslang} ;
-            case FuncType::Fxc_D3DCompile:     return { "D3DCompile", PassThroughMode::Fxc};
-            case FuncType::Fxc_D3DDisassemble: return { "D3DDisassemble", PassThroughMode::Fxc };
             case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", PassThroughMode::Dxc };
             default: return { nullptr, PassThroughMode::None };
         } 

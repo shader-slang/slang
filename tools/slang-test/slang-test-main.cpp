@@ -1687,7 +1687,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.sourceLanguage = (ext == "c") ? SLANG_SOURCE_LANGUAGE_C : SLANG_SOURCE_LANGUAGE_CPP;
 
     // Build a shared library
-    options.targetType = DownstreamCompiler::TargetType::SharedLibrary;
+    options.targetType = SLANG_SHARED_LIBRARY;
 
     // Compile this source
     options.sourceFiles.add(filePath);

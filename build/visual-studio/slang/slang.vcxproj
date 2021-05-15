@@ -220,7 +220,6 @@
     <ClInclude Include="..\..\..\source\slang\slang-glsl-extension-tracker.h" />
     <ClInclude Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.h" />
     <ClInclude Include="..\..\..\source\slang\slang-image-format-defs.h" />
-    <ClInclude Include="..\..\..\source\slang\slang-include-system.h" />
     <ClInclude Include="..\..\..\source\slang\slang-intrinsic-expand.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-any-value-marshalling.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-augment-make-existential.h" />
@@ -334,7 +333,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-extractor.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-dxc-support.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-cpp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-cuda.cpp" />
@@ -346,7 +344,6 @@
     <ClCompile Include="..\..\..\source\slang\slang-emit.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-glsl-extension-tracker.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-hlsl-intrinsic-set.cpp" />
-    <ClCompile Include="..\..\..\source\slang\slang-include-system.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-intrinsic-expand.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-any-value-marshalling.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-augment-make-existential.cpp" />
