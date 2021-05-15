@@ -101,7 +101,7 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 // The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to do for resources means that there wouldn't be a single f() function any more.
 // But for CUDA and C++ that's not the case or generally desirable.
 
-IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
+static IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
 {
     // JS(TODO):
     // There could perhaps be other situations, that need to be covered
@@ -119,7 +119,9 @@ IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
     return inst->findDecoration<IRFormatDecoration>();
 }
 
-bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
+// Returns true if dataType and imageFormat are compatible - that they have the same representation,
+// and no conversion is required.
+static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
 {
     int numElems = 1;
 
@@ -145,6 +147,63 @@ bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
     }
 
     return formatBaseType == baseType;
+}
+
+static bool _isConvertRequired(ImageFormat imageFormat, IRInst* resourceVar)
+{
+    auto textureType = as<IRTextureTypeBase>(resourceVar->getDataType());
+    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
+    return elementType && !_isImageFormatCompatible(imageFormat, elementType);
+}
+
+static size_t _calcBackingElementSizeInBytes(IRInst* resourceVar)
+{
+    // First see if there is a format associated with the resource
+    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceVar))
+    {
+        const ImageFormat imageFormat = formatDecoration->getFormat();
+
+        if (_isConvertRequired(imageFormat, resourceVar))
+        {
+            // If the access is a converting access then the x coordinate is *NOT* scaled
+            // This is a CUDA specific issue(!).
+            return 1;
+        }
+
+        const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
+        return imageFormatInfo.sizeInBytes;
+    }
+    else
+    {
+        // If not we *assume* the backing format is the same as the element type used for access.
+        /// Ie in RWTexture<T>, this would return sizeof(T)
+
+        auto textureType = as<IRTextureTypeBase>(resourceVar->getDataType());
+        IRType* elementType = textureType ? textureType->getElementType() : nullptr;
+
+        if (elementType)
+        {
+            int numElems = 1;
+
+            if (auto vecType = as<IRVectorType>(elementType))
+            {
+                numElems = int(getIntVal(vecType->getElementCount()));
+                elementType = vecType->getElementType();
+            }
+
+            BaseType baseType = BaseType::Void;
+            if (auto basicType = as<IRBasicType>(elementType))
+            {
+                baseType = basicType->getBaseType();
+            }
+
+            const auto& info = BaseTypeInfo::getInfo(baseType);
+            return info.sizeInBytes * numElems; 
+        }
+    }
+
+    // When in doubt 4 is not a terrible guess based on limitations around DX11 etc
+    return 4;
 }
 
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
@@ -269,10 +328,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(arg0))
                 {
                     const ImageFormat imageFormat = formatDecoration->getFormat();
-                    auto textureType = as<IRTextureTypeBase>(arg0->getDataType());
-                    IRType* elementType = textureType ? textureType->getElementType() : nullptr;
-
-                    if (elementType && ! _isImageFormatCompatible(imageFormat, elementType))
+                    if (_isConvertRequired(imageFormat, arg0))
                     {
                         // Append _convert on the name to signify we need to use a code path, that will automatically
                         // do the format conversion.
@@ -282,6 +338,18 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
             break;
         }
+
+        case 'E':
+        {
+            /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface
+            /// access is byte addressed.
+            /// $E will return the byte size of the *backing element*.
+            size_t elemSizeInBytes = _calcBackingElementSizeInBytes(m_callInst->getArg(0));
+            SLANG_ASSERT(elemSizeInBytes > 0);
+            m_writer->emitUInt64(UInt64(elemSizeInBytes));
+            break;
+        }
+
         case 'c':
         {
             // When doing texture access in glsl the result may need to be cast.
