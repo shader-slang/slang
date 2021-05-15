@@ -347,7 +347,7 @@ public:
     virtual ISlangSharedLibrary* getSharedLibrary() { return nullptr; }
 
         /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
-    virtual SlangResult dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
+    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
 
         /// True if underlying compiler uses file system to pass source
     virtual bool isFileBased() = 0;

@@ -42,7 +42,7 @@ public:
     // DownstreamCompiler
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE;
     virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_sharedLibrary; }
-    virtual SlangResult dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
+    virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out) SLANG_OVERRIDE;
     virtual bool isFileBased() SLANG_OVERRIDE { return false; }
 
         /// Must be called before use
@@ -212,7 +212,7 @@ SlangResult GlslangDownstreamCompiler::compile(const CompileOptions& options, Re
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
 {
     // Can only disassemble blobs that are DXBC
     if (sourceBlobTarget != SLANG_SPIRV)
