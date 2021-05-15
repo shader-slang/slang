@@ -343,13 +343,10 @@ public:
     const Desc& getDesc() const { return m_desc;  }
         /// Compile using the specified options. The result is in resOut
     virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) = 0;
-        /// Some downstream compilers are backed by a shared library. This allows access to the shared library to access internal functions. 
-    virtual ISlangSharedLibrary* getSharedLibrary() { return nullptr; }
-
         /// Some compilers have support converting a binary blob into disassembly. Output disassembly is held in the output blob
     virtual SlangResult disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out);
 
-        /// True if underlying compiler uses file system to pass source
+        /// True if underlying compiler uses file system to communicate source
     virtual bool isFileBased() = 0;
 
         /// Get info for a compiler type
@@ -432,25 +429,6 @@ public:
     CommandLineDownstreamCompiler(const Desc& desc):Super(desc) {}
 
     CommandLine m_cmdLine;
-};
-
-class SharedLibraryDownstreamCompiler: public DownstreamCompiler
-{
-public:
-    typedef DownstreamCompiler Super;
-
-    // DownstreamCompiler
-    virtual SlangResult compile(const CompileOptions& options, RefPtr<DownstreamCompileResult>& outResult) SLANG_OVERRIDE { SLANG_UNUSED(options); SLANG_UNUSED(outResult); return SLANG_E_NOT_IMPLEMENTED; }
-    virtual bool isFileBased() SLANG_OVERRIDE { return true; }
-    virtual ISlangSharedLibrary* getSharedLibrary() SLANG_OVERRIDE { return m_library; }
-
-    SharedLibraryDownstreamCompiler(const Desc& desc, ISlangSharedLibrary* library):
-        Super(desc),
-        m_library(library)
-    {
-    }
-protected:
-    ComPtr<ISlangSharedLibrary> m_library;
 };
 
 class DownstreamCompilerSet : public RefObject
