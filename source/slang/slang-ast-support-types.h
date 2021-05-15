@@ -122,9 +122,19 @@ namespace Slang
 
     enum class ImageFormat
     {
-#define FORMAT(NAME) NAME,
+#define FORMAT(NAME, OTHER) NAME,
 #include "slang-image-format-defs.h"
     };
+
+    struct ImageFormatInfo
+    {
+        SlangScalarType scalarType;         ///< If image format is not made up of channels of set sizes this will be SLANG_SCALAR_TYPE_NONE
+        uint8_t channelCount;               ///< The number of channels
+        uint8_t sizeInBytes;                ///< Size in bytes
+        UnownedStringSlice name;            ///< The name associated with this type. NOTE! Currently these names *are* the GLSL format names.
+    };
+
+    const ImageFormatInfo& getImageFormatInfo(ImageFormat format);
 
     bool findImageFormatByName(char const* name, ImageFormat* outFormat);
     char const* getGLSLNameForImageFormat(ImageFormat format);

@@ -20,11 +20,11 @@ These limitations apply to Slang transpiling to CUDA.
 * Samplers are not separate objects in CUDA - they are combined into a single 'TextureObject'. So samplers are effectively ignored on CUDA targets. 
 * When using a TextureArray.Sample (layered texture in CUDA) - the index will be treated as an int, as this is all CUDA allows
 * Care must be used in using `WaveGetLaneIndex` wave intrinsic - it will only give the right results for appropriate launches
-* CUDA 'surfaces' are used for textures which are read/write. CUDA does NOT do format conversion with surfaces.
+* CUDA 'surfaces' are used for textures which are read/write (aka RWTexture). 
 
 The following are a work in progress or not implemented but are planned to be so in the future
 
-* Some resource types remain unsupported, and not all methods on types are supported
+* Some resource types remain unsupported, and not all methods on all types are supported
 
 # How it works
 
@@ -122,8 +122,6 @@ The UniformState and UniformEntryPointParams struct typically vary by shader. Un
     size_t sizeInBytes;
 ```  
 
-
-
 ## Texture
 
 Read only textures will be bound as the opaque CUDA type CUtexObject. This type is the combination of both a texture AND a sampler. This is somewhat different from HLSL, where there can be separate `SamplerState` variables. This allows access of a single texture binding with different types of sampling. 
@@ -138,11 +136,58 @@ Load is only supported for Texture1D, and the mip map selection argument is igno
  
 RWTexture types are converted into CUsurfObject type. 
 
-In CUDA it is not possible to do a format conversion on an access to a CUsurfObject, so it must be backed by the same data format as is used within the Slang source code. 
+In regular CUDA it is not possible to do a format conversion on an access to a CUsurfObject. Slang does add support for hardware write conversions where they are available. To enable the feature it is necessary to attribute your RWTexture with `format`. For example
+
+```
+[format("rg16f")]
+RWTexture2D<float2> rwt2D_2;
+```
+
+The format names used are the same as for (GLSL layout format types)[https://www.khronos.org/opengl/wiki/Layout_Qualifier_(GLSL)]. If no format is specified Slang will *assume* that the format is the same as the type specified. 
+
+Note that the format attribution is on variables/paramters/fields and not part of the type system. This means that if you have a scenario like...
+
+```
+[format(rg16f)]
+RWTexture2d<float2> g_texture;
+
+float2 getValue(RWTexture2D<float2> t)
+{
+    return t[int2(0, 0];
+}
+
+void doThing()
+{
+    float2 v = getValue(g_texture);
+}
+```
+
+Even `getValue` will receive t *without* the format attribute, and so will access it, presumably erroneously. A work around for this specific scenario would be to attribute the parameter
+
+```
+float2 getValue([format("rg16f")] RWTexture2D<float2> t)
+{
+    return t[int2(0, 0];
+}
+```
+
+This will only work correctly if `getValue` is called with a `t` that has that format attribute. As it stands no checking is performed on this matching so no error or warning will be produced if there is a mismatch. 
+
+There is limited software support for doing a conversion on reading. Currently this only supports only 1D, 2D, 3D RWTexture, backed with half1, half2 or half4. For this path to work NVRTC must have the `cuda_fp16.h` and associated files available. Please check the section on `Half Support`.
+
+If hardware read conversions are desired, this can be achieved by having a Texture<T> that uses the surface of a RWTexture<T>. Using the Texture<T> not only allows hardware conversion but also filtering. 
 
 It is also worth noting that CUsurfObjects in CUDA are NOT allowed to have mip maps. 
 
-By default surface access uses cudaBoundaryModeZero, this can be replaced using the macro SLANG_CUDA_BOUNDARY_MODE in the CUDA prelude.
+By default surface access uses cudaBoundaryModeZero, this can be replaced using the macro SLANG_CUDA_BOUNDARY_MODE in the CUDA prelude. For HW format conversions the macro SLANG_PTX_BOUNDARY_MODE. These boundary settings are in effect global for the whole of the kernel. 
+
+`SLANG_CUDA_BOUNDARY_MODE` can be one of
+
+* cudaBoundaryModeZero      causes an execution trap on out-of-bounds addresses
+* cudaBoundaryModeClamp     stores data at the nearest surface location (sized appropriately)
+* cudaBoundaryModeTrap      drops stores to out-of-bounds addresses 
+
+`SLANG_PTX_BOUNDARY_MODE` can be one of `trap`, `clamp` or `zero`. In general it is recommended to have both set to the same type of value, for example `cudaBoundaryModeZero` and `zero`.
 
 ## Sampler
 
