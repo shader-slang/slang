@@ -1,6 +1,8 @@
 // slang-intrinsic-expand.cpp
 #include "slang-intrinsic-expand.h"
 
+#include "slang-emit-cuda.h"
+
 namespace Slang {
 
 void IntrinsicExpandContext::emit(IRCall* inst, IRUse* args, Int argCount, const UnownedStringSlice& intrinsicText)
@@ -101,13 +103,13 @@ static BaseType _getBaseTypeFromScalarType(SlangScalarType type)
 // The VK back-end gets away with this kind of coincidentally, since the "legalization" we have to do for resources means that there wouldn't be a single f() function any more.
 // But for CUDA and C++ that's not the case or generally desirable.
 
-static IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
+static IRFormatDecoration* _findImageFormatDecoration(IRInst* resourceInst)
 {
     // JS(TODO):
     // There could perhaps be other situations, that need to be covered
 
     // If this is a load, we need to get the decoration from the field key
-    if (IRLoad* load = as<IRLoad>(inst))
+    if (IRLoad* load = as<IRLoad>(resourceInst))
     {
         if (IRFieldAddress* fieldAddress = as<IRFieldAddress>(load->getOperand(0)))
         {
@@ -116,7 +118,7 @@ static IRFormatDecoration* _findImageFormatDecoration(IRInst* inst)
         }
     }
     // Otherwise just try on the instruction
-    return inst->findDecoration<IRFormatDecoration>();
+    return resourceInst->findDecoration<IRFormatDecoration>();
 }
 
 // Returns true if dataType and imageFormat are compatible - that they have the same representation,
@@ -149,36 +151,26 @@ static bool _isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType)
     return formatBaseType == baseType;
 }
 
-static bool _isConvertRequired(ImageFormat imageFormat, IRInst* resourceVar)
+static bool _isConvertRequired(ImageFormat imageFormat, IRInst* callee)
 {
-    auto textureType = as<IRTextureTypeBase>(resourceVar->getDataType());
+    auto textureType = as<IRTextureTypeBase>(callee->getDataType());
     IRType* elementType = textureType ? textureType->getElementType() : nullptr;
     return elementType && !_isImageFormatCompatible(imageFormat, elementType);
 }
 
-static size_t _calcBackingElementSizeInBytes(IRInst* resourceVar)
+static size_t _calcBackingElementSizeInBytes(IRInst* resourceInst)
 {
     // First see if there is a format associated with the resource
-    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceVar))
+    if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
     {
-        const ImageFormat imageFormat = formatDecoration->getFormat();
-
-        if (_isConvertRequired(imageFormat, resourceVar))
-        {
-            // If the access is a converting access then the x coordinate is *NOT* scaled
-            // This is a CUDA specific issue(!).
-            return 1;
-        }
-
-        const auto& imageFormatInfo = getImageFormatInfo(imageFormat);
-        return imageFormatInfo.sizeInBytes;
+        return getImageFormatInfo(formatDecoration->getFormat()).sizeInBytes;
     }
     else
     {
         // If not we *assume* the backing format is the same as the element type used for access.
         /// Ie in RWTexture<T>, this would return sizeof(T)
 
-        auto textureType = as<IRTextureTypeBase>(resourceVar->getDataType());
+        auto textureType = as<IRTextureTypeBase>(resourceInst->getDataType());
         IRType* elementType = textureType ? textureType->getElementType() : nullptr;
 
         if (elementType)
@@ -204,6 +196,18 @@ static size_t _calcBackingElementSizeInBytes(IRInst* resourceVar)
 
     // When in doubt 4 is not a terrible guess based on limitations around DX11 etc
     return 4;
+}
+
+static bool _isResourceRead(IRCall* call)
+{
+    IRType* returnType = call->getDataType();
+    return returnType && (as<IRVoidType>(returnType) == nullptr);
+}
+
+static bool _isResourceWrite(IRCall* call)
+{
+    IRType* returnType = call->getDataType();
+    return returnType && (as<IRVoidType>(returnType) != nullptr);
 }
 
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
@@ -323,13 +327,35 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // writes that will do a format conversion.
             if (m_emitter->getTarget() == CodeGenTarget::CUDASource)
             {
-                IRInst* arg0 = m_callInst->getArg(0);
+                IRInst* resourceInst = m_callInst->getArg(0);
 
-                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(arg0))
+                if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
                 {
                     const ImageFormat imageFormat = formatDecoration->getFormat();
-                    if (_isConvertRequired(imageFormat, arg0))
+                    if (_isConvertRequired(imageFormat, resourceInst))
                     {
+                        // If the function returns something it's a reader so we may need to convert
+                        // and in doing so require half
+                        if (_isResourceRead(m_callInst))
+                        {
+                            // If the source format if half derived, then we need to enable half
+                            switch (imageFormat)
+                            {
+                                case ImageFormat::r16f:
+                                case ImageFormat::rg16f:
+                                case ImageFormat::rgba16f:
+                                {
+                                    CUDAExtensionTracker* extensionTracker = as<CUDAExtensionTracker>(m_emitter->getExtensionTracker());
+                                    if (extensionTracker)
+                                    {
+                                        extensionTracker->requireBaseType(BaseType::Half);
+                                    }
+                                    break;
+                                }
+                                default: break;
+                            }
+                        }
+
                         // Append _convert on the name to signify we need to use a code path, that will automatically
                         // do the format conversion.
                         m_writer->emit("_convert");
@@ -344,7 +370,21 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             /// Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface
             /// access is byte addressed.
             /// $E will return the byte size of the *backing element*.
-            size_t elemSizeInBytes = _calcBackingElementSizeInBytes(m_callInst->getArg(0));
+
+            IRInst* resourceInst = m_callInst->getArg(0);
+            size_t elemSizeInBytes = _calcBackingElementSizeInBytes(resourceInst);
+
+            // If we have a format converstion and its a *write* we don't need to scale
+            if (IRFormatDecoration* formatDecoration = _findImageFormatDecoration(resourceInst))
+            {
+                const ImageFormat imageFormat = formatDecoration->getFormat();
+                if (_isConvertRequired(imageFormat, resourceInst) && _isResourceWrite(m_callInst))
+                {
+                    // If there is a conversion *and* it's a write we don't need to scale.
+                    elemSizeInBytes = 1;
+                }
+            }
+
             SLANG_ASSERT(elemSizeInBytes > 0);
             m_writer->emitUInt64(UInt64(elemSizeInBytes));
             break;

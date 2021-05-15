@@ -1,5 +1,3 @@
-
-
 // Native half not supported on CPU currently
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 // Doesn't work on DX11 currently - locks up on binding
@@ -9,15 +7,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type -shaderobj
 // TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DIABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
-
-// Note that this test is a little silly. The output does not confirm that the write actually worked.
-// This is because it's not trivial on CUDA to do so. If there is a write conversion, the RWTexture
-// is backed by a surface. There is a texture converting write (in sust.p) but not in reading.
-// 
-// In practice if if you wanted a texture read, you'd either only be able to read *without* format 
-// conversion, or via a separate binding of the same surface as a Texture.
-// There's no simple way to describe either, so this test just confirms it outputs PTX that can 
-// be executed, and unfortunately doesn't test if the write conversion actually *worked*
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
 
@@ -41,14 +30,24 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     
-    float val = idx;
+    float val = 0;
  
-    // Do a format converting write!
-    rwt2D[uint2(idx, idx)] = val;    
+    // Do a format converting write2!
+    rwt2D[uint2(idx, idx)] = idx - 1;
+    rwt2D_2[uint2(idx, idx)] = float2(idx + idx, idx * idx);
+    rwt2D_4[uint2(idx, idx)] = float4(idx + 97, idx + 8, idx + 16, idx + 24);    
     
-    rwt2D_2[uint2(idx, idx)] = float2(val * 2, val * 3);    
+    // May not be strictly necessary
+    AllMemoryBarrierWithGroupSync();
     
-    rwt2D_4[uint2(idx, idx)] = float4(val + 1, val - 1, val * 4, val * -4);    
+    // Do read converting
+    // There is *only* CUDA support for half/float *converting* reads for 1d, 2d, 3d shapes for RWTexture/surface
+    
+    float4 v4 = rwt2D_4[uint2(idx, idx)];
+    float2 v2 = rwt2D_2[uint2(idx, idx)];
+    float v = rwt2D[uint2(idx, idx)];
+    
+    val += v4.x + v2.x + v;
     
     outputBuffer[idx] = val;
 }

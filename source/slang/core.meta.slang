@@ -1083,7 +1083,7 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                             }
 
                             sb << (isArray ? "Layered" : "");
-                            sb << "read<$T0>($0";
+                            sb << "read$C<$T0>($0";
                                 
                             for (int i = 0; i < vecCount; ++i)
                             {
