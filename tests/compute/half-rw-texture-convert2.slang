@@ -1,4 +1,3 @@
-
 // Native half not supported on CPU currently
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 // Doesn't work on DX11 currently - locks up on binding
@@ -8,14 +7,20 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type -shaderobj
 // TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
 //DIABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
-// TODO(JS): Doesn't work on certain CI systems. 
+
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
 
 //TEST_INPUT: RWTexture2D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt2D
-RWTexture2D<half> rwt2D;
+[format("r16f")]
+RWTexture2D<float> rwt2D;
+
+//TEST_INPUT: RWTexture2D(format=RG_Float16, size=4, content = one, mipMaps = 1):name rwt2D_2
+[format("rg16f")]
+RWTexture2D<float2> rwt2D_2;
 
 //TEST_INPUT: RWTexture2D(format=RGBA_Float16, size=4, content = one, mipMaps = 1):name rwt2D_4
-RWTexture2D<half4> rwt2D_4;
+[format("rgba16f")]
+RWTexture2D<float4> rwt2D_4;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -25,27 +30,24 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     
-    float val = 0.0f;
+    float val = 0;
  
-    //val += rwt1D[idx];
+    // Do a format converting write2!
+    rwt2D[uint2(idx, idx)] = idx - 1;
+    rwt2D_2[uint2(idx, idx)] = float2(idx + idx, idx * idx);
+    rwt2D_4[uint2(idx, idx)] = float4(idx + 97, idx + 8, idx + 16, idx + 24);    
     
-    half h0 = rwt2D[uint2(idx, idx)];
-
-    val += float(h0);
+    // May not be strictly necessary
+    AllMemoryBarrierWithGroupSync();
     
-    half4 h1 = rwt2D_4[uint2(idx, idx)];
-    float4 f1 = h1;
-   
-    val += f1.x + f1.y + f1.z + f1.w;
+    // Do read converting
+    // There is *only* CUDA support for half/float *converting* reads for 1d, 2d, 3d shapes for RWTexture/surface
     
-    // NOTE! This is disabled because on CUDA, whilst this has an effect it is not what is expected.
-    // The value read back has changed but seems to always be 1.
-    // rwt1D[idx] = idx;
-    rwt2D[uint2(idx, idx)] = half(idx);    
+    float4 v4 = rwt2D_4[uint2(idx, idx)];
+    float2 v2 = rwt2D_2[uint2(idx, idx)];
+    float v = rwt2D[uint2(idx, idx)];
     
-    //val += rwt1D[idx];
-    val += rwt2D[uint2(idx, idx)];
-    //val += rwt3D[uint3(idx, idx, idx)];
- 
+    val += v4.x + v2.x + v;
+    
     outputBuffer[idx] = val;
 }

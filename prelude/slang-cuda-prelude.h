@@ -63,6 +63,15 @@
  
 #ifndef SLANG_CUDA_BOUNDARY_MODE
 #   define SLANG_CUDA_BOUNDARY_MODE cudaBoundaryModeZero
+
+// Can be one of SLANG_CUDA_PTX_BOUNDARY_MODE. Only applies *PTX* emitted CUDA operations
+// which currently is just RWTextureRW format writes
+// 
+// .trap         causes an execution trap on out-of-bounds addresses
+// .clamp        stores data at the nearest surface location (sized appropriately)
+// .zero         drops stores to out-of-bounds addresses 
+
+#   define SLANG_PTX_BOUNDARY_MODE "zero"
 #endif
 
 struct TypeInfo
@@ -306,6 +315,15 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort2 __half_as_ushort(const __half2& i) { 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort3 __half_as_ushort(const __half3& i) { return make_ushort3(__half_as_ushort(i.xy.x), __half_as_ushort(i.xy.y), __half_as_ushort(i.z)); }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL ushort4 __half_as_ushort(const __half4& i) { return make_ushort4(__half_as_ushort(i.xy.x), __half_as_ushort(i.xy.y), __half_as_ushort(i.zw.x), __half_as_ushort(i.zw.y)); }
 
+// This is a little bit of a hack. Fortunately CUDA has the definitions of the templated types in 
+// include/surface_indirect_functions.h
+// Here we find the template definition requires a specialization of __nv_isurf_trait to allow 
+// a specialization of the surface write functions. 
+// This *isn't* a problem on the read functions as they don't have a return type that uses this mechanism 
+
+template<> struct __nv_isurf_trait<__half> { typedef void type; };
+template<> struct __nv_isurf_trait<__half2> { typedef void type; };
+template<> struct __nv_isurf_trait<__half4> { typedef void type; };
 
 #define SLANG_DROP_PARENS(...) __VA_ARGS__
 
@@ -336,8 +354,6 @@ SLANG_SURFACE_READ(surf2DLayeredread, (int x, int y, int layer), (x, y, layer))
 SLANG_SURFACE_READ(surfCubemapread, (int x, int y, int face), (x, y, face))
 SLANG_SURFACE_READ(surfCubemapLayeredread, (int x, int y, int layerFace), (x, y, layerFace))
 
-// The following doesn't quite work, for reasons currently not determined
-#if 0
 #define SLANG_SURFACE_WRITE(FUNC_NAME, TYPE_ARGS, ARGS) \
 template <> \
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void FUNC_NAME<__half>(__half data, cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
@@ -364,9 +380,123 @@ SLANG_SURFACE_WRITE(surf1DLayeredwrite, (int x, int layer), (x, layer))
 SLANG_SURFACE_WRITE(surf2DLayeredwrite, (int x, int y, int layer), (x, y, layer))
 SLANG_SURFACE_WRITE(surfCubemapwrite, (int x, int y, int face), (x, y, face))
 SLANG_SURFACE_WRITE(surfCubemapLayeredwrite, (int x, int y, int layerFace), (x, y, layerFace))
-#endif     
-     
+
+// ! Hack to test out reading !!!
+// Only works converting *from* half 
+ 
+//template <typename T> 
+//SLANG_FORCE_INLINE SLANG_CUDA_CALL T surf2Dread_convert(cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
+
+#define SLANG_SURFACE_READ_HALF_CONVERT(FUNC_NAME, TYPE_ARGS, ARGS) \
+\
+template <typename T>  \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T FUNC_NAME##_convert(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode); \
+\
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float FUNC_NAME##_convert<float>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode)  \
+{ \
+    return __ushort_as_half(FUNC_NAME<uint16_t>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+} \
+\
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float2 FUNC_NAME##_convert<float2>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
+{ \
+    const __half2 v = __ushort_as_half(FUNC_NAME<ushort2>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+    return float2{v.x, v.y}; \
+} \
+\
+template <> \
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float4 FUNC_NAME##_convert<float4>(cudaSurfaceObject_t surfObj, SLANG_DROP_PARENS TYPE_ARGS, cudaSurfaceBoundaryMode boundaryMode) \
+{ \
+    const __half4 v = __ushort_as_half(FUNC_NAME<ushort4>(surfObj, SLANG_DROP_PARENS ARGS, boundaryMode)); \
+    return float4{v.xy.x, v.xy.y, v.zw.x, v.zw.y}; \
+}
+
+SLANG_SURFACE_READ_HALF_CONVERT(surf1Dread, (int x), (x)) 
+SLANG_SURFACE_READ_HALF_CONVERT(surf2Dread, (int x, int y), (x, y)) 
+SLANG_SURFACE_READ_HALF_CONVERT(surf3Dread, (int x, int y, int z), (x, y, z))
+
 #endif
+
+// Support for doing format conversion when writing to a surface/RWTexture
+
+// NOTE! For normal surface access x values are *byte* addressed.
+// For the _convert versions they are *not*. They don't need to be because sust.p does not require it.
+
+template <typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode);
+template <typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode);
+template <typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert(T, cudaSurfaceObject_t surfObj, int x, int y, int z, cudaSurfaceBoundaryMode boundaryMode);
+
+// https://docs.nvidia.com/cuda/inline-ptx-assembly/index.html
+// https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#surface-instructions-sust
+
+// Float
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode)
+{
+    asm volatile ( "{sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2};}\n\t" :: "l"(surfObj),"r"(x),"f"(v));     
+}
+ 
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(v));
+}
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float>(float v, cudaSurfaceObject_t surfObj, int x, int y, int z, cudaSurfaceBoundaryMode boundaryMode)
+{
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"r"(z),"f"(v));
+}
+
+// Float2
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float2>(float2 v, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y;
+    asm volatile ( "{sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2,%3};}\n\t" :: "l"(surfObj),"r"(x),"f"(vx),"f"(vy));     
+}
+ 
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float2>(float2 v, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y;
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3,%4};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(vx),"f"(vy));
+}
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float2>(float2 v, cudaSurfaceObject_t surfObj, int x, int y, int z, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y;
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4,%5};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"r"(z),"f"(vx),"f"(vy));
+}
+
+// Float4
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf1Dwrite_convert<float4>(float4 v, cudaSurfaceObject_t surfObj, int x, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
+    asm volatile ( "{sust.p.1d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1}], {%2,%3,%4,%5};}\n\t" :: "l"(surfObj),"r"(x),"f"(vx),"f"(vy),"f"(vz),"f"(vw));     
+}
+ 
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf2Dwrite_convert<float4>(float4 v, cudaSurfaceObject_t surfObj, int x, int y, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2}], {%3,%4,%5,%6};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"f"(vx),"f"(vy),"f"(vz),"f"(vw));
+}
+
+template <>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void surf3Dwrite_convert<float4>(float4 v, cudaSurfaceObject_t surfObj, int x, int y, int z, cudaSurfaceBoundaryMode boundaryMode)
+{
+    const float vx = v.x, vy = v.y, vz = v.z, vw = v.w;
+    asm volatile ( "{sust.p.2d.b32." SLANG_PTX_BOUNDARY_MODE " [%0, {%1,%2,%3}], {%4,%5,%6,%7};}\n\t" :: "l"(surfObj),"r"(x),"r"(y),"r"(z),"f"(vx),"f"(vy),"f"(vz),"f"(vw));
+}
 
 // ----------------------------- F32 -----------------------------------------
 

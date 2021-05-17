@@ -1,7 +1,6 @@
 Slang Target Compatibility 
 ==========================
 
-
 Shader Model (SM) numbers are D3D Shader Model versions, unless explicitly stated otherwise.
 OpenGL compatibility is not listed here, because OpenGL isn't an officially supported target. 
 
@@ -10,7 +9,7 @@ Items with ^ means there is some discussion about support later in the document 
 
 | Feature                     |    D3D11     |    D3D12     |     VK     |      CUDA     |    CPU
 |-----------------------------|--------------|--------------|------------|---------------|---------------
-| Half Type                   |     No       |     Yes      |   Yes      |     No +      |    No +
+| Half Type                   |     No       |     Yes      |   Yes      |     Yes ^     |    No +
 | Double Type                 |     Yes      |     Yes      |   Yes      |     Yes       |    Yes
 | Double Intrinsics           |     No       |   Limited +  |  Limited   |     Most      |    Yes
 | u/int64_t Type              |     No       |   Yes ^      |   Yes      |     Yes       |    Yes
@@ -45,6 +44,8 @@ Items with ^ means there is some discussion about support later in the document 
 ## Half Type
 
 There appears to be a problem writing to a StructuredBuffer containing half on D3D12. D3D12 also appears to have problems doing calculations with half.
+
+In order for half to work in CUDA, NVRTC must be able to include `cuda_fp16.h` and related files. Please read the [CUDA target documentation](cuda-target.md) for more details. 
 
 ## u/int64_t Type
 
@@ -201,8 +202,6 @@ uint64_t RWByteAddressBuffer::InterlockedMinU64(uint byteAddress, uint64_t value
 uint64_t RWByteAddressBuffer::InterlockedAndU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedOrU64(uint byteAddress, uint64_t value);
 uint64_t RWByteAddressBuffer::InterlockedXorU64(uint byteAddress, uint64_t value);
-
-
 ```
 
 On HLSL based targets this functionality is achieved using [NVAPI](https://developer.nvidia.com/nvapi). Support for NVAPI is described

@@ -293,7 +293,7 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
     return builder;
 }
 
-/* static */String StringUtil::getString(ISlangBlob* blob)
+/* static */UnownedStringSlice StringUtil::getSlice(ISlangBlob* blob)
 {
     if (blob)
     {
@@ -301,15 +301,20 @@ UnownedStringSlice StringUtil::getAtInSplit(const UnownedStringSlice& in, char s
         if (size > 0)
         {
             const char* contents = (const char*)blob->getBufferPointer();
-            // Check it has terminating 0, if not we must construct as if it does
+            // Check it has terminating 0, if it has we skip it, because slices do not need zero termination 
             if (contents[size - 1] == 0)
             {
                 size--;
             }
-            return String(contents, contents + size);
+            return UnownedStringSlice(contents, contents + size);
         }
     }
-    return String();
+    return UnownedStringSlice();
+}
+
+/* static */String StringUtil::getString(ISlangBlob* blob)
+{
+    return getSlice(blob);
 }
 
 ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)

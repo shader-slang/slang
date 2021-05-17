@@ -8,6 +8,7 @@
 
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-name.h"
+#include "../compiler-core/slang-include-system.h"
 
 #include "../core/slang-std-writers.h"
 
@@ -21,7 +22,6 @@
 #include "slang-syntax.h"
 
 
-#include "slang-include-system.h"
 
 #include "slang-serialize-ir-types.h"
 
@@ -76,6 +76,7 @@ namespace Slang
         HostCallable        = SLANG_HOST_CALLABLE,
         CUDASource          = SLANG_CUDA_SOURCE,
         PTX                 = SLANG_PTX,
+        ObjectCode          = SLANG_OBJECT_CODE,
         CountOf             = SLANG_TARGET_COUNT_OF,
     };
 
@@ -2229,8 +2230,6 @@ namespace Slang
         {
             Glslang_Compile_1_0,
             Glslang_Compile_1_1,
-            Fxc_D3DCompile,
-            Fxc_D3DDisassemble,
             Dxc_DxcCreateInstance,
             CountOf,
         };

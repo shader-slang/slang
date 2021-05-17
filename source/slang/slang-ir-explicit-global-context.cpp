@@ -467,7 +467,7 @@ struct IntroduceExplicitGlobalContextPass
         addKernelContextNameHint(contextParam);
         contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
 
-        // The new parameter can be registerd as the context value
+        // The new parameter can be registered as the context value
         // to be used for `func` right away.
         //
         // Note: we register the value *before* modifying locations
@@ -482,8 +482,12 @@ struct IntroduceExplicitGlobalContextPass
         // TODO: There is an issue here if `func` might be called
         // dynamically, through something like a witness table.
         //
-        List<IRUse*> uses;
-        for( auto use = func->firstUse; use; use = use->nextUse )
+        // We collect all the uses first which are in calls.
+        // NOTE! That we collect all calls and then process (and don't iterate
+        // using the linked list), because when a replacement is made the func usage
+        // linked list will no longer hold all of the use sites.
+        List<IRCall*> callUses;
+        for (auto use = func->firstUse; use; use = use->nextUse)
         {
             // We will only fix up calls to `func`, and ignore
             // other operations that might refer to it.
@@ -495,9 +499,15 @@ struct IntroduceExplicitGlobalContextPass
             // to a higher-order function.
             //
             auto call = as<IRCall>(use->getUser());
-            if(!call)
-                continue;
+            if (call)
+            {
+                callUses.add(call);
+            }
+        }
 
+        // Fix up all of the call uses
+        for( auto call : callUses)
+        {
             // We are going to construct a new call to `func`
             // that has all of the arguments of the original call...
             //

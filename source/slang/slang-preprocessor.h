@@ -5,8 +5,7 @@
 #include "../core/slang-basic.h"
 
 #include "../compiler-core/slang-lexer.h"
-
-#include "slang-include-system.h"
+#include "../compiler-core/slang-include-system.h"
 
 namespace Slang {
 
