@@ -60,15 +60,16 @@ struct CommandLineReader
     const String& getValueAndAdvance() { const String& value = peekValue(); advance(); return value; }
 
         /// True if at end
-    bool atEnd() const { return m_index >= m_args->m_args.getCount(); }
+    bool atEnd() const { return m_index >= m_args->getArgCount(); }
         /// True if has a current arg
     bool hasArg() const { return !atEnd(); }
 
         /// Advance to next arg
-    void advance() { SLANG_ASSERT(m_index < m_args->getCount()); m_index++; }
+    void advance() { SLANG_ASSERT(m_index < m_args->getArgCount()); m_index++; }
         /// Removes arg at current position
     void removeArg() { SLANG_ASSERT(hasArg()); m_args->m_args.removeAt(m_index); }
 
+        /// Get the value from the arg previous to the current position. Will assert if there isn't one.
     String getPreviousValue() const; 
 
         /// If there is an arg outArg is set and advanced
