@@ -9,6 +9,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-args.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -65,6 +68,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

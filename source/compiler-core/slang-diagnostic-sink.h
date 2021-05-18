@@ -138,8 +138,9 @@ public:
     {
         enum Enum: Flags
         {
-            VerbosePath = 0x1,                  ///< Will display a more verbose path (if available) - such as a canonical or absolute path
-            SourceLocationLine = 0x2,           ///< If set will display the location line if source is available
+            VerbosePath         = 0x1,           ///< Will display a more verbose path (if available) - such as a canonical or absolute path
+            SourceLocationLine  = 0x2,           ///< If set will display the location line if source is available
+            HumaneLoc           = 0x4,           ///< If set will display humane locs (filename/line number) information
         };
     };
 
@@ -203,6 +204,8 @@ public:
         /// Set the source manager used for lookup of source locs
     void setSourceManager(SourceManager* inSourceManager) { m_sourceManager = inSourceManager; }
 
+        /// Set the flags
+    void setFlags(Flags flags) { m_flags = flags; } 
         /// Get the flags
     Flags getFlags() const { return m_flags; }
         /// Set a flag
@@ -216,6 +219,10 @@ public:
         /// improve quality of highlighting a locations token. If not set, will just have a single
         /// character caret at location
     SourceLocationLexer getSourceLocationLexer() const { return m_sourceLocationLexer; }
+
+        /// Set the maximum length (in chars) of a source line displayed. Set to 0 for no limit
+    void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
+    Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
         /// Initialize state. 
     void init(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer);
@@ -241,6 +248,9 @@ protected:
 
     int m_errorCount = 0;
     int m_internalErrorLocsNoted = 0;
+
+    /// If 0, then there is no limit, otherwise max amount of chars of the source line location
+    Index m_sourceLineMaxLength = 0;            
 
     Flags m_flags = 0;
 

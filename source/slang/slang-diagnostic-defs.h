@@ -74,7 +74,7 @@ DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '
 DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
-DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'")
+DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'")
 DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'")
