@@ -410,7 +410,7 @@ struct OptionsParser
 
         DiagnosticSink* requestSink = requestImpl->getSink();
 
-        RefPtr<CommandLineContext> cmdLineContext = new CommandLineContext;
+        CommandLineContext* cmdLineContext = requestImpl->m_downstreamArgs.getContext();
         
         // Why create a new DiagnosticSink?
         // We *don't* want the lexer that comes as default (it's for Slang source!)
@@ -447,7 +447,12 @@ struct OptionsParser
 
         // Set up the args
         CommandLineArgs args(cmdLineContext);
+        // Converts input args into args in 'args'.
+        // Doing so will allocate some SourceLoc space from the CommandLineContext.
         args.setArgs(argv, argc);
+
+        // Before we do anything else lets strip out all of the downstream arguments.
+        SLANG_RETURN_ON_FAIL(requestImpl->m_downstreamArgs.stripDownstreamArgs(args, 0, sink));
 
         CommandLineReader reader(&args, sink);
 

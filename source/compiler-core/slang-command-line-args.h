@@ -141,10 +141,16 @@ struct DownstreamArgs
         /// Looks for '-X' expressions, removing them from ioArgs and putting in appropriate args 
     SlangResult stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink);
 
+        /// Get the context used
+    CommandLineContext* getContext() const { return m_context; }
+
+        /// Ctor
     DownstreamArgs(CommandLineContext* context):
         m_context(context)
     {
     }
+        /// Default ctor - for convenience, should really use with context normally
+    DownstreamArgs() {}
 
 protected:
     Index _findOrAddName(SourceLoc loc, const UnownedStringSlice& name, Flags flags, DiagnosticSink* sink);
