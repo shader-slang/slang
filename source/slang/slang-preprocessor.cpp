@@ -790,7 +790,7 @@ struct ExpansionInputStream : InputStream
         m_lookaheadToken = _readTokenImpl();
     }
 
-    Token ExpansionInputStream::readToken() SLANG_OVERRIDE
+    Token readToken() SLANG_OVERRIDE
     {
         // Reading a token from an expansion strema amounts to checking
         // whether the current state of the input stream marks the start
@@ -805,7 +805,7 @@ struct ExpansionInputStream : InputStream
         return result;
     }
 
-    Token ExpansionInputStream::peekToken() SLANG_OVERRIDE
+    Token peekToken() SLANG_OVERRIDE
     {
         _maybeBeginMacroInvocation();
         return m_lookaheadToken;
@@ -817,14 +817,14 @@ struct ExpansionInputStream : InputStream
     // a file, since we often want to read unexpanded tokens for
     // preprocessor directives.
 
-    Token ExpansionInputStream::readRawToken()
+    Token readRawToken()
     {
         Token result = m_lookaheadToken;
         m_lookaheadToken = _readTokenImpl();
         return result;
     }
 
-    Token ExpansionInputStream::peekRawToken()
+    Token peekRawToken()
     {
         return m_lookaheadToken;
     }
@@ -846,7 +846,7 @@ private:
     Token m_lookaheadToken;
 
         /// Read a token, bypassing lookahead
-    Token ExpansionInputStream::_readTokenImpl()
+    Token _readTokenImpl()
     {
         Token token = m_inputStreams.readToken();
         return token;
