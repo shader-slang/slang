@@ -467,16 +467,16 @@ struct OptionsParser
 
         while (reader.hasArg())
         {
-            auto valueAndLoc = reader.getArgAndAdvance();
-            const auto& value = valueAndLoc.value;
+            auto arg = reader.getArgAndAdvance();
+            const auto& argValue = arg.value;
 
-            if (value[0] == '-')
+            if (argValue[0] == '-')
             {
-                if(value == "-no-mangle" )
+                if(argValue == "-no-mangle" )
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
-                else if (value == "-load-stdlib")
+                else if (argValue == "-load-stdlib")
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -486,11 +486,11 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                     SLANG_RETURN_ON_FAIL(session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
                 }
-                else if (value == "-compile-stdlib")
+                else if (argValue == "-compile-stdlib")
                 {
                     compileStdLib = true;
                 }
-                else if (value == "-archive-type")
+                else if (argValue == "-archive-type")
                 {
                     CommandLineArg archiveTypeName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(archiveTypeName));
@@ -502,7 +502,7 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
                 }
-                else if (value == "-save-stdlib")
+                else if (argValue == "-save-stdlib")
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -512,7 +512,7 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
                     SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName.value, blob->getBufferPointer(), blob->getBufferSize()));
                 }
-                else if (value == "-save-stdlib-bin-source")
+                else if (argValue == "-save-stdlib-bin-source")
                 {
                     CommandLineArg fileName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
@@ -528,38 +528,38 @@ struct OptionsParser
 
                     File::writeAllText(fileName.value, builder);
                 }
-                else if (value == "-no-codegen")
+                else if (argValue == "-no-codegen")
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
                 }
-                else if (value == "-dump-intermediates")
+                else if (argValue == "-dump-intermediates")
                 {
                     compileRequest->setDumpIntermediates(true);
                 }
-                else if (value == "-dump-intermediate-prefix")
+                else if (argValue == "-dump-intermediate-prefix")
                 {
                     CommandLineArg prefix;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(prefix));
                     requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix.value;
                 }
-                else if (value == "-output-includes")
+                else if (argValue == "-output-includes")
                 {
                     requestImpl->getFrontEndReq()->outputIncludes = true;
                 }
-                else if(value == "-dump-ir" )
+                else if(argValue == "-dump-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
-                else if (value == "-E" || value == "-output-preprocessor")
+                else if (argValue == "-E" || argValue == "-output-preprocessor")
                 {
                     requestImpl->getFrontEndReq()->outputPreprocessor = true;
                 }
-                else if (value == "-dump-ast")
+                else if (argValue == "-dump-ast")
                 {
                     requestImpl->getFrontEndReq()->shouldDumpAST = true;
                 }
-                else if (value == "-doc")
+                else if (argValue == "-doc")
                 {
                     // If compiling stdlib is enabled, will write out documentation
                     compileStdLibFlags |= slang::CompileStdLibFlag::WriteDocumentation;
@@ -567,32 +567,32 @@ struct OptionsParser
                     // Enable writing out documentation on the req
                     requestImpl->getFrontEndReq()->shouldDocument = true;
                 }
-                else if (value == "-dump-repro")
+                else if (argValue == "-dump-repro")
                 {
                     CommandLineArg dumpRepro;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(dumpRepro));
                     requestImpl->m_dumpRepro = dumpRepro.value;
                     compileRequest->enableReproCapture();
                 }
-                else if (value == "-dump-repro-on-error")
+                else if (argValue == "-dump-repro-on-error")
                 {
                     requestImpl->m_dumpReproOnError = true;
                 }
-                else if (value == "-extract-repro")
+                else if (argValue == "-extract-repro")
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
                     SLANG_RETURN_ON_FAIL(ReproUtil::extractFilesToDirectory(reproName.value));
                 }
-                else if (value == "-module-name")
+                else if (argValue == "-module-name")
                 {
                     CommandLineArg moduleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(moduleName));
 
                     compileRequest->setDefaultModuleName(moduleName.value.getBuffer());
                 }
-                else if(value == "-load-repro")
+                else if(argValue == "-load-repro")
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
@@ -620,7 +620,7 @@ struct OptionsParser
 
                     hasLoadedRepro = true;
                 }
-                else if (value == "-repro-file-system")
+                else if (argValue == "-repro-file-system")
                 {
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
@@ -653,47 +653,47 @@ struct OptionsParser
                     // Set as the file system
                     compileRequest->setFileSystem(cacheFileSystem);
                 }
-                else if (value == "-serial-ir")
+                else if (argValue == "-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
                 }
-                else if (value == "-disable-specialization")
+                else if (argValue == "-disable-specialization")
                 {
                     requestImpl->getBackEndReq()->disableSpecialization = true;
                 }
-                else if (value == "-disable-dynamic-dispatch")
+                else if (argValue == "-disable-dynamic-dispatch")
                 {
                     requestImpl->getBackEndReq()->disableDynamicDispatch = true;
                 }
-                else if (value == "-verbose-paths")
+                else if (argValue == "-verbose-paths")
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
                 }
-                else if (value == "-verify-debug-serial-ir")
+                else if (argValue == "-verify-debug-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->verifyDebugSerialization = true;
                 }
-                else if(value == "-validate-ir" )
+                else if(argValue == "-validate-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldValidateIR = true;
                     requestImpl->getBackEndReq()->shouldValidateIR = true;
                 }
-                else if(value == "-skip-codegen" )
+                else if(argValue == "-skip-codegen" )
                 {
                     requestImpl->m_shouldSkipCodegen = true;
                 }
-                else if(value == "-parameter-blocks-use-register-spaces" )
+                else if(argValue == "-parameter-blocks-use-register-spaces" )
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
-                else if (value == "-ir-compression")
+                else if (argValue == "-ir-compression")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.value.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
                 }
-                else if (value == "-target")
+                else if (argValue == "-target")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -714,7 +714,7 @@ struct OptionsParser
                 // A "profile" can specify both a general capability level for
                 // a target, and also (as a legacy/compatibility feature) a
                 // specific stage to use for an entry point.
-                else if (value == "-profile")
+                else if (argValue == "-profile")
                 {
                     CommandLineArg operand;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
@@ -771,7 +771,7 @@ struct OptionsParser
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
-                else if( value == "-capability" )
+                else if( argValue == "-capability" )
                 {
                     // The `-capability` option is similar to `-profile` but does not set the actual profile
                     // for a target (it just adds capabilities).
@@ -800,7 +800,7 @@ struct OptionsParser
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
-                else if (value == "-stage")
+                else if (argValue == "-stage")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -816,7 +816,7 @@ struct OptionsParser
                         setStage(getCurrentEntryPoint(), stage);
                     }
                 }
-                else if (value == "-entry")
+                else if (argValue == "-entry")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -827,11 +827,11 @@ struct OptionsParser
 
                     rawEntryPoints.add(rawEntryPoint);
                 }
-                else if (value == "-heterogeneous")
+                else if (argValue == "-heterogeneous")
                 {
                     requestImpl->getLinkage()->m_heterogeneous = true;
                 }
-                else if (value == "-lang")
+                else if (argValue == "-lang")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -851,7 +851,7 @@ struct OptionsParser
                         }
                     }
                 }
-                else if (value == "-pass-through")
+                else if (argValue == "-pass-through")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -865,20 +865,20 @@ struct OptionsParser
 
                     compileRequest->setPassThrough(passThrough);
                 }
-                else if (value.getLength() >= 2 && value[1] == 'D')
+                else if (argValue.getLength() >= 2 && argValue[1] == 'D')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -DFOO
                     // or it might come separately, as in:
                     //     -D FOO
 
-                    UnownedStringSlice slice = value.getUnownedSlice().tail(2);
+                    UnownedStringSlice slice = argValue.getUnownedSlice().tail(2);
 
-                    CommandLineArg arg;
+                    CommandLineArg nextArg;
                     if (slice.getLength() <= 0)
                     {
-                        SLANG_RETURN_ON_FAIL(reader.expectArg(arg));
-                        slice = arg.value.getUnownedSlice();
+                        SLANG_RETURN_ON_FAIL(reader.expectArg(nextArg));
+                        slice = nextArg.value.getUnownedSlice();
                     }
 
                     // The string that sets up the define can have an `=` between
@@ -898,43 +898,43 @@ struct OptionsParser
                         compileRequest->addPreprocessorDefine(String(slice).getBuffer(), "");
                     }
                 }
-                else if (value.getLength() >= 2 && value[1] == 'I')
+                else if (argValue.getLength() >= 2 && argValue[1] == 'I')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -IFOO
                     // or it might come separately, as in:
                     //     -I FOO
                     // (see handling of `-D` above)
-                    UnownedStringSlice slice = value.getUnownedSlice().tail(2);
+                    UnownedStringSlice slice = argValue.getUnownedSlice().tail(2);
 
-                    CommandLineArg arg;
+                    CommandLineArg nextArg;
                     if (slice.getLength() <= 0)
                     {
                         // Need to read another argument from the command line
-                        SLANG_RETURN_ON_FAIL(reader.expectArg(arg));
-                        slice = arg.value.getUnownedSlice();
+                        SLANG_RETURN_ON_FAIL(reader.expectArg(nextArg));
+                        slice = nextArg.value.getUnownedSlice();
                     }
 
                     compileRequest->addSearchPath(String(slice).getBuffer());
                 }
                 //
                 // A `-o` option is used to specify a desired output file.
-                else if (value == "-o")
+                else if (argValue == "-o")
                 {
                     CommandLineArg outputPath;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(outputPath));
 
                     addOutputPath(outputPath.value.getBuffer());
                 }
-                else if(value == "-matrix-layout-row-major")
+                else if(argValue == "-matrix-layout-row-major")
                 {
                     defaultMatrixLayoutMode = kMatrixLayoutMode_RowMajor;
                 }
-                else if(value == "-matrix-layout-column-major")
+                else if(argValue == "-matrix-layout-column-major")
                 {
                     defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
                 }
-                else if(value == "-line-directive-mode")
+                else if(argValue == "-line-directive-mode")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -953,7 +953,7 @@ struct OptionsParser
                     compileRequest->setLineDirectiveMode(mode);
 
                 }
-                else if( value == "-fp-mode" || value == "-floating-point-mode" )
+                else if( argValue == "-fp-mode" || argValue == "-floating-point-mode" )
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -975,9 +975,9 @@ struct OptionsParser
 
                     setFloatingPointMode(getCurrentTarget(), mode);
                 }
-                else if( value.getLength() >= 2 && value[1] == 'O' )
+                else if( argValue.getLength() >= 2 && argValue[1] == 'O' )
                 {
-                    UnownedStringSlice levelSlice = value.getUnownedSlice().tail(2);
+                    UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                     SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
                     const char c = levelSlice.getLength() == 1 ? levelSlice[0] : 0;
@@ -990,7 +990,7 @@ struct OptionsParser
                         case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
                         default:
                         {
-                            sink->diagnose(valueAndLoc.loc, Diagnostics::unknownOptimiziationLevel, valueAndLoc.value);
+                            sink->diagnose(arg.loc, Diagnostics::unknownOptimiziationLevel, arg.value);
                             return SLANG_FAIL;
                         }
                     }
@@ -1001,31 +1001,31 @@ struct OptionsParser
                 // Note: unlike with `-O` above, we have to consider that other
                 // options might have names that start with `-g` and so cannot
                 // just detect it as a prefix.
-                else if( value == "-g" || value == "-g2" )
+                else if( argValue == "-g" || argValue == "-g2" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
                 }
-                else if( value == "-g0" )
+                else if( argValue == "-g0" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_NONE);
                 }
-                else if( value == "-g1" )
+                else if( argValue == "-g1" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MINIMAL);
                 }
-                else if( value == "-g3" )
+                else if( argValue == "-g3" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 }
-                else if( value == "-default-image-format-unknown" )
+                else if( argValue == "-default-image-format-unknown" )
                 {
                     requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
                 }
-                else if (value == "-obfuscate")
+                else if (argValue == "-obfuscate")
                 {
                     requestImpl->getLinkage()->m_obfuscateCode = true;
                 }
-                else if (value == "-file-system")
+                else if (argValue == "-file-system")
                 {
                     CommandLineArg name;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(name));
@@ -1050,7 +1050,7 @@ struct OptionsParser
                         return SLANG_FAIL;
                     }
                 }
-                else if (value == "-r")
+                else if (argValue == "-r")
                 {
                     CommandLineArg referenceModuleName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
@@ -1062,15 +1062,15 @@ struct OptionsParser
 
                     _addLibraryReference(requestImpl, &fileStream);
                 }
-                else if (value == "-v")
+                else if (argValue == "-v")
                 {
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
                 }
-                else if( value == "-emit-spirv-directly" )
+                else if( argValue == "-emit-spirv-directly" )
                 {
                     requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
                 }
-                else if (value == "-default-downstream-compiler")
+                else if (argValue == "-default-downstream-compiler")
                 {
                     CommandLineArg sourceLanguageArg, compilerArg;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(sourceLanguageArg));
@@ -1092,11 +1092,11 @@ struct OptionsParser
 
                     if (SLANG_FAILED(session->setDefaultDownstreamCompiler(sourceLanguage, compiler)))
                     {
-                        sink->diagnose(valueAndLoc.loc, Diagnostics::unableToSetDefaultDownstreamCompiler, compilerArg.value, sourceLanguageArg.value);
+                        sink->diagnose(arg.loc, Diagnostics::unableToSetDefaultDownstreamCompiler, compilerArg.value, sourceLanguageArg.value);
                         return SLANG_FAIL;
                     }
                 }       
-                else if (value == "--")
+                else if (argValue == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
                     // and treat the rest of the command line as input file names:
@@ -1108,15 +1108,15 @@ struct OptionsParser
                 }
                 else
                 {
-                    if (value.endsWith("-path"))
+                    if (argValue.endsWith("-path"))
                     {
-                        const Index index = value.lastIndexOf('-');
+                        const Index index = argValue.lastIndexOf('-');
                         if (index >= 0)
                         {
                             CommandLineArg name;
                             SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
-                            UnownedStringSlice passThroughSlice = value.getUnownedSlice().head(index).tail(1);
+                            UnownedStringSlice passThroughSlice = argValue.getUnownedSlice().head(index).tail(1);
 
                             // Skip the initial -, up to the last -
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
@@ -1127,20 +1127,20 @@ struct OptionsParser
                             }
                             else
                             {
-                                sink->diagnose(valueAndLoc.loc, Diagnostics::unknownDownstreamCompiler, passThroughSlice);
+                                sink->diagnose(arg.loc, Diagnostics::unknownDownstreamCompiler, passThroughSlice);
                                 return SLANG_FAIL;
                             }
                         }
                     }
 
-                    sink->diagnose(valueAndLoc.loc, Diagnostics::unknownCommandLineOption, value);
+                    sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
                     // TODO: print a usage message
                     return SLANG_FAIL;
                 }
             }
             else
             {
-                SLANG_RETURN_ON_FAIL(addInputPath(value.getBuffer()));
+                SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
             }
         }
 
