@@ -24,4 +24,8 @@
 
 DIAGNOSTIC(-1, Note, seeTokenPasteLocation, "see token pasted location")
 
+DIAGNOSTIC(21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'")
+
+DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "an internal error threw an exception while working on code near this location")
+
 #undef DIAGNOSTIC
