@@ -410,13 +410,8 @@ struct OptionsParser
 
         DiagnosticSink* requestSink = requestImpl->getSink();
 
-        SourceManager* parentSourceManager = requestSink->getSourceManager();
-
-        // We need a new source manager to track our command line 'source'
-
-        SourceManager sourceManager;
-        sourceManager.initialize(parentSourceManager, parentSourceManager->getFileSystemExt());
-
+        RefPtr<CommandLineContext> cmdLineContext = new CommandLineContext;
+        
         // Why create a new DiagnosticSink?
         // We *don't* want the lexer that comes as default (it's for Slang source!)
         // We may want to set flags that are different
@@ -432,7 +427,7 @@ struct OptionsParser
         //
         // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
       
-        DiagnosticSink parseSink(&sourceManager, nullptr);
+        DiagnosticSink parseSink(cmdLineContext->getSourceManager(), nullptr);
         
         {
             parseSink.setFlags(requestSink->getFlags());
@@ -451,7 +446,7 @@ struct OptionsParser
         DiagnosticSink* sink = &parseSink;
 
         // Set up the args
-        CommandLineArgs args(&sourceManager);
+        CommandLineArgs args(cmdLineContext);
         args.setArgs(argv, argc);
 
         CommandLineReader reader(&args, sink);

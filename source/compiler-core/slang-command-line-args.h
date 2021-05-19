@@ -17,6 +17,23 @@ struct CommandLineArg
     SourceLoc loc;          ///< The location of the arg
 };
 
+class CommandLineContext : public RefObject
+{
+public:        
+        /// Get the source manager
+    SourceManager* getSourceManager() { return &m_sourceManager; }
+
+    CommandLineContext(ISlangFileSystemExt* fileSystemExt = nullptr)
+    {
+        m_sourceManager.initialize(nullptr, fileSystemExt);
+        // Make range start from high value, so can be differentiated from other uses
+        m_sourceManager.allocateSourceRange(~(~SourceLoc::RawValue(0) >> 1));
+    }
+
+protected:
+    SourceManager m_sourceManager;
+};
+
 struct CommandLineArgs
 {
     typedef CommandLineArg Arg;
@@ -30,18 +47,20 @@ struct CommandLineArgs
         /// NOTE! Should NOT include the executable name
     void setArgs(const char*const* args, size_t argCount);
 
-        /// Ctor with a source manager
-    CommandLineArgs(SourceManager* manager):
-        m_sourceManager(manager),
-        m_sourceView(nullptr)
+        /// True if has args in same order
+    bool hasArgs(const char*const* args, Index count) const;
+
+        /// Ctor with a context
+    CommandLineArgs(CommandLineContext* context):
+        m_context(context)
     {
     }
+        /// Default Ctor
+    CommandLineArgs() {}
 
-    String m_executablePath;                ///< Can be optionally be set
-
+    //String m_executablePath;                ///< Can be optionally be set
     List<Arg> m_args;                       ///< The args
-    SourceManager* m_sourceManager;         ///< The source manager and associated diagnostics sink
-    SourceView* m_sourceView;        ///< contains the command line as source
+    RefPtr<CommandLineContext> m_context;   ///< The context, which mainly has source manager
 };
 
 struct CommandLineReader
@@ -77,6 +96,9 @@ struct CommandLineReader
     SlangResult expectArg(String& outArg);
     SlangResult expectArg(CommandLineArg& outArg);
 
+        /// Get the current index
+    Index getIndex() const { return m_index; }
+
         /// Set up reader with args
     CommandLineReader(CommandLineArgs* args, DiagnosticSink* sink):
         m_args(args),
@@ -89,6 +111,43 @@ struct CommandLineReader
     CommandLineArgs* m_args;
     Index m_index;
 };
+
+struct DownstreamArgs
+{
+    typedef uint32_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            AllowNewNames = 0x01,
+        };
+    };
+
+        /// Add a name, returns the index
+    Index addName(const String& name);
+        /// Find the index of a name. Returns < 0 if not found.
+    Index findName(const String& name) const { return m_names.indexOf(name); }
+
+        /// Get the args at the nameIndex
+    CommandLineArgs& getArgs(Index nameIndex) { return m_args[nameIndex]; }
+
+        /// Looks for '-X' expressions, removing them from ioArgs and putting in appropriate args 
+    SlangResult stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink);
+
+    DownstreamArgs(CommandLineContext* context):
+        m_context(context)
+    {
+    }
+
+protected:
+    Index _findOrAddName(SourceLoc loc, const UnownedStringSlice& name, Flags flags, DiagnosticSink* sink);
+
+    List<String> m_names;
+    List<CommandLineArgs> m_args;
+
+    RefPtr<CommandLineContext> m_context;
+};
+
 
 } // namespace Slang
 
