@@ -126,9 +126,7 @@ void Session::init()
     getNamePool()->setRootNamePool(getRootNamePool());
 
     m_sharedLibraryLoader = DefaultSharedLibraryLoader::getSingleton();
-    // Set all the shared library function pointers to nullptr
-    ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
-
+    
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);

@@ -15,30 +15,7 @@
 
 using namespace Slang;
 
-/* static */ SlangResult ParseDiagnosticUtil::parseGlslangLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
-{
-    /* ERROR: tests/diagnostics/syntax-error-intrinsic.slang:13: '@' : unexpected token */
 
-    if (lineSlices.getCount() < 4)
-    {
-        return SLANG_FAIL;
-    }
-    {
-        const UnownedStringSlice severitySlice = lineSlices[0].trim();
-
-        outDiagnostic.severity = DownstreamDiagnostic::Severity::Error;
-        if (severitySlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("warning")))
-        {
-            outDiagnostic.severity = DownstreamDiagnostic::Severity::Warning;
-        }
-    }
-
-    outDiagnostic.filePath = lineSlices[1];
-
-    SLANG_RETURN_ON_FAIL(StringUtil::parseInt(lineSlices[2], outDiagnostic.fileLine));
-    outDiagnostic.text = UnownedStringSlice(lineSlices[3].begin(), line.end());
-    return SLANG_OK;
-}
 
 /* static */SlangResult ParseDiagnosticUtil::parseGenericLine(const UnownedStringSlice& line, List<UnownedStringSlice>& lineSlices, DownstreamDiagnostic& outDiagnostic)
 {
@@ -183,8 +160,8 @@ static bool _isSlangDiagnostic(const UnownedStringSlice& line)
     tests/diagnostics/accessors.slang(11): error 31101: accessors other than 'set' must not have parameters
     */
 
-    // Need to determine where the path is located, and that depends on the compiler
-    const Int pathIndex = (compilerIdentity == CompilerIdentity::make(SLANG_PASS_THROUGH_GLSLANG)) ? 1 : 0;
+    // The index where the path starts
+    const Int pathIndex = 0;
 
     // Now we want to fix up a path as might have drive letter, and therefore :
     // If this is the situation then we need to have a slice after the one at the index
@@ -254,19 +231,12 @@ static SlangResult _findDownstreamCompiler(const UnownedStringSlice& slice, Slan
 
 /* static */ParseDiagnosticUtil::LineParser ParseDiagnosticUtil::getLineParser(const CompilerIdentity& compilerIdentity)
 {
-    if (compilerIdentity.m_type == CompilerIdentity::Slang)
+    switch (compilerIdentity.m_type)
     {
-        return &parseSlangLine;
+        case CompilerIdentity::Slang:               return &parseSlangLine;
+        case CompilerIdentity::DownstreamCompiler:  return &parseGenericLine;
+        default: return nullptr;
     }
-    else if (compilerIdentity.m_type == CompilerIdentity::DownstreamCompiler)
-    {
-        switch (compilerIdentity.m_downstreamCompiler)
-        {
-            case SLANG_PASS_THROUGH_GLSLANG:    return &parseGlslangLine;
-            default:                            return &parseGenericLine;
-        }
-    }
-    return nullptr;
 }
 
 static bool _isWhitespace(const UnownedStringSlice& slice)
@@ -290,16 +260,10 @@ static bool _isWhitespace(const UnownedStringSlice& slice)
         return SLANG_OK;
     }
 
-    // TODO(JS):
-    // As it stands output of downstream compilers isn't standardized. This can be improved upon - and if so
-    // we should have a function that will parse the standardized output
-    // Currently dxc/fxc/glslang, use a different downstream path
-
     CompilerIdentity compilerIdentity;
     SLANG_RETURN_ON_FAIL(ParseDiagnosticUtil::identifyCompiler(inText, compilerIdentity));
 
     UnownedStringSlice linePrefix;
-
     if (compilerIdentity.m_type == CompilerIdentity::Type::DownstreamCompiler)
     {
         linePrefix = TypeTextUtil::getPassThroughAsHumanText(compilerIdentity.m_downstreamCompiler);
