@@ -1,6 +1,8 @@
 result code = 1
 standard error = {
-(0): error 24: unknown '#line' directive mode 'quizzical'
+(1): error 24: unknown '#line' directive mode 'quizzical'
+tests/diagnostics/command-line/unknown-line-directive-mode.slang -line-directive-mode quizzical
+                                                                                      ^
 }
 standard output = {
 }

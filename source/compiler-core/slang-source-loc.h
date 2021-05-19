@@ -379,6 +379,9 @@ struct SourceManager
         /// Allocate a range of SourceLoc locations, these can be used to identify a specific location in the source
     SourceRange allocateSourceRange(UInt size);
 
+        /// Returns the loc for start of next allocation
+    SourceLoc getNextRangeStart() const { return m_nextLoc; }
+
         /// Create a SourceFile defined with the specified path, and content held within a blob
     SourceFile* createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize);
     SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
