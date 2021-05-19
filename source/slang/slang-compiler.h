@@ -2226,16 +2226,6 @@ namespace Slang
             /// Get the default compiler for a language
         DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
 
-        enum class SharedLibraryFuncType
-        {
-            Glslang_Compile_1_0,
-            Glslang_Compile_1_1,
-            Dxc_DxcCreateInstance,
-            CountOf,
-        };
-
-        //
-
         RefPtr<Scope>   baseLanguageScope;
         RefPtr<Scope>   coreLanguageScope;
         RefPtr<Scope>   hlslLanguageScope;
@@ -2289,8 +2279,6 @@ namespace Slang
             /// Will unload the specified shared library if it's currently loaded 
         void resetDownstreamCompiler(PassThroughMode type);
 
-        SlangFuncPtr getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink);
-
             /// Get the prelude associated with the language
         const String& getPreludeForLanguage(SourceLanguage language) { return m_languagePreludes[int(language)]; }
 
@@ -2306,8 +2294,6 @@ namespace Slang
         ~Session();
 
         ComPtr<ISlangSharedLibraryLoader> m_sharedLibraryLoader;                    ///< The shared library loader (never null)
-
-        SlangFuncPtr m_sharedLibraryFunctions[int(SharedLibraryFuncType::CountOf)]; ///< Functions from shared libraries
 
         int m_downstreamCompilerInitialized = 0;                                        
 
