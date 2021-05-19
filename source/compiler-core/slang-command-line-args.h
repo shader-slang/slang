@@ -50,6 +50,9 @@ struct CommandLineArgs
         /// True if has args in same order
     bool hasArgs(const char*const* args, Index count) const;
 
+        /// Add an arg
+    void add(const Arg& arg) { m_args.add(arg); }
+
         /// Ctor with a context
     CommandLineArgs(CommandLineContext* context):
         m_context(context)
@@ -98,6 +101,8 @@ struct CommandLineReader
 
         /// Get the current index
     Index getIndex() const { return m_index; }
+        /// Set the current index
+    void setIndex(Index index) { SLANG_ASSERT(index >= 0 && index <= m_args->getArgCount()); m_index = index; }
 
         /// Set up reader with args
     CommandLineReader(CommandLineArgs* args, DiagnosticSink* sink):
@@ -129,7 +134,9 @@ struct DownstreamArgs
     Index findName(const String& name) const { return m_names.indexOf(name); }
 
         /// Get the args at the nameIndex
-    CommandLineArgs& getArgs(Index nameIndex) { return m_args[nameIndex]; }
+    CommandLineArgs& getArgsAt(Index nameIndex) { return m_args[nameIndex]; }
+        /// Get args by name - will assert if name isn't found
+    CommandLineArgs& getArgsByName(char* name);
 
         /// Looks for '-X' expressions, removing them from ioArgs and putting in appropriate args 
     SlangResult stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink);

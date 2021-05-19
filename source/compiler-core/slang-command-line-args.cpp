@@ -156,6 +156,13 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
     return -1;
 }
 
+CommandLineArgs& DownstreamArgs::getArgsByName(char* name)
+{
+    Index index = findName(name);
+    SLANG_ASSERT(index >= 0);
+    return m_args[index];
+}
+
 SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink)
 {
     CommandLineReader reader(&ioArgs, sink);
@@ -211,7 +218,7 @@ SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags f
                 SLANG_ASSERT(depth <= 0 || index >= count);
 
                 // Add all of these args
-                CommandLineArgs& args = m_args[nameIndex];
+                CommandLineArgs& args = getArgsAt(nameIndex);
 
                 // Copy the values in the range
                 args.m_args.addRange(ioArgs.m_args.getBuffer() + startIndex + 1, index - (startIndex + 1));
@@ -231,6 +238,8 @@ SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags f
             }
             else
             {
+                const Index startIndex = reader.getIndex();
+
                 // Extract the name
                 UnownedStringSlice name = arg.value.getUnownedSlice().tail(2);
                 const Index nameIndex = _findOrAddName(arg.loc, name, flags, sink);
@@ -244,8 +253,18 @@ SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags f
                 CommandLineArg nextArg;
                 SLANG_RETURN_ON_FAIL(reader.expectArg(nextArg));
 
-                ioArgs.m_args.add(nextArg);
+                getArgsAt(nameIndex).add(nextArg);
+
+                // Rewind to the start index
+                reader.setIndex(startIndex);
+                // Remove the args
+                ioArgs.m_args.removeRange(startIndex, 2);
             }
+        }
+        else
+        {
+            // Advance and leave
+            reader.advance();
         }
     }
 
