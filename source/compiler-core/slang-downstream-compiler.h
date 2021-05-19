@@ -298,6 +298,9 @@ public:
             /// Profile names are tied to compilers and targets.
         String profileName; 
 
+            /// Arguments that are specific to a particular compiler implementation.
+        List<String> compilerSpecificArguments;
+
             /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
         ISlangFileSystemExt* fileSystemExt = nullptr;
         SourceManager* sourceManager = nullptr;
