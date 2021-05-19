@@ -412,15 +412,32 @@ struct OptionsParser
 
         SourceManager* parentSourceManager = requestSink->getSourceManager();
 
+        // We need a new source manager to track our command line 'source'
+
         SourceManager sourceManager;
         sourceManager.initialize(parentSourceManager, parentSourceManager->getFileSystemExt());
 
-        // Use this source manager for now
-        DiagnosticSink parseSink;
-        parseSink.init(&sourceManager, nullptr);
-
+        // Why create a new DiagnosticSink?
+        // We *don't* want the lexer that comes as default (it's for Slang source!)
+        // We may want to set flags that are different
+        // We will need to use a new sourceManager that will just last for this parse and will map locs to
+        // source lines.
+        //
+        // The *problem* is that we still need to communicate to the requestSink in some suitable way.
+        //
+        // 1) We could have some kind of scoping mechanism (and only one sink)
+        // 2) We could have a 'parent' diagnostic sink, that if we set we route output too
+        // 3) We use something like the ISlangWriter to always be the thing output too (this has problems because
+        // some code assumes the diagnostics are accessible as a string)
+        //
+        // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
+      
+        DiagnosticSink parseSink(&sourceManager, nullptr);
+        
         {
             parseSink.setFlags(requestSink->getFlags());
+            // Allow HumaneLoc - it won't display much for command line parsing - just (1):
+            // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
             //parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
             parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
         }
@@ -428,10 +445,8 @@ struct OptionsParser
         // We don't know how big the terminal is.. let's guess 120 for now 
         parseSink.setSourceLineMaxLength(120);
 
-        parseSink.writer = requestSink->writer;
-
-        // We are sort of assuming that output will be through writer, as if it's added to the buffer it will never be seen
-        SLANG_ASSERT(parseSink.writer);
+        // All diagnostics will also be sent to requestSink
+        parseSink.setParentSink(requestSink);
 
         DiagnosticSink* sink = &parseSink;
 

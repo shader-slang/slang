@@ -224,6 +224,10 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
+        /// The parent sink is another sink that will receive diagnostics from this sink.
+    void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
+    DiagnosticSink* getParentSink() const { return m_parentSink; }
+
         /// Initialize state. 
     void init(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer);
 
@@ -245,6 +249,10 @@ public:
 
 protected:
     void diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args);
+    void diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
+
+        /// If set all diagnostics (as formatted by *this* sink, will be routed to the parent).
+    DiagnosticSink* m_parentSink = nullptr;
 
     int m_errorCount = 0;
     int m_internalErrorLocsNoted = 0;

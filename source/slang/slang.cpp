@@ -3620,42 +3620,7 @@ TargetProgram::TargetProgram(
 
 //
 
-void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
-{
-    // Don't consider invalid source locations.
-    if(!loc.isValid())
-        return;
 
-    // If this is the first source location being noted,
-    // then emit a message to help the user isolate what
-    // code might have confused the compiler.
-    if(m_internalErrorLocsNoted == 0)
-    {
-        diagnose(loc, Diagnostics::noteLocationOfInternalError);
-    }
-    m_internalErrorLocsNoted++;
-}
-
-SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
-{
-    // If the client doesn't want an output blob, there is nothing to do.
-    //
-    if(!outBlob) return SLANG_OK;
-
-    // For outputBuffer to be valid and hold diagnostics, writer must not be set
-    SLANG_ASSERT(writer == nullptr);
-
-    // If there were no errors, and there was no diagnostic output, there is nothing to do.
-    if(getErrorCount() == 0 && outputBuffer.getLength() == 0)
-    {
-        return SLANG_OK;
-    }
-
-    Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(outputBuffer);
-    *outBlob = blob.detach();
-
-    return SLANG_OK;
-}
 
 
 Session* CompileRequestBase::getSession()

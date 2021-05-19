@@ -439,43 +439,94 @@ void DiagnosticSink::init(SourceManager* sourceManager, SourceLocationLexer sour
     }
 }
 
-void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
+void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
 {
-    StringBuilder sb;
-    formatDiagnosticMessage(sb, info.messageFormat, argCount, args);
+    // Don't consider invalid source locations.
+    if (!loc.isValid())
+        return;
 
-    Diagnostic diagnostic;
-    diagnostic.ErrorID = info.id;
-    diagnostic.Message = sb.ProduceString();
-    diagnostic.loc = pos;
-    diagnostic.severity = info.severity;
+    if (m_parentSink)
+    {
+        m_parentSink->noteInternalErrorLoc(loc);
+    }
 
-    if (diagnostic.severity >= Severity::Error)
+    // If this is the first source location being noted,
+    // then emit a message to help the user isolate what
+    // code might have confused the compiler.
+    if (m_internalErrorLocsNoted == 0)
+    {
+        diagnose(loc, MiscDiagnostics::noteLocationOfInternalError);
+    }
+    m_internalErrorLocsNoted++;
+}
+
+SlangResult DiagnosticSink::getBlobIfNeeded(ISlangBlob** outBlob)
+{
+    // If the client doesn't want an output blob, there is nothing to do.
+    //
+    if (!outBlob) return SLANG_OK;
+
+    // For outputBuffer to be valid and hold diagnostics, writer must not be set
+    SLANG_ASSERT(writer == nullptr);
+
+    // If there were no errors, and there was no diagnostic output, there is nothing to do.
+    if (getErrorCount() == 0 && outputBuffer.getLength() == 0)
+    {
+        return SLANG_OK;
+    }
+
+    Slang::ComPtr<ISlangBlob> blob = Slang::StringUtil::createStringBlob(outputBuffer);
+    *outBlob = blob.detach();
+
+    return SLANG_OK;
+}
+
+void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage)
+{
+    if (info.severity >= Severity::Error)
     {
         m_errorCount++;
     }
 
-    // Did the client supply a callback for us to use?
-    if( writer )
+    if (writer)
     {
-        // If so, pass the error string along to them
-        StringBuilder messageBuilder;
-        formatDiagnostic(this, diagnostic, messageBuilder);
-
-        writer->write(messageBuilder.getBuffer(), messageBuilder.getLength());
+        writer->write(formattedMessage.begin(), formattedMessage.getLength());
     }
     else
     {
-        // If the user doesn't have a callback, then just
-        // collect our diagnostic messages into a buffer
-        formatDiagnostic(this, diagnostic, outputBuffer);
+        outputBuffer.append(formattedMessage);
     }
 
-    if (diagnostic.severity >= Severity::Fatal)
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseImpl(info, formattedMessage);
+    }
+
+    if (info.severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
         throw AbortCompilationException();
     }
+}
+
+void DiagnosticSink::diagnoseImpl(SourceLoc const& pos, DiagnosticInfo const& info, int argCount, DiagnosticArg const* const* args)
+{
+    StringBuilder messageBuilder;
+    {
+        StringBuilder sb;
+        formatDiagnosticMessage(sb, info.messageFormat, argCount, args);
+
+        Diagnostic diagnostic;
+        diagnostic.ErrorID = info.id;
+        diagnostic.Message = sb.ProduceString();
+        diagnostic.loc = pos;
+        diagnostic.severity = info.severity;
+
+        // If so, pass the error string along to them
+        formatDiagnostic(this, diagnostic, messageBuilder);
+    }
+
+    diagnoseImpl(info, messageBuilder.getUnownedSlice());
 }
 
 void DiagnosticSink::diagnoseRaw(
@@ -505,6 +556,11 @@ void DiagnosticSink::diagnoseRaw(
         // If the user doesn't have a callback, then just
         // collect our diagnostic messages into a buffer
         outputBuffer.append(message);
+    }
+
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseRaw(severity, message);
     }
 
     if (severity >= Severity::Fatal)
