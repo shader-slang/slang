@@ -1350,8 +1350,13 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                 {
                     // We are just going to ignore all of these for now....
                     m_reader.advanceToken();
-                    while (m_reader.peekTokenType() != TokenType::EndOfFile)
+                    for (;;)
                     {
+                        auto t = m_reader.peekToken();
+                        if (t.type == TokenType::EndOfFile || (t.flags & TokenFlag::AtStartOfLine))
+                        {
+                            break;
+                        }
                         m_reader.advanceToken();
                     }
                     break;
