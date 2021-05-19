@@ -210,7 +210,7 @@ int main(int argc, const char*const* argv)
 
         // Set to true to see command line that initiated C++ extractor. Helpful when finding issues from solution building failing, and then so
         // being able to repeat the issue
-        bool dumpCommandLine = false;
+        bool dumpCommandLine = true;
 
         if (dumpCommandLine)
         {
