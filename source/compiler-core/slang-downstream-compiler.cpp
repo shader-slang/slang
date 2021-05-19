@@ -10,6 +10,7 @@
 #include "../core/slang-io.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-blob.h"
+#include "../core/slang-char-util.h"
 
 #ifdef SLANG_VC
 #   include "windows/slang-win-visual-studio-util.h"
@@ -20,6 +21,7 @@
 #include "slang-nvrtc-compiler.h"
 #include "slang-fxc-compiler.h"
 #include "slang-dxc-compiler.h"
+#include "slang-glslang-compiler.h"
 
 namespace Slang
 {
@@ -114,9 +116,57 @@ void DownstreamCompiler::Desc::appendAsText(StringBuilder& out) const
     return SLANG_OK;
 }
 
+/* static */SlangResult DownstreamDiagnostic::splitColonDelimitedLine(const UnownedStringSlice& line, Int pathIndex, List<UnownedStringSlice>& outSlices)
+{
+    StringUtil::split(line, ':', outSlices);
+
+    // Now we want to fix up a path as might have drive letter, and therefore :
+    // If this is the situation then we need to have a slice after the one at the index
+    if (outSlices.getCount() > pathIndex + 1)
+    {
+        const UnownedStringSlice pathStart = outSlices[pathIndex].trim();
+        if (pathStart.getLength() == 1 && CharUtil::isAlpha(pathStart[0]))
+        {
+            // Splice back together
+            outSlices[pathIndex] = UnownedStringSlice(outSlices[pathIndex].begin(), outSlices[pathIndex + 1].end());
+            outSlices.removeAt(pathIndex + 1);
+        }
+    }
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult DownstreamDiagnostic::parseColonDelimitedDiagnostics(const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<DownstreamDiagnostic>& outDiagnostics)
+{
+    List<UnownedStringSlice> splitLine;
+
+    UnownedStringSlice text(inText), line;
+    while (StringUtil::extractLine(text, line))
+    {
+        SLANG_RETURN_ON_FAIL(splitColonDelimitedLine(line, pathIndex, splitLine));
+
+        DownstreamDiagnostic diagnostic;
+        diagnostic.severity = DownstreamDiagnostic::Severity::Error;
+        diagnostic.stage = DownstreamDiagnostic::Stage::Compile;
+        diagnostic.fileLine = 0;
+
+        if (SLANG_SUCCEEDED(lineParser(line, splitLine, diagnostic)))
+        {
+            outDiagnostics.add(diagnostic);
+        }
+        else
+        {
+            // If couldn't parse, just add as a note
+            DownstreamDiagnostics::addNote(line, outDiagnostics);
+        }
+    }
+
+    return SLANG_OK;
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
-SlangResult DownstreamCompiler::dissassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
+SlangResult DownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget, const void* blob, size_t blobSize, ISlangBlob** out)
 {
     SLANG_UNUSED(sourceBlobTarget);
     SLANG_UNUSED(blob);
@@ -676,24 +726,6 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     }
 }
 
-static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
-{
-#if SLANG_UNIX_FAMILY
-    // On unix systems we need to ensure pthread is loaded first.
-    ComPtr<ISlangSharedLibrary> pthreadLibrary;
-    DefaultSharedLibraryLoader::load(loader, path, "pthread", pthreadLibrary.writeRef());
-#endif
-    ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (SLANG_SUCCEEDED(DefaultSharedLibraryLoader::load(loader, path, "slang-glslang", sharedLibrary.writeRef())))
-    {
-        // Can we determine the version?
-        DownstreamCompiler::Desc desc(SLANG_PASS_THROUGH_GLSLANG);
-        RefPtr<DownstreamCompiler> compiler(new SharedLibraryDownstreamCompiler(desc, sharedLibrary));
-        set->addCompiler(compiler);
-    }
-    return SLANG_OK;
-}
-
 /* static */void DownstreamCompilerUtil::setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)])
 {
     outFuncs[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = &VisualStudioCompilerUtil::locateCompilers;
@@ -702,7 +734,7 @@ static SlangResult _locateGlslangCompilers(const String& path, ISlangSharedLibra
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
-    outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &_locateGlslangCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerSet !!!!!!!!!!!!!!!!!!!!!!*/

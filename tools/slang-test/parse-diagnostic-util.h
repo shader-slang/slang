@@ -60,12 +60,6 @@ struct ParseDiagnosticUtil
         /// Given a compiler identity returns a line parsing function.
     static LineParser getLineParser(const CompilerIdentity& compilerIdentity);
 
-        /// For DXC lines
-    static SlangResult parseDXCLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
-
-        /// For GLSL lines
-    static SlangResult parseGlslangLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
-
         /// For a 'generic' (as in uses DownstreamCompiler mechanism) line parsing
     static SlangResult parseGenericLine(const Slang::UnownedStringSlice& line, Slang::List<Slang::UnownedStringSlice>& lineSlices, Slang::DownstreamDiagnostic& outDiagnostic);
 

@@ -62,18 +62,6 @@ namespace Slang
 
     } // anonymous
 
-    static FunctionInfo _getFunctionInfo(Session::SharedLibraryFuncType funcType)
-    {
-        typedef Session::SharedLibraryFuncType FuncType;
-        
-        switch (funcType)
-        {
-            case FuncType::Glslang_Compile_1_0:   return { "glslang_compile", PassThroughMode::Glslang} ;
-            case FuncType::Glslang_Compile_1_1:   return { "glslang_compile_1_1", PassThroughMode::Glslang} ;
-            case FuncType::Dxc_DxcCreateInstance:  return { "DxcCreateInstance", PassThroughMode::Dxc };
-            default: return { nullptr, PassThroughMode::None };
-        } 
-    }
 
     void Session::_setSharedLibraryLoader(ISlangSharedLibraryLoader* loader)
     {
@@ -87,9 +75,6 @@ namespace Slang
             {
                 m_downstreamCompilers[i].setNull();
             }
-
-            // Clear all of the functions
-            ::memset(m_sharedLibraryFunctions, 0, sizeof(m_sharedLibraryFunctions));
 
             // Set the loader
             m_sharedLibraryLoader = loader;
@@ -177,47 +162,6 @@ namespace Slang
         }
         m_downstreamCompilers[int(type)] = compiler;
         return compiler;
-    }
-
-    SlangFuncPtr Session::getSharedLibraryFunc(SharedLibraryFuncType type, DiagnosticSink* sink)
-    {
-        if (m_sharedLibraryFunctions[int(type)])
-        {
-            return m_sharedLibraryFunctions[int(type)];
-        }
-        // do we have the library
-        FunctionInfo info = _getFunctionInfo(type);
-        if (info.name == nullptr)
-        {
-            return nullptr;
-        }
-        // Try loading the library
-        DownstreamCompiler* compiler = getOrLoadDownstreamCompiler(info.compilerType, sink);
-        if (!compiler)
-        {
-            return nullptr;
-        }
-        ISlangSharedLibrary* sharedLibrary = compiler->getSharedLibrary();
-        if (!sharedLibrary)
-        {
-            return nullptr;
-        }
-
-        // Okay now access the func
-        SlangFuncPtr func = sharedLibrary->findFuncByName(info.name);
-        if (!func)
-        {
-            if (sink)
-            {
-                UnownedStringSlice compilerName = TypeTextUtil::getPassThroughName(SlangPassThrough(info.compilerType));
-                sink->diagnose(SourceLoc(), Diagnostics::failedToFindFunctionForCompiler, info.name, compilerName);
-            }
-            return nullptr;
-        }
-
-        // Store in the function cache
-        m_sharedLibraryFunctions[int(type)] = func;
-        return func;
     }
 
     void checkTranslationUnit(
