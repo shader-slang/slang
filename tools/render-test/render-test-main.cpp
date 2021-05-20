@@ -99,9 +99,9 @@ public:
 
     Result applyBinding(PipelineType pipelineType, ICommandEncoder* encoder);
     void setProjectionMatrix(IShaderObject* rootObject);
-    Result writeBindingOutput(const char* fileName);
+    Result writeBindingOutput(const String& fileName);
 
-    Result writeScreen(const char* filename);
+    Result writeScreen(const String& filename);
 
 protected:
     /// Called in initialize
@@ -645,12 +645,12 @@ void RenderTestApp::finalize()
 {
 }
 
-Result RenderTestApp::writeBindingOutput(const char* fileName)
+Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
     m_queue->wait();
 
-    FILE * f = fopen(fileName, "wb");
+    FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
     {
         return SLANG_FAIL;
@@ -722,7 +722,7 @@ Result RenderTestApp::writeBindingOutput(const char* fileName)
     return SLANG_OK;
 }
 
-Result RenderTestApp::writeScreen(const char* filename)
+Result RenderTestApp::writeScreen(const String& filename)
 {
     size_t rowPitch, pixelSize;
     ComPtr<ISlangBlob> blob;
@@ -731,7 +731,7 @@ Result RenderTestApp::writeScreen(const char* filename)
     auto bufferSize = blob->getBufferSize();
     uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
     uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
-    return PngSerializeUtil::write(filename, blob, width, height);
+    return PngSerializeUtil::write(filename.getBuffer(), blob, width, height);
 }
 
 Result RenderTestApp::update()
@@ -761,7 +761,7 @@ Result RenderTestApp::update()
     m_queue->wait();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
-    if (m_options.outputPath || m_options.performanceProfile)
+    if (m_options.outputPath.getLength() || m_options.performanceProfile)
     {
         // Wait until everything is complete
 
@@ -800,7 +800,7 @@ Result RenderTestApp::update()
             _outputProfileTime(m_startTicks, endTicks);
         }
 
-        if (m_options.outputPath)
+        if (m_options.outputPath.getLength())
         {
             if (m_options.shaderType == Options::ShaderProgramType::Compute || m_options.shaderType == Options::ShaderProgramType::GraphicsCompute)
             {
@@ -902,8 +902,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     
     input.profile = "";
     input.target = SLANG_TARGET_NONE;
-    input.args = &options.slangArgs[0];
-    input.argCount = options.slangArgCount;
 
 	SlangSourceLanguage nativeLanguage = SLANG_SOURCE_LANGUAGE_UNKNOWN;
 	SlangPassThrough slangPassThrough = SLANG_PASS_THROUGH_NONE;
@@ -1013,7 +1011,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 #endif
 
     // Use the profile name set on options if set
-    input.profile = options.profileName ? options.profileName : input.profile;
+    input.profile = options.profileName.getLength() ? options.profileName : input.profile;
 
     StringBuilder rendererName;
     auto info = 

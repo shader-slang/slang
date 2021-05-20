@@ -437,9 +437,6 @@ struct OptionsParser
             parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
         }
 
-        // We don't know how big the terminal is.. let's guess 120 for now 
-        parseSink.setSourceLineMaxLength(120);
-
         // All diagnostics will also be sent to requestSink
         parseSink.setParentSink(requestSink);
 
