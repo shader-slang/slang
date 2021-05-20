@@ -1329,6 +1329,9 @@ namespace Slang
         // Definitions to provide during preprocessing
         Dictionary<String, String> preprocessorDefinitions;
 
+        /// Holds any args that are destined for downstream compilers/tools etc
+        DownstreamArgs m_downstreamArgs;
+
         // Source manager to help track files loaded
         SourceManager m_defaultSourceManager;
         SourceManager* m_sourceManager = nullptr;
@@ -2022,9 +2025,7 @@ namespace Slang
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
 
-            /// Holds any args that are destined for downstream compilers/tools etc
-        DownstreamArgs m_downstreamArgs;
-
+        
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);
         
