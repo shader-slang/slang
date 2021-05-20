@@ -964,8 +964,10 @@ namespace Slang
         typedef DownstreamCompiler::CompileOptions CompileOptions;
         CompileOptions options;
 
-        /* Let's set the compiler specific options */
+        /* Let's set the compiler specific options 
 
+          We can only do this if the endToEndReq is set. */
+        if (endToEndReq)
         {
             auto name = TypeTextUtil::getPassThroughName((SlangPassThrough)downstreamCompiler);
             const Index nameIndex = endToEndReq->m_downstreamArgs.findName(name);
