@@ -1,0 +1,9 @@
+result code = 0
+standard error = {
+tests/preprocessor/preproc-concat-3.slang(5): warning 15503: toking pasting with '##' resulted in the invalid token ')CONCAT'
+#define CONCAT(a, b) a ## b
+                       ^~
+}
+standard output = {
+CONCAT ( a , a ) CONCAT ( b , b ) ; 
+}

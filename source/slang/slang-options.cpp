@@ -410,13 +410,8 @@ struct OptionsParser
 
         DiagnosticSink* requestSink = requestImpl->getSink();
 
-        SourceManager* parentSourceManager = requestSink->getSourceManager();
-
-        // We need a new source manager to track our command line 'source'
-
-        SourceManager sourceManager;
-        sourceManager.initialize(parentSourceManager, parentSourceManager->getFileSystemExt());
-
+        CommandLineContext* cmdLineContext = requestImpl->m_downstreamArgs.getContext();
+        
         // Why create a new DiagnosticSink?
         // We *don't* want the lexer that comes as default (it's for Slang source!)
         // We may want to set flags that are different
@@ -432,7 +427,7 @@ struct OptionsParser
         //
         // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
       
-        DiagnosticSink parseSink(&sourceManager, nullptr);
+        DiagnosticSink parseSink(cmdLineContext->getSourceManager(), nullptr);
         
         {
             parseSink.setFlags(requestSink->getFlags());
@@ -451,8 +446,13 @@ struct OptionsParser
         DiagnosticSink* sink = &parseSink;
 
         // Set up the args
-        CommandLineArgs args(&sourceManager);
+        CommandLineArgs args(cmdLineContext);
+        // Converts input args into args in 'args'.
+        // Doing so will allocate some SourceLoc space from the CommandLineContext.
         args.setArgs(argv, argc);
+
+        // Before we do anything else lets strip out all of the downstream arguments.
+        SLANG_RETURN_ON_FAIL(requestImpl->m_downstreamArgs.stripDownstreamArgs(args, 0, sink));
 
         CommandLineReader reader(&args, sink);
 
@@ -1638,6 +1638,10 @@ struct OptionsParser
                     {
                     case CodeGenTarget::CPPSource:
                     case CodeGenTarget::PTX:
+                    case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::HostCallable:
+                    case CodeGenTarget::Executable:
+                    case CodeGenTarget::SharedLibrary:
                         rawOutput.isWholeProgram = true;
                         break;
                     default:

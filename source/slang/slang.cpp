@@ -4,6 +4,7 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-archive-file-system.h"
+#include "../core/slang-type-text-util.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -1392,7 +1393,7 @@ protected:
     // whether any macro values were set in a given source file
     // that are semantically relevant to other stages of compilation.
     //
-    void handleEndOfFile(Preprocessor* preprocessor) SLANG_OVERRIDE
+    void handleEndOfTranslationUnit(Preprocessor* preprocessor) SLANG_OVERRIDE
     {
         // We look at the preprocessor state after reading the entire
         // source file/string, in order to see if any macros have been
@@ -2046,6 +2047,22 @@ void EndToEndCompileRequest::init()
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
 
     m_backEndReq = new BackEndCompileRequest(getLinkage(), getSink());
+
+    RefPtr<CommandLineContext> context = new CommandLineContext;
+    m_downstreamArgs = DownstreamArgs(context);
+
+    // Add all of the possible names we allow for downstream tools
+    {
+        for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
+        {
+            m_downstreamArgs.addName(TypeTextUtil::getPassThroughName(SlangPassThrough(i)));
+        }
+
+        // Generic downstream tool
+        m_downstreamArgs.addName("downstream");
+        // Generic downstream linker
+        m_downstreamArgs.addName("linker");
+    }
 }
 
 SlangResult EndToEndCompileRequest::executeActionsInner()

@@ -258,7 +258,8 @@ protected:
     int m_internalErrorLocsNoted = 0;
 
     /// If 0, then there is no limit, otherwise max amount of chars of the source line location
-    Index m_sourceLineMaxLength = 0;            
+    /// We don't know the size of a terminal in general, but for now we'll guess 120.
+    Index m_sourceLineMaxLength = 120;            
 
     Flags m_flags = 0;
 
