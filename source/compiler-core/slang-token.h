@@ -26,9 +26,8 @@ struct TokenFlag
     {
         AtStartOfLine           = 1 << 0,
         AfterWhitespace         = 1 << 1,
-        SuppressMacroExpansion  = 1 << 2,
-        ScrubbingNeeded         = 1 << 3,
-        Name                    = 1 << 4,           ///< Determines if 'name' is set or 'chars' in the charsNameUnion
+        ScrubbingNeeded         = 1 << 2,
+        Name                    = 1 << 3,           ///< Determines if 'name' is set or 'chars' in the charsNameUnion
     };
 };
 

@@ -1,7 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE:-E
 
-// NOTE! This test should *fail*, if preprocessor is working correctly!
-
 #define CONCAT(a, b) a ## b
 
 #define A a
@@ -17,7 +15,7 @@
 // CONCAT is disabled, A and B are expanded on next pass
 // A2 B2 are first and last tokens pre expansion args
 // 
-// Slang outputs 
+// Old Slang outputs 
 // ab ab ab 
 
 CONCAT(CONCAT(A, B) A2, B2 CONCAT(A, B))

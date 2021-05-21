@@ -1375,7 +1375,7 @@ protected:
     // whether any macro values were set in a given source file
     // that are semantically relevant to other stages of compilation.
     //
-    void handleEndOfFile(Preprocessor* preprocessor) SLANG_OVERRIDE
+    void handleEndOfTranslationUnit(Preprocessor* preprocessor) SLANG_OVERRIDE
     {
         // We look at the preprocessor state after reading the entire
         // source file/string, in order to see if any macros have been
