@@ -200,13 +200,16 @@ It is also worth noting that `-X...` options can be nested. This would allow a G
 -Xgcc -Xlinker --split -X
 ```
 
+Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+NOTE! Not all tools that Slang uses downstream make command line argument parsing available. Of note `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration.
+
 The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the DXC option `-Gfa` in a render-test via 
 
 ```
 -Xslang... -Xdxc -Gfa -X.
 ```
 
-It's also worth noting that setting options for tools that aren't used has no effect. This allows for setting `-X` options sepecific for all downstream tools on a command line, and they are only used when a compilation needs them.
 
 ### Specifying where dlls/shared libraries are loaded from
 

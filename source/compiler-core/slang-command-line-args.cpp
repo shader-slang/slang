@@ -133,7 +133,10 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
 {
     if (name.getLength() <= 0)
     {
-        sink->diagnose(loc, MiscDiagnostics::downstreamToolNameNotDefined);
+        if (sink)
+        {
+            sink->diagnose(loc, MiscDiagnostics::downstreamToolNameNotDefined);
+        }
         return -1;
     }
 
@@ -148,7 +151,23 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
         return index;
     }
 
-    sink->diagnose(loc, MiscDiagnostics::downstreamNameNotKnown);
+    if (sink)
+    {
+        StringBuilder names;
+
+        names << "[ ";
+        for (Index i = 0; i < m_entries.getCount(); ++i)
+        {
+            if (i)
+            {
+                names << ", ";
+            }
+            names << m_entries[i].name;
+        }
+        names << " ]";
+
+        sink->diagnose(loc, MiscDiagnostics::downstreamNameNotKnown, names);
+    }
     return -1;
 }
 
