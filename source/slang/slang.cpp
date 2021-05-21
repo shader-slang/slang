@@ -896,35 +896,65 @@ SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getTypeLayout(
     return asExternal(typeLayout);
 }
 
-SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL Linkage::getParameterBlockLayout(
+SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
     slang::TypeReflection* inType,
-    SlangInt targetIndex,
-    slang::LayoutRules rules,
+    slang::ContainerType containerType,
     ISlangBlob** outDiagnostics)
 {
     auto type = asInternal(inType);
 
-    if (targetIndex < 0 || targetIndex >= targets.getCount())
-        return nullptr;
+    Type* containerTypeReflection = nullptr;
+    ContainerTypeKey key = {inType, containerType};
+    if (!m_containerTypes.TryGetValue(key, containerTypeReflection))
+    {
+        switch (containerType)
+        {
+        case slang::ContainerType::ConstantBuffer:
+            {
+                ConstantBufferType* cbType = getASTBuilder()->create<ConstantBufferType>();
+                cbType->elementType = type;
+                containerTypeReflection = cbType;
+            }
+            break;
+        case slang::ContainerType::ParameterBlock:
+            {
+                ParameterBlockType* pbType = getASTBuilder()->create<ParameterBlockType>();
+                pbType->elementType = type;
+                containerTypeReflection = pbType;
+            }
+            break;
+        case slang::ContainerType::StructuredBuffer:
+            {
+                HLSLStructuredBufferType* sbType =
+                    getASTBuilder()->create<HLSLStructuredBufferType>();
+                sbType->elementType = type;
+                containerTypeReflection = sbType;
+            }
+            break;
+        case slang::ContainerType::UnsizedArray:
+            {
+                ArrayExpressionType* arrType = getASTBuilder()->create<ArrayExpressionType>();
+                arrType->baseType = type;
+                arrType->arrayLength = nullptr;
+                containerTypeReflection = arrType;
+            }
+            break;
+        default:
+            containerTypeReflection = type;
+            break;
+        }
+        
+        m_containerTypes.Add(key, containerTypeReflection);
+    }
 
-    auto target = targets[targetIndex];
-
-    // TODO: We need a way to pass through the layout rules
-    // that the user requested (e.g., constant buffers vs.
-    // structured buffer rules). Right now the API only
-    // exposes a single case, so this isn't a big deal.
-    //
-    SLANG_UNUSED(rules);
-
-    auto typeLayout = target->getParameterBlockLayout(type);
-
-    // TODO: We currently don't have a path for capturing
-    // errors that occur during layout (e.g., types that
-    // are invalid because of target-specific layout constraints).
-    //
     SLANG_UNUSED(outDiagnostics);
 
-    return asExternal(typeLayout);
+    return asExternal(containerTypeReflection);
+}
+
+SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getDynamicType()
+{
+    return asExternal(getASTBuilder()->getSharedASTBuilder()->getDynamicType());
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeRTTIMangledName(
@@ -1131,19 +1161,6 @@ TypeLayout* TargetRequest::getTypeLayout(Type* type)
     getTypeLayouts()[type] = result;
     return result.Ptr();
 }
-
-TypeLayout* TargetRequest::getParameterBlockLayout(Type* type)
-{
-    ParameterBlockType* parameterBlockType = nullptr;
-    if (!parameterBlockTypes.TryGetValue(type, parameterBlockType))
-    {
-        parameterBlockType = getLinkage()->getASTBuilder()->create<ParameterBlockType>();
-        parameterBlockType->elementType = type;
-        parameterBlockTypes.Add(type, parameterBlockType);
-    }
-    return getTypeLayout(parameterBlockType);
-}
-
 
 //
 // TranslationUnitRequest
