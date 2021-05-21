@@ -781,6 +781,13 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+        case kIROp_GetPRD:
+        {
+            m_writer->emit("(");
+            emitType(inst->getDataType());
+            m_writer->emit(")getPRD()");
+            return true;
+        }
         default: break;
     }
 
