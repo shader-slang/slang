@@ -56,6 +56,9 @@
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-byte-encode.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-test\unit-test-command-line-args.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-compression.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

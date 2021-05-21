@@ -239,10 +239,10 @@ static UnownedStringSlice _extractLineContainingPosition(const UnownedStringSlic
     return UnownedStringSlice(start, end);
 }
 
-static void _reduceLength(Index startIndex, StringBuilder& ioBuf)
+static void _reduceLength(Index startIndex, const UnownedStringSlice& prefix, StringBuilder& ioBuf)
 {
     StringBuilder buf;
-    buf << "...";
+    buf << prefix;
     buf.append(ioBuf.getUnownedSlice().tail(startIndex));
     ioBuf = buf;
 }
@@ -313,21 +313,28 @@ static void _sourceLocationNoteDiagnostic(DiagnosticSink* sink, SourceView* sour
         const Index maxLength = sink->getSourceLineMaxLength();
         if (maxLength > 0)
         {
-            Index endIndex = lexer ? caretLine.getLength() : (caretIndex + (maxLength / 4));
+            const UnownedStringSlice ellipsis = UnownedStringSlice::fromLiteral("...");
+            const UnownedStringSlice spaces = UnownedStringSlice::fromLiteral("   ");
+            SLANG_ASSERT(ellipsis.getLength() == spaces.getLength());
+
+            // We use the caretLine length if we have a lexer, because it will have underscores such that it's end is the end of
+            // the item at issue.
+            // If we don't have the lexer, we guesstimate using 1/4 of the maximum length
+            const Index endIndex = lexer ? caretLine.getLength() : (caretIndex + (maxLength / 4));
 
             if (endIndex > maxLength)
             {
-                Index startIndex = endIndex - (maxLength - 3);
+                const Index startIndex = endIndex - (maxLength - ellipsis.getLength());
 
-                _reduceLength(startIndex, sourceLine);
-                _reduceLength(startIndex, caretLine);
+                _reduceLength(startIndex, ellipsis, sourceLine);
+                _reduceLength(startIndex, spaces, caretLine);
             }
 
             if (sourceLine.getLength() > maxLength)
             {
                 StringBuilder buf;
-                buf.append(sourceLine.getUnownedSlice().head(maxLength - 3));
-                buf << "...";
+                buf.append(sourceLine.getUnownedSlice().head(maxLength - ellipsis.getLength()));
+                buf << ellipsis;
                 sourceLine = buf;
             }
         }

@@ -9,6 +9,7 @@
 #include "../compiler-core/slang-downstream-compiler.h"
 #include "../compiler-core/slang-name.h"
 #include "../compiler-core/slang-include-system.h"
+#include "../compiler-core/slang-command-line-args.h"
 
 #include "../core/slang-std-writers.h"
 
@@ -20,7 +21,6 @@
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
-
 
 
 #include "slang-serialize-ir-types.h"
@@ -2021,6 +2021,9 @@ namespace Slang
             String wholeTargetOutputPath;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
+
+            /// Holds any args that are destined for downstream compilers/tools etc
+        DownstreamArgs m_downstreamArgs;
 
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);
