@@ -17,35 +17,13 @@
 #include "../core/slang-type-text-util.h"
 #include "../core/slang-hex-dump-util.h"
 
+#include "../compiler-core/slang-command-line-args.h"
+
 #include <assert.h>
 
 namespace Slang {
 
 SlangResult _addLibraryReference(EndToEndCompileRequest* req, Stream* stream);
-
-SlangResult tryReadCommandLineArgumentRaw(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, char const** argOut)
-{
-    *argOut = nullptr;
-    char const* const*& cursor = *ioCursor;
-    if (cursor == end)
-    {
-        sink->diagnose(SourceLoc(), Diagnostics::expectedArgumentForOption, option);
-        return SLANG_FAIL;
-    }
-    else
-    {
-        *argOut = *cursor++;
-        return SLANG_OK;
-    }
-}
-
-SlangResult tryReadCommandLineArgument(DiagnosticSink* sink, char const* option, char const* const**ioCursor, char const* const*end, String& argOut)
-{
-    const char* arg;
-    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, option, ioCursor, end, &arg));
-    argOut = arg;
-    return SLANG_OK;
-}
 
 struct OptionsParser
 {
@@ -425,11 +403,58 @@ struct OptionsParser
         int             argc,
         char const* const*  argv)
     {
+       
         // Copy some state out of the current request, in case we've been called
         // after some other initialization has been performed.
         flags = requestImpl->getFrontEndReq()->compileFlags;
 
-        DiagnosticSink* sink = requestImpl->getSink();
+        DiagnosticSink* requestSink = requestImpl->getSink();
+
+        SourceManager* parentSourceManager = requestSink->getSourceManager();
+
+        // We need a new source manager to track our command line 'source'
+
+        SourceManager sourceManager;
+        sourceManager.initialize(parentSourceManager, parentSourceManager->getFileSystemExt());
+
+        // Why create a new DiagnosticSink?
+        // We *don't* want the lexer that comes as default (it's for Slang source!)
+        // We may want to set flags that are different
+        // We will need to use a new sourceManager that will just last for this parse and will map locs to
+        // source lines.
+        //
+        // The *problem* is that we still need to communicate to the requestSink in some suitable way.
+        //
+        // 1) We could have some kind of scoping mechanism (and only one sink)
+        // 2) We could have a 'parent' diagnostic sink, that if we set we route output too
+        // 3) We use something like the ISlangWriter to always be the thing output too (this has problems because
+        // some code assumes the diagnostics are accessible as a string)
+        //
+        // The solution used here is to have DiagnosticsSink have a 'parent' that also gets diagnostics reported to.
+      
+        DiagnosticSink parseSink(&sourceManager, nullptr);
+        
+        {
+            parseSink.setFlags(requestSink->getFlags());
+            // Allow HumaneLoc - it won't display much for command line parsing - just (1):
+            // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
+            //parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
+            parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+        }
+
+        // We don't know how big the terminal is.. let's guess 120 for now 
+        parseSink.setSourceLineMaxLength(120);
+
+        // All diagnostics will also be sent to requestSink
+        parseSink.setParentSink(requestSink);
+
+        DiagnosticSink* sink = &parseSink;
+
+        // Set up the args
+        CommandLineArgs args(&sourceManager);
+        args.setArgs(argv, argc);
+
+        CommandLineReader reader(&args, sink);
 
         SlangMatrixLayoutMode defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_MODE_UNKNOWN;
 
@@ -440,59 +465,57 @@ struct OptionsParser
         slang::CompileStdLibFlags compileStdLibFlags = 0;
         bool hasLoadedRepro = false;
 
-        char const* const* argCursor = &argv[0];
-        char const* const* argEnd = &argv[argc];
-        while (argCursor != argEnd)
+        while (reader.hasArg())
         {
-            char const* arg = *argCursor++;
-            if (arg[0] == '-')
-            {
-                UnownedStringSlice argStr = UnownedStringSlice(arg);
+            auto arg = reader.getArgAndAdvance();
+            const auto& argValue = arg.value;
 
-                if(argStr == "-no-mangle" )
+            if (argValue[0] == '-')
+            {
+                if(argValue == "-no-mangle" )
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_MANGLING;
                 }
-                else if (argStr == "-load-stdlib")
+                else if (argValue == "-load-stdlib")
                 {
-                    String fileName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+                    CommandLineArg fileName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
 
                     // Load the file
                     ScopedAllocation contents;
-                    SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName, contents));
+                    SLANG_RETURN_ON_FAIL(File::readAllBytes(fileName.value, contents));
                     SLANG_RETURN_ON_FAIL(session->loadStdLib(contents.getData(), contents.getSizeInBytes()));
                 }
-                else if (argStr == "-compile-stdlib")
+                else if (argValue == "-compile-stdlib")
                 {
                     compileStdLib = true;
                 }
-                else if (argStr == "-archive-type")
+                else if (argValue == "-archive-type")
                 {
-                    String archiveTypeName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, archiveTypeName));
+                    CommandLineArg archiveTypeName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(archiveTypeName));
 
-                    archiveType = TypeTextUtil::findArchiveType(archiveTypeName.getUnownedSlice());
+                    archiveType = TypeTextUtil::findArchiveType(archiveTypeName.value.getUnownedSlice());
                     if (archiveType == SLANG_ARCHIVE_TYPE_UNDEFINED)
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownArchiveType, archiveTypeName);
+                        sink->diagnose(archiveTypeName.loc, Diagnostics::unknownArchiveType, archiveTypeName.value);
                         return SLANG_FAIL;
                     }
                 }
-                else if (argStr == "-save-stdlib")
+                else if (argValue == "-save-stdlib")
                 {
-                    String fileName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+                    CommandLineArg fileName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
 
                     ComPtr<ISlangBlob> blob;
 
                     SLANG_RETURN_ON_FAIL(session->saveStdLib(archiveType, blob.writeRef()));
-                    SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName, blob->getBufferPointer(), blob->getBufferSize()));
+                    SLANG_RETURN_ON_FAIL(File::writeAllBytes(fileName.value, blob->getBufferPointer(), blob->getBufferSize()));
                 }
-                else if (argStr == "-save-stdlib-bin-source")
+                else if (argValue == "-save-stdlib-bin-source")
                 {
-                    String fileName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, fileName));
+                    CommandLineArg fileName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(fileName));
 
                     ComPtr<ISlangBlob> blob;
 
@@ -503,40 +526,40 @@ struct OptionsParser
 
                     SLANG_RETURN_ON_FAIL(HexDumpUtil::dumpSourceBytes((const uint8_t*)blob->getBufferPointer(), blob->getBufferSize(), 16, &writer));
 
-                    File::writeAllText(fileName, builder);
+                    File::writeAllText(fileName.value, builder);
                 }
-                else if (argStr == "-no-codegen")
+                else if (argValue == "-no-codegen")
                 {
                     flags |= SLANG_COMPILE_FLAG_NO_CODEGEN;
                 }
-                else if (argStr == "-dump-intermediates")
+                else if (argValue == "-dump-intermediates")
                 {
                     compileRequest->setDumpIntermediates(true);
                 }
-                else if (argStr == "-dump-intermediate-prefix")
+                else if (argValue == "-dump-intermediate-prefix")
                 {
-                    String prefix;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, prefix));
-                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix;
+                    CommandLineArg prefix;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(prefix));
+                    requestImpl->getBackEndReq()->m_dumpIntermediatePrefix = prefix.value;
                 }
-                else if (argStr == "-output-includes")
+                else if (argValue == "-output-includes")
                 {
                     requestImpl->getFrontEndReq()->outputIncludes = true;
                 }
-                else if(argStr == "-dump-ir" )
+                else if(argValue == "-dump-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldDumpIR = true;
                     requestImpl->getBackEndReq()->shouldDumpIR = true;
                 }
-                else if (argStr == "-E" || argStr == "-output-preprocessor")
+                else if (argValue == "-E" || argValue == "-output-preprocessor")
                 {
                     requestImpl->getFrontEndReq()->outputPreprocessor = true;
                 }
-                else if (argStr == "-dump-ast")
+                else if (argValue == "-dump-ast")
                 {
                     requestImpl->getFrontEndReq()->shouldDumpAST = true;
                 }
-                else if (argStr == "-doc")
+                else if (argValue == "-doc")
                 {
                     // If compiling stdlib is enabled, will write out documentation
                     compileStdLibFlags |= slang::CompileStdLibFlag::WriteDocumentation;
@@ -544,36 +567,38 @@ struct OptionsParser
                     // Enable writing out documentation on the req
                     requestImpl->getFrontEndReq()->shouldDocument = true;
                 }
-                else if (argStr == "-dump-repro")
+                else if (argValue == "-dump-repro")
                 {
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, requestImpl->m_dumpRepro));
+                    CommandLineArg dumpRepro;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(dumpRepro));
+                    requestImpl->m_dumpRepro = dumpRepro.value;
                     compileRequest->enableReproCapture();
                 }
-                else if (argStr == "-dump-repro-on-error")
+                else if (argValue == "-dump-repro-on-error")
                 {
                     requestImpl->m_dumpReproOnError = true;
                 }
-                else if (argStr == "-extract-repro")
+                else if (argValue == "-extract-repro")
                 {
-                    String reproName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+                    CommandLineArg reproName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
-                    SLANG_RETURN_ON_FAIL(ReproUtil::extractFilesToDirectory(reproName));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::extractFilesToDirectory(reproName.value));
                 }
-                else if (argStr == "-module-name")
+                else if (argValue == "-module-name")
                 {
-                    String moduleName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, moduleName));
+                    CommandLineArg moduleName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(moduleName));
 
-                    compileRequest->setDefaultModuleName(moduleName.getBuffer());
+                    compileRequest->setDefaultModuleName(moduleName.value.getBuffer());
                 }
-                else if(argStr == "-load-repro")
+                else if(argValue == "-load-repro")
                 {
-                    String reproName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+                    CommandLineArg reproName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName, buffer));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName.value, buffer));
 
                     auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
@@ -582,7 +607,7 @@ struct OptionsParser
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
                     ComPtr<ISlangFileSystem> fileSystem;
                     String dirPath;
-                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName.value, dirPath)))
                     {
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
@@ -595,13 +620,13 @@ struct OptionsParser
 
                     hasLoadedRepro = true;
                 }
-                else if (argStr == "-repro-file-system")
+                else if (argValue == "-repro-file-system")
                 {
-                    String reproName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, reproName));
+                    CommandLineArg reproName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName, buffer));
+                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName.value, buffer));
 
                     auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
@@ -610,7 +635,7 @@ struct OptionsParser
                     // If we can find a directory, that exists, we will set up a file system to load from that directory
                     ComPtr<ISlangFileSystem> dirFileSystem;
                     String dirPath;
-                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName, dirPath)))
+                    if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(reproName.value, dirPath)))
                     {
                         SlangPathType pathType;
                         if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
@@ -628,55 +653,56 @@ struct OptionsParser
                     // Set as the file system
                     compileRequest->setFileSystem(cacheFileSystem);
                 }
-                else if (argStr == "-serial-ir")
+                else if (argValue == "-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->useSerialIRBottleneck = true;
                 }
-                else if (argStr == "-disable-specialization")
+                else if (argValue == "-disable-specialization")
                 {
                     requestImpl->getBackEndReq()->disableSpecialization = true;
                 }
-                else if (argStr == "-disable-dynamic-dispatch")
+                else if (argValue == "-disable-dynamic-dispatch")
                 {
                     requestImpl->getBackEndReq()->disableDynamicDispatch = true;
                 }
-                else if (argStr == "-verbose-paths")
+                else if (argValue == "-verbose-paths")
                 {
                     requestImpl->getSink()->setFlag(DiagnosticSink::Flag::VerbosePath);
                 }
-                else if (argStr == "-verify-debug-serial-ir")
+                else if (argValue == "-verify-debug-serial-ir")
                 {
                     requestImpl->getFrontEndReq()->verifyDebugSerialization = true;
                 }
-                else if(argStr == "-validate-ir" )
+                else if(argValue == "-validate-ir" )
                 {
                     requestImpl->getFrontEndReq()->shouldValidateIR = true;
                     requestImpl->getBackEndReq()->shouldValidateIR = true;
                 }
-                else if(argStr == "-skip-codegen" )
+                else if(argValue == "-skip-codegen" )
                 {
                     requestImpl->m_shouldSkipCodegen = true;
                 }
-                else if(argStr == "-parameter-blocks-use-register-spaces" )
+                else if(argValue == "-parameter-blocks-use-register-spaces" )
                 {
                     getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_PARAMETER_BLOCKS_USE_REGISTER_SPACES;
                 }
-                else if (argStr == "-ir-compression")
+                else if (argValue == "-ir-compression")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
-                    SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
-                }
-                else if (argStr == "-target")
-                {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
-                    const CodeGenTarget format = (CodeGenTarget)TypeTextUtil::findCompileTargetFromName(name.getUnownedSlice());
+                    SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(name.value.getUnownedSlice(), requestImpl->getLinkage()->serialCompressionType));
+                }
+                else if (argValue == "-target")
+                {
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+
+                    const CodeGenTarget format = (CodeGenTarget)TypeTextUtil::findCompileTargetFromName(name.value.getUnownedSlice());
 
                     if (format == CodeGenTarget::Unknown)
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownCodeGenerationTarget, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownCodeGenerationTarget, name.value);
                         return SLANG_FAIL;
                     }
 
@@ -688,22 +714,22 @@ struct OptionsParser
                 // A "profile" can specify both a general capability level for
                 // a target, and also (as a legacy/compatibility feature) a
                 // specific stage to use for an entry point.
-                else if (argStr == "-profile")
+                else if (argValue == "-profile")
                 {
-                    String operand;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, operand));
+                    CommandLineArg operand;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
-                    // A a convenience, the `-profile` option supporst an operand that consists
+                    // A a convenience, the `-profile` option supports an operand that consists
                     // of multiple tokens separated with `+`. The eventual goal is that each
                     // of these tokens will represent a capability that should be assumed to
                     // be present on the target.
                     //
                     List<UnownedStringSlice> slices;
-                    StringUtil::split(operand.getUnownedSlice(), '+', slices);
+                    StringUtil::split(operand.value.getUnownedSlice(), '+', slices);
                     Index sliceCount = slices.getCount();
 
                     // For now, we will require that the *first* capability in the list is
-                    // special, and reprsents the traditional `Profile` to compile for in
+                    // special, and represents the traditional `Profile` to compile for in
                     // the existing Slang model.
                     //
                     UnownedStringSlice profileName = sliceCount >= 1 ? slices[0] : UnownedTerminatedStringSlice("");
@@ -711,7 +737,7 @@ struct OptionsParser
                     SlangProfileID profileID = Slang::Profile::lookUp(profileName).raw;
                     if( profileID == SLANG_PROFILE_UNKNOWN )
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, profileName);
+                        sink->diagnose(operand.loc, Diagnostics::unknownProfile, profileName);
                         return SLANG_FAIL;
                     }
                     else
@@ -738,14 +764,14 @@ struct OptionsParser
                         CapabilityAtom atom = findCapabilityAtom(atomName);
                         if( atom == CapabilityAtom::Invalid )
                         {
-                            sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, atomName);
+                            sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
                             return SLANG_FAIL;
                         }
 
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
-                else if( argStr == "-capability" )
+                else if( argValue == "-capability" )
                 {
                     // The `-capability` option is similar to `-profile` but does not set the actual profile
                     // for a target (it just adds capabilities).
@@ -755,11 +781,11 @@ struct OptionsParser
                     // value in only allowing a single `-profile` option per target while still allowing
                     // zero or more `-capability` options.
 
-                    String operand;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, operand));
+                    CommandLineArg operand;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(operand));
 
                     List<UnownedStringSlice> slices;
-                    StringUtil::split(operand.getUnownedSlice(), '+', slices);
+                    StringUtil::split(operand.value.getUnownedSlice(), '+', slices);
                     Index sliceCount = slices.getCount();
                     for(Index i = 0; i < sliceCount; ++i)
                     {
@@ -767,22 +793,22 @@ struct OptionsParser
                         CapabilityAtom atom = findCapabilityAtom(atomName);
                         if( atom == CapabilityAtom::Invalid )
                         {
-                            sink->diagnose(SourceLoc(), Diagnostics::unknownProfile, atomName);
+                            sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
                             return SLANG_FAIL;
                         }
 
                         addCapabilityAtom(getCurrentTarget(), atom);
                     }
                 }
-                else if (argStr == "-stage")
+                else if (argValue == "-stage")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
-                    Stage stage = findStageByName(name);
+                    Stage stage = findStageByName(name.value);
                     if( stage == Stage::Unknown )
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownStage, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownStage, name.value);
                         return SLANG_FAIL;
                     }
                     else
@@ -790,331 +816,331 @@ struct OptionsParser
                         setStage(getCurrentEntryPoint(), stage);
                     }
                 }
-                else if (argStr == "-entry")
+                else if (argValue == "-entry")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     RawEntryPoint rawEntryPoint;
-                    rawEntryPoint.name = name;
+                    rawEntryPoint.name = name.value;
                     rawEntryPoint.translationUnitIndex = currentTranslationUnitIndex;
 
                     rawEntryPoints.add(rawEntryPoint);
                 }
-                else if (argStr == "-heterogeneous")
+                else if (argValue == "-heterogeneous")
                 {
                     requestImpl->getLinkage()->m_heterogeneous = true;
                 }
-                else if (argStr == "-lang")
+                else if (argValue == "-lang")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
-                    const SourceLanguage sourceLanguage = (SourceLanguage)TypeTextUtil::findSourceLanguage(name.getUnownedSlice());
+                    const SourceLanguage sourceLanguage = (SourceLanguage)TypeTextUtil::findSourceLanguage(name.value.getUnownedSlice());
 
                     if (sourceLanguage == SourceLanguage::Unknown)
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownSourceLanguage, name.value);
                         return SLANG_FAIL;
                     }
                     else
                     {
-                        while ((*argCursor)[0] != '-' && argCursor != argEnd)
+                        while (reader.hasArg() && reader.peekValue().startsWith("-"))
                         {
-                            SLANG_RETURN_ON_FAIL(addInputPath(*argCursor++, sourceLanguage));
+                            SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer(), sourceLanguage));
                         }
                     }
                 }
-                else if (argStr == "-pass-through")
+                else if (argValue == "-pass-through")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(name.getUnownedSlice(), passThrough)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(name.value.getUnownedSlice(), passThrough)))
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownPassThroughTarget, name.value);
                         return SLANG_FAIL;
                     }
 
                     compileRequest->setPassThrough(passThrough);
                 }
-                else if (argStr.getLength() >= 2 && argStr[1] == 'D')
+                else if (argValue.getLength() >= 2 && argValue[1] == 'D')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -DFOO
                     // or it might come separately, as in:
                     //     -D FOO
-                    char const* defineStr = arg + 2;
-                    if (defineStr[0] == 0)
+
+                    UnownedStringSlice slice = argValue.getUnownedSlice().tail(2);
+
+                    CommandLineArg nextArg;
+                    if (slice.getLength() <= 0)
                     {
-                        // Need to read another argument from the command line
-                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &defineStr));
-                    }
-                    // The string that sets up the define can have an `=` between
-                    // the name to be defined and its value, so we search for one.
-                    char const* eqPos = nullptr;
-                    for(char const* dd = defineStr; *dd; ++dd)
-                    {
-                        if (*dd == '=')
-                        {
-                            eqPos = dd;
-                            break;
-                        }
+                        SLANG_RETURN_ON_FAIL(reader.expectArg(nextArg));
+                        slice = nextArg.value.getUnownedSlice();
                     }
 
+                    // The string that sets up the define can have an `=` between
+                    // the name to be defined and its value, so we search for one.
+                    const Index equalIndex = slice.indexOf('=');
+
                     // Now set the preprocessor define
-                    //
-                    if (eqPos)
+              
+                    if (equalIndex >= 0)
                     {
                         // If we found an `=`, we split the string...
-                        compileRequest->addPreprocessorDefine(String(defineStr, eqPos).begin(), String(eqPos+1).begin());
+                        compileRequest->addPreprocessorDefine(String(slice.head(equalIndex)).getBuffer(), String(slice.tail(equalIndex + 1)).getBuffer());
                     }
                     else
                     {
                         // If there was no `=`, then just #define it to an empty string
-                        compileRequest->addPreprocessorDefine(String(defineStr).begin(), "");
+                        compileRequest->addPreprocessorDefine(String(slice).getBuffer(), "");
                     }
                 }
-                else if (argStr.getLength() >= 2 && argStr[1] == 'I')
+                else if (argValue.getLength() >= 2 && argValue[1] == 'I')
                 {
                     // The value to be defined might be part of the same option, as in:
                     //     -IFOO
                     // or it might come separately, as in:
                     //     -I FOO
                     // (see handling of `-D` above)
-                    char const* includeDirStr = arg + 2;
-                    if (includeDirStr[0] == 0)
+                    UnownedStringSlice slice = argValue.getUnownedSlice().tail(2);
+
+                    CommandLineArg nextArg;
+                    if (slice.getLength() <= 0)
                     {
                         // Need to read another argument from the command line
-                        SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &includeDirStr));
+                        SLANG_RETURN_ON_FAIL(reader.expectArg(nextArg));
+                        slice = nextArg.value.getUnownedSlice();
                     }
 
-                    compileRequest->addSearchPath(includeDirStr);
+                    compileRequest->addSearchPath(String(slice).getBuffer());
                 }
                 //
                 // A `-o` option is used to specify a desired output file.
-                else if (argStr == "-o")
+                else if (argValue == "-o")
                 {
-                    char const* outputPath = nullptr;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgumentRaw(sink, arg, &argCursor, argEnd, &outputPath));
-                    if (!outputPath) continue;
+                    CommandLineArg outputPath;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(outputPath));
 
-                    addOutputPath(outputPath);
+                    addOutputPath(outputPath.value.getBuffer());
                 }
-                else if(argStr == "-matrix-layout-row-major")
+                else if(argValue == "-matrix-layout-row-major")
                 {
                     defaultMatrixLayoutMode = kMatrixLayoutMode_RowMajor;
                 }
-                else if(argStr == "-matrix-layout-column-major")
+                else if(argValue == "-matrix-layout-column-major")
                 {
                     defaultMatrixLayoutMode = kMatrixLayoutMode_ColumnMajor;
                 }
-                else if(argStr == "-line-directive-mode")
+                else if(argValue == "-line-directive-mode")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     SlangLineDirectiveMode mode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
-                    if(name == "none")
+                    if(name.value == "none")
                     {
                         mode = SLANG_LINE_DIRECTIVE_MODE_NONE;
                     }
                     else
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownLineDirectiveMode, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownLineDirectiveMode, name.value);
                         return SLANG_FAIL;
                     }
 
                     compileRequest->setLineDirectiveMode(mode);
 
                 }
-                else if( argStr == "-fp-mode" || argStr == "-floating-point-mode" )
+                else if( argValue == "-fp-mode" || argValue == "-floating-point-mode" )
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
                     FloatingPointMode mode = FloatingPointMode::Default;
-                    if(name == "fast")
+                    if(name.value == "fast")
                     {
                         mode = FloatingPointMode::Fast;
                     }
-                    else if(name == "precise")
+                    else if(name.value == "precise")
                     {
                         mode = FloatingPointMode::Precise;
                     }
                     else
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownFloatingPointMode, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownFloatingPointMode, name.value);
                         return SLANG_FAIL;
                     }
 
                     setFloatingPointMode(getCurrentTarget(), mode);
                 }
-                else if( argStr[1] == 'O' )
+                else if( argValue.getLength() >= 2 && argValue[1] == 'O' )
                 {
-                    char const* name = arg + 2;
+                    UnownedStringSlice levelSlice = argValue.getUnownedSlice().tail(2);
                     SlangOptimizationLevel level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
 
-                    bool invalidOptimizationLevel = strlen(name) > 2;
-                    switch( name[0] )
-                    {
-                    case '0':   level = SLANG_OPTIMIZATION_LEVEL_NONE;      break;
-                    case '1':   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
-                    case '2':   level = SLANG_OPTIMIZATION_LEVEL_HIGH;      break;
-                    case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
-                    case  0 :   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
-                    default:
-                        invalidOptimizationLevel = true;
-                        break;
-                    }
-                    if( invalidOptimizationLevel )
-                    {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownOptimiziationLevel, name);
-                        return SLANG_FAIL;
-                    }
+                    const char c = levelSlice.getLength() == 1 ? levelSlice[0] : 0;
 
+                    switch (c)
+                    {
+                        case '0':   level = SLANG_OPTIMIZATION_LEVEL_NONE;      break;
+                        case '1':   level = SLANG_OPTIMIZATION_LEVEL_DEFAULT;   break;
+                        case '2':   level = SLANG_OPTIMIZATION_LEVEL_HIGH;      break;
+                        case '3':   level = SLANG_OPTIMIZATION_LEVEL_MAXIMAL;   break;
+                        default:
+                        {
+                            sink->diagnose(arg.loc, Diagnostics::unknownOptimiziationLevel, arg.value);
+                            return SLANG_FAIL;
+                        }
+                    }
+                 
                     compileRequest->setOptimizationLevel(level);
                 }
 
                 // Note: unlike with `-O` above, we have to consider that other
                 // options might have names that start with `-g` and so cannot
                 // just detect it as a prefix.
-                else if( argStr == "-g" || argStr == "-g2" )
+                else if( argValue == "-g" || argValue == "-g2" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_STANDARD);
                 }
-                else if( argStr == "-g0" )
+                else if( argValue == "-g0" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_NONE);
                 }
-                else if( argStr == "-g1" )
+                else if( argValue == "-g1" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MINIMAL);
                 }
-                else if( argStr == "-g3" )
+                else if( argValue == "-g3" )
                 {
                     compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
                 }
-                else if( argStr == "-default-image-format-unknown" )
+                else if( argValue == "-default-image-format-unknown" )
                 {
                     requestImpl->getBackEndReq()->useUnknownImageFormatAsDefault = true;
                 }
-                else if (argStr == "-obfuscate")
+                else if (argValue == "-obfuscate")
                 {
                     requestImpl->getLinkage()->m_obfuscateCode = true;
                 }
-                else if (argStr == "-file-system")
+                else if (argValue == "-file-system")
                 {
-                    String name;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                    CommandLineArg name;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(name));
 
-                    if (name == "default")
+                    if (name.value == "default")
                     {
                         compileRequest->setFileSystem(nullptr);
                     }
-                    else if (name == "load-file")
+                    else if (name.value == "load-file")
                     {
                         // 'Simple' just implements loadFile interface, so will be wrapped with CacheFileSystem internally
                         compileRequest->setFileSystem(OSFileSystem::getLoadSingleton());
                     }
-                    else if (name == "os")
+                    else if (name.value == "os")
                     {
                         // 'Immutable' implements the ISlangFileSystemExt interface - and will be used directly
                         compileRequest->setFileSystem(OSFileSystem::getExtSingleton());
                     }
                     else
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownFileSystemOption, name);
+                        sink->diagnose(name.loc, Diagnostics::unknownFileSystemOption, name.value);
                         return SLANG_FAIL;
                     }
                 }
-                else if (argStr == "-r")
+                else if (argValue == "-r")
                 {
-                    String referenceModuleName;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, referenceModuleName));
+                    CommandLineArg referenceModuleName;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
                     // We need to deserialize and add the modules
-                    FileStream fileStream(referenceModuleName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+                    FileStream fileStream(referenceModuleName.value, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
 
-                    // TODO: probalby near an error when we can't open the file?
+                    // TODO: probably near an error when we can't open the file?
 
                     _addLibraryReference(requestImpl, &fileStream);
                 }
-                else if (argStr == "-v")
+                else if (argValue == "-v")
                 {
                     sink->diagnoseRaw(Severity::Note, session->getBuildTagString());
                 }
-                else if( argStr == "-emit-spirv-directly" )
+                else if( argValue == "-emit-spirv-directly" )
                 {
                     requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
                 }
-                else if (argStr == "-default-downstream-compiler")
+                else if (argValue == "-default-downstream-compiler")
                 {
-                    String sourceLanguageText;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, sourceLanguageText));
-                    String compilerText;
-                    SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, compilerText));
+                    CommandLineArg sourceLanguageArg, compilerArg;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(sourceLanguageArg));
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(compilerArg));
 
-                    SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageText.getUnownedSlice());
+                    SlangSourceLanguage sourceLanguage = TypeTextUtil::findSourceLanguage(sourceLanguageArg.value.getUnownedSlice());
                     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownSourceLanguage, sourceLanguageText);
+                        sink->diagnose(sourceLanguageArg.loc, Diagnostics::unknownSourceLanguage, sourceLanguageArg.value);
                         return SLANG_FAIL;
                     }
 
                     SlangPassThrough compiler;
-                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(compilerText.getUnownedSlice(), compiler)))
+                    if (SLANG_FAILED(TypeTextUtil::findPassThrough(compilerArg.value.getUnownedSlice(), compiler)))
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unknownPassThroughTarget, compilerText);
+                        sink->diagnose(compilerArg.loc, Diagnostics::unknownPassThroughTarget, compilerArg.value);
                         return SLANG_FAIL;
                     }
 
                     if (SLANG_FAILED(session->setDefaultDownstreamCompiler(sourceLanguage, compiler)))
                     {
-                        sink->diagnose(SourceLoc(), Diagnostics::unableToSetDefaultDownstreamCompiler, compilerText, sourceLanguageText, compilerText);
+                        sink->diagnose(arg.loc, Diagnostics::unableToSetDefaultDownstreamCompiler, compilerArg.value, sourceLanguageArg.value);
                         return SLANG_FAIL;
                     }
                 }       
-                else if (argStr == "--")
+                else if (argValue == "--")
                 {
                     // The `--` option causes us to stop trying to parse options,
                     // and treat the rest of the command line as input file names:
-                    while (argCursor != argEnd)
+                    while (reader.hasArg())
                     {
-                        SLANG_RETURN_ON_FAIL(addInputPath(*argCursor++));
+                        SLANG_RETURN_ON_FAIL(addInputPath(reader.getValueAndAdvance().getBuffer()));
                     }
                     break;
                 }
                 else
                 {
-                    if (argStr.endsWith("-path"))
+                    if (argValue.endsWith("-path"))
                     {
-                        Index index = argStr.lastIndexOf('-');
+                        const Index index = argValue.lastIndexOf('-');
                         if (index >= 0)
                         {
-                            String name;
-                            SLANG_RETURN_ON_FAIL(tryReadCommandLineArgument(sink, arg, &argCursor, argEnd, name));
+                            CommandLineArg name;
+                            SLANG_RETURN_ON_FAIL(reader.expectArg(name));
+
+                            UnownedStringSlice passThroughSlice = argValue.getUnownedSlice().head(index).tail(1);
 
                             // Skip the initial -, up to the last -
-                            UnownedStringSlice passThruSlice(argStr.begin() + 1, argStr.begin() + index);
                             SlangPassThrough passThrough = SLANG_PASS_THROUGH_NONE;
-                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(passThruSlice, passThrough)))
+                            if (SLANG_SUCCEEDED(TypeTextUtil::findPassThrough(passThroughSlice, passThrough)))
                             {
-                                session->setDownstreamCompilerPath(passThrough, name.getBuffer());
+                                session->setDownstreamCompilerPath(passThrough, name.value.getBuffer());
                                 continue;
+                            }
+                            else
+                            {
+                                sink->diagnose(arg.loc, Diagnostics::unknownDownstreamCompiler, passThroughSlice);
+                                return SLANG_FAIL;
                             }
                         }
                     }
 
-                    sink->diagnose(SourceLoc(), Diagnostics::unknownCommandLineOption, argStr);
+                    sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
                     // TODO: print a usage message
                     return SLANG_FAIL;
                 }
             }
             else
             {
-                SLANG_RETURN_ON_FAIL(addInputPath(arg));
+                SLANG_RETURN_ON_FAIL(addInputPath(argValue.getBuffer()));
             }
         }
 
@@ -1686,7 +1712,7 @@ SlangResult parseOptions(
     OptionsParser parser;
     parser.compileRequest = inCompileRequest;
     parser.requestImpl = compileRequest;
-    parser.session = (SlangSession*)compileRequest->getSession();
+    parser.session = asInternal(compileRequest->getSession());
 
     Result res = parser.parse(argc, argv);
 

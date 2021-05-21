@@ -74,7 +74,7 @@ DIAGNOSTIC(    18, Error, unknownFileSystemOption, "unknown file-system option '
 DIAGNOSTIC(    19, Error, unknownSourceLanguage, "unknown source language '$0'")
 
 DIAGNOSTIC(    20, Error, entryPointsNeedToBeAssociatedWithTranslationUnits, "when using multiple source files, entry points must be specified after their corresponding source file(s)")
-DIAGNOSTIC(    21, Error, expectedArgumentForOption, "expected an argument for command-line option '$0'")
+DIAGNOSTIC(    22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(    24, Error, unknownLineDirectiveMode, "unknown '#line' directive mode '$0'")
 DIAGNOSTIC(    25, Error, unknownFloatingPointMode, "unknown floating-point mode '$0'")
@@ -103,8 +103,6 @@ DIAGNOSTIC(    50, Error, duplicateTargets, "the target '$0' has been specified 
 
 DIAGNOSTIC(    60, Error, cannotDeduceOutputFormatFromPath, "cannot infer an output format from the output path '$0'")
 DIAGNOSTIC(    61, Error, cannotMatchOutputFileToTarget, "no specified '-target' option matches the output path '$0', which implies the '$1' format")
-
-DIAGNOSTIC(    62, Error, failedToFindFunctionForCompiler, "failed to find function '$0' for downstream compiler '$1'")
 
 DIAGNOSTIC(    70, Error, cannotMatchOutputFileToEntryPoint, "the output path '$0' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point")
 
@@ -540,7 +538,6 @@ DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to re
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.")
 
 DIAGNOSTIC(52002, Error, passThroughCompilerNotFound, "Could not find a suitable pass-through compiler for '$0'.")
-DIAGNOSTIC(52003, Error, cppCompilerNotFound, "Could not find a suitable C/C++ compiler for '$0'.")
 
 DIAGNOSTIC(52004, Error, unableToWriteFile, "Unable to write file '$0'")
 DIAGNOSTIC(52005, Error, unableToReadFile, "Unable to read file '$0'")
@@ -561,7 +558,6 @@ DIAGNOSTIC(99999, Internal, unexpected, "unexpected condition encountered in Sla
 DIAGNOSTIC(99999, Internal, internalCompilerError, "Slang internal compiler error")
 DIAGNOSTIC(99999, Error, compilationAborted, "Slang compilation aborted due to internal error")
 DIAGNOSTIC(99999, Error, compilationAbortedDueToException, "Slang compilation aborted due to an exception of $0: $1")
-DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "the Slang compiler threw an exception while working on code near this location")
 DIAGNOSTIC(99999, Internal, serialDebugVerificationFailed, "Verification of serial debug information failed.")
 
 #undef DIAGNOSTIC

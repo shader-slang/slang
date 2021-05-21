@@ -1,6 +1,8 @@
 result code = 1
 standard error = {
-(0): error 17: unknown command-line option '-destroy-all-humans'
+(1): error 17: unknown command-line option '-destroy-all-humans'
+tests/diagnostics/command-line/unknown-option.slang -destroy-all-humans
+                                                    ^
 }
 standard output = {
 }
