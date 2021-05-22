@@ -373,12 +373,18 @@ Result DebugDevice::createCommandQueue(const ICommandQueue::Desc& desc, ICommand
     return result;
 }
 
-Result DebugDevice::createShaderObject(slang::TypeReflection* type, IShaderObject** outShaderObject)
+Result DebugDevice::createShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outShaderObject)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
-    auto result = baseObject->createShaderObject(type, outObject->baseObject.writeRef());
+    auto typeName = type->getName();
+    auto result =
+        baseObject->createShaderObject(type, containerType, outObject->baseObject.writeRef());
+    outObject->m_typeName = typeName;
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outShaderObject, outObject);
@@ -838,6 +844,12 @@ void DebugSwapchain::maybeRebuildImageList()
     }
 }
 
+ShaderObjectContainerType DebugShaderObject::getContainerType()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getContainerType();
+}
+
 slang::TypeLayoutReflection* DebugShaderObject::getElementTypeLayout()
 {
     SLANG_GFX_API_FUNC;
@@ -896,6 +908,7 @@ Result DebugShaderObject::getObject(ShaderOffset const& offset, IShaderObject** 
     }
     debugShaderObject = new DebugShaderObject();
     debugShaderObject->baseObject = innerObject;
+    debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
     m_objects[ShaderOffsetKey{offset}] = debugShaderObject;
     returnComPtr(object, debugShaderObject);
     return resultCode;

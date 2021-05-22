@@ -3859,6 +3859,11 @@ namespace slang
 
     };
 
+    enum class ContainerType
+    {
+        None, UnsizedArray, StructuredBuffer, ConstantBuffer, ParameterBlock
+    };
+
         /** A session provides a scope for code that is loaded.
 
         A session can be used to load modules of Slang source code,
@@ -3950,11 +3955,23 @@ namespace slang
             LayoutRules     rules = LayoutRules::Default,
             ISlangBlob**    outDiagnostics = nullptr) = 0;
 
-        virtual SLANG_NO_THROW TypeLayoutReflection* SLANG_MCALL getParameterBlockLayout(
+            /** Get a container type from `elementType`. For example, given type `T`, returns
+                a type that represents `StructuredBuffer<T>`.
+
+                @param `elementType`: the element type to wrap around.
+                @param `containerType`: the type of the container to wrap `elementType` in.
+                @param `outDiagnostics`: a blob to receive diagnostic messages.
+            */
+        virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL getContainerType(
             TypeReflection* elementType,
-            SlangInt        targetIndex = 0,
-            LayoutRules     rules = LayoutRules::Default,
-            ISlangBlob**    outDiagnostics = nullptr) = 0;
+            ContainerType containerType,
+            ISlangBlob** outDiagnostics = nullptr) = 0;
+
+            /** Return a `TypeReflection` that represents the `__Dynamic` type.
+                This type can be used as a specialization argument to indicate using
+                dynamic dispatch.
+            */
+        virtual SLANG_NO_THROW TypeReflection* SLANG_MCALL getDynamicType() = 0;
 
             /** Get the mangled name for a type RTTI object.
             */
@@ -4202,6 +4219,14 @@ namespace slang
             /** A type specialization argument, used for `Kind::Type`. */
             TypeReflection* type;
         };
+
+        static SpecializationArg fromType(TypeReflection* inType)
+        {
+            SpecializationArg rs;
+            rs.kind = Kind::Type;
+            rs.type = inType;
+            return rs;
+        }
     };
 }
 

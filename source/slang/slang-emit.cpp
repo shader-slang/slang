@@ -849,7 +849,13 @@ SlangResult emitEntryPointsSourceFromIR(
     }
 
     // There may be global-scope modifiers that we should emit now
+    // Supress emitting line directives when emitting preprocessor directives since
+    // these preprocessor directives may be required to appear in the first line
+    // of the output. An example is that the "#version" line in a GLSL source must
+    // appear before anything else.
+    sourceWriter.supressLineDirective();
     sourceEmitter->emitPreprocessorDirectives();
+    sourceWriter.resumeLineDirective();
 
     RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
 

@@ -38,8 +38,9 @@ namespace Slang
     TokenReader::TokenReader()
         : m_cursor(nullptr)
         , m_end   (nullptr)
-    {}
-
+    {
+        _updateLookaheadToken();
+    }
 
     Token& TokenReader::peekToken()
     {
@@ -58,18 +59,33 @@ namespace Slang
 
     Token TokenReader::advanceToken()
     {
-        if (!m_cursor)
-            return getEndOfFileToken();
-
-        Token token = m_nextToken;
-        if (m_cursor < m_end)
-        {
+        Token result = m_nextToken;
+        if (m_cursor != m_end)
             m_cursor++;
-            m_nextToken = *m_cursor;
-        }
-        else
+        _updateLookaheadToken();
+        return result;
+    }
+
+    void TokenReader::_updateLookaheadToken()
+    {
+        // We assume here that we can read a token from a non-null `m_cursor`
+        // *even* in the case where `m_cursor == m_end`, because the invariant
+        // for lists of tokens is that they should be terminated with and
+        // end-of-file token, so that there is always a token "one past the end."
+        //
+        m_nextToken = m_cursor ? *m_cursor : getEndOfFileToken();
+
+        // If the token we read came from the end of the sub-sequence we are
+        // reading, then we will change the token type to an end-of-file token
+        // so that code that reads from the sequence and expects a terminating
+        // EOF will find it.
+        //
+        // TODO: We might eventually want a way to look at the actual token type
+        // and not just use EOF in all cases: e.g., when emitting diagnostic
+        // messages that include the token that is seen.
+        // 
+        if(m_cursor == m_end)
             m_nextToken.type = TokenType::EndOfFile;
-        return token;
     }
 
     // Lexer
@@ -78,8 +94,7 @@ namespace Slang
         SourceView*     sourceView,
         DiagnosticSink* sink,
         NamePool*       namePool,
-        MemoryArena*    memoryArena,
-        OptionFlags     optionFlags)
+        MemoryArena*    memoryArena)
     {
         m_sourceView  = sourceView;
         m_sink        = sink;
@@ -95,9 +110,12 @@ namespace Slang
         // Set the start location
         m_startLoc = sourceView->getRange().begin;
 
+        // The first token read from a translation unit should be considered to be at
+        // the start of a line, and *also* as coming after whitespace (conceptually
+        // both the end-of-file and beginning-of-file pseudo-tokens are whitespace).
+        //
         m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
         m_lexerFlags = 0;
-        m_optionFlags = optionFlags;
     }
 
     Lexer::~Lexer()
@@ -331,7 +349,7 @@ namespace Slang
         return lexer->m_startLoc + (lexer->m_cursor - lexer->m_begin);
     }
 
-    static void _lexDigits(Lexer* lexer, int base, LexerFlags flags)
+    static void _lexDigits(Lexer* lexer, int base)
     {
         for(;;)
         {
@@ -362,7 +380,7 @@ namespace Slang
 
             if(digitVal >= base)
             {
-                if (auto sink = lexer->getDiagnosticSink(flags))
+                if (auto sink = lexer->getDiagnosticSink())
                 {
                     char buffer[] = { (char) c, 0 };
                     sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::invalidDigitForBase, buffer, base);
@@ -418,7 +436,7 @@ namespace Slang
         return true;
     }
 
-    static bool _maybeLexNumberExponent(Lexer* lexer, int base, LexerFlags flags)
+    static bool _maybeLexNumberExponent(Lexer* lexer, int base)
     {
         if(!_isNumberExponent(_peek(lexer), base))
             return false;
@@ -436,37 +454,37 @@ namespace Slang
 
         // TODO(tfoley): it would be an error to not see digits here...
 
-        _lexDigits(lexer, 10, flags);
+        _lexDigits(lexer, 10);
 
         return true;
     }
 
-    static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base, LexerFlags flags)
+    static TokenType _lexNumberAfterDecimalPoint(Lexer* lexer, int base)
     {
-        _lexDigits(lexer, base, flags);
-        _maybeLexNumberExponent(lexer, base, flags);
+        _lexDigits(lexer, base);
+        _maybeLexNumberExponent(lexer, base);
 
         return _maybeLexNumberSuffix(lexer, TokenType::FloatingPointLiteral);
     }
 
-    static TokenType _lexNumber(Lexer* lexer, int base, LexerFlags flags)
+    static TokenType _lexNumber(Lexer* lexer, int base)
     {
         // TODO(tfoley): Need to consider whether to allow any kind of digit separator character.
 
         TokenType tokenType = TokenType::IntegerLiteral;
 
         // At the start of things, we just concern ourselves with digits
-        _lexDigits(lexer, base, flags);
+        _lexDigits(lexer, base);
 
         if( _peek(lexer) == '.' )
         {
             tokenType = TokenType::FloatingPointLiteral;
 
             _advance(lexer);
-            _lexDigits(lexer, base, flags);
+            _lexDigits(lexer, base);
         }
 
-        if( _maybeLexNumberExponent(lexer, base, flags))
+        if( _maybeLexNumberExponent(lexer, base))
         {
             tokenType = TokenType::FloatingPointLiteral;
         }
@@ -669,7 +687,7 @@ namespace Slang
         return value;
     }
 
-    static void _lexStringLiteralBody(Lexer* lexer, char quote, LexerFlags flags)
+    static void _lexStringLiteralBody(Lexer* lexer, char quote)
     {
         for(;;)
         {
@@ -683,14 +701,14 @@ namespace Slang
             switch(c)
             {
             case kEOF:
-                if (auto sink = lexer->getDiagnosticSink(flags))
+                if (auto sink = lexer->getDiagnosticSink())
                 {
                     sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::endOfFileInLiteral);
                 }
                 return;
 
             case '\n': case '\r':
-                if (auto sink = lexer->getDiagnosticSink(flags))
+                if (auto sink = lexer->getDiagnosticSink())
                 {
                     sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::newlineInLiteral);
                 }
@@ -907,41 +925,17 @@ namespace Slang
         return String(content.begin() + 1, content.end() - 1); 
     }
 
-
-
-    static TokenType _lexTokenImpl(Lexer* lexer, LexerFlags effectiveFlags)
+    static TokenType _lexTokenImpl(Lexer* lexer)
     {
-        if(effectiveFlags & kLexerFlag_ExpectDirectiveMessage)
-        {
-            for(;;)
-            {
-                switch(_peek(lexer))
-                {
-                default:
-                    _advance(lexer);
-                    continue;
-
-                case kEOF: case '\r': case '\n':
-                    break;
-                }
-                break;
-            }
-            return TokenType::DirectiveMessage;
-        }
-
         switch(_peek(lexer))
         {
         default:
             break;
 
         case kEOF:
-            if((effectiveFlags & kLexerFlag_InDirective) != 0)
-                return TokenType::EndOfDirective;
             return TokenType::EndOfFile;
 
         case '\r': case '\n':
-            if((effectiveFlags & kLexerFlag_InDirective) != 0)
-                return TokenType::EndOfDirective;
             _handleNewLine(lexer);
             return TokenType::NewLine;
 
@@ -955,7 +949,7 @@ namespace Slang
             {
             case '0': case '1': case '2': case '3': case '4':
             case '5': case '6': case '7': case '8': case '9':
-                return _lexNumberAfterDecimalPoint(lexer, 10, effectiveFlags);
+                return _lexNumberAfterDecimalPoint(lexer, 10);
 
             // TODO(tfoley): handle ellipsis (`...`)
 
@@ -965,7 +959,7 @@ namespace Slang
 
         case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-            return _lexNumber(lexer, 10, effectiveFlags);
+            return _lexNumber(lexer, 10);
 
         case '0':
             {
@@ -978,23 +972,23 @@ namespace Slang
 
                 case '.':
                     _advance(lexer);
-                    return _lexNumberAfterDecimalPoint(lexer, 10, effectiveFlags);
+                    return _lexNumberAfterDecimalPoint(lexer, 10);
 
                 case 'x': case 'X':
                     _advance(lexer);
-                    return _lexNumber(lexer, 16, effectiveFlags);
+                    return _lexNumber(lexer, 16);
 
                 case 'b': case 'B':
                     _advance(lexer);
-                    return _lexNumber(lexer, 2, effectiveFlags);
+                    return _lexNumber(lexer, 2);
 
                 case '0': case '1': case '2': case '3': case '4':
                 case '5': case '6': case '7': case '8': case '9':
-                    if (auto sink = lexer->getDiagnosticSink(effectiveFlags))
+                    if (auto sink = lexer->getDiagnosticSink())
                     {
                         sink->diagnose(loc, LexerDiagnostics::octalLiteral);
                     }
-                    return _lexNumber(lexer, 8, effectiveFlags);
+                    return _lexNumber(lexer, 8);
                 }
             }
 
@@ -1016,12 +1010,12 @@ namespace Slang
 
         case '\"':
             _advance(lexer);
-            _lexStringLiteralBody(lexer, '\"', effectiveFlags);
+            _lexStringLiteralBody(lexer, '\"');
             return TokenType::StringLiteral;
 
         case '\'':
             _advance(lexer);
-            _lexStringLiteralBody(lexer, '\'', effectiveFlags);
+            _lexStringLiteralBody(lexer, '\'');
             return TokenType::CharLiteral;
 
         case '+':
@@ -1202,7 +1196,7 @@ namespace Slang
             auto loc = _getSourceLoc(lexer);
             int c = _advance(lexer);
 
-            if (auto sink = lexer->getDiagnosticSink(effectiveFlags))
+            if (auto sink = lexer->getDiagnosticSink())
             {
                 if(c >= 0x20 && c <=  0x7E)
                 {
@@ -1220,9 +1214,8 @@ namespace Slang
         }
     }
 
-    Token Lexer::lexToken(LexerFlags extraFlags)
+    Token Lexer::lexToken()
     {
-        auto& flags = m_tokenFlags;
         for(;;)
         {
             Token token;
@@ -1230,73 +1223,54 @@ namespace Slang
 
             char const* textBegin = m_cursor;
 
-            auto tokenType = _lexTokenImpl(this, m_lexerFlags | extraFlags);
+            auto tokenType = _lexTokenImpl(this);
 
-            // The low-level lexer produces tokens for things we want
-            // to ignore, such as white space, so we skip them here.
+            // The flags on the token we just lexed will be based
+            // on the current state of the lexer.
+            //
+            auto tokenFlags = m_tokenFlags;
+            //
+            // Depending on what kind of token we just lexed, the
+            // flags that will be used for the *next* token might
+            // need to be updated.
+            //
             switch(tokenType)
             {
-            case TokenType::Invalid:
-                flags = 0;
-                continue;
-
             case TokenType::NewLine:
-                flags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-                continue;
-
-            case TokenType::WhiteSpace:
-            {
-                flags |= TokenFlag::AfterWhitespace;
-                continue;
-            }
-            case TokenType::BlockComment:
-            case TokenType::LineComment:
-            {
-                flags |= TokenFlag::AfterWhitespace;
-                if (m_optionFlags & OptionFlag::TokenizeComments)
                 {
-                    // We don't break here, and use the normal token adding logic
-                    // because we want the behavior to be identical (in terms of flags etc)
-                    // as if TokenizeComments is not enabled
-                    char const* textEnd = m_cursor;
-
-                    token.type =  tokenType;
-                    token.flags = m_tokenFlags;
-                    token.setContent(UnownedStringSlice(textBegin, textEnd));
-
-                    return token;
+                    // If we just reached the end of a line, then the next token
+                    // should count as being at the start of a line, and also after
+                    // whitespace.
+                    //
+                    m_tokenFlags = TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+                    break;
                 }
 
-                continue;
-            }
+            case TokenType::WhiteSpace:
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+                {
+                    // True horizontal whitespace and comments both count as whitespace.
+                    //
+                    // Note that a line comment does not include the terminating newline,
+                    // we do not need to set `AtStartOfLine` here.
+                    //
+                    m_tokenFlags |= TokenFlag::AfterWhitespace;
+                    break;
+                }
             
-            // We don't want to skip the end-of-file token, but we *do*
-            // want to make sure it has appropriate flags to make our life easier
-            case TokenType::EndOfFile:
-                flags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
-                break;
-
-            // We will also do some book-keeping around preprocessor directives here:
-            //
-            // If we see a `#` at the start of a line, then we are entering a
-            // preprocessor directive.
-            case TokenType::Pound:
-                if((flags & TokenFlag::AtStartOfLine) != 0)
-                    m_lexerFlags |= kLexerFlag_InDirective;
-                break;
-            //
-            // And if we saw an end-of-line during a directive, then we are
-            // now leaving that directive.
-            //
-            case TokenType::EndOfDirective:
-                m_lexerFlags &= ~kLexerFlag_InDirective;
-                break;
-
             default:
-                break;
+                {
+                    // If we read some token other then the above cases, then we are
+                    // neither after whitespace nor at the start of a line.
+                    //
+                    m_tokenFlags = 0;
+                    break;
+                }
             }
 
             token.type =  tokenType;
+            token.flags = tokenFlags;
 
             char const* textEnd = m_cursor;
 
@@ -1308,7 +1282,7 @@ namespace Slang
                 // Only perform this work if we encountered an escaped newline
                 // while lexing this token (e.g., keep a flag on the lexer), or
                 // do it on-demand when the actual value of the token is needed.
-                if (m_tokenFlags & TokenFlag::ScrubbingNeeded)
+                if (tokenFlags & TokenFlag::ScrubbingNeeded)
                 {
                     // Allocate space that will always be more than enough for stripped contents
                     char* startDst = (char*)m_memoryArena->allocateUnaligned(textEnd - textBegin);
@@ -1348,10 +1322,6 @@ namespace Slang
                 }
             }
 
-            token.flags = flags;
-
-            m_tokenFlags = 0;
-
             if (tokenType == TokenType::Identifier)
             {
                 token.setName(m_namePool->getName(token.getContent()));
@@ -1361,14 +1331,52 @@ namespace Slang
         }
     }
 
-    TokenList Lexer::lexAllTokens()
+    TokenList Lexer::lexAllSemanticTokens()
     {
         TokenList tokenList;
         for(;;)
         {
             Token token = lexToken();
-            tokenList.add(token);
 
+            // We are only interested intokens that are semantically
+            // significant, so we will skip over forms of whitespace
+            // and comments.
+            //
+            switch( token.type )
+            {
+            default:
+                break;
+
+            case TokenType::WhiteSpace:
+            case TokenType::BlockComment:
+            case TokenType::LineComment:
+            case TokenType::NewLine:
+                continue;
+            }
+
+            tokenList.add(token);
+            if(token.type == TokenType::EndOfFile)
+                return tokenList;
+        }
+    }
+
+    TokenList Lexer::lexAllMarkupTokens()
+    {
+        TokenList tokenList;
+        for(;;)
+        {
+            Token token = lexToken();
+            switch( token.type )
+            {
+            default:
+                break;
+
+            case TokenType::WhiteSpace:
+            case TokenType::NewLine:
+                continue;
+            }
+
+            tokenList.add(token);
             if(token.type == TokenType::EndOfFile)
                 return tokenList;
         }

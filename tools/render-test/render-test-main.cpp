@@ -232,13 +232,20 @@ struct AssignValsFromLayoutContext
     SlangResult assignTexture(ShaderCursor const& dstCursor, ShaderInputLayout::TextureVal* srcVal)
     {
         ComPtr<ITextureResource> texture;
-        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
-            srcVal->textureDesc, ResourceState::ShaderResource, device, texture));
+        ResourceState defaultState = ResourceState::ShaderResource;
+        IResourceView::Type viewType = IResourceView::Type::ShaderResource;
 
-        // TODO: support UAV textures...
+        if (srcVal->textureDesc.isRWTexture)
+        {
+            defaultState = ResourceState::UnorderedAccess;
+            viewType = IResourceView::Type::UnorderedAccess;
+        }
+
+        SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
+            srcVal->textureDesc, defaultState, device, texture));
 
         IResourceView::Desc viewDesc;
-        viewDesc.type = IResourceView::Type::ShaderResource;
+        viewDesc.type = viewType;
         viewDesc.format = texture->getDesc()->format;
         auto textureView = device->createTextureView(
             texture,
@@ -1076,7 +1083,14 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
-
+        for (int i = 0; i < options.slangArgCount; i++)
+        {
+            if (UnownedStringSlice(options.slangArgs[i]) == "-matrix-layout-column-major")
+            {
+                desc.slang.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+            }
+        }
+        
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
 

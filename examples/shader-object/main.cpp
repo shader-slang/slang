@@ -212,8 +212,8 @@ int main()
 
         // Now we can use this type to create a shader object that can be bound to the root object.
         ComPtr<gfx::IShaderObject> transformer;
-        SLANG_RETURN_ON_FAIL(
-            device->createShaderObject(addTransformerType, transformer.writeRef()));
+        SLANG_RETURN_ON_FAIL(device->createShaderObject(
+            addTransformerType, ShaderObjectContainerType::None, transformer.writeRef()));
         // Set the `c` field of the `AddTransformer`.
         float c = 1.0f;
         gfx::ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));

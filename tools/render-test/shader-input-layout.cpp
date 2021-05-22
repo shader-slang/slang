@@ -416,7 +416,17 @@ namespace renderer_test
 
         String parseTypeName(Misc::TokenReader& parser)
         {
-            return parser.ReadWord();
+            String typeName = parser.ReadWord();
+            if (parser.AdvanceIf("<"))
+            {
+                StringBuilder sb;
+                sb << typeName << "<";
+                sb << parseTypeName(parser);
+                sb << ">";
+                parser.Read(">");
+                return sb.ProduceString();
+            }
+            return typeName;
         }
 
         RefPtr<ShaderInputLayout::Val> parseValExpr(Misc::TokenReader& parser)

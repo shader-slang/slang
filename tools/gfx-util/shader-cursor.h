@@ -26,6 +26,7 @@ struct ShaderCursor
 {
     IShaderObject* m_baseObject = nullptr;
     slang::TypeLayoutReflection* m_typeLayout = nullptr;
+    ShaderObjectContainerType m_containerType = ShaderObjectContainerType::None;
     ShaderOffset m_offset;
 
     /// Get the type (layout) of the value being pointed at by the cursor
@@ -78,6 +79,7 @@ struct ShaderCursor
     ShaderCursor(IShaderObject* object)
         : m_baseObject(object)
         , m_typeLayout(object->getElementTypeLayout())
+        , m_containerType(object->getContainerType())
     {}
 
     SlangResult setData(void const* data, size_t size) const
@@ -116,9 +118,13 @@ struct ShaderCursor
         /// Produce a cursor to the element or field with the given `index`.
         ///
         /// This is a convenience wrapper around `getElement()`.
-    ShaderCursor operator[](SlangInt index) const
-    {
-        return getElement(index);
-    }
+    ShaderCursor operator[](int64_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](uint64_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](int32_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](uint32_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](int16_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](uint16_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](int8_t index) const { return getElement((SlangInt)index); }
+    ShaderCursor operator[](uint8_t index) const { return getElement((SlangInt)index); }
 };
 }

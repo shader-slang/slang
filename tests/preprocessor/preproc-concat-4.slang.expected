@@ -2,5 +2,5 @@ result code = 0
 standard error = {
 }
 standard output = {
-a ab b ; 
+CONCAT ( a , b ) A2B2 CONCAT ( a , b ) 
 }

@@ -505,6 +505,11 @@ struct ShaderOffset
     SlangInt bindingArrayIndex = 0;
 };
 
+enum class ShaderObjectContainerType
+{
+    None, Array, StructuredBuffer
+};
+
 class IShaderObject : public ISlangUnknown
 {
 public:
@@ -516,6 +521,7 @@ public:
     }
 
     virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() = 0;
+    virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() = 0;
     virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() = 0;
 
     ComPtr<IShaderObject> getEntryPoint(UInt index)
@@ -1302,12 +1308,15 @@ public:
         return queue;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType container,
+        IShaderObject** outObject) = 0;
 
     inline ComPtr<IShaderObject> createShaderObject(slang::TypeReflection* type)
     {
         ComPtr<IShaderObject> object;
-        SLANG_RETURN_NULL_ON_FAIL(createShaderObject(type, object.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createShaderObject(type, ShaderObjectContainerType::None, object.writeRef()));
         return object;
     }
 

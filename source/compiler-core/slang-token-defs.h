@@ -18,7 +18,6 @@
 
 TOKEN(Unknown,          "<unknown>")
 TOKEN(EndOfFile,        "end of file")
-TOKEN(EndOfDirective,   "end of line")
 TOKEN(Invalid,          "invalid character")
 TOKEN(Identifier,       "identifier")
 TOKEN(IntegerLiteral,   "integer literal")
@@ -26,10 +25,9 @@ TOKEN(FloatingPointLiteral,    "floating-point literal")
 TOKEN(StringLiteral,    "string literal")
 TOKEN(CharLiteral,      "character literal")
 TOKEN(WhiteSpace,       "whitespace")
-TOKEN(NewLine,          "newline")
+TOKEN(NewLine,          "end of line")
 TOKEN(LineComment,      "line comment")
 TOKEN(BlockComment,     "block comment")
-TOKEN(DirectiveMessage, "user-defined message")
 
 #define PUNCTUATION(id, text) \
     TOKEN(id, "'" text "'")
