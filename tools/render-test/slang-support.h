@@ -38,8 +38,6 @@ struct ShaderCompileRequest
 
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
-
-    //Slang::List<Slang::String> compileArgs;
 };
 
 
