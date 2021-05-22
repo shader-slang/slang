@@ -2065,22 +2065,6 @@ void EndToEndCompileRequest::init()
     m_frontEndReq = new FrontEndCompileRequest(getLinkage(), m_writers, getSink());
 
     m_backEndReq = new BackEndCompileRequest(getLinkage(), getSink());
-
-    RefPtr<CommandLineContext> context = new CommandLineContext;
-    m_downstreamArgs = DownstreamArgs(context);
-
-    // Add all of the possible names we allow for downstream tools
-    {
-        for (Index i = SLANG_PASS_THROUGH_NONE + 1; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
-        {
-            m_downstreamArgs.addName(TypeTextUtil::getPassThroughName(SlangPassThrough(i)));
-        }
-
-        // Generic downstream tool
-        m_downstreamArgs.addName("downstream");
-        // Generic downstream linker
-        m_downstreamArgs.addName("linker");
-    }
 }
 
 SlangResult EndToEndCompileRequest::executeActionsInner()

@@ -1638,6 +1638,10 @@ struct OptionsParser
                     {
                     case CodeGenTarget::CPPSource:
                     case CodeGenTarget::PTX:
+                    case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::HostCallable:
+                    case CodeGenTarget::Executable:
+                    case CodeGenTarget::SharedLibrary:
                         rawOutput.isWholeProgram = true;
                         break;
                     default:
