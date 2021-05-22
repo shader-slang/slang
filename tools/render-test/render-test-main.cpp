@@ -1083,11 +1083,17 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
-        for (int i = 0; i < options.slangArgCount; i++)
+
+        // Look for args going to slang
         {
-            if (UnownedStringSlice(options.slangArgs[i]) == "-matrix-layout-column-major")
+            const auto& args = options.downstreamArgs.getArgsByName("slang");
+            for (const auto& arg : args)
             {
-                desc.slang.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                if (arg.value == "-matrix-layout-column-major")
+                {
+                    desc.slang.defaultMatrixLayoutMode = SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
+                    break;
+                }
             }
         }
         
