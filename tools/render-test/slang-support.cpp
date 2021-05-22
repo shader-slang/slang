@@ -88,18 +88,21 @@ void ShaderCompilerUtil::Output::reset()
     out.session = session;
 
     // Parse all the extra args
-    if (request.compileArgs.getCount() > 0)
     {
         List<const char*> args;
-        for (const auto& arg : request.compileArgs)
+        for (const auto& arg : options.downstreamArgs.getArgsByName("slang"))
         {
-            args.add(arg.getBuffer());
+            args.add(arg.value.getBuffer());
         }
-        SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, args.getBuffer(), int(args.getCount())));
+
+        if (args.getCount())
+        {
+            SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, args.getBuffer(), int(args.getCount())));
+        }
     }
 
     spSetCodeGenTarget(slangRequest, input.target);
-    spSetTargetProfile(slangRequest, 0, spFindProfile(session, input.profile));
+    spSetTargetProfile(slangRequest, 0, spFindProfile(session, input.profile.getBuffer()));
 
     // Define a macro so that shader code in a test can detect what language we
     // are nominally working with.
@@ -140,10 +143,7 @@ void ShaderCompilerUtil::Output::reset()
         spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CODEGEN);
     }
 
-    // Process any additional command-line options specified for Slang using
-    // the `-xslang <arg>` option to `render-test`.
-    SLANG_RETURN_ON_FAIL(spProcessCommandLineArguments(slangRequest, input.args, input.argCount)); 
-
+    
     const auto sourceLanguage = input.sourceLanguage;
 
     int translationUnitIndex = 0;
@@ -322,7 +322,6 @@ void ShaderCompilerUtil::Output::reset()
 /* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
 {
     String sourcePath = options.sourcePath;
-    auto& compileArgs = options.compileArgs;
     auto shaderType = options.shaderType;
 
     List<char> sourceText;
@@ -376,8 +375,6 @@ void ShaderCompilerUtil::Output::reset()
     sourceInfo.dataEnd = sourceText.getBuffer() + sourceText.getCount() - 1;
 
     ShaderCompileRequest compileRequest;
-
-    compileRequest.compileArgs = compileArgs;
 
     compileRequest.source = sourceInfo;
 

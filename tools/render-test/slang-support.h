@@ -38,8 +38,6 @@ struct ShaderCompileRequest
 
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
-
-    Slang::List<Slang::String> compileArgs;
 };
 
 
@@ -47,13 +45,11 @@ struct ShaderCompilerUtil
 {
     struct Input
     {
-        SlangCompileTarget      target;
-        SlangSourceLanguage     sourceLanguage;
-        SlangPassThrough        passThrough;
-        PipelineType            pipelineType = PipelineType::Unknown;
-        char const*             profile;
-        const char**            args;
-        int                     argCount;
+        SlangCompileTarget          target;
+        SlangSourceLanguage         sourceLanguage;
+        SlangPassThrough            passThrough;
+        PipelineType                pipelineType = PipelineType::Unknown;
+        Slang::String               profile;
     };
 
     struct Output

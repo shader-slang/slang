@@ -1349,6 +1349,9 @@ namespace Slang
         // Determine whether to output heterogeneity-related code
         bool m_heterogeneous = false;
 
+        /// Holds any args that are destined for downstream compilers/tools etc
+        DownstreamArgs m_downstreamArgs;
+
         // Name pool for looking up names
         NamePool namePool;
 
@@ -2035,9 +2038,6 @@ namespace Slang
             String wholeTargetOutputPath;
         };
         Dictionary<TargetRequest*, RefPtr<TargetInfo>> m_targetInfos;
-
-            /// Holds any args that are destined for downstream compilers/tools etc
-        DownstreamArgs m_downstreamArgs;
 
             /// Writes the modules in a container to the stream
         SlangResult writeContainerToStream(Stream* stream);

@@ -17,6 +17,9 @@ struct CommandLineArg
     SourceLoc loc;          ///< The location of the arg
 };
 
+/* This type ends up being really just a container for the sourceManager that has the CommandLine specific SourceLocs.
+That it would perhaps be better to just have SourceManager derive from RefObject, and then we could remove this
+type. */
 class CommandLineContext : public RefObject
 {
 public:        
@@ -27,6 +30,8 @@ public:
     {
         m_sourceManager.initialize(nullptr, fileSystemExt);
         // Make range start from high value, so can be differentiated from other uses
+        // That this doesn't not assume exclusive use of this range - just that in normal use scenarios
+        // there is no confusion, and using the wrong source manager, will typically report nothing is found.
         m_sourceManager.allocateSourceRange(~(~SourceLoc::RawValue(0) >> 1));
     }
 
@@ -128,15 +133,22 @@ struct DownstreamArgs
         };
     };
 
+    struct Entry
+    {
+        String name;                        ///< The name of the 'tool' that these args are associated with
+        CommandLineArgs args;               ///< The args to be passed to the tool
+    };
+
         /// Add a name, returns the index
     Index addName(const String& name);
         /// Find the index of a name. Returns < 0 if not found.
-    Index findName(const String& name) const { return m_names.indexOf(name); }
+    Index findName(const String& name) const { return m_entries.findFirstIndex([&](const Entry& entry) -> bool { return entry.name == name; }); }
 
         /// Get the args at the nameIndex
-    CommandLineArgs& getArgsAt(Index nameIndex) { return m_args[nameIndex]; }
+    CommandLineArgs& getArgsAt(Index nameIndex) { return m_entries[nameIndex].args; }
         /// Get args by name - will assert if name isn't found
     CommandLineArgs& getArgsByName(char* name);
+    const CommandLineArgs& getArgsByName(char* name) const;
 
         /// Looks for '-X' expressions, removing them from ioArgs and putting in appropriate args 
     SlangResult stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink);
@@ -155,10 +167,9 @@ struct DownstreamArgs
 protected:
     Index _findOrAddName(SourceLoc loc, const UnownedStringSlice& name, Flags flags, DiagnosticSink* sink);
 
-    List<String> m_names;
-    List<CommandLineArgs> m_args;
+    List<Entry> m_entries;                  ///< All of the entries
 
-    RefPtr<CommandLineContext> m_context;
+    RefPtr<CommandLineContext> m_context;   ///< The context that is being used (primarily for loc tracking) across all entries/args
 };
 
 

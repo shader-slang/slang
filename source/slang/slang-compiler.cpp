@@ -967,13 +967,14 @@ namespace Slang
         /* Let's set the compiler specific options 
 
           We can only do this if the endToEndReq is set. */
-        if (endToEndReq)
         {
+            auto linkage = targetReq->getLinkage();
+        
             auto name = TypeTextUtil::getPassThroughName((SlangPassThrough)downstreamCompiler);
-            const Index nameIndex = endToEndReq->m_downstreamArgs.findName(name);
+            const Index nameIndex = linkage->m_downstreamArgs.findName(name);
             if (nameIndex >= 0)
             {
-                auto& args = endToEndReq->m_downstreamArgs.getArgsAt(nameIndex);
+                auto& args = linkage->m_downstreamArgs.getArgsAt(nameIndex);
                 for (const auto& arg : args.m_args)
                 {
                     options.compilerSpecificArguments.add(arg.value);

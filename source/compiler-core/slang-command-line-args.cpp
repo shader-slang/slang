@@ -63,7 +63,6 @@ bool CommandLineArgs::hasArgs(const char*const* args, Index count) const
     return true;
 }
 
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
                          CommandLineReader
@@ -121,14 +120,11 @@ SlangResult CommandLineReader::expectArg(CommandLineArg& outArg)
 
 Index DownstreamArgs::addName(const String& name)
 {
-    Index index = m_names.indexOf(name);
+    Index index = findName(name);
     if (index < 0)
     {
-        index = m_names.getCount();
-        m_names.add(name);
-
-        CommandLineArgs args(m_context);
-        m_args.add(args);
+        index = m_entries.getCount();
+        m_entries.add(Entry{name, CommandLineArgs(m_context) });
     }
     return index;
 }
@@ -137,7 +133,10 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
 {
     if (name.getLength() <= 0)
     {
-        sink->diagnose(loc, MiscDiagnostics::downstreamToolNameNotDefined);
+        if (sink)
+        {
+            sink->diagnose(loc, MiscDiagnostics::downstreamToolNameNotDefined);
+        }
         return -1;
     }
 
@@ -152,15 +151,38 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
         return index;
     }
 
-    sink->diagnose(loc, MiscDiagnostics::downstreamNameNotKnown);
+    if (sink)
+    {
+        StringBuilder names;
+
+        names << "[ ";
+        for (Index i = 0; i < m_entries.getCount(); ++i)
+        {
+            if (i)
+            {
+                names << ", ";
+            }
+            names << m_entries[i].name;
+        }
+        names << " ]";
+
+        sink->diagnose(loc, MiscDiagnostics::downstreamNameNotKnown, names);
+    }
     return -1;
 }
 
 CommandLineArgs& DownstreamArgs::getArgsByName(char* name)
 {
-    Index index = findName(name);
+    const Index index = findName(name);
     SLANG_ASSERT(index >= 0);
-    return m_args[index];
+    return m_entries[index].args;
+}
+
+const CommandLineArgs& DownstreamArgs::getArgsByName(char* name) const
+{
+    const Index index = findName(name);
+    SLANG_ASSERT(index >= 0);
+    return m_entries[index].args;
 }
 
 SlangResult DownstreamArgs::stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink)
