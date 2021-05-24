@@ -296,6 +296,11 @@ struct ExtendedShaderObjectTypeList
     }
 };
 
+struct ExtendedShaderObjectTypeListObject
+    : public ExtendedShaderObjectTypeList
+    , public Slang::RefObject
+{};
+
 class ShaderObjectLayoutBase : public Slang::RefObject
 {
 protected:
@@ -471,6 +476,7 @@ protected:
 
     // Specialization args for a StructuredBuffer object.
     ExtendedShaderObjectTypeList m_structuredBufferSpecializationArgs;
+    Slang::RefPtr<ExtendedShaderObjectTypeListObject> m_userProvidedSpecializationArgs;
 
 public:
     TShaderObjectLayoutImpl* getLayout()
@@ -687,10 +693,52 @@ public:
         return SLANG_OK;
     }
 
+    virtual Result setSpecializationArgs(
+        const slang::SpecializationArg* args,
+        uint32_t count) override
+    {
+        if (!m_userProvidedSpecializationArgs)
+        {
+            m_userProvidedSpecializationArgs = new ExtendedShaderObjectTypeListObject();
+        }
+        else
+        {
+            m_userProvidedSpecializationArgs->clear();
+        }
+        auto device = getRenderer();
+        for (uint32_t i = 0; i < count; i++)
+        {
+            gfx::ExtendedShaderObjectType extendedType;
+            switch (args[i].kind)
+            {
+            case slang::SpecializationArg::Kind::Type:
+                extendedType.slangType = args[i].type;
+                extendedType.componentID = device->shaderCache.getComponentId(args[i].type);
+                break;
+            default:
+                SLANG_ASSERT(false && "Unexpected specialization argument kind.");
+                return SLANG_FAIL;
+            }
+            m_userProvidedSpecializationArgs->add(extendedType);
+        }
+        return SLANG_OK;
+    }
+
     // Appends all types that are used to specialize the element type of this shader object in
     // `args` list.
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
     {
+        if (m_userProvidedSpecializationArgs)
+        {
+            args.addRange(*m_userProvidedSpecializationArgs);
+            return SLANG_OK;
+        }
+        if (m_layout->getContainerType() != ShaderObjectContainerType::None)
+        {
+            args.addRange(m_structuredBufferSpecializationArgs);
+            return SLANG_OK;
+        }
+
         auto device = getRenderer();
         auto& subObjectRanges = getLayout()->getSubObjectRanges();
         // The following logic is built on the assumption that all fields that involve
@@ -740,6 +788,8 @@ public:
                     }
                 case slang::BindingType::ParameterBlock:
                 case slang::BindingType::ConstantBuffer:
+                case slang::BindingType::RawBuffer:
+                case slang::BindingType::MutableRawBuffer:
                     // Currently we only handle the case where the field's type is
                     // `ParameterBlock<SomeStruct>` or `ConstantBuffer<SomeStruct>`, where
                     // `SomeStruct` is a struct type (not directly an interface type). In this case,
@@ -750,10 +800,6 @@ public:
                     // `ParameterBlock<IFoo>`. We should treat this case the same way as the
                     // `ExistentialValue` case here, but currently we lack a mechanism to
                     // distinguish the two scenarios.
-                    break;
-                case slang::BindingType::RawBuffer:
-                case slang::BindingType::MutableRawBuffer:
-                     typeArgs.addRange(subObject->m_structuredBufferSpecializationArgs);
                     break;
                 }
 

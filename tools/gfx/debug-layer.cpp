@@ -385,6 +385,8 @@ Result DebugDevice::createShaderObject(
     auto result =
         baseObject->createShaderObject(type, containerType, outObject->baseObject.writeRef());
     outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outShaderObject, outObject);
@@ -952,10 +954,38 @@ Result DebugShaderObject::setCombinedTextureSampler(
         offset, viewImpl->baseObject.get(), samplerImpl->baseObject.get());
 }
 
+Result DebugShaderObject::setSpecializationArgs(
+    const slang::SpecializationArg* args,
+    uint32_t count)
+{
+    ComPtr<slang::ISession> session;
+    m_device->getSlangSession(session.writeRef());
+    auto expectedCount = (uint32_t)session->getTypeLayout(m_slangType)
+                             ->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM);
+    if (expectedCount != count)
+    {
+        GFX_DIAGNOSE_ERROR_FORMAT(
+            "specialization argument count for shader object type %s mismatch: expecting %d but %d "
+            "provided.",
+            m_typeName.getBuffer(),
+            expectedCount,
+            count);
+    };
+    return baseObject->setSpecializationArgs(args, count);
+}
+
 DebugObjectBase::DebugObjectBase()
 {
     static uint64_t uidCounter = 0;
     uid = ++uidCounter;
+}
+
+Result DebugRootShaderObject::setSpecializationArgs(
+    const slang::SpecializationArg* args,
+    uint32_t count)
+{
+    GFX_DIAGNOSE_ERROR("`setSpecializationArgs` should not be called directly on root objects.");
+    return baseObject->setSpecializationArgs(args, count);
 }
 
 } // namespace gfx

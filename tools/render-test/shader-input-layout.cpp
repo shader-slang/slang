@@ -346,6 +346,37 @@ namespace renderer_test
             return SLANG_OK;
         }
 
+        SlangResult parseObjectAttributes(ShaderInputLayout::ObjectVal* val, Misc::TokenReader& parser)
+        {
+            if (parser.AdvanceIf(":"))
+            {
+                while (!parser.IsEnd() && parser.NextToken().Type == Misc::TokenType::Identifier)
+                {
+                    if (parser.AdvanceIf("specialization_args"))
+                    {
+                        parser.Read(Misc::TokenType::LParent);
+                        while (!parser.IsEnd() &&
+                               parser.NextToken().Type != Misc::TokenType::RParent)
+                        {
+                            val->specializationArgs.add(parseTypeName(parser));
+                            if (!parser.AdvanceIf(","))
+                                break;
+                        }
+                        parser.Read(Misc::TokenType::RParent);
+                    }
+                    else
+                    {
+                        throw ShaderInputLayoutFormatException(
+                            StringBuilder() << "Unknown attribute \'" << parser.NextToken().Content << "\' ("
+                                            << parser.NextToken().Position.Line << ")");
+
+                        return SLANG_FAIL;
+                    }
+                }
+            }
+            return SLANG_OK;
+        }
+
         Format parseFormatOption(Misc::TokenReader& parser)
         {
             parser.Read("=");
@@ -511,6 +542,7 @@ namespace renderer_test
                         }
 
                         val->contentVal = parseValExpr(parser);
+                        parseObjectAttributes(val, parser);
                         return val;
                     }
                     else if( parser.AdvanceIf("out") )
