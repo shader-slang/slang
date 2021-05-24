@@ -783,7 +783,7 @@ toolSharedLibrary "render-test"
     uuid "61F7EB00-7281-4BF3-9470-7C2EA92620C3"
     
     includedirs { ".", "external", "source", "tools/gfx", "tools/platform" }
-    links { "core", "slang", "gfx", "gfx-util", "platform" }
+    links { "core", "compiler-core", "slang", "gfx", "gfx-util", "platform" }
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         

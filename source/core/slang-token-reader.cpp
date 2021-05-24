@@ -1,7 +1,8 @@
 #include "slang-token-reader.h"
 
-namespace Slang
-{
+namespace Slang {
+namespace Misc {
+
     enum class TokenizeErrorType
     {
         InvalidCharacter, InvalidEscapeSequence
@@ -765,4 +766,6 @@ namespace Slang
         this->tokens = TokenizeText("", text);
         tokenPtr = 0;
     }
-}
+
+} // namespace Misc
+} // namespace Slang

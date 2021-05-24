@@ -179,6 +179,7 @@
     <ClCompile Include="..\..\..\tools\slang-test\test-reporter.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-offset-container.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-byte-encode.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-test\unit-test-command-line-args.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-compression.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-free-list.cpp" />

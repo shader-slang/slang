@@ -1,6 +1,6 @@
 // Test using interface typed shader parameters with texture typed fields.
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cuda
+//TEST(compute):COMPARE_COMPUTE:-cpu
+//TEST(compute):COMPARE_COMPUTE:-cuda
 
 [anyValueSize(16)]
 interface IInterface
@@ -10,8 +10,7 @@ interface IInterface
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<uint> gOutputBuffer;
-//TEST_INPUT: Texture2D(size=8, content = one):name t2D,bindless
-//TEST_INPUT:ubuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) handle(t2D) 0 0], stride=4):name=gCb
+//TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{Texture2D(size=8, content = one)}}
 StructuredBuffer<IInterface> gCb;
 
 [numthreads(4, 1, 1)]

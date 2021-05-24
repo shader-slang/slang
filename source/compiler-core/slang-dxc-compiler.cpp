@@ -212,14 +212,23 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         0,
         dxcSourceBlob.writeRef()));
 
-    WCHAR const* args[16];
-    UINT32 argCount = 0;
+    List<const WCHAR*> args;
+
+    // Add all compiler specific options
+    List<OSString> compilerSpecific;
+    compilerSpecific.setCount(options.compilerSpecificArguments.getCount());
+
+    for (Index i = 0; i < options.compilerSpecificArguments.getCount(); ++i)
+    {
+        compilerSpecific[i] = options.compilerSpecificArguments[i].toWString();
+        args.add(compilerSpecific[i]);
+    }
 
     // TODO: deal with
     bool treatWarningsAsErrors = false;
     if (treatWarningsAsErrors)
     {
-        args[argCount++] = L"-WX";
+        args.add(L"-WX");
     }
 
     switch (options.matrixLayout)
@@ -228,7 +237,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
             break;
 
         case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-            args[argCount++] = L"-Zpr";
+            args.add(L"-Zpr");
             break;
     }
 
@@ -238,7 +247,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
             break;
 
         case FloatingPointMode::Precise:
-            args[argCount++] = L"-Gis"; // "force IEEE strictness"
+            args.add(L"-Gis"); // "force IEEE strictness"
             break;
     }
 
@@ -247,10 +256,10 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         default:
             break;
 
-        case OptimizationLevel::None:       args[argCount++] = L"-Od"; break;
-        case OptimizationLevel::Default:    args[argCount++] = L"-O1"; break;
-        case OptimizationLevel::High:       args[argCount++] = L"-O2"; break;
-        case OptimizationLevel::Maximal:    args[argCount++] = L"-O3"; break;
+        case OptimizationLevel::None:       args.add(L"-Od"); break;
+        case OptimizationLevel::Default:    args.add(L"-O1"); break;
+        case OptimizationLevel::High:       args.add(L"-O2"); break;
+        case OptimizationLevel::Maximal:    args.add(L"-O3"); break;
     }
 
     switch (options.debugInfoType)
@@ -259,7 +268,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
             break;
 
         default:
-            args[argCount++] = L"-Zi";
+            args.add(L"-Zi");
             break;
     }
 
@@ -278,14 +287,14 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
     // work on mainline Clang. Thus the only option we have available
     // is the big hammer of turning off *all* warnings coming from dxc.
     //
-    args[argCount++] = L"-no-warnings";
+    args.add(L"-no-warnings");
 
     OSString wideEntryPointName = options.entryPointName.toWString();
     OSString wideProfileName = options.profileName.toWString();
 
     if (options.flags & CompileOptions::Flag::EnableFloat16)
     {
-        args[argCount++] = L"-enable-16bit-types";
+        args.add(L"-enable-16bit-types");
     }
 
     SearchDirectoryList searchDirectories;
@@ -303,8 +312,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& options, RefPtr
         sourcePath.begin(),
         wideEntryPointName.begin(),
         wideProfileName.begin(),
-        args,
-        argCount,
+        args.getBuffer(),
+        UINT32(args.getCount()),
         nullptr,            // `#define`s
         0,                  // `#define` count
         &includeHandler,    // `#include` handler

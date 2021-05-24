@@ -964,6 +964,24 @@ namespace Slang
         typedef DownstreamCompiler::CompileOptions CompileOptions;
         CompileOptions options;
 
+        /* Let's set the compiler specific options 
+
+          We can only do this if the endToEndReq is set. */
+        {
+            auto linkage = targetReq->getLinkage();
+        
+            auto name = TypeTextUtil::getPassThroughName((SlangPassThrough)downstreamCompiler);
+            const Index nameIndex = linkage->m_downstreamArgs.findName(name);
+            if (nameIndex >= 0)
+            {
+                auto& args = linkage->m_downstreamArgs.getArgsAt(nameIndex);
+                for (const auto& arg : args.m_args)
+                {
+                    options.compilerSpecificArguments.add(arg.value);
+                }
+            }
+        }
+
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
         for that to work most easily we want to use the original file, if there is one */
