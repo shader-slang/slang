@@ -693,9 +693,8 @@ public:
         return SLANG_OK;
     }
 
-    virtual Result setSpecializationArgs(
-        const slang::SpecializationArg* args,
-        uint32_t count) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) override
     {
         if (!m_userProvidedSpecializationArgs)
         {
