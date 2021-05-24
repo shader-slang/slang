@@ -3,8 +3,9 @@
 
 #include "slang-basic.h"
 
-namespace Slang
-{
+namespace Slang {
+namespace Misc {
+
     /* NOTE! This TokenReader is NOT used by the main slang compiler !*/
 
     enum class TokenType
@@ -293,7 +294,9 @@ namespace Slang
             result.add(lastStr);
         return result;
     }
-}
+
+} // namespace Misc
+} // namespace Slang
 
 
 #endif

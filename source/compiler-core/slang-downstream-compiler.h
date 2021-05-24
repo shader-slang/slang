@@ -310,6 +310,9 @@ public:
             /// The stage being compiled for 
         SlangStage stage = SLANG_STAGE_NONE;
 
+            /// Arguments that are specific to a particular compiler implementation.
+        List<String> compilerSpecificArguments;
+
             /// NOTE! Not all downstream compilers can use the fileSystemExt/sourceManager. This option will be ignored in those scenarios.
         ISlangFileSystemExt* fileSystemExt = nullptr;
         SourceManager* sourceManager = nullptr;

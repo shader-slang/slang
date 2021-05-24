@@ -480,6 +480,10 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     {
         return convert(parameterGroupType->elementType);
     }
+    else if (auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type))
+    {
+        return convert(structuredBufferType->elementType);
+    }
     else if( auto vectorType = as<VectorExpressionType>(type))
     {
         return convert(vectorType->elementType);
@@ -1485,7 +1489,7 @@ namespace Slang
                 Index bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
                 SlangBindingType bindingType = SLANG_BINDING_TYPE_CONSTANT_BUFFER;
                 Index spaceOffset = -1;
-                bool usesIndirectAllocation = false;
+                bool shouldAllocDescriptorSet = true;
                 LayoutResourceKind kind = LayoutResourceKind::None;
 
                 // TODO: It is unclear if this should be looking at the resource
@@ -1515,13 +1519,14 @@ namespace Slang
                         // Note: the only case where a parameter group should
                         // reflect as consuming `Uniform` storage is on CPU/CUDA,
                         // where that will be the only resource it contains.
+                    case LayoutResourceKind::Uniform:
+                        break;
                         //
                         // TODO: If we ever support targets that don't have
                         // constant buffers at all, this logic would be questionable.
                         //
                     case LayoutResourceKind::RegisterSpace:
-                    case LayoutResourceKind::Uniform:
-                        usesIndirectAllocation = true;
+                        shouldAllocDescriptorSet = false;
                         break;
                     }
 
@@ -1591,7 +1596,7 @@ namespace Slang
                 // because the physical storage for `C.a` is provided by the
                 // memory allocation for `C` itself.
 
-                if( !usesIndirectAllocation )
+                if (shouldAllocDescriptorSet)
                 {
                     // The logic here assumes that when a parameter group consumes
                     // resources that must "leak" into the outer scope (including
@@ -1737,8 +1742,8 @@ namespace Slang
             else
             {
                 // Here we have the catch-all case that handles "leaf" fields
-                // that should never introduce a sub-object range, but might
-                // need to introduce a binding range and descriptor ranges.
+                // that might need to introduce a binding range and descriptor
+                // ranges.
                 //
                 // First, we want to determine what type of binding this
                 // leaf field should map to, if any. We being by querying
@@ -1839,12 +1844,13 @@ namespace Slang
                         // TODO: Make some clear decisions about what should and should
                         // not appear here.
                         //
-                    case LayoutResourceKind::Uniform:
                     case LayoutResourceKind::RegisterSpace:
                     case LayoutResourceKind::VaryingInput:
                     case LayoutResourceKind::VaryingOutput:
                     case LayoutResourceKind::HitAttributes:
                     case LayoutResourceKind::RayPayload:
+                    case LayoutResourceKind::ExistentialTypeParam:
+                    case LayoutResourceKind::ExistentialObjectParam:
                         continue;
                     }
 
@@ -1888,7 +1894,19 @@ namespace Slang
                     bindingRange.descriptorRangeCount++;
                 }
 
+                auto bindingRangeIndex = m_extendedInfo->m_bindingRanges.getCount();
+
                 m_extendedInfo->m_bindingRanges.add(bindingRange);
+
+                // For `StructuredBuffer` fields, we also make sure to report it as a sub-object range.
+                if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+                {
+                    TypeLayout::ExtendedInfo::SubObjectRangeInfo subObjectRange;
+                    subObjectRange.bindingRangeIndex = bindingRangeIndex;
+                    subObjectRange.offsetVarLayout = createOffsetVarLayout(typeLayout, path);
+                    subObjectRange.spaceOffset = 0;
+                    m_extendedInfo->m_subObjectRanges.add(subObjectRange);
+                }
             }
         }
     };

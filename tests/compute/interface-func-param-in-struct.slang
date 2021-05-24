@@ -1,7 +1,7 @@
 // Tests specializing a function with existential-struct-typed param.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu -shaderobj
 
 [anyValueSize(8)]
 interface IInterface
@@ -9,7 +9,7 @@ interface IInterface
     uint eval();
 }
 
-struct Impl : IInterface
+public struct Impl : IInterface
 {
     uint val;
     uint eval()
@@ -33,7 +33,7 @@ void compute(uint tid, Params p)
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID,
-//TEST_INPUT:ubuffer(data=[0 0 0 0 1 0], stride=4):name=params.obj
+//TEST_INPUT:set params.obj = new StructuredBuffer<IInterface>{new Impl{1}}
     uniform Params params)
 {
 	uint tid = dispatchThreadID.x;

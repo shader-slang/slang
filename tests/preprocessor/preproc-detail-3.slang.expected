@@ -1,0 +1,9 @@
+result code = 0
+standard error = {
+tests/preprocessor/preproc-detail-3.slang(9): warning 15401: macro 'C' is not defined
+#undef C
+       ^
+}
+standard output = {
+
+}

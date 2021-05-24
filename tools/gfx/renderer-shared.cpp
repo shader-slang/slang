@@ -32,7 +32,7 @@ const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = SLANG_UUID_IResourceCom
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
 const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
 
-gfx::StageType translateStage(SlangStage slangStage)
+StageType translateStage(SlangStage slangStage)
 {
     switch (slangStage)
     {
@@ -86,12 +86,12 @@ IResource* TextureResource::getInterface(const Slang::Guid& guid)
 SLANG_NO_THROW IResource::Type SLANG_MCALL TextureResource::getType() { return m_type; }
 SLANG_NO_THROW ITextureResource::Desc* SLANG_MCALL TextureResource::getDesc() { return &m_desc; }
 
-gfx::StageType mapStage(SlangStage stage)
+StageType mapStage(SlangStage stage)
 {
     switch( stage )
     {
     default:
-        return gfx::StageType::Unknown;
+        return StageType::Unknown;
 
     case SLANG_STAGE_AMPLIFICATION:     return gfx::StageType::Amplification;
     case SLANG_STAGE_ANY_HIT:           return gfx::StageType::AnyHit;
@@ -110,14 +110,21 @@ gfx::StageType mapStage(SlangStage stage)
     }
 }
 
-IShaderObject* gfx::ShaderObjectBase::getInterface(const Guid& guid)
+IResourceView* ResourceViewBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
+        return static_cast<IResourceView*>(this);
+    return nullptr;
+}
+
+IShaderObject* ShaderObjectBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
         return static_cast<IShaderObject*>(this);
     return nullptr;
 }
 
-bool gfx::ShaderObjectBase::_doesValueFitInExistentialPayload(
+bool ShaderObjectBase::_doesValueFitInExistentialPayload(
     slang::TypeLayoutReflection*    concreteTypeLayout,
     slang::TypeLayoutReflection*    existentialTypeLayout)
 {
@@ -176,21 +183,21 @@ bool gfx::ShaderObjectBase::_doesValueFitInExistentialPayload(
     return true;
 }
 
-IShaderProgram* gfx::ShaderProgramBase::getInterface(const Guid& guid)
+IShaderProgram* ShaderProgramBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderProgram)
         return static_cast<IShaderProgram*>(this);
     return nullptr;
 }
 
-IInputLayout* gfx::InputLayoutBase::getInterface(const Guid& guid)
+IInputLayout* InputLayoutBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IInputLayout)
         return static_cast<IInputLayout*>(this);
     return nullptr;
 }
 
-IFramebufferLayout* gfx::FramebufferLayoutBase::getInterface(const Guid& guid)
+IFramebufferLayout* FramebufferLayoutBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebufferLayout)
         return static_cast<IFramebufferLayout*>(this);
@@ -260,18 +267,34 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::getSlangSession(slang::ISession*
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(slang::TypeReflection* type, IShaderObject** outObject)
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType container,
+    IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
 }
 
 Result RendererBase::getShaderObjectLayout(
-    slang::TypeReflection*      type,
-    ShaderObjectLayoutBase**    outLayout)
+    slang::TypeReflection* type,
+    ShaderObjectContainerType container,
+    ShaderObjectLayoutBase** outLayout)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    switch (container)
+    {
+    case ShaderObjectContainerType::StructuredBuffer:
+        type = slangContext.session->getContainerType(type, slang::ContainerType::StructuredBuffer);
+        break;
+    case ShaderObjectContainerType::Array:
+        type = slangContext.session->getContainerType(type, slang::ContainerType::UnsizedArray);
+        break;
+    default:
+        break;
+    }
+
     if( !m_shaderObjectLayoutCache.TryGetValue(type, shaderObjectLayout) )
     {
         auto typeLayout = slangContext.session->getTypeLayout(type);
@@ -373,8 +396,8 @@ Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectTyp
     SLANG_RETURN_ON_FAIL(collectSpecializationArgs(specializationArgs));
     if (specializationArgs.getCount() == 0)
     {
-        shaderObjectType.componentID = getLayout()->getComponentID();
-        shaderObjectType.slangType = getLayout()->getElementTypeLayout()->getType();
+        shaderObjectType.componentID = getLayoutBase()->getComponentID();
+        shaderObjectType.slangType = getLayoutBase()->getElementTypeLayout()->getType();
     }
     else
     {
@@ -385,6 +408,94 @@ Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectTyp
     }
     *outType = shaderObjectType;
     return SLANG_OK;
+}
+
+Result ShaderObjectBase::setExistentialHeader(
+    slang::TypeReflection* existentialType,
+    slang::TypeReflection* concreteType,
+    ShaderOffset offset)
+{
+    // The first field of the tuple (offset zero) is the run-time type information
+    // (RTTI) ID for the concrete type being stored into the field.
+    //
+    // TODO: We need to be able to gather the RTTI type ID from `object` and then
+    // use `setData(offset, &TypeID, sizeof(TypeID))`.
+
+    // The second field of the tuple (offset 8) is the ID of the "witness" for the
+    // conformance of the concrete type to the interface used by this field.
+    //
+    auto witnessTableOffset = offset;
+    witnessTableOffset.uniformOffset += 8;
+    //
+    // Conformances of a type to an interface are computed and then stored by the
+    // Slang runtime, so we can look up the ID for this particular conformance (which
+    // will create it on demand).
+    //
+    ComPtr<slang::ISession> slangSession;
+    SLANG_RETURN_ON_FAIL(getRenderer()->getSlangSession(slangSession.writeRef()));
+    //
+    // Note: If the type doesn't actually conform to the required interface for
+    // this sub-object range, then this is the point where we will detect that
+    // fact and error out.
+    //
+    uint32_t conformanceID = 0xFFFFFFFF;
+    SLANG_RETURN_ON_FAIL(slangSession->getTypeConformanceWitnessSequentialID(
+        concreteType, existentialType, &conformanceID));
+    //
+    // Once we have the conformance ID, then we can write it into the object
+    // at the required offset.
+    //
+    SLANG_RETURN_ON_FAIL(setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
+
+    return SLANG_OK;
+}
+
+ResourceViewBase* SimpleShaderObjectData::getResourceView(
+    RendererBase* device,
+    slang::TypeLayoutReflection* elementLayout,
+    slang::BindingType bindingType)
+{
+    if (!m_structuredBuffer)
+    {
+        // Create structured buffer resource if it has not been created.
+        IBufferResource::Desc desc = {};
+        desc.allowedStates =
+            ResourceStateSet(ResourceState::ShaderResource, ResourceState::UnorderedAccess);
+        desc.defaultState = ResourceState::ShaderResource;
+        desc.elementSize = (int)elementLayout->getSize();
+        desc.format = Format::Unknown;
+        desc.type = IResource::Type::Buffer;
+        desc.sizeInBytes = (size_t)m_ordinaryData.getCount();
+        ComPtr<IBufferResource> bufferResource;
+        SLANG_RETURN_NULL_ON_FAIL(device->createBufferResource(
+            desc, m_ordinaryData.getBuffer(), bufferResource.writeRef()));
+        m_structuredBuffer = static_cast<BufferResource*>(bufferResource.get());
+
+        // Create read-only (shader-resource) and mutable (unordered access) views.
+        ComPtr<IResourceView> resourceView;
+        IResourceView::Desc viewDesc = {};
+        viewDesc.format = Format::Unknown;
+        viewDesc.type = IResourceView::Type::ShaderResource;
+        SLANG_RETURN_NULL_ON_FAIL(device->createBufferView(
+            bufferResource.get(), viewDesc, resourceView.writeRef()));
+        m_structuredBufferView = static_cast<ResourceViewBase*>(resourceView.get());
+        viewDesc.type = IResourceView::Type::UnorderedAccess;
+        SLANG_RETURN_NULL_ON_FAIL(
+            device->createBufferView(
+            bufferResource.get(), viewDesc, resourceView.writeRef()));
+        m_rwStructuredBufferView = static_cast<ResourceViewBase*>(resourceView.get());
+    }
+
+    switch (bindingType)
+    {
+    case slang::BindingType::RawBuffer:
+        return m_structuredBufferView.Ptr();
+    case slang::BindingType::MutableRawBuffer:
+        return m_rwStructuredBufferView.Ptr();
+    default:
+        SLANG_ASSERT(false && "Invalid binding type.");
+        return nullptr;
+    }
 }
 
 Result RendererBase::maybeSpecializePipeline(
@@ -425,11 +536,14 @@ Result RendererBase::maybeSpecializePipeline(
                 specializationArgs.getCount(),
                 specializedComponentType.writeRef(),
                 diagnosticBlob.writeRef());
-            if (compileRs != SLANG_OK)
+            if (diagnosticBlob)
             {
-                printf("%s\n", (char*)diagnosticBlob->getBufferPointer());
-                return SLANG_FAIL;
+                getDebugCallback()->handleMessage(
+                    compileRs == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                    DebugMessageSource::Slang,
+                    (char*)diagnosticBlob->getBufferPointer());
             }
+            SLANG_RETURN_ON_FAIL(compileRs);
 
             // Now create specialized shader program using compiled binaries.
             ComPtr<IShaderProgram> specializedProgram;
@@ -496,4 +610,3 @@ IDebugCallback* _getNullDebugCallback()
 }
 
 } // namespace gfx
-

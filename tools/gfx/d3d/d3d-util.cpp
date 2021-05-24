@@ -139,8 +139,7 @@ D3D12_RESOURCE_STATES D3DUtil::translateResourceState(ResourceState state)
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
     case gfx::ResourceState::UnorderedAccess:
-        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     case gfx::ResourceState::RenderTarget:
         return D3D12_RESOURCE_STATE_RENDER_TARGET;
     case gfx::ResourceState::DepthRead:

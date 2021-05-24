@@ -75,8 +75,10 @@ public:
         IInputLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createShaderObject(slang::TypeReflection* type, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType container,
+        IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
@@ -147,6 +149,7 @@ public:
 public:
     IShaderObject* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() override;
+    virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() override;
     virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getEntryPoint(UInt index, IShaderObject** entryPoint) override;
@@ -184,6 +187,7 @@ public:
                     (Slang::HashCode)offset.bindingRangeIndex));
         }
     };
+    Slang::String m_typeName;
     Slang::List<Slang::RefPtr<DebugShaderObject>> m_entryPoints;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugShaderObject>> m_objects;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugResourceView>> m_resources;

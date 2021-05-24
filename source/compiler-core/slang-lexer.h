@@ -45,13 +45,21 @@ namespace Slang
         explicit TokenReader(TokenSpan const& tokens)
             : m_cursor(tokens.begin())
             , m_end   (tokens.end  ())
-            , m_nextToken(tokens.begin() ? *tokens.begin() : getEndOfFileToken())
-        {}
+        {
+            _updateLookaheadToken();
+        }
         explicit TokenReader(TokenList const& tokens)
             : m_cursor(tokens.begin())
             , m_end   (tokens.end  ())
-            , m_nextToken(tokens.begin() ? *tokens.begin() : getEndOfFileToken())
-        {}
+        {
+            _updateLookaheadToken();
+        }
+        explicit TokenReader(Token const* begin, Token const* end)
+            : m_cursor(begin)
+            , m_end   (end)
+        {
+            _updateLookaheadToken();
+        }
         struct ParsingCursor
         {
             Token nextToken;
@@ -85,34 +93,25 @@ namespace Slang
         const Token* m_cursor;
         const Token* m_end;
         static Token getEndOfFileToken();
+
+    private:
+            /// Update the lookahead token in `m_nextToken` to reflect the cursor state
+        void _updateLookaheadToken();
     };
 
     typedef unsigned int LexerFlags;
     enum
     {
-        kLexerFlag_InDirective              = 1 << 0, ///< Turn end-of-line and end-of-file into end-of-directive
-        kLexerFlag_ExpectFileName           = 1 << 1, ///< Support `<>` style strings for file paths
-        kLexerFlag_IgnoreInvalid            = 1 << 2, ///< Suppress errors about invalid/unsupported characters
-        kLexerFlag_ExpectDirectiveMessage   = 1 << 3, ///< Don't lexer ordinary tokens, and instead consume rest of line as a string
+        kLexerFlag_SuppressDiagnostics      = 1 << 2, ///< Suppress errors about invalid/unsupported characters
     };
 
     struct Lexer
     {
-        typedef uint32_t OptionFlags;
-        struct OptionFlag
-        {
-            enum Enum : OptionFlags
-            {
-                TokenizeComments         = 1 << 0, ///< If set comments will be output to the token stream
-            };
-        };
-
         void initialize(
             SourceView*     sourceView,
             DiagnosticSink* sink,
             NamePool*       namePool,
-            MemoryArena*    memoryArena,
-            OptionFlags     optionFlags = 0);
+            MemoryArena*    memoryArena);
 
         ~Lexer();
 
@@ -126,12 +125,20 @@ namespace Slang
             /// not needed by the DiagnosticSink.
         static UnownedStringSlice sourceLocationLexer(const UnownedStringSlice& in);
 
-        Token lexToken(LexerFlags extraFlags = 0);
+            /// Lex the next token in the input stream, returning an EOF token if at end.
+        Token lexToken();
 
-        TokenList lexAllTokens();
+            /// Lex all tokens (up to the end of the stream) that are semantically relevant
+        TokenList lexAllSemanticTokens();
 
-            /// Get the diagnostic sink, taking into account flags. Can return nullptr if ignoring invalid
-        DiagnosticSink* getDiagnosticSink(LexerFlags flags) { return ((flags & kLexerFlag_IgnoreInvalid) == 0) ? m_sink : nullptr; }
+            /// Lex all tokens (up to the end of the stream) that are relevant to things like markup
+        TokenList lexAllMarkupTokens();
+
+            /// Get the diagnostic sink, taking into account flags. Will return null if suppressing diagnostics.
+        DiagnosticSink* getDiagnosticSink()
+        {
+            return ((m_lexerFlags & kLexerFlag_SuppressDiagnostics) == 0) ? m_sink : nullptr;
+        }
 
         SourceView*     m_sourceView;
         DiagnosticSink* m_sink;
@@ -147,7 +154,6 @@ namespace Slang
 
         TokenFlags      m_tokenFlags;
         LexerFlags      m_lexerFlags;
-        OptionFlags     m_optionFlags;
 
         MemoryArena*    m_memoryArena;
     };

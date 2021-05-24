@@ -82,7 +82,7 @@ namespace renderer_test
         RefPtr<ShaderInputLayout::ParentVal> parentVal;
         List<RefPtr<ShaderInputLayout::ParentVal>> parentValStack;
 
-        SlangResult parseOption(TokenReader& parser, String const& word, ShaderInputLayout::TextureVal* val)
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::TextureVal* val)
         {
             if (word == "depth")
             {
@@ -133,7 +133,7 @@ namespace renderer_test
             return SLANG_OK;
         }
 
-        SlangResult parseOption(TokenReader& parser, String const& word, ShaderInputLayout::SamplerVal* val)
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::SamplerVal* val)
         {
             if (word == "depthCompare")
             {
@@ -146,7 +146,7 @@ namespace renderer_test
             return SLANG_OK;
         }
 
-        SlangResult parseOption(TokenReader& parser, String const& word, ShaderInputLayout::DataValBase* val)
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::DataValBase* val)
         {
             if (word == "data")
             {
@@ -157,13 +157,13 @@ namespace renderer_test
                 while (!parser.IsEnd() && !parser.LookAhead("]"))
                 {
                     bool negate = false;
-                    if(parser.NextToken().Type == TokenType::OpSub)
+                    if(parser.NextToken().Type == Misc::TokenType::OpSub)
                     {
                         parser.ReadToken();
                         negate = true;
                     }
 
-                    if (parser.NextToken().Type == TokenType::IntLiteral)
+                    if (parser.NextToken().Type == Misc::TokenType::IntLiteral)
                     {
                         uint32_t value = parser.ReadUInt();
                         if(negate) value = uint32_t(-int32_t(value));
@@ -186,7 +186,7 @@ namespace renderer_test
             return SLANG_OK;
         }
 
-        SlangResult parseOption(TokenReader& parser, String const& word, ShaderInputLayout::BufferVal* val)
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::BufferVal* val)
         {
             if (word == "stride")
             {
@@ -332,7 +332,7 @@ namespace renderer_test
             return SLANG_OK;
         }
 
-        SlangResult parseOption(TokenReader& parser, String const& word, ShaderInputLayout::ObjectVal* val)
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::ObjectVal* val)
         {
             if( word == "type" )
             {
@@ -346,7 +346,7 @@ namespace renderer_test
             return SLANG_OK;
         }
 
-        Format parseFormatOption(TokenReader& parser)
+        Format parseFormatOption(Misc::TokenReader& parser)
         {
             parser.Read("=");
             auto formatWord = parser.ReadWord();
@@ -355,7 +355,7 @@ namespace renderer_test
         }
 
         template<typename T>
-        void maybeParseOptions(TokenReader& parser, T* val)
+        void maybeParseOptions(Misc::TokenReader& parser, T* val)
         {
             // parse options
             if (parser.LookAhead("("))
@@ -378,11 +378,11 @@ namespace renderer_test
             }
         }
 
-        RefPtr<ShaderInputLayout::Val> parseNumericValExpr(TokenReader& parser, bool negate = false)
+        RefPtr<ShaderInputLayout::Val> parseNumericValExpr(Misc::TokenReader& parser, bool negate = false)
         {
             switch(parser.NextToken().Type)
             {
-            case TokenType::IntLiteral:
+            case Misc::TokenType::IntLiteral:
                 {
                     RefPtr<ShaderInputLayout::DataVal> val = new ShaderInputLayout::DataVal;
 
@@ -394,7 +394,7 @@ namespace renderer_test
                 }
                 break;
 
-            case TokenType::DoubleLiteral:
+            case Misc::TokenType::DoubleLiteral:
                 {
                     RefPtr<ShaderInputLayout::DataVal> val = new ShaderInputLayout::DataVal;
 
@@ -414,13 +414,25 @@ namespace renderer_test
             }
         }
 
-        String parseTypeName(TokenReader& parser)
+        String parseTypeName(Misc::TokenReader& parser)
         {
-            return parser.ReadWord();
+            String typeName = parser.ReadWord();
+            if (parser.AdvanceIf("<"))
+            {
+                StringBuilder sb;
+                sb << typeName << "<";
+                sb << parseTypeName(parser);
+                sb << ">";
+                parser.Read(">");
+                return sb.ProduceString();
+            }
+            return typeName;
         }
 
-        RefPtr<ShaderInputLayout::Val> parseValExpr(TokenReader& parser)
+        RefPtr<ShaderInputLayout::Val> parseValExpr(Misc::TokenReader& parser)
         {
+            typedef Misc::TokenType TokenType;
+
             switch(parser.NextToken().Type)
             {
             case TokenType::OpSub:
@@ -521,7 +533,7 @@ namespace renderer_test
             }
         }
 
-        RefPtr<ShaderInputLayout::Val> parseVal(TokenReader& parser)
+        RefPtr<ShaderInputLayout::Val> parseVal(Misc::TokenReader& parser)
         {
             auto word = parser.NextToken().Content;
             if (parser.AdvanceIf("begin_array"))
@@ -647,8 +659,11 @@ namespace renderer_test
             parser.ReadToken();
         }
 
-        String parseName(TokenReader& parser)
+        String parseName(Misc::TokenReader& parser)
         {
+            typedef Misc::Token Token;
+            typedef Misc::TokenType TokenType;
+
             StringBuilder builder;
 
             Token nameToken = parser.ReadToken();
@@ -685,7 +700,7 @@ namespace renderer_test
             }
         }
 
-        void parseFieldBindings(TokenReader& parser, ShaderInputLayout::Field& ioField)
+        void parseFieldBindings(Misc::TokenReader& parser, ShaderInputLayout::Field& ioField)
         {
             // parse bindings
             if (parser.LookAhead(":"))
@@ -700,7 +715,7 @@ namespace renderer_test
                     else if (parser.AdvanceIf("name"))
                     {
                         // Optionally consume '=' 
-                        if (parser.NextToken().Type == TokenType::OpAssign)
+                        if (parser.NextToken().Type == Misc::TokenType::OpAssign)
                         {
                             parser.ReadToken();
                         }
@@ -725,7 +740,7 @@ namespace renderer_test
             parentVal = val;
         }
 
-        void parseValEntry(TokenReader& parser)
+        void parseValEntry(Misc::TokenReader& parser)
         {
             auto parentForNewVal = parentVal;
 
@@ -736,19 +751,19 @@ namespace renderer_test
             parentForNewVal->addField(field);
         }
 
-        void parseSetEntry(TokenReader& parser)
+        void parseSetEntry(Misc::TokenReader& parser)
         {
             auto parentForNewVal = parentVal;
 
             ShaderInputLayout::Field field;
             field.name = parseName(parser);
-            parser.Read(TokenType::OpAssign);
+            parser.Read(Misc::TokenType::OpAssign);
             field.val = parseValExpr(parser);
 
             parentForNewVal->addField(field);
         }
 
-        void parseLine(TokenReader& parser)
+        void parseLine(Misc::TokenReader& parser)
         {
             if (parser.LookAhead("entryPointSpecializationArg")
                 || parser.LookAhead("type")
@@ -794,18 +809,18 @@ namespace renderer_test
             RefPtr<ShaderInputLayout::AggVal> rootVal = new ShaderInputLayout::AggVal;
             parentVal = rootVal;
 
-            auto lines = Split(source, '\n');
+            auto lines = Misc::Split(source, '\n');
             for (auto & line : lines)
             {
                 if (line.startsWith("//TEST_INPUT:"))
                 {
                     auto lineContent = line.subString(13, line.getLength() - 13);
-                    TokenReader parser(lineContent);
+                    Misc::TokenReader parser(lineContent);
                     try
                     {
                         parseLine(parser);
                     }
-                    catch (const TextFormatException&)
+                    catch (const Misc::TextFormatException&)
                     {
                         StringBuilder msg;
                         msg << "Invalid input syntax at line " << parser.NextToken().Position.Line;

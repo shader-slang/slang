@@ -1,9 +1,12 @@
 // Test using interface typed shader parameters with associated types.
 
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-dx11
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-vk
-//DISABLED_TEST(compute):COMPARE_COMPUTE:-cuda -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -profile sm_5_0
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -gl  -profile glsl440
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -vk -profile glsl440
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -cpu
+
+
 
 [anyValueSize(8)]
 interface IAssoc
@@ -21,10 +24,13 @@ interface IInterface
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<int> gOutputBuffer;
 
-//TEST_INPUT:ubuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb
+
+// Specialize gCb1, but not gCb2
+//TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{1}};
 RWStructuredBuffer<IInterface> gCb;
 
-//TEST_INPUT:ubuffer(data=[rtti(MyImpl) witness(MyImpl, IInterface) 1 0], stride=4):name=gCb1
+// Add two elements into the structured buffer to prevent specialization.
+//TEST_INPUT: set gCb1 = new StructuredBuffer<IInterface>{new MyImpl{1}, new MyImpl2{2}};
 RWStructuredBuffer<IInterface> gCb1;
 
 [numthreads(4, 1, 1)]
@@ -40,9 +46,6 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     gOutputBuffer[tid] = outputVal;
 }
 
-// Specialize gCb1, but not gCb2
-//TEST_INPUT: globalExistentialType MyImpl
-//TEST_INPUT: globalExistentialType __Dynamic
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 public struct MyImpl : IInterface
 {

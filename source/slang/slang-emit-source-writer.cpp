@@ -330,6 +330,9 @@ void SourceWriter::_emitLineDirectiveAndUpdateSourceLocation(const HumaneSourceL
 
 void SourceWriter::_emitLineDirectiveIfNeeded(const HumaneSourceLoc& sourceLocation)
 {
+    if (m_supressLineDirective)
+        return;
+
     // Don't do any of this work if the user has requested that we
     // not emit line directives.
     auto mode = getLineDirectiveMode();

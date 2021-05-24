@@ -179,6 +179,8 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\tools\render-test\diagnostic-defs.h" />
+    <ClInclude Include="..\..\..\tools\render-test\diagnostics.h" />
     <ClInclude Include="..\..\..\tools\render-test\options.h" />
     <ClInclude Include="..\..\..\tools\render-test\png-serialize-util.h" />
     <ClInclude Include="..\..\..\tools\render-test\shader-input-layout.h" />
@@ -186,6 +188,7 @@
     <ClInclude Include="..\..\..\tools\render-test\slang-support.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\render-test\diagnostics.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\options.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\png-serialize-util.cpp" />
     <ClCompile Include="..\..\..\tools\render-test\render-test-main.cpp" />
@@ -196,6 +199,9 @@
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">
       <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">
+      <Project>{12C1E89D-F5D0-41D3-8E8D-FB3F358F8126}</Project>
     </ProjectReference>
     <ProjectReference Include="..\slang\slang.vcxproj">
       <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>

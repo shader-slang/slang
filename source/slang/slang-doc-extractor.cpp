@@ -834,10 +834,10 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
 
                 // Run the lexer
                 Lexer lexer;
-                lexer.initialize(sourceView, sink, &namePool, &memoryArena, Lexer::OptionFlag::TokenizeComments);
+                lexer.initialize(sourceView, sink, &namePool, &memoryArena);
 
                 // Lex everything
-                tokens = lexer.lexAllTokens();
+                tokens = lexer.lexAllMarkupTokens();
 
                 // Let's work out the access
 

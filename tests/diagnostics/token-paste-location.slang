@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE:
 
 
-#define SOME %
-#define THING %
+#define SOME +
+#define THING +
 
 #define A SOME
 #define B THING
