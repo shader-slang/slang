@@ -1201,7 +1201,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             IRBuilder builder(m_sharedBuilder);
 			builder.setInsertBefore(m_firstOrdinaryInst);
 			IRPtrType* ptrType = builder.getPtrType(info.type);
-			IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetPRD, 0, nullptr);
+			IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
             return LegalizedVaryingVal::makeAddress(getRayPayload);
             // Todo: compute how many registers are required for the current payload. 
             // If more than 32, use the above logic. 

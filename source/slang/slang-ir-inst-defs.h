@@ -499,7 +499,7 @@ INST(GpuForeach, gpuForeach, 3, 0)
 
 // Wrapper for OptiX intrinsics used to load and store ray payload data using
 // a pointer represented by two payload registers.
-INST(GetPRD, getPRD, 0, 0)
+INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
 
 /* Decoration */
 

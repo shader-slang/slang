@@ -781,11 +781,11 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
-        case kIROp_GetPRD:
+        case kIROp_GetOptiXRayPayloadPtr:
         {
             m_writer->emit("(");
             emitType(inst->getDataType());
-            m_writer->emit(")getPRD()");
+            m_writer->emit(")getOptiXRayPayloadPtr()");
             return true;
         }
         default: break;
