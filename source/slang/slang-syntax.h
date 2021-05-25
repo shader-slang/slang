@@ -136,7 +136,10 @@ namespace Slang
         return getMembersOfType<VarDecl>(declRef, filterStyle);
     }
 
-    
+    inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> const& declRef)
+    {
+        return declRef.substitute(astBuilder, declRef.getDecl()->tagType);
+    }
 
     inline Type* getBaseType(ASTBuilder* astBuilder, DeclRef<InheritanceDecl> const& declRef)
     {
