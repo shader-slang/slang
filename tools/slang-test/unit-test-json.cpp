@@ -1,5 +1,6 @@
 
 #include "../../source/compiler-core/slang-json-lexer.h"
+#include "../../source/core/slang-string-escape-util.h"
 
 #include "test-context.h"
 
@@ -111,7 +112,58 @@ static void jsonUnitTest()
         SLANG_CHECK(SLANG_SUCCEEDED(_lex(text, &sink, toks)));
 
         SLANG_CHECK(_areEqual(&sourceManager, toks, eles, SLANG_COUNT_OF(eles)));
+    }
 
+    {
+        StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+
+        
+        {
+            const auto slice = UnownedStringSlice::fromLiteral("\n\r\b\f\t \"\\/ Some text...");
+
+            SLANG_CHECK(handler->isEscapingNeeded(slice));
+            SLANG_CHECK(!handler->isEscapingNeeded(UnownedStringSlice::fromLiteral("Hello!")));
+
+            StringBuilder escaped;
+            handler->appendEscaped(slice, escaped);
+
+            StringBuilder unescaped;
+            handler->appendUnescaped(escaped.getUnownedSlice(), unescaped);
+
+            SLANG_CHECK(unescaped == slice);
+        }
+
+        {
+            uint32_t v = 0x7f;
+
+            StringBuilder buf;
+            while (v < 0x10000)
+            {
+                char work[10] = "\\u";
+
+                for (Int i = 0; i < 4; ++i)
+                {
+                    const uint32_t digitValue = (v >> ((3 - i) * 4)) & 0xf;
+
+                    char digitC = (digitValue > 9) ? char(digitValue - 10 + 'a') : char(digitValue + '0');
+                    work[i + 2] =  digitC;
+                }
+
+                buf << UnownedStringSlice(work, 6);
+
+                v += v;
+            }
+
+            // Decode it
+            StringBuilder unescaped;
+            handler->appendUnescaped(buf.getUnownedSlice(), unescaped);
+
+            // Encode it
+            StringBuilder escaped;
+            handler->appendEscaped(unescaped.getUnownedSlice(), escaped);
+
+            SLANG_CHECK(escaped == buf);
+        }
     }
 }
 

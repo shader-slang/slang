@@ -613,8 +613,21 @@ static uint32_t _getUnicodePointFromUTF8(UnownedStringSlice& ioSlice)
         codePoint += (cur[i] & 0x3F);
     }
 
-    ioSlice = UnownedStringSlice(cur, ioSlice.end());
+    ioSlice = UnownedStringSlice(cur + count, ioSlice.end());
     return codePoint;
+}
+
+static void _appendHex16(uint32_t value, StringBuilder& out)
+{
+    // Let's go with hex
+    char buf[] = "\\u0000";
+
+    buf[2] = s_hex[(value >> 12) & 0xf];
+    buf[3] = s_hex[(value >> 8) & 0xf];
+    buf[4] = s_hex[(value >> 4) & 0xf];
+    buf[5] = s_hex[(value >> 0) & 0xf];
+
+    out.append(UnownedStringSlice(buf, 6));
 }
 
 SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
@@ -650,23 +663,15 @@ SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& sli
             }
 
             // UTF8
-            UnownedStringSlice remainigSlice(cur, end);
-            uint32_t codePoint = _getUnicodePointFromUTF8(remainigSlice);
+            UnownedStringSlice remainingSlice(cur, end);
+            uint32_t codePoint = _getUnicodePointFromUTF8(remainingSlice);
 
             // We only support up to 16 bit unicode values for now...
             SLANG_ASSERT(codePoint < 0x10000);
 
-            // Let's go with hex
-            char buf[] = "\\u0000";
+            _appendHex16(codePoint, out);
 
-            buf[2] = s_hex[(c >> 12) & 0xf];
-            buf[3] = s_hex[(c >>  8) & 0xf];
-            buf[4] = s_hex[(c >>  4) & 0xf];
-            buf[5] = s_hex[(c >>  0) & 0xf];
-
-            out.append(buf);
-
-            cur = remainigSlice.begin() - 1;
+            cur = remainingSlice.begin() - 1;
             start = cur + 1;
         }
         else if (uint8_t(c) < ' ' || (c >= 0x7e))
@@ -676,11 +681,7 @@ SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& sli
                 out.append(start, cur);
             }
 
-            // Let's go with hex
-            char buf[] = "\\u0000";
-
-            buf[4] = s_hex[ (c >> 4) & 0xf];
-            buf[5] = s_hex[ (c >> 0) & 0xf];
+            _appendHex16(uint32_t(c), out);
 
             start = cur + 1;
         }
@@ -711,9 +712,9 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
         if (c == '\\')
         {
             // Flush
-            if (start < end)
+            if (start < cur)
             {
-                out.append(start, end);
+                out.append(start, cur);
             }
 
             /// Next 
@@ -781,6 +782,7 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
                         SLANG_ASSERT(digitValue < 0x10);
                         value = (value << 4) | digitValue;
                     }
+                    cur += 4;
 
                     // NOTE! Strictly speaking we may want to combine 2 UTF16 surrogates to make a single
                     // UTF8 encoded char.
