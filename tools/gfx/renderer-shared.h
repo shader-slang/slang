@@ -473,10 +473,10 @@ class ShaderObjectBaseImpl : public ShaderObjectBase
 protected:
     TShaderObjectData m_data;
     Slang::List<Slang::RefPtr<TShaderObjectImpl>> m_objects;
+    Slang::List<Slang::RefPtr<ExtendedShaderObjectTypeListObject>> m_userProvidedSpecializationArgs;
 
     // Specialization args for a StructuredBuffer object.
     ExtendedShaderObjectTypeList m_structuredBufferSpecializationArgs;
-    Slang::RefPtr<ExtendedShaderObjectTypeListObject> m_userProvidedSpecializationArgs;
 
 public:
     TShaderObjectLayoutImpl* getLayout()
@@ -500,6 +500,39 @@ public:
 
         returnComPtr(outObject, m_objects[bindingRange.subObjectIndex + offset.bindingArrayIndex]);
         return SLANG_OK;
+    }
+
+    void setSpecializationArgsForContainerElement(ExtendedShaderObjectTypeList& specializationArgs)
+    {
+        // Compute specialization args for the structured buffer object.
+        // If we haven't filled anything to `m_structuredBufferSpecializationArgs` yet,
+        // use `specializationArgs` directly.
+        if (m_structuredBufferSpecializationArgs.getCount() == 0)
+        {
+            m_structuredBufferSpecializationArgs = Slang::_Move(specializationArgs);
+        }
+        else
+        {
+            // If `m_structuredBufferSpecializationArgs` already contains some arguments, we
+            // need to check if they are the same as `specializationArgs`, and replace
+            // anything that is different with `__Dynamic` because we cannot specialize the
+            // buffer type if the element types are not the same.
+            SLANG_ASSERT(
+                m_structuredBufferSpecializationArgs.getCount() == specializationArgs.getCount());
+            auto device = getRenderer();
+            for (Slang::Index i = 0; i < m_structuredBufferSpecializationArgs.getCount(); i++)
+            {
+                if (m_structuredBufferSpecializationArgs[i].componentID !=
+                    specializationArgs[i].componentID)
+                {
+                    auto dynamicType = device->slangContext.session->getDynamicType();
+                    m_structuredBufferSpecializationArgs.componentIDs[i] =
+                        device->shaderCache.getComponentId(dynamicType);
+                    m_structuredBufferSpecializationArgs.components[i] =
+                        slang::SpecializationArg::fromType(dynamicType);
+                }
+            }
+        }
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -563,36 +596,7 @@ public:
                 subObject->m_data.getBuffer(),
                 (size_t)subObject->m_data.getCount()));
 
-            // Compute specialization args for the structured buffer object.
-            // If we haven't filled anything to `m_structuredBufferSpecializationArgs` yet,
-            // use `specializationArgs` directly.
-            if (m_structuredBufferSpecializationArgs.getCount() == 0)
-            {
-                m_structuredBufferSpecializationArgs = Slang::_Move(specializationArgs);
-            }
-            else
-            {
-                // If `m_structuredBufferSpecializationArgs` already contains some arguments, we
-                // need to check if they are the same as `specializationArgs`, and replace
-                // anything that is different with `__Dynamic` because we cannot specialize the
-                // buffer type if the element types are not the same.
-                SLANG_ASSERT(
-                    m_structuredBufferSpecializationArgs.getCount() ==
-                    specializationArgs.getCount());
-                auto device = getRenderer();
-                for (Slang::Index i = 0; i < m_structuredBufferSpecializationArgs.getCount(); i++)
-                {
-                    if (m_structuredBufferSpecializationArgs[i].componentID !=
-                        specializationArgs[i].componentID)
-                    {
-                        auto dynamicType = device->slangContext.session->getDynamicType();
-                        m_structuredBufferSpecializationArgs.componentIDs[i] =
-                            device->shaderCache.getComponentId(dynamicType);
-                        m_structuredBufferSpecializationArgs.components[i] =
-                            slang::SpecializationArg::fromType(dynamicType);
-                    }
-                }
-            }
+            setSpecializationArgsForContainerElement(specializationArgs);
             return SLANG_OK;
         }
 
@@ -693,17 +697,11 @@ public:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) override
+    Result getExtendedShaderTypeListFromSpecializationArgs(
+        ExtendedShaderObjectTypeList& list,
+        const slang::SpecializationArg* args,
+        uint32_t count)
     {
-        if (!m_userProvidedSpecializationArgs)
-        {
-            m_userProvidedSpecializationArgs = new ExtendedShaderObjectTypeListObject();
-        }
-        else
-        {
-            m_userProvidedSpecializationArgs->clear();
-        }
         auto device = getRenderer();
         for (uint32_t i = 0; i < count; i++)
         {
@@ -718,8 +716,50 @@ public:
                 SLANG_ASSERT(false && "Unexpected specialization argument kind.");
                 return SLANG_FAIL;
             }
-            m_userProvidedSpecializationArgs->add(extendedType);
+            list.add(extendedType);
         }
+        return SLANG_OK;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
+        const slang::SpecializationArg* args,
+        uint32_t count) override
+    {
+        auto layout = getLayout();
+
+        // If the shader object is a container, delegate the processing to
+        // `setSpecializationArgsForContainerElements`.
+        if (layout->getContainerType() != ShaderObjectContainerType::None)
+        {
+            ExtendedShaderObjectTypeList argList;
+            SLANG_RETURN_ON_FAIL(
+                getExtendedShaderTypeListFromSpecializationArgs(argList, args, count));
+            setSpecializationArgsForContainerElement(argList);
+            return SLANG_OK;
+        }
+
+        if (offset.bindingRangeIndex < 0)
+            return SLANG_E_INVALID_ARG;
+        if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
+            return SLANG_E_INVALID_ARG;
+
+        auto bindingRangeIndex = offset.bindingRangeIndex;
+        auto bindingRange = layout->getBindingRange(bindingRangeIndex);
+        auto objectIndex = bindingRange.subObjectIndex + offset.bindingArrayIndex;
+        if (objectIndex >= m_userProvidedSpecializationArgs.getCount())
+            m_userProvidedSpecializationArgs.setCount(objectIndex + 1);
+        if (!m_userProvidedSpecializationArgs[objectIndex])
+        {
+            m_userProvidedSpecializationArgs[objectIndex] =
+                new ExtendedShaderObjectTypeListObject();
+        }
+        else
+        {
+            m_userProvidedSpecializationArgs[objectIndex]->clear();
+        }
+        SLANG_RETURN_ON_FAIL(getExtendedShaderTypeListFromSpecializationArgs(
+            *m_userProvidedSpecializationArgs[objectIndex], args, count));
         return SLANG_OK;
     }
 
@@ -727,11 +767,6 @@ public:
     // `args` list.
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
     {
-        if (m_userProvidedSpecializationArgs)
-        {
-            args.addRange(*m_userProvidedSpecializationArgs);
-            return SLANG_OK;
-        }
         if (m_layout->getContainerType() != ShaderObjectContainerType::None)
         {
             args.addRange(m_structuredBufferSpecializationArgs);
@@ -761,11 +796,18 @@ public:
                  subObjectIndexInRange++)
             {
                 ExtendedShaderObjectTypeList typeArgs;
-
-                auto subObject = m_objects[bindingRange.subObjectIndex + subObjectIndexInRange];
+                auto objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+                auto subObject = m_objects[objectIndex];
 
                 if (!subObject)
                     continue;
+
+                if (objectIndex < m_userProvidedSpecializationArgs.getCount() &&
+                    m_userProvidedSpecializationArgs[objectIndex])
+                {
+                    args.addRange(*m_userProvidedSpecializationArgs[objectIndex]);
+                    continue;
+                }
 
                 switch (bindingRange.bindingType)
                 {
