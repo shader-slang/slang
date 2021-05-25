@@ -214,7 +214,7 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
             return LexResult{ JSONTokenType::Invalid, nullptr };
         }
         // Skip the digit
-        *cursor++;
+        cursor++;
         // Skip any more digits
         while (CharUtil::isDigit(*cursor)) cursor++;
     }
@@ -240,7 +240,8 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
             return LexResult{ JSONTokenType::Invalid, nullptr };
         }
 
-        *cursor++;
+        // Skip the digit
+        cursor++;
         // Skip any more digits
         while (CharUtil::isDigit(*cursor)) cursor++;
     }
