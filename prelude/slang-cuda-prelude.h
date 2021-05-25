@@ -1615,26 +1615,63 @@ struct UniformState;
 
 // ---------------------- OptiX Ray Payload --------------------------------------
 #ifdef SLANG_CUDA_ENABLE_OPTIX
+struct RayDesc
+{
+    float3 Origin;
+    float  TMin;
+    float3 Direction;
+    float  TMax;
+};
+
 static __forceinline__ __device__
 void *unpackOptiXRayPayloadPointer(uint32_t i0, uint32_t i1)
 {
-	const uint64_t uptr = static_cast<uint64_t>(i0) << 32 | i1;
-	void*           ptr = reinterpret_cast<void*>(uptr);
-	return ptr;
+    const uint64_t uptr = static_cast<uint64_t>(i0) << 32 | i1;
+    void*           ptr = reinterpret_cast<void*>(uptr);
+    return ptr;
 }
 
 static __forceinline__ __device__
 void  packOptiXRayPayloadPointer(void* ptr, uint32_t& i0, uint32_t& i1)
 {
-	const uint64_t uptr = reinterpret_cast<uint64_t>(ptr);
-	i0 = uptr >> 32;
-	i1 = uptr & 0x00000000ffffffff;
+    const uint64_t uptr = reinterpret_cast<uint64_t>(ptr);
+    i0 = uptr >> 32;
+    i1 = uptr & 0x00000000ffffffff;
 }
 
 static __forceinline__ __device__ void *getOptiXRayPayloadPtr()
 {
-	const uint32_t u0 = optixGetPayload_0();
-	const uint32_t u1 = optixGetPayload_1();
-	return unpackOptiXRayPayloadPointer(u0, u1);
+    const uint32_t u0 = optixGetPayload_0();
+    const uint32_t u1 = optixGetPayload_1();
+    return unpackOptiXRayPayloadPointer(u0, u1);
+}
+
+template<typename T>
+__forceinline__ __device__ void *traceOptiXRay(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray,
+    T *Payload
+) {
+    uint32_t r0, r1;
+    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+    optixTrace(
+        AccelerationStructure,
+        Ray.Origin,
+        Ray.Direction,
+        Ray.TMin,
+        Ray.TMax,
+        0.f, /* Time for motion blur, currently unsupported in slang */
+        InstanceInclusionMask,
+        RayFlags,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex,
+        r0, r1
+    );
 }
 #endif
