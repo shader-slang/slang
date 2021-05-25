@@ -497,6 +497,10 @@ INST(GroupMemoryBarrierWithGroupSync, GroupMemoryBarrierWithGroupSync, 0, 0)
 // GPU_FOREACH loop of the form 
 INST(GpuForeach, gpuForeach, 3, 0)
 
+// Wrapper for OptiX intrinsics used to load and store ray payload data using
+// a pointer represented by two payload registers.
+INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
+
 /* Decoration */
 
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
