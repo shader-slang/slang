@@ -1,5 +1,5 @@
 // slang-json-diagnostics.cpp
-#include "slang-core-diagnostics.h"
+#include "slang-json-diagnostics.h"
 
 namespace Slang {
 

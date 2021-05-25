@@ -22,6 +22,8 @@ SlangResult JSONLexer::init(SourceView* sourceView, DiagnosticSink* sink)
 
     m_contentStart = sourceFile->getContent().begin();
 
+    m_startLoc = sourceView->getRange().begin;
+
     m_lexemeStart = m_contentStart;
     m_cursor = m_lexemeStart;
 
@@ -101,6 +103,7 @@ JSONTokenType JSONLexer::advance()
             case ']':           return _setToken(JSONTokenType::RBracket, cursor);
             case '{':           return _setToken(JSONTokenType::LBrace, cursor);
             case '}':           return _setToken(JSONTokenType::RBrace, cursor);
+
             case '-':
             case '0':
             case '1':
@@ -113,7 +116,7 @@ JSONTokenType JSONLexer::advance()
             case '8':
             case '9':
             {
-                LexResult res = _lexNumber(cursor);
+                LexResult res = _lexNumber(cursor - 1);
                 if (res.cursor == nullptr)
                 {
                     return _setToken(JSONTokenType::Invalid, m_lexemeStart);
@@ -190,7 +193,7 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
     else if (*cursor >= '1' && *cursor <= '9')
     {
         cursor++;
-        while (*cursor >= '0' && *cursor <= '9')
+        while (CharUtil::isDigit(*cursor))
         {
             cursor++;
         }
@@ -200,8 +203,9 @@ JSONLexer::LexResult JSONLexer::_lexNumber(const char* cursor)
     if (*cursor == '.')
     {
         tokenType = JSONTokenType::FloatLiteral;
-
+        // Skip the dot
         cursor++;
+        // Must have at least one digit
         if (!CharUtil::isDigit(*cursor))
         {
             m_sink->diagnose(_getLoc(cursor), JSONDiagnostics::expectingADigit);
@@ -351,7 +355,10 @@ const char* JSONLexer::_lexWhitespace(const char* cursor)
 {
     while (true)
     {
-        const char c = *cursor++;
+        const char c = *cursor;
+
+        // Might want to use CharUtil::isWhitespace...
+
         switch (c)
         {
             case ' ':
@@ -359,14 +366,16 @@ const char* JSONLexer::_lexWhitespace(const char* cursor)
             case '\r':
             case '\t':
             {
+                cursor++;
                 break;
             }
             default:
             {
                 // Hit non white space
-                return cursor - 1;
+                return cursor;
             }
         }
+
     }
 }
 

@@ -39,6 +39,7 @@ class JSONLexer
 {
 public:
     JSONToken& peekToken() { return m_token; }
+    JSONTokenType peekType() { return m_token.type; }
 
     JSONTokenType advance();
 
@@ -63,13 +64,12 @@ protected:
     {
         SLANG_ASSERT(cursor >= m_lexemeStart);
         m_token.type = type;
-        m_token.loc = m_startLoc + (cursor - m_contentStart);
+        m_token.loc = m_startLoc + (m_lexemeStart - m_contentStart);
         m_token.length = uint32_t(cursor - m_lexemeStart);
         m_cursor = cursor;
         return type;
     }
     JSONTokenType _setInvalidToken();
-
 
     JSONToken m_token;
 
