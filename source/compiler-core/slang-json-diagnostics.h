@@ -1,5 +1,5 @@
-#ifndef SLANG_CORE_DIAGNOSTICS_H
-#define SLANG_CORE_DIAGNOSTICS_H
+#ifndef SLANG_JSON_DIAGNOSTICS_H
+#define SLANG_JSON_DIAGNOSTICS_H
 
 #include "../core/slang-basic.h"
 #include "../core/slang-writer.h"
