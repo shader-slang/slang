@@ -248,6 +248,7 @@ public:
 
         Slang::String typeName;
         ValPtr contentVal;
+        Slang::List<Slang::String> specializationArgs;
     };
 
     class ArrayVal : public ParentVal

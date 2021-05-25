@@ -341,6 +341,26 @@ struct AssignValsFromLayoutContext
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
 
+        if (srcVal->specializationArgs.getCount())
+        {
+            List<slang::SpecializationArg> args;
+            for (auto srcArg : srcVal->specializationArgs)
+            {
+                auto argType = slangReflection->findTypeByName(srcArg.getBuffer());
+                if (argType)
+                {
+                    slang::SpecializationArg arg = slang::SpecializationArg::fromType(argType);
+                    args.add(arg);
+                }
+                else
+                {
+                    StdWriters::getError().print(
+                        "error: could not find shader type '%s'\n", srcArg.getBuffer());
+                    return SLANG_E_INVALID_ARG;
+                }
+            }
+            shaderObject->setSpecializationArgs(args.getBuffer(), args.getCount());
+        }
         dstCursor.setObject(shaderObject);
         return SLANG_OK;
     }

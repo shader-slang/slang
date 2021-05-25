@@ -895,11 +895,7 @@ protected:
 
     virtual LegalizedVaryingVal createLegalUserVaryingValImpl(VaryingParamInfo const& info)
     {
-        SLANG_UNUSED(info);
-
-        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support user-defined varying parameters");
-
-        return LegalizedVaryingVal();
+        return diagnoseUnsupportedUserVal(info);
     }
 
     virtual LegalizedVaryingVal createLegalSystemVaryingValImpl(VaryingParamInfo const& info)
@@ -915,7 +911,16 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support this system-defined varying parameters");
+        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support this system-defined varying parameter");
+
+        return LegalizedVaryingVal();
+    }
+
+    LegalizedVaryingVal diagnoseUnsupportedUserVal(VaryingParamInfo const& info)
+    {
+        SLANG_UNUSED(info);
+
+        m_sink->diagnose(m_param, Diagnostics::unimplemented, "this target doesn't support this user-defined varying parameter");
 
         return LegalizedVaryingVal();
     }
@@ -1054,6 +1059,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     //
     IRType* uint3Type = nullptr;
 
+    // Scans through and returns the first typeLayout attribute of non-zero size.
+    static LayoutResourceKind getLayoutResourceKind(IRTypeLayout* typeLayout) {
+        for (auto attr : typeLayout->getSizeAttrs()) {
+            if (attr->getSize() != 0) return attr->getResourceKind();
+        }
+        return LayoutResourceKind::None;
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -1114,7 +1127,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     IRInst* groupThreadIndex = nullptr;
     IRInst* dispatchThreadID = nullptr;
-
     void beginEntryPointImpl() SLANG_OVERRIDE
     {
         IRBuilder builder(m_sharedBuilder);
@@ -1174,9 +1186,36 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         case SystemValueSemanticName::GroupThreadID:    return LegalizedVaryingVal::makeValue(threadIdxGlobalParam);
         case SystemValueSemanticName::GroupThreadIndex: return LegalizedVaryingVal::makeValue(groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID: return LegalizedVaryingVal::makeValue(dispatchThreadID);
-
         default:
             return diagnoseUnsupportedSystemVal(info);
+        }
+    }
+
+    LegalizedVaryingVal createLegalUserVaryingValImpl(VaryingParamInfo const& info) SLANG_OVERRIDE
+    {
+        auto layoutResourceKind = getLayoutResourceKind(info.typeLayout);
+        switch (layoutResourceKind)
+        {
+        case LayoutResourceKind::RayPayload: {
+            IRBuilder builder(m_sharedBuilder);
+			builder.setInsertBefore(m_firstOrdinaryInst);
+			IRPtrType* ptrType = builder.getPtrType(info.type);
+			IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+            return LegalizedVaryingVal::makeAddress(getRayPayload);
+            // Todo: compute how many registers are required for the current payload. 
+            // If more than 32, use the above logic. 
+            // Otherwise, either use the optix_get_payload or optix_set_payload 
+            // intrinsics depending on input/output
+            /*if (info.kind == LayoutResourceKind::VaryingInput) {
+            }
+            else if (info.kind == LayoutResourceKind::VaryingOutput) {
+            }
+            else {
+                return diagnoseUnsupportedUserVal(info);
+            }*/ 
+        }
+        default:
+            return diagnoseUnsupportedUserVal(info);
         }
     }
 };
