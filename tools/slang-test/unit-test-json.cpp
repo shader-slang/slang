@@ -90,7 +90,7 @@ static void jsonUnitTest()
     DiagnosticSink sink(&sourceManager, nullptr);
 
     {
-        const char text[] = " { \"Hello\" : [ \"World\", 1, 2.0] }";
+        const char text[] = " { \"Hello\" : [ \"World\", 1, 2.0, -3.0, -435.5345435, 45e-10, 421.00e+20, 17e1] }";
 
         const Element eles[] =
         {
@@ -103,6 +103,16 @@ static void jsonUnitTest()
             {JSONTokenType::IntegerLiteral, "1" },
             {JSONTokenType::Comma, "," },
             {JSONTokenType::FloatLiteral, "2.0" },
+            {JSONTokenType::Comma, "," },
+            {JSONTokenType::FloatLiteral, "-3.0" },
+            {JSONTokenType::Comma, "," },
+            {JSONTokenType::FloatLiteral, "-435.5345435" },
+            {JSONTokenType::Comma, "," },
+            {JSONTokenType::FloatLiteral, "45e-10" },
+            {JSONTokenType::Comma, "," },
+            {JSONTokenType::FloatLiteral, "421.00e+20" },
+            {JSONTokenType::Comma, "," },
+            {JSONTokenType::FloatLiteral, "17e1" },
             {JSONTokenType::RBracket, "]" },
             {JSONTokenType::RBrace, "}" },
             {JSONTokenType::EndOfFile, "" },
