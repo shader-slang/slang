@@ -22,6 +22,7 @@ enum class ShaderInputType
     UniformData,
     Object,
     Aggregate,
+    Specialize,
 };
 
 enum class InputTextureContent
@@ -248,7 +249,16 @@ public:
 
         Slang::String typeName;
         ValPtr contentVal;
-        Slang::List<Slang::String> specializationArgs;
+    };
+
+    class SpecializeVal : public Val
+    {
+    public:
+        ValPtr contentVal;
+        Slang::List<Slang::String> typeArgs;
+        SpecializeVal()
+            : Val(ShaderInputType::Specialize)
+        {}
     };
 
     class ArrayVal : public ParentVal

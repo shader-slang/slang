@@ -29,7 +29,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 //TEST_INPUT: set gCb = new StructuredBuffer<IInterface>{new MyImpl{1}};
 RWStructuredBuffer<IInterface> gCb;
 
-//TEST_INPUT: set gCb1 = new StructuredBuffer<IInterface>{new MyImpl{1}} : specialization_args(__Dynamic);
+//TEST_INPUT: set gCb1 = dynamic new StructuredBuffer<IInterface>{new MyImpl{1}}
 RWStructuredBuffer<IInterface> gCb1;
 
 [numthreads(4, 1, 1)]

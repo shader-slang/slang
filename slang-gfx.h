@@ -545,12 +545,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
         ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) = 0;
 
-        /// Manually setting the specialization arguments for the shader object, overriding
-        /// the default arguments computed from the sub-objects.
+        /// Manually overrides the specialization argument for the sub-object binding at `offset`.
         /// Specialization arguments are passed to the shader compiler to specialize the type
         /// of interface-typed shader parameters.
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
+        const slang::SpecializationArg* args,
+        uint32_t count) = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \

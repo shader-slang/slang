@@ -340,29 +340,27 @@ struct AssignValsFromLayoutContext
         ComPtr<IShaderObject> shaderObject = device->createShaderObject(slangType);
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
-
-        if (srcVal->specializationArgs.getCount())
-        {
-            List<slang::SpecializationArg> args;
-            for (auto srcArg : srcVal->specializationArgs)
-            {
-                auto argType = slangReflection->findTypeByName(srcArg.getBuffer());
-                if (argType)
-                {
-                    slang::SpecializationArg arg = slang::SpecializationArg::fromType(argType);
-                    args.add(arg);
-                }
-                else
-                {
-                    StdWriters::getError().print(
-                        "error: could not find shader type '%s'\n", srcArg.getBuffer());
-                    return SLANG_E_INVALID_ARG;
-                }
-            }
-            shaderObject->setSpecializationArgs(args.getBuffer(), args.getCount());
-        }
         dstCursor.setObject(shaderObject);
         return SLANG_OK;
+    }
+
+    SlangResult assignValWithSpecializationArg(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::SpecializeVal* srcVal)
+    {
+        assign(dstCursor, srcVal->contentVal);
+        List<slang::SpecializationArg> args;
+        for (auto& typeName : srcVal->typeArgs)
+        {
+            auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
+            if (!slangType)
+            {
+                StdWriters::getError().print("error: could not find shader type '%s'\n", typeName.getBuffer());
+                return SLANG_E_INVALID_ARG;
+            }
+            args.add(slang::SpecializationArg::fromType(slangType));
+        }
+        return dstCursor.setSpecializationArgs(args.getBuffer(), (uint32_t)args.getCount());
     }
 
     SlangResult assignArray(ShaderCursor const& dstCursor, ShaderInputLayout::ArrayVal* srcVal)
@@ -398,6 +396,10 @@ struct AssignValsFromLayoutContext
 
         case ShaderInputType::Object:
             return assignObject(dstCursor, (ShaderInputLayout::ObjectVal*) srcVal.Ptr());
+
+        case ShaderInputType::Specialize:
+            return assignValWithSpecializationArg(
+                dstCursor, (ShaderInputLayout::SpecializeVal*)srcVal.Ptr());
 
         case ShaderInputType::Aggregate:
             return assignAggregate(dstCursor, (ShaderInputLayout::AggVal*) srcVal.Ptr());

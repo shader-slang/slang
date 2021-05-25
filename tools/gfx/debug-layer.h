@@ -168,6 +168,7 @@ public:
         IResourceView* textureView,
         ISamplerState* sampler) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
         const slang::SpecializationArg* args,
         uint32_t count) override;
 
@@ -204,8 +205,10 @@ class DebugRootShaderObject : public DebugShaderObject
 public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
+        const slang::SpecializationArg* args,
+        uint32_t count) override;
 };
 
 class DebugCommandBuffer;
