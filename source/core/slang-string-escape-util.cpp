@@ -87,6 +87,8 @@ SlangResult SpaceStringEscapeHandler::appendEscaped(const UnownedStringSlice& sl
     }
 }
 
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!! CppStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 class CppStringEscapeHandler : public StringEscapeHandler
@@ -445,10 +447,378 @@ SlangResult CppStringEscapeHandler::lexQuoted(const char* cursor, const char** o
     }
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!! JSONStringEscapeHandler !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+class JSONStringEscapeHandler : public StringEscapeHandler
+{
+public:
+    typedef StringEscapeHandler Super;
+
+    virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
+    virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
+    virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
+
+    JSONStringEscapeHandler() : Super('"') {}
+};
+
+bool JSONStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
+{
+    const char* cur = slice.begin();
+    const char*const end = slice.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+
+        switch (c)
+        {
+            case '\"':
+            case '\\':
+            case '/':
+            {
+                return true;
+            }
+            default:
+            {
+                if (c < ' ' || c >= 0x7e)
+                {
+                    return true;
+                }
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+SlangResult JSONStringEscapeHandler::lexQuoted(const char* cursor, const char** outCursor)
+{
+    // We've skipped the first "
+    while (true)
+    {
+        const char c = *cursor++;
+
+        switch (c)
+        {
+            case 0:     return SLANG_FAIL;
+            case '"':
+            {
+                *outCursor = cursor;
+                return SLANG_OK;
+            }
+            case '\\':
+            {
+                const char nextC = *cursor;
+                switch (nextC)
+                {
+                    case '"':
+                    case '\\':
+                    case '/':
+                    case 'b':
+                    case 'f':
+                    case 'n':
+                    case 'r':
+                    case 't':
+                    {
+                        ++cursor;
+                        break;
+                    }
+                    case 'u':
+                    {
+                        cursor++;
+                        for (Index i = 0; i < 4; ++i)
+                        {
+                            if (!CharUtil::isHexDigit(cursor[i]))
+                            {
+                                return SLANG_FAIL;
+                            }
+                        }
+                        cursor += 4;
+                        break;
+                    }
+                }
+            }
+            // Somewhat surprisingly it appears it's valid to have \r\n inside of quotes.
+            default: break;
+        }
+    }
+}
+
+static char _getJSONEscapedChar(char c)
+{
+    switch (c)
+    {
+        case '\b':      return 'b';
+        case '\f':      return 'f';
+        case '\n':      return 'n';
+        case '\r':      return 'r';
+        case '\t':      return 't';
+        case '\\':      return '\\';
+        case '/':       return '/';
+        case '"':       return '"';
+        default:        return 0;
+    }
+}
+
+static char _getJSONUnescapedChar(char c)
+{
+    switch (c)
+    {
+        case 'b':      return '\b';
+        case 'f':      return '\f';
+        case 'n':      return '\n';
+        case 'r':      return '\r';
+        case 't':      return '\t';
+        case '\\':      return '\\';
+        case '/':       return '/';
+        case '"':       return '"';
+        default:        return 0;
+    }
+}
+
+static const char s_hex[] = "0123456789abcdef";
+
+// Outputs ioSlice with the chars remaining after utf8 encoded value
+// Returns ~uint32_t(0) if can't decode
+static uint32_t _getUnicodePointFromUTF8(UnownedStringSlice& ioSlice)
+{
+    const Index length = ioSlice.getLength();
+    SLANG_ASSERT(length > 0);
+    const char* cur = ioSlice.begin();
+
+    uint32_t codePoint = 0;
+    unsigned int leading = cur[0];
+    unsigned int mask = 0x80;
+
+    Index count = 0;
+    while (leading & mask)
+    {
+        count++;
+        mask >>= 1;
+    }
+
+    if (count > length)
+    {
+        SLANG_ASSERT(!"Can't decode");
+        ioSlice = UnownedStringSlice(ioSlice.end(), ioSlice.end());
+        return ~uint32_t(0);
+    }
+
+    codePoint = (leading & (mask - 1));
+    for (Index i = 1; i <= count - 1; i++)
+    {
+        codePoint <<= 6;
+        codePoint += (cur[i] & 0x3F);
+    }
+
+    ioSlice = UnownedStringSlice(cur, ioSlice.end());
+    return codePoint;
+}
+
+SlangResult JSONStringEscapeHandler::appendEscaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const char* start = slice.begin();
+    const char* cur = start;
+    const char*const end = slice.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+        
+        const char escapedChar = _getJSONEscapedChar(c);
+
+        if (escapedChar)
+        {
+            // Flush
+            if (start < cur)
+            {
+                out.append(start, cur);
+            }
+            out.appendChar('\\');
+            out.appendChar(escapedChar);
+
+            start = cur + 1;
+        }
+        else if (uint8_t(c) & 0x80)
+        {
+            // Flush
+            if (start < cur)
+            {
+                out.append(start, cur);
+            }
+
+            // UTF8
+            UnownedStringSlice remainigSlice(cur, end);
+            uint32_t codePoint = _getUnicodePointFromUTF8(remainigSlice);
+
+            // We only support up to 16 bit unicode values for now...
+            SLANG_ASSERT(codePoint < 0x10000);
+
+            // Let's go with hex
+            char buf[] = "\\u0000";
+
+            buf[2] = s_hex[(c >> 12) & 0xf];
+            buf[3] = s_hex[(c >>  8) & 0xf];
+            buf[4] = s_hex[(c >>  4) & 0xf];
+            buf[5] = s_hex[(c >>  0) & 0xf];
+
+            out.append(buf);
+
+            cur = remainigSlice.begin() - 1;
+            start = cur + 1;
+        }
+        else if (uint8_t(c) < ' ' || (c >= 0x7e))
+        {
+            if (start < cur)
+            {
+                out.append(start, cur);
+            }
+
+            // Let's go with hex
+            char buf[] = "\\u0000";
+
+            buf[4] = s_hex[ (c >> 4) & 0xf];
+            buf[5] = s_hex[ (c >> 0) & 0xf];
+
+            start = cur + 1;
+        }
+        else
+        {
+            // Can go out as it is
+        }
+    }
+
+    // Flush at the end
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+    return SLANG_OK;
+}
+
+SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
+{
+    const char* start = slice.begin();
+    const char* cur = start;
+    const char*const end = slice.end();
+
+    for (; cur < end; ++cur)
+    {
+        const char c = *cur;
+
+        if (c == '\\')
+        {
+            // Flush
+            if (start < end)
+            {
+                out.append(start, end);
+            }
+
+            /// Next 
+            cur++;
+
+            if (cur >= end)
+            {
+                return SLANG_FAIL;
+            }
+
+            // Need to handle various escape sequence cases
+            switch (*cur)
+            {
+                case '\"':
+                case '\\':
+                case '/':
+                case 'b':
+                case 'f':
+                case 'n':
+                case 'r':
+                case 't':
+                {
+                    const char unescapedChar = _getJSONUnescapedChar(*cur);
+                    if (unescapedChar == 0)
+                    {
+                        // Don't know how to unescape that char
+                        return SLANG_FAIL;
+                    }
+                    out.appendChar(unescapedChar);
+
+                    start = cur + 1;
+                    break;
+                }
+                case 'u':
+                {
+                    uint32_t value = 0;
+                    cur++;
+
+                    if (cur + 4 > end)
+                    {
+                        return SLANG_FAIL;
+                    }
+
+                    for (Index i = 0; i < 4; ++i)
+                    {
+                        const char digitC = cur[i];
+
+                        uint32_t digitValue;
+                        if (digitC >= '0' && digitC <= '9')
+                        {
+                            digitValue = digitC - '0';
+                        }
+                        else if (digitC >= 'a' && digitC <= 'f')
+                        {
+                            digitValue = digitC -'a' + 10;
+                        }
+                        else if(digitC >= 'A' && digitC <= 'F')
+                        {
+                            digitValue = digitC - 'A' + 10;
+                        }
+                        else
+                        {
+                            return SLANG_FAIL;
+                        }
+                        SLANG_ASSERT(digitValue < 0x10);
+                        value = (value << 4) | digitValue;
+                    }
+
+                    // NOTE! Strictly speaking we may want to combine 2 UTF16 surrogates to make a single
+                    // UTF8 encoded char.
+                    
+                    // Need to encode in UTF8 to concat
+
+                    char buf[8];
+                    int len = EncodeUnicodePointToUTF8(buf, value);
+
+                    out.append(buf, buf + len);
+
+                    start = cur;
+                    cur--;
+                    break;
+                }
+                default:
+                {
+                    // Can't decode
+                    return SLANG_FAIL;
+                }
+            }
+        }
+    }
+
+    // Flush
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+
+    return SLANG_OK;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!! StringEscapeUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 static CppStringEscapeHandler g_cppHandler;
 static SpaceStringEscapeHandler g_spaceHandler;
+static JSONStringEscapeHandler g_jsonHandler;
 
 StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
 {
@@ -456,6 +826,7 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     {
         case Style::Cpp:    return &g_cppHandler;
         case Style::Space:  return &g_spaceHandler;
+        case Style::JSON:   return &g_jsonHandler;
         default:            return nullptr;
     }
 }

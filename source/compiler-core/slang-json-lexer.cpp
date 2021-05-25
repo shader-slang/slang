@@ -155,8 +155,10 @@ JSONTokenType JSONLexer::advance()
                 StringBuilder buf;
                 if (c <= ' ' || c >= 0x7e)
                 {
-                    char hexBuf[5] = "0x";
                     static const char s_hex[] = "012345679abcdef";
+
+                    char hexBuf[5] = "0x";
+      
                     uint32_t value = c;
                     hexBuf[2] = s_hex[((value >> 4) & 0xf)];
                     hexBuf[3] = s_hex[(value & 0xf)];
