@@ -686,6 +686,12 @@ struct HLSLRayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
         : DefaultVaryingLayoutRulesImpl(kind)
     {}
 };
+struct CUDARayTracingLayoutRulesImpl : DefaultVaryingLayoutRulesImpl
+{
+    CUDARayTracingLayoutRulesImpl(LayoutResourceKind kind)
+        : DefaultVaryingLayoutRulesImpl(kind)
+    {}
+};
 
 DefaultLayoutRulesImpl kDefaultLayoutRulesImpl;
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
@@ -707,7 +713,13 @@ HLSLRayTracingLayoutRulesImpl kHLSLRayPayloadParameterLayoutRulesImpl(LayoutReso
 HLSLRayTracingLayoutRulesImpl kHLSLCallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
 HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
+// Just copying what was done above for now, but for CUDA...
+//CUDAVaryingLayoutRulesImpl kCUDAVaryingInputLayoutRulesImpl(LayoutResourceKind::VertexInput);
+//CUDAVaryingLayoutRulesImpl kCUDAVaryingOutputLayoutRulesImpl(LayoutResourceKind::FragmentOutput);
 //
+CUDARayTracingLayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
+//CUDARayTracingLayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
+//CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
 struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
@@ -927,6 +939,12 @@ LayoutRulesImpl kCUDAAnyValueLayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl,
     &kDefaultLayoutRulesImpl,
     &kCUDAObjectLayoutRulesImpl,
+};
+
+// We want a custom layout for ray payloads to handle the logic of
+// copying payload registers vs reading / writing to and from memory
+LayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl, &kCUDARayPayloadParameterLayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
 };
 
 // GLSL cases
@@ -1276,7 +1294,8 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules()
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getRayPayloadParameterRules()
 {
-    return nullptr;
+    // Mimicking HLSL 
+    return &kCUDARayPayloadParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 {

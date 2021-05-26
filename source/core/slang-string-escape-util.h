@@ -51,6 +51,7 @@ struct StringEscapeUtil
     {
         Cpp,            ///< Cpp style quoting and escape handling
         Space,          ///< Applies quotes if there are spaces. Does not escape.
+        JSON,           ///< Json encoding
     };
 
         /// Given a style returns a handler
