@@ -49,7 +49,7 @@ static SlangResult _lex(const char* in, DiagnosticSink* sink, List<JSONToken>& t
     return SLANG_OK;
 }
 
-static SlangResult _parse(const char* in, DiagnosticSink* sink, StringBuilder& out)
+static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONWriter& writer)
 {
     SourceManager* sourceManager = sink->getSourceManager();
 
@@ -60,12 +60,8 @@ static SlangResult _parse(const char* in, DiagnosticSink* sink, StringBuilder& o
     JSONLexer lexer;
     lexer.init(sourceView, sink);
 
-    JSONWriter writer(JSONWriter::Format::AlwaysReturn);
-
     JSONParser parser;
     SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &writer, sink));
-
-    out = writer.getBuilder();
     return SLANG_OK;
 }
 
@@ -200,11 +196,29 @@ static void jsonUnitTest()
     {
         const char in[] = "{ \"Hello\" : \"Json\", \"!\" : 10, \"array\" : [1, 2, 3.0] }";
 
-        StringBuilder buf;
+        {
+            auto style = JSONWriter::IndentationStyle::Allman;
 
-        _parse(in, &sink, buf);
+            JSONWriter writer(style);
+            _parse(in, &sink, writer);
 
-        SLANG_ASSERT(buf.getLength() > 0);
+            JSONWriter writerCheck(style);
+            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+
+            SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
+        }
+
+        {
+            auto style = JSONWriter::IndentationStyle::KNR;
+
+            JSONWriter writer(style, 80);
+            _parse(in, &sink, writer);
+
+            JSONWriter writerCheck(style);
+            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+
+            SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
+        }
 
     }
 }
