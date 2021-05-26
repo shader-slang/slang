@@ -68,6 +68,9 @@
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-test\unit-test-json.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-memory-arena.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
