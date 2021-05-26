@@ -167,6 +167,10 @@ public:
         ShaderOffset const& offset,
         IResourceView* textureView,
         ISamplerState* sampler) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
+        const slang::SpecializationArg* args,
+        uint32_t count) override;
 
 public:
     struct ShaderOffsetKey
@@ -188,6 +192,8 @@ public:
         }
     };
     Slang::String m_typeName;
+    slang::TypeReflection* m_slangType = nullptr;
+    DebugDevice* m_device;
     Slang::List<Slang::RefPtr<DebugShaderObject>> m_entryPoints;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugShaderObject>> m_objects;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugResourceView>> m_resources;
@@ -199,6 +205,10 @@ class DebugRootShaderObject : public DebugShaderObject
 public:
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+        ShaderOffset const& offset,
+        const slang::SpecializationArg* args,
+        uint32_t count) override;
 };
 
 class DebugCommandBuffer;
