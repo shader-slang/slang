@@ -1,0 +1,37 @@
+//
+
+// The file is meant to be included multiple times, to produce different
+// pieces of declaration/definition code related to diagnostic messages
+//
+// Each diagnostic is declared here with:
+//
+//     DIAGNOSTIC(id, severity, name, messageFormat)
+//
+// Where `id` is the unique diagnostic ID, `severity` is the default
+// severity (from the `Severity` enum), `name` is a name used to refer
+// to this diagnostic from code, and `messageFormat` is the default
+// (non-localized) message for the diagnostic, with placeholders
+// for any arguments.
+
+#ifndef DIAGNOSTIC
+#error Need to #define DIAGNOSTIC(...) before including 
+#define DIAGNOSTIC(id, severity, name, messageFormat) /* */
+#endif
+
+//
+// -1 - Notes that decorate another diagnostic.
+//
+
+//
+// 2xxxx - JSON Lexical analysis
+//
+
+DIAGNOSTIC(20000, Error, unexpectedCharacter, "unexpected character '$0'")
+DIAGNOSTIC(20001, Error, endOfFileInLiteral, "end of file in literal")
+DIAGNOSTIC(20002, Error, newlineInLiteral, "newline in literal")
+DIAGNOSTIC(20003, Error, endOfFileInComment, "end of file in comment")
+DIAGNOSTIC(20004, Error, expectingAHexDigit, "expecting a hex digit")
+DIAGNOSTIC(20005, Error, expectingADigit, "expecting a digit")
+DIAGNOSTIC(20006, Error, expectingValueName, "expecting value name [null, true, false]")
+
+#undef DIAGNOSTIC
