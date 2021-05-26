@@ -2254,6 +2254,7 @@ namespace Slang
             case CodeGenTarget::DXBytecodeAssembly: return ".dxbc.asm";
             case CodeGenTarget::DXILAssembly:       return ".dxil.asm";
             case CodeGenTarget::CSource:            return ".c";
+            case CodeGenTarget::CUDASource:         return ".cu";
             case CodeGenTarget::CPPSource:          return ".cpp";
                 // What these should be called is target specific, but just use these exts to make clear for now
                 // for now
@@ -2277,6 +2278,7 @@ namespace Slang
         switch (target)
         {    
             case CodeGenTarget::CPPSource:
+            case CodeGenTarget::CUDASource:
             case CodeGenTarget::CSource:
             case CodeGenTarget::DXILAssembly:
             case CodeGenTarget::DXBytecodeAssembly:
