@@ -36,6 +36,15 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-include-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-json-diagnostic-defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-json-diagnostics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-json-lexer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -96,6 +105,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-include-system.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-json-diagnostics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-json-lexer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp">
