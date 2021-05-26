@@ -92,6 +92,11 @@ struct ShaderCursor
         return m_baseObject->setObject(m_offset, object);
     }
 
+    SlangResult setSpecializationArgs(const slang::SpecializationArg* args, uint32_t count) const
+    {
+        return m_baseObject->setSpecializationArgs(m_offset, args, count);
+    }
+
     SlangResult setResource(IResourceView* resourceView) const
     {
         return m_baseObject->setResource(m_offset, resourceView);

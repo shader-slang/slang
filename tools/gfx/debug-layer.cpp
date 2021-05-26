@@ -955,23 +955,12 @@ Result DebugShaderObject::setCombinedTextureSampler(
 }
 
 Result DebugShaderObject::setSpecializationArgs(
+    ShaderOffset const& offset,
     const slang::SpecializationArg* args,
     uint32_t count)
 {
-    ComPtr<slang::ISession> session;
-    m_device->getSlangSession(session.writeRef());
-    auto expectedCount = (uint32_t)session->getTypeLayout(m_slangType)
-                             ->getSize(SLANG_PARAMETER_CATEGORY_EXISTENTIAL_TYPE_PARAM);
-    if (expectedCount != count)
-    {
-        GFX_DIAGNOSE_ERROR_FORMAT(
-            "specialization argument count for shader object type %s mismatch: expecting %d but %d "
-            "provided.",
-            m_typeName.getBuffer(),
-            expectedCount,
-            count);
-    };
-    return baseObject->setSpecializationArgs(args, count);
+
+    return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 DebugObjectBase::DebugObjectBase()
@@ -981,11 +970,11 @@ DebugObjectBase::DebugObjectBase()
 }
 
 Result DebugRootShaderObject::setSpecializationArgs(
+    ShaderOffset const& offset,
     const slang::SpecializationArg* args,
     uint32_t count)
 {
-    GFX_DIAGNOSE_ERROR("`setSpecializationArgs` should not be called directly on root objects.");
-    return baseObject->setSpecializationArgs(args, count);
+    return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 } // namespace gfx
