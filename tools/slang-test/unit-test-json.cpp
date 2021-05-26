@@ -1,6 +1,7 @@
 
 #include "../../source/compiler-core/slang-json-lexer.h"
 #include "../../source/core/slang-string-escape-util.h"
+#include "../../source/compiler-core/slang-json-parser.h"
 
 #include "test-context.h"
 
@@ -45,6 +46,26 @@ static SlangResult _lex(const char* in, DiagnosticSink* sink, List<JSONToken>& t
     // If we advance from end of file we should still be at EndOfFile
     SLANG_ASSERT(lexer.advance() == JSONTokenType::EndOfFile);
 
+    return SLANG_OK;
+}
+
+static SlangResult _parse(const char* in, DiagnosticSink* sink, StringBuilder& out)
+{
+    SourceManager* sourceManager = sink->getSourceManager();
+
+    String contents(in);
+    SourceFile* sourceFile = sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceView* sourceView = sourceManager->createSourceView(sourceFile, nullptr, SourceLoc());
+
+    JSONLexer lexer;
+    lexer.init(sourceView, sink);
+
+    JSONWriter writer(JSONWriter::Format::AlwaysReturn);
+
+    JSONParser parser;
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &writer, sink));
+
+    out = writer.getBuilder();
     return SLANG_OK;
 }
 
@@ -174,6 +195,17 @@ static void jsonUnitTest()
 
             SLANG_CHECK(escaped == buf);
         }
+    }
+
+    {
+        const char in[] = "{ \"Hello\" : \"Json\", \"!\" : 10, \"array\" : [1, 2, 3.0] }";
+
+        StringBuilder buf;
+
+        _parse(in, &sink, buf);
+
+        SLANG_ASSERT(buf.getLength() > 0);
+
     }
 }
 
