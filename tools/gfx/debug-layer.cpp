@@ -385,6 +385,8 @@ Result DebugDevice::createShaderObject(
     auto result =
         baseObject->createShaderObject(type, containerType, outObject->baseObject.writeRef());
     outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outShaderObject, outObject);
@@ -952,10 +954,27 @@ Result DebugShaderObject::setCombinedTextureSampler(
         offset, viewImpl->baseObject.get(), samplerImpl->baseObject.get());
 }
 
+Result DebugShaderObject::setSpecializationArgs(
+    ShaderOffset const& offset,
+    const slang::SpecializationArg* args,
+    uint32_t count)
+{
+
+    return baseObject->setSpecializationArgs(offset, args, count);
+}
+
 DebugObjectBase::DebugObjectBase()
 {
     static uint64_t uidCounter = 0;
     uid = ++uidCounter;
+}
+
+Result DebugRootShaderObject::setSpecializationArgs(
+    ShaderOffset const& offset,
+    const slang::SpecializationArg* args,
+    uint32_t count)
+{
+    return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 } // namespace gfx

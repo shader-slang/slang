@@ -519,6 +519,31 @@ namespace renderer_test
                         val->isOutput = true;
                         return val;
                     }
+                    else if (parser.AdvanceIf("specialize"))
+                    {
+                        RefPtr<ShaderInputLayout::SpecializeVal> val =
+                            new ShaderInputLayout::SpecializeVal();
+
+                        parser.Read(Misc::TokenType::LParent);
+                        while (!parser.IsEnd() &&
+                               parser.NextToken().Type != Misc::TokenType::RParent)
+                        {
+                            val->typeArgs.add(parseTypeName(parser));
+                            if (!parser.AdvanceIf(","))
+                                break;
+                        }
+                        parser.Read(Misc::TokenType::RParent);
+                        val->contentVal = parseValExpr(parser);
+                        return val;
+                    }
+                    else if (parser.AdvanceIf("dynamic"))
+                    {
+                        RefPtr<ShaderInputLayout::SpecializeVal> val =
+                            new ShaderInputLayout::SpecializeVal();
+                        val->typeArgs.add("__Dynamic");
+                        val->contentVal = parseValExpr(parser);
+                        return val;
+                    }
                     else
                     {
                         // We assume that any other word is introducing one of the other
