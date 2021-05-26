@@ -1059,8 +1059,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     //
     IRType* uint3Type = nullptr;
 
-    // Scans through and returns the first typeLayout attribute
-    // of non-zero size.
+    // Scans through and returns the first typeLayout attribute of non-zero size.
     static LayoutResourceKind getLayoutResourceKind(IRTypeLayout* typeLayout) {
         for (auto attr : typeLayout->getSizeAttrs()) {
             if (attr->getSize() != 0) return attr->getResourceKind();

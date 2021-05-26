@@ -211,6 +211,20 @@ namespace Slang
 
                     auto inheritedType = getBaseType(m_astBuilder, inheritanceDeclRef);
 
+
+                    // There's one annoying corner case where something that *looks* like an inheritnace
+                    // declaration isn't actually one, and that is when an `enum` type includes an explicit
+                    // declaration of its "tag type."
+                    //
+                    if (auto enumDeclRef = declRef.as<EnumDecl>())
+                    {
+                        if (inheritedType->equals(getTagType(m_astBuilder, enumDeclRef)))
+                        {
+                            return;
+                        }
+                    }
+
+
                     // We need to ensure that the witness that gets created
                     // is a composite one, reflecting lookup through
                     // the inheritance declaration.
