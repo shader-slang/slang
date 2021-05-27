@@ -5475,6 +5475,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // a field that holds the base type...
                 //
                 auto irKey = getBuilder()->createStructKey();
+                addLinkageDecoration(context, irKey, inheritanceDecl);
                 auto keyVal = LoweredValInfo::simple(irKey);
                 setGlobalValue(context, inheritanceDecl, keyVal);
                 return keyVal;

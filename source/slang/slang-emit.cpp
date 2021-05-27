@@ -698,6 +698,15 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
     eliminateDeadCode(irModule);
+
+
+    // We include one final step to (optionally) dump the IR and validate
+    // it after all of the optimization passes are complete. This should
+    // reflect the IR that code is generated from as closely as possible.
+    //
+#if 0
+    dumpIRIfEnabled(compileRequest, irModule, "OPTIMIZED");
+#endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
     return SLANG_OK;
