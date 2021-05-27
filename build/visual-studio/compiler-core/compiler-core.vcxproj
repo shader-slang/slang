@@ -183,6 +183,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-parser.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-json-value.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-misc-diagnostic-defs.h" />
@@ -208,6 +209,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-parser.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-json-value.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name-convention-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />

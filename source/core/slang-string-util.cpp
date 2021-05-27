@@ -458,9 +458,162 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
-SLANG_FORCE_INLINE static bool _isDigit(char c)
+struct DoublePow10
 {
-    return (c >= '0' && c <= '9');
+    enum { kSize = 16 };
+
+    double get(Index i) const
+    {
+        if (i <= -kSize ||
+            i >= kSize)
+        {
+            return pow(10.0, i);
+        }
+        else
+        {
+            return m_pow10[i + kSize];
+        }
+    }
+
+    DoublePow10()
+    {
+        m_pow10[kSize] = 1.0;
+        for (Index i = 1; i <= kSize; ++i)
+        {
+            m_pow10[kSize - i] = pow(10, -i);
+            m_pow10[kSize + i] = pow(10, i);
+        }
+    }
+
+    double m_pow10[kSize * 2 + 1];
+};
+
+static const DoublePow10 g_pow10;
+
+/* static */SlangResult StringUtil::parseDouble(UnownedStringSlice& ioText, double& out)
+{
+    const char* cur = ioText.begin();
+    const char* end = ioText.end();
+    SLANG_ASSERT(cur < end);
+
+    Index exp = 0;
+    Index expDelta = 0;
+
+    double value;
+    {
+        bool negate = false;
+        if (cur < end && *cur == '-')
+        {
+            negate = true;
+            cur++;
+        }
+
+        // Max digits holdable in uint64_t
+        const Index maxDigits = 19;
+
+        uint64_t mantissa = 0;
+
+        const char* curEnd = cur + maxDigits;
+        curEnd = (curEnd < end) ? curEnd : end;
+
+        // Handle leading digits
+        for (; cur < curEnd; cur++)
+        {
+            const char c = *cur;
+            if (c == '.')
+            {
+                SLANG_ASSERT(expDelta == 0);
+                // Move the end if it can be moved (as we skip over .)
+                curEnd += (curEnd < end);
+                // Each digit will now sub 1 for exp
+                expDelta = -1;
+            }
+            else if (CharUtil::isDigit(c))
+            {
+                mantissa = mantissa * 10 + (c - '0');
+                exp += expDelta;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        value = negate ? -double(mantissa) : double(mantissa);
+    }
+
+    {
+        // If the delta is -1 we now make it do nothing
+        // If the delta is 0 we make it 1
+        expDelta++;
+        for (; cur < end; ++cur)
+        {
+            const char c = *cur;
+            if (c == '.')
+            {
+                SLANG_ASSERT(expDelta > 0);
+                expDelta = 0;
+            }
+            else if (CharUtil::isDigit(c))
+            {
+                exp += expDelta;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Work out the exponent 
+        if (cur < end && (*cur == 'e' || *cur == 'E'))
+        {
+            cur++;
+            if (cur >= end)
+            {
+                // If we hit an e we must have something after it
+                return SLANG_FAIL;
+            }
+
+            Index e = 0;
+            bool negateExp = false;
+            if (*cur == '-')
+            {
+                negateExp = true;
+                cur++;
+            }
+            else if (*cur == '+')
+            {
+                cur++;
+            }
+            if (cur >= end)
+            {
+                return SLANG_FAIL;
+            }
+         
+            for (; cur < end; ++cur)
+            {
+                const char c = *cur;
+                if (CharUtil::isDigit(c))
+                {
+                    e = e * 10 + (c - '0');
+                }
+                else
+                {
+                    break;
+                }
+            }
+            exp += negateExp ? -e : e;
+        }
+    }
+
+    if (exp)
+    {
+        value *= g_pow10.get(exp);
+    }
+
+    out = value;
+    ioText = UnownedStringSlice(cur, end);
+    return SLANG_OK;
 }
 
 /* static */SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
@@ -476,7 +629,7 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     }
 
     // We need at least one digit
-    if (cur >= end || !_isDigit(*cur))
+    if (cur >= end || !CharUtil::isDigit(*cur))
     {
         return SLANG_FAIL;
     }
@@ -486,7 +639,7 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     for (; cur < end; ++cur)
     {
         const char c = *cur;
-        if (!_isDigit(c))
+        if (!CharUtil::isDigit(c))
         {
             return SLANG_FAIL;
         }
@@ -496,6 +649,76 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     value = negate ? -value : value;
 
     outValue = value;
+    return SLANG_OK;
+}
+
+/* static */SlangResult StringUtil::parseInt64(UnownedStringSlice& ioText, int64_t& out)
+{
+    bool negate = false;
+
+    const char* cur = ioText.begin();
+    const char* end = ioText.end();
+
+    if (cur < end)
+    {
+        if (*cur == '-')
+        {
+            negate = true;
+            cur++;
+        }
+        else if (*cur == '+')
+        {
+            cur++;
+        }
+    }
+
+    // Must have at least one digit
+    if (cur >= end || !CharUtil::isDigit(*cur))
+    {
+        return SLANG_FAIL;
+    }
+
+    uint64_t value = 0;
+    // We can have 20 digits, but the last digit can cause overflow.
+    // Lets do the easy first digits first
+    Index numSimple = 19;
+    while (cur < end && CharUtil::isDigit(*cur) && numSimple > 0)
+    {
+        value = value * 10 + (*cur - '0');
+    }
+
+    if (cur < end && CharUtil::isDigit(*cur))
+    {
+        const auto prevValue = value;
+        value = value * 10 + (*cur - '0');
+
+        if (value < prevValue)
+        {
+            // We have overflow
+            return SLANG_FAIL;
+        }
+    }
+
+    if (negate)
+    {
+        if (value > ~((~uint64_t(0)) >> 1))
+        {
+            // Overflow
+            return SLANG_FAIL;
+        }
+        out = -int64_t(value);
+    }
+    else
+    {
+        if (value > ((~uint64_t(0)) >> 1))
+        {
+            // Overflow
+            return SLANG_FAIL;
+        }
+        out = value;
+    }
+
+    ioText = UnownedStringSlice(cur, end);
     return SLANG_OK;
 }
 

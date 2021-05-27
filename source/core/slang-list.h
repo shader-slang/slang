@@ -351,7 +351,7 @@ namespace Slang
 
         void growToCount(Index count)
         {
-            Index newBufferCount = Index(1) << Math::Log2Ceil(count);
+            Index newBufferCount = Index(1) << Math::Log2Ceil((unsigned int)count);
             if (m_capacity < newBufferCount)
             {
                 reserve(newBufferCount);
