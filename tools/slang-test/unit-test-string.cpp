@@ -211,24 +211,14 @@ static void stringUnitTest()
             buf.Clear();
             _append(value, buf);
 
-            double parsedValue;
-
             UnownedStringSlice slice = buf.getUnownedSlice();
+
+            double parsedValue;
             SlangResult res = StringUtil::parseDouble(slice, parsedValue);
 
+            auto ulpsParsed = _calcULPDistance(value, parsedValue);
+            
             SLANG_CHECK(SLANG_SUCCEEDED(res));
-            SLANG_CHECK(slice.getLength() == 0);
-
-            if (!_areApproximatelyEqual(value, parsedValue))
-            {
-                auto ulps = _calcULPDistance(value, parsedValue);
-
-                UnownedStringSlice slice = buf.getUnownedSlice();
-                StringUtil::parseDouble(slice, parsedValue);
-
-
-                SLANG_UNUSED(ulps);
-            }
 
             // Check that they are equal
             SLANG_CHECK(_areApproximatelyEqual(value, parsedValue));
@@ -253,14 +243,14 @@ static void stringUnitTest()
             buf.Clear();
             buf << value;
 
+
             int64_t parsedValue;
 
             UnownedStringSlice slice = buf.getUnownedSlice();
             SlangResult res = StringUtil::parseInt64(slice, parsedValue);
 
             SLANG_CHECK(SLANG_SUCCEEDED(res));
-            SLANG_CHECK(slice.getLength() == 0);
-
+            
             // Check that they are equal
             SLANG_CHECK(value == parsedValue);
         }

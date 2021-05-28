@@ -458,174 +458,30 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
-struct DoublePow10
+/* static */SlangResult StringUtil::parseDouble(const UnownedStringSlice& text, double& out)
 {
-    enum { kSize = 16 };
+    const Index bufSize = 32;
 
-    double get(Index i) const
+    const auto len = text.getLength();
+
+    if (len > bufSize - 1)
     {
-        if (i <= -kSize ||
-            i >= kSize)
-        {
-            return pow(10.0, i);
-        }
-        else
-        {
-            return m_pow10[i + kSize];
-        }
-    }
+        List<char> work;
+        work.setCount(len + 1);
+        char* dst = work.getBuffer();
 
-    DoublePow10()
+        ::memcpy(dst, text.begin(), len * sizeof(char));
+        dst[len] = 0;
+
+        out = atof(dst);
+    }
+    else
     {
-        m_pow10[kSize] = 1.0;
-        for (Index i = 1; i <= kSize; ++i)
-        {
-            m_pow10[kSize - i] = pow(10, -i);
-            m_pow10[kSize + i] = pow(10, i);
-        }
+        char buf[bufSize];
+        ::memcpy(buf, text.begin(), len * sizeof(char));
+        buf[len] = 0;
+        out = atof(buf);
     }
-
-    double m_pow10[kSize * 2 + 1];
-};
-
-static const DoublePow10 g_pow10;
-
-/* static */SlangResult StringUtil::parseDouble(UnownedStringSlice& ioText, double& out)
-{
-    const char* cur = ioText.begin();
-    const char* end = ioText.end();
-    SLANG_ASSERT(cur < end);
-
-    Index exp = 0;
-    
-    double value;
-    {
-        bool negate = false;
-        if (cur < end && *cur == '-')
-        {
-            negate = true;
-            cur++;
-        }
-
-        // Max digits holdable in uint64_t
-        const Index maxDigits = 19;
-
-        uint64_t mantissa = 0;
-
-        const char* curEnd = cur + maxDigits;
-        curEnd = (curEnd < end) ? curEnd : end;
-
-        // Handle leading digits
-        for (; cur < curEnd; cur++)
-        {
-            const char c = *cur;
-            if (CharUtil::isDigit(c))
-            {
-                mantissa = mantissa * 10 + (c - '0');
-                continue;
-            }
-            break;
-        }
-
-        // If we hit a . handle it
-        if (cur < curEnd && *cur == '.')
-        {
-            // Skip .
-            cur++;
-
-            // Save the current value, as all the digits after . could be 0s, and we don't want that
-            // to make us lose precision.
-            const auto saveMantissa = mantissa;
-
-            char nonZero = 0;
-            for (; cur < curEnd && CharUtil::isDigit(*cur); ++cur, --exp)
-            {
-                const char c = *cur;
-                const char digit = c - '0';
-                // nonZero will be non zero if any digit isn't a 0.
-                nonZero |= digit;
-                mantissa = mantissa * 10 + digit;
-            }
-
-            // If everything after . is 0, restore
-            if (nonZero == 0)
-            {
-                exp = 0;
-                mantissa = saveMantissa;
-            }
-        }
-        else
-        {
-            // We may not have hit the . yet
-            // We need to increase the exponent
-            for (; cur < end && CharUtil::isDigit(*cur); ++cur, ++exp);
-
-            // If we now hit the . skip it
-            if (cur < end && *cur == '.')
-            {
-                cur++;
-            }
-        }
-
-        // We must be past the . if there was one. 
-        // Consume any remaining digits 
-        for (; cur < end && CharUtil::isDigit(*cur); ++cur);
-
-        // Calculate the value
-        value = negate ? -double(mantissa) : double(mantissa);
-    }
-
-    {
-        // Work out the exponent 
-        if (cur < end && (*cur == 'e' || *cur == 'E'))
-        {
-            // Skip the e
-            cur++;
-            if (cur >= end)
-            {
-                // If we hit an e we must have something after it
-                return SLANG_FAIL;
-            }
-
-            Index e = 0;
-            bool negateExp = false;
-            if (*cur == '-')
-            {
-                negateExp = true;
-                cur++;
-            }
-            else if (*cur == '+')
-            {
-                cur++;
-            }
-            if (cur >= end)
-            {
-                return SLANG_FAIL;
-            }
-         
-            for (; cur < end; ++cur)
-            {
-                const char c = *cur;
-                if (CharUtil::isDigit(c))
-                {
-                    e = e * 10 + (c - '0');
-                }
-                else
-                {
-                    break;
-                }
-            }
-            exp += negateExp ? -e : e;
-        }
-    }
-
-    if (exp)
-    {
-        value *= g_pow10.get(exp);
-    }
-
-    out = value;
-    ioText = UnownedStringSlice(cur, end);
     return SLANG_OK;
 }
 
@@ -665,12 +521,12 @@ static const DoublePow10 g_pow10;
     return SLANG_OK;
 }
 
-/* static */SlangResult StringUtil::parseInt64(UnownedStringSlice& ioText, int64_t& out)
+/* static */SlangResult StringUtil::parseInt64(const UnownedStringSlice& text, int64_t& out)
 {
     bool negate = false;
 
-    const char* cur = ioText.begin();
-    const char* end = ioText.end();
+    const char* cur = text.begin();
+    const char* end = text.end();
 
     if (cur < end)
     {
@@ -732,8 +588,7 @@ static const DoublePow10 g_pow10;
         out = value;
     }
 
-    ioText = UnownedStringSlice(cur, end);
-    return SLANG_OK;
+    return (cur == end) ? SLANG_OK : SLANG_FAIL;
 }
 
 } // namespace Slang

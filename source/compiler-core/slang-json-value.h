@@ -13,6 +13,23 @@ typedef uint32_t JSONKey;
 
 struct JSONValue
 {
+    enum class Kind
+    {
+        Invalid,
+
+        Null,
+
+        Bool,
+        String,
+        Integer,
+        Float,
+
+        Array,
+        Object,
+
+        CountOf, 
+    };
+
     enum class Type
     {
         Invalid,
@@ -31,30 +48,39 @@ struct JSONValue
 
         Array,
         Object,
+
+        CountOf,
     };
 
     static bool isLexeme(Type type) { return Index(type) >= Index(Type::StringLexeme) && Index(type) <= Index(Type::FloatLexeme); }
 
     static JSONValue makeInt(int64_t inValue, SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::IntegerValue; value.loc = loc; value.intValue = inValue; return value; }
     static JSONValue makeFloat(double inValue, SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::FloatValue; value.loc = loc; value.floatValue = inValue; return value; }
-    static JSONValue makeFalse(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::False; value.loc = loc; return value; }
-    static JSONValue makeTrue(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::True; value.loc = loc; return value; }
     static JSONValue makeNull(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Null; value.loc = loc; return value; }
-    static JSONValue makeEmptyArray(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Array; value.loc = loc; value.rangeIndex = 0; return value; }
-    static JSONValue makeEmptyObject(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Object; value.loc = loc; value.rangeIndex = 0; return value; }
+    static JSONValue makeBool(bool inValue, SourceLoc loc = SourceLoc()) { JSONValue value; value.type = (inValue ? Type::True : Type::False); value.loc = loc; return value; }
 
     static JSONValue makeLexeme(Type type, SourceLoc loc,  Index length) { SLANG_ASSERT(isLexeme(type)); JSONValue value; value.type = type; value.loc = loc; value.length = length; return value; }
+
+    static JSONValue makeEmptyArray(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Array; value.loc = loc; value.rangeIndex = 0; return value; }
+    static JSONValue makeEmptyObject(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Object; value.loc = loc; value.rangeIndex = 0; return value; }
 
         /// True if this is a object like
     bool isObjectLike() const { return Index(type) >= Index(Type::Array); }
 
+        /// True if this appears to be a valid value
     bool isValid() const { return type != JSONValue::Type::Invalid; }
 
         /// True if needs destroy
     bool needsDestroy() const { return isObjectLike() && rangeIndex != 0; }
 
-    Type type;
-    SourceLoc loc;
+        /// Get the kind
+    SLANG_FORCE_INLINE Kind getKind() const { return getKindForType(type); }
+
+        /// Given a type return the associated kind
+    static Kind getKindForType(Type type) { return g_typeToKind[Index(type)]; }
+
+    Type type;                  ///< The type of value
+    SourceLoc loc;              ///< The (optional) location in source of this value.
 
     union 
     {
@@ -64,8 +90,9 @@ struct JSONValue
         int64_t intValue;           ///< Integer value
         JSONKey stringKey;          ///< The pool key if it's a string
     };
-};
 
+    static const Kind g_typeToKind[Index(Type::CountOf)];
+};
 
 struct JSONKeyValue
 {
@@ -84,11 +111,11 @@ class JSONContainer : public RefObject
 public:
 
         /// Make a new array
-    JSONValue makeArray(const JSONValue* values, Index valuesCount, SourceLoc loc = SourceLoc());
+    JSONValue createArray(const JSONValue* values, Index valuesCount, SourceLoc loc = SourceLoc());
         /// Make a new object
-    JSONValue makeObject(const JSONKeyValue* keyValues, Index keyValueCount, SourceLoc loc = SourceLoc());
+    JSONValue createObject(const JSONKeyValue* keyValues, Index keyValueCount, SourceLoc loc = SourceLoc());
         /// Make a string
-    JSONValue makeString(const UnownedStringSlice& slice, SourceLoc loc = SourceLoc()); 
+    JSONValue createString(const UnownedStringSlice& slice, SourceLoc loc = SourceLoc()); 
 
     ConstArrayView<JSONValue> getArray(const JSONValue& in) const;
     ConstArrayView<JSONKeyValue> getObject(const JSONValue& in) const;
@@ -120,6 +147,9 @@ public:
         /// As a float value
     double asFloat(const JSONValue& value);
 
+        /// Returns string as a key
+    JSONKey getStringKey(const JSONValue& in);
+
         /// Get as a string. 
     UnownedStringSlice getString(const JSONValue& in);
 
@@ -130,6 +160,13 @@ public:
     JSONKey getKey(const UnownedStringSlice& slice);
         /// Get the string from the key
     UnownedStringSlice getStringFromKey(JSONKey key) const { return m_slicePool.getSlice(StringSlicePool::Handle(key)); }
+
+        /// True if they are the same value
+        /// If object like type comparison is performed recursively.
+        /// NOTE! That Float and Integer values do not compare & source locations are ignored.
+    bool areEqual(const JSONValue& a, const JSONValue& b);
+    bool areEqual(const JSONValue* a, const JSONValue* b, Index count);
+    bool areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
 
         /// Destroy value
     void destroy(JSONValue& value);
@@ -171,6 +208,12 @@ protected:
     void _removeKey(JSONValue& obj, Index globalIndex);
         /// Note does not destroy values in range.
     void _destroyRange(Index rangeIndex);
+
+    static bool _sameKeyOrder(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+        /// True if the values are equal
+    bool _areEqualValues(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+        /// True if the key and value are equal
+    bool _areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
 
     StringBuilder m_buf;                        ///< A temporary buffer used to hold unescaped strings
 

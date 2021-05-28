@@ -6,6 +6,26 @@
 
 namespace Slang {
 
+/* static */const JSONValue::Kind JSONValue::g_typeToKind[] =
+{
+    JSONValue::Kind::Invalid,           // Invalid
+
+    JSONValue::Kind::Bool,              // True,
+    JSONValue::Kind::Bool,              // False
+    JSONValue::Kind::Null,              // Null,
+
+    JSONValue::Kind::String,            // StringLexeme,
+    JSONValue::Kind::Integer,           // IntegerLexeme,
+    JSONValue::Kind::Float,             // FloatLexeme,
+
+    JSONValue::Kind::Integer,           // IntegerValue,
+    JSONValue::Kind::Float,             // FloatValue,
+    JSONValue::Kind::String,            // StringValue,
+
+    JSONValue::Kind::Array,             // Array,
+    JSONValue::Kind::Object,            // Object,
+};
+
 static JSONKeyValue _makeInvalidKeyValue()
 {
     JSONKeyValue keyValue;
@@ -70,7 +90,7 @@ Index JSONContainer::_addRange(Range::Type type, Index startIndex, Index count)
     }
 }
 
-JSONValue JSONContainer::makeArray(const JSONValue* values, Index valuesCount, SourceLoc loc)
+JSONValue JSONContainer::createArray(const JSONValue* values, Index valuesCount, SourceLoc loc)
 {
     if (valuesCount <= 0)
     {
@@ -86,7 +106,7 @@ JSONValue JSONContainer::makeArray(const JSONValue* values, Index valuesCount, S
     return value;
 }
 
-JSONValue JSONContainer::makeObject(const JSONKeyValue* keyValues, Index keyValueCount, SourceLoc loc)
+JSONValue JSONContainer::createObject(const JSONKeyValue* keyValues, Index keyValueCount, SourceLoc loc)
 {
     if (keyValueCount <= 0)
     {
@@ -102,7 +122,7 @@ JSONValue JSONContainer::makeObject(const JSONKeyValue* keyValues, Index keyValu
     return value;
 }
 
-JSONValue JSONContainer::makeString(const UnownedStringSlice& slice, SourceLoc loc)
+JSONValue JSONContainer::createString(const UnownedStringSlice& slice, SourceLoc loc)
 {
     JSONValue value;
     value.type = JSONValue::Type::StringValue;
@@ -214,6 +234,11 @@ UnownedStringSlice JSONContainer::getString(const JSONValue& in)
     return UnownedStringSlice();
 }
 
+JSONKey JSONContainer::getStringKey(const JSONValue& in)
+{
+    return (in.type == JSONValue::Type::StringValue) ? in.stringKey : getKey(getString(in));
+}
+ 
 bool JSONContainer::asBool(const JSONValue& value)
 {
     switch (value.type)
@@ -558,6 +583,164 @@ void JSONContainer::destroyRecursively(JSONValue& inValue)
             }
         }
     }
+}
+
+bool JSONContainer::areEqual(const JSONValue* a, const JSONValue* b, Index count)
+{
+    for (Index i = 0; i < count; ++i)
+    {
+        if (!areEqual(a[i], b[i]))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+/* static */bool JSONContainer::_sameKeyOrder(const JSONKeyValue* a, const JSONKeyValue* b, Index count)
+{
+    for (Index i = 0; i < count; ++i)
+    {
+        if (a[i].key != b[i].key)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool JSONContainer::_areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyValue* b, Index count)
+{
+    for (Index i = 0; i < count; ++i)
+    {
+        const auto& curA = a[i];
+        const auto& curB = b[i];
+
+        if (curA.key != curB.key ||
+            !areEqual(curA.value, curB.value))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool JSONContainer::_areEqualValues(const JSONKeyValue* a, const JSONKeyValue* b, Index count)
+{
+    for (Index i = 0; i < count; ++i)
+    {
+        if (!areEqual(a[i].value, b[i].value))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool JSONContainer::areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index count)
+{
+    if (count == 0)
+    {
+        return true;
+    }
+
+    if (_sameKeyOrder(a, b, count))
+    {
+        return _areEqualValues(a, b, count);
+    }
+    else
+    {
+            // We need to compare with keys in the same order
+        List<JSONKeyValue> sortedAs;
+        sortedAs.addRange(a, count);
+
+        List<JSONKeyValue> sortedBs;
+        sortedBs.addRange(b, count);
+
+        sortedAs.sort([](const JSONKeyValue&a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
+        sortedBs.sort([](const JSONKeyValue&a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
+
+        return _areEqualOrderedKeys(sortedAs.getBuffer(), sortedBs.getBuffer(), count);
+    }
+}
+
+bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
+{
+    if (&a == &b)
+    {
+        return true;
+    }
+
+    if (a.type == b.type)
+    {
+        switch (a.type)
+        {
+            default:
+            // Invalid are never equal
+            case JSONValue::Type::Invalid:      return false;
+            case JSONValue::Type::True:         
+            case JSONValue::Type::False:        
+            case JSONValue::Type::Null:
+            {
+                return true;
+            }
+            case JSONValue::Type::IntegerLexeme:return asInteger(a) == asInteger(b); 
+            case JSONValue::Type::FloatLexeme:  return asFloat(a) == asFloat(b);
+            case JSONValue::Type::StringLexeme:
+            {
+                // If the lexemes are equal they are equal
+                UnownedStringSlice lexemeA = getLexeme(a);
+                UnownedStringSlice lexemeB = getLexeme(b);
+                // Else we want to decode the string to be sure if they are equal.
+                return lexemeA == lexemeB || getStringKey(a) == getStringKey(b);
+            }
+            case JSONValue::Type::IntegerValue: return a.intValue == b.intValue;
+            case JSONValue::Type::FloatValue:   return a.floatValue == b.floatValue;
+            case JSONValue::Type::StringValue:  return a.stringKey == b.stringKey;
+
+            case JSONValue::Type::Array:
+            {
+                if (a.rangeIndex == b.rangeIndex)
+                {
+                    return true;
+                }
+                auto arrayA = getArray(a);
+                auto arrayB = getArray(b);
+
+                const Index count = arrayA.getCount();
+                return (count == arrayB.getCount()) && areEqual(arrayA.getBuffer(), arrayB.getBuffer(), count);
+            }
+            case JSONValue::Type::Object:
+            {
+                if (a.rangeIndex == b.rangeIndex)
+                {
+                    return true;
+                }
+                const auto aValues = getObject(a);
+                const auto bValues = getObject(b);
+
+                const Index count = aValues.getCount();
+                return (count == bValues.getCount()) && areEqual(aValues.getBuffer(), bValues.getBuffer(), count);
+            }
+        }
+    }
+
+    // If they are the same kind, and float/int/string we can convert to compare
+    const JSONValue::Kind kind = a.getKind();
+    if (kind == b.getKind())
+    {
+        switch (kind)
+        {
+            case JSONValue::Kind::String:   return getStringKey(a) == getStringKey(b); 
+            case JSONValue::Kind::Integer:  return asInteger(a) == asInteger(b);
+            case JSONValue::Kind::Float:    return asFloat(a) == asFloat(b);
+            default: break;
+        }
+    }
+
+    return false;
 }
 
 } // namespace Slang
