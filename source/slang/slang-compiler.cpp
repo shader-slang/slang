@@ -368,17 +368,10 @@ namespace Slang
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         // Check if the type is supported on this compile
-        switch (passThrough)
+        if (passThrough == PassThroughMode::None)
         {
-            case PassThroughMode::None:
-            {
-                // If no pass through -> that will always work!
-                return SLANG_OK;
-            }
-#if !SLANG_ENABLE_GLSLANG_SUPPORT
-            case PassThroughMode::Glslang: return SLANG_E_NOT_IMPLEMENTED;
-#endif
-            default: break;
+            // If no pass through -> that will always work!
+            return SLANG_OK;
         }
 
         return session->getOrLoadDownstreamCompiler(passThrough, nullptr) ? SLANG_OK: SLANG_E_NOT_FOUND;
