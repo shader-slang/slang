@@ -4,7 +4,7 @@
 
 #include "test-context.h"
 
-#include <math.h>
+//#include <math.h>
 
 #include <sstream>
 
@@ -71,6 +71,7 @@ static int64_t _calcULPDistance(double a, double b)
 
     const int64_t max = int64_t((~uint64_t(0)) >> 1);
 
+#if 0
     // Max distance for NaN
     if (isnan(a) || isnan(b))
     {
@@ -82,6 +83,7 @@ static int64_t _calcULPDistance(double a, double b)
     {
         return max;
     }
+#endif
 
     int64_t ia, ib;
     memcpy(&ia, &a, sizeof(a));
