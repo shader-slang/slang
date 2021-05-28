@@ -497,8 +497,7 @@ static const DoublePow10 g_pow10;
     SLANG_ASSERT(cur < end);
 
     Index exp = 0;
-    Index expDelta = 0;
-
+    
     double value;
     {
         bool negate = false;
@@ -520,53 +519,67 @@ static const DoublePow10 g_pow10;
         for (; cur < curEnd; cur++)
         {
             const char c = *cur;
-            if (c == '.')
-            {
-                SLANG_ASSERT(expDelta == 0);
-                // Move the end if it can be moved (as we skip over .)
-                curEnd += (curEnd < end);
-                // Each digit will now sub 1 for exp
-                expDelta = -1;
-            }
-            else if (CharUtil::isDigit(c))
+            if (CharUtil::isDigit(c))
             {
                 mantissa = mantissa * 10 + (c - '0');
-                exp += expDelta;
+                continue;
             }
-            else
+            break;
+        }
+
+        // If we hit a . handle it
+        if (cur < curEnd && *cur == '.')
+        {
+            // Skip .
+            cur++;
+
+            // Save the current value, as all the digits after . could be 0s, and we don't want that
+            // to make us lose precision.
+            const auto saveMantissa = mantissa;
+
+            char nonZero = 0;
+            for (; cur < curEnd && CharUtil::isDigit(*cur); ++cur, --exp)
             {
-                break;
+                const char c = *cur;
+                const char digit = c - '0';
+                // nonZero will be non zero if any digit isn't a 0.
+                nonZero |= digit;
+                mantissa = mantissa * 10 + digit;
+            }
+
+            // If everything after . is 0, restore
+            if (nonZero == 0)
+            {
+                exp = 0;
+                mantissa = saveMantissa;
+            }
+        }
+        else
+        {
+            // We may not have hit the . yet
+            // We need to increase the exponent
+            for (; cur < end && CharUtil::isDigit(*cur); ++cur, ++exp);
+
+            // If we now hit the . skip it
+            if (cur < end && *cur == '.')
+            {
+                cur++;
             }
         }
 
+        // We must be past the . if there was one. 
+        // Consume any remaining digits 
+        for (; cur < end && CharUtil::isDigit(*cur); ++cur);
+
+        // Calculate the value
         value = negate ? -double(mantissa) : double(mantissa);
     }
 
     {
-        // If the delta is -1 we now make it do nothing
-        // If the delta is 0 we make it 1
-        expDelta++;
-        for (; cur < end; ++cur)
-        {
-            const char c = *cur;
-            if (c == '.')
-            {
-                SLANG_ASSERT(expDelta > 0);
-                expDelta = 0;
-            }
-            else if (CharUtil::isDigit(c))
-            {
-                exp += expDelta;
-            }
-            else
-            {
-                break;
-            }
-        }
-
         // Work out the exponent 
         if (cur < end && (*cur == 'e' || *cur == 'E'))
         {
+            // Skip the e
             cur++;
             if (cur >= end)
             {
@@ -682,7 +695,7 @@ static const DoublePow10 g_pow10;
     // We can have 20 digits, but the last digit can cause overflow.
     // Lets do the easy first digits first
     Index numSimple = 19;
-    while (cur < end && CharUtil::isDigit(*cur) && numSimple > 0)
+    for (; cur < end && CharUtil::isDigit(*cur) && numSimple > 0; ++cur, --numSimple)
     {
         value = value * 10 + (*cur - '0');
     }
@@ -691,6 +704,7 @@ static const DoublePow10 g_pow10;
     {
         const auto prevValue = value;
         value = value * 10 + (*cur - '0');
+        cur++;
 
         if (value < prevValue)
         {
