@@ -12,6 +12,13 @@
 
 namespace Slang {
 
+GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc) :
+    Super(desc)
+{
+    m_glslExtensionTracker = dynamicCast<GLSLExtensionTracker>(desc.extensionTracker);
+    SLANG_ASSERT(m_glslExtensionTracker);
+}
+
 SlangResult GLSLSourceEmitter::init()
 {
     SLANG_RETURN_ON_FAIL(Super::init());
