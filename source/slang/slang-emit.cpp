@@ -698,6 +698,15 @@ Result linkAndOptimizeIR(
     // bit_cast on basic types.
     lowerBitCast(targetRequest, irModule);
     eliminateDeadCode(irModule);
+
+
+    // We include one final step to (optionally) dump the IR and validate
+    // it after all of the optimization passes are complete. This should
+    // reflect the IR that code is generated from as closely as possible.
+    //
+#if 0
+    dumpIRIfEnabled(compileRequest, irModule, "OPTIMIZED");
+#endif
     validateIRModuleIfEnabled(compileRequest, irModule);
 
     return SLANG_OK;
@@ -712,9 +721,10 @@ SlangResult emitEntryPointsSourceFromIR(
     const List<Int>&        entryPointIndices,
     CodeGenTarget           target,
     TargetRequest*          targetRequest,
-    SourceResult&           outSource)
+    ExtensionTracker*       extensionTracker, 
+    String&                 outSource)
 {
-    outSource.reset();
+    outSource = String();
 
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
@@ -751,6 +761,7 @@ SlangResult emitEntryPointsSourceFromIR(
     }
     desc.targetCaps = targetRequest->getTargetCaps();
     desc.sourceWriter = &sourceWriter;
+    desc.extensionTracker = extensionTracker;
 
     // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
     // items in the linkedIR module
@@ -857,8 +868,6 @@ SlangResult emitEntryPointsSourceFromIR(
     sourceEmitter->emitPreprocessorDirectives();
     sourceWriter.resumeLineDirective();
 
-    RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
-
     if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
     {
         trackGLSLTargetCaps(glslExtensionTracker, targetRequest->getTargetCaps());
@@ -878,9 +887,7 @@ SlangResult emitEntryPointsSourceFromIR(
     finalResultBuilder << code;
 
     // Write out the result
-    outSource.source = finalResultBuilder.ProduceString();
-    outSource.extensionTracker = extensionTracker;
-
+    outSource = finalResultBuilder.ProduceString();
     return SLANG_OK;
 }
 

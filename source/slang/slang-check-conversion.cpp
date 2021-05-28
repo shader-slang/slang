@@ -151,6 +151,44 @@ namespace Slang
             ioInitArgIndex);
     }
 
+    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    {
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        if(!inheritanceDecl)
+            return nullptr;
+
+        auto baseType = getBaseType(astBuilder, inheritanceDecl);
+        auto baseDeclRefType = as<DeclRefType>(baseType);
+        if(!baseDeclRefType)
+            return nullptr;
+
+        auto baseDeclRef = baseDeclRefType->declRef;
+        auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
+        if(!baseStructDeclRef)
+            return nullptr;
+
+        return baseDeclRefType;
+    }
+
+    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef)
+    {
+        auto inheritanceDecl = getMembersOfType<InheritanceDecl>(structTypeDeclRef).getFirstOrNull();
+        if (!inheritanceDecl)
+            return DeclRef<StructDecl>();
+
+        auto baseType = getBaseType(astBuilder, inheritanceDecl);
+        auto baseDeclRefType = as<DeclRefType>(baseType);
+        if (!baseDeclRefType)
+            return DeclRef<StructDecl>();
+
+        auto baseDeclRef = baseDeclRefType->declRef;
+        auto baseStructDeclRef = baseDeclRef.as<StructDecl>();
+        if (!baseStructDeclRef)
+            return DeclRef<StructDecl>();
+
+        return baseStructDeclRef;
+    }
+
     bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         Type*                inToType,
         Expr**               outToExpr,
@@ -375,6 +413,30 @@ namespace Slang
             if(auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
             {
                 // Trying to initialize a `struct` type given an initializer list.
+                //
+                // Before we iterate over the fields, we want to check if this struct
+                // inherits from another `struct` type. If so, we want to read
+                // an initializer for that base type first.
+                //
+                if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
+                {
+                    Expr* coercedArg = nullptr;
+                    bool argResult = _readValueFromInitializerList(
+                        baseStructType,
+                        outToExpr ? &coercedArg : nullptr,
+                        fromInitializerListExpr,
+                        ioArgIndex);
+
+                    // No point in trying further if any argument fails
+                    if (!argResult)
+                        return false;
+
+                    if (coercedArg)
+                    {
+                        coercedArgs.add(coercedArg);
+                    }
+                }
+
                 // We will go through the fields in order and try to match them
                 // up with initializer arguments.
                 //
