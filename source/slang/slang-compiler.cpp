@@ -1053,10 +1053,7 @@ namespace Slang
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
                 options.sourceContentsPath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
-
-                String source;
-                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, source));
-                options.sourceContents = source;
+                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
             }
             else
             {
@@ -1072,11 +1069,7 @@ namespace Slang
         }
         else
         {
-            String source;
-            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, source));
-
-            options.sourceContents = source;
-            
+            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
             maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
         }
 
@@ -1526,19 +1519,18 @@ namespace Slang
             {
                 RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
 
-                String source;
+                String code;
                 if (SLANG_FAILED(emitEntryPointsSource(compileRequest,
                     entryPointIndices,
                     targetReq,
                     target,
                     endToEndReq,
                     extensionTracker,
-                    source)))
+                    code)))
                 {
                     return result;
                 }
 
-                const auto& code = source;
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }
