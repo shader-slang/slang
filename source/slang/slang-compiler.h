@@ -2145,17 +2145,9 @@ namespace Slang
     String calcSourcePathForEntryPoint(EndToEndCompileRequest* endToEndReq, Int entryPointIndex);
     String calcSourcePathForEntryPoints(EndToEndCompileRequest* endToEndReq, const List<Int>& entryPointIndices);
 
-    struct SourceResult
+    class ExtensionTracker : public RefObject
     {
-        void reset()
-        {
-            source = String();
-            extensionTracker.setNull();
-        }
-
-        String source;
-        // Must be cast to a specific extension tracker such as GLSLExtensionTracker
-        RefPtr<RefObject> extensionTracker;
+    public:
     };
 
     /* Emits entry point source taking into account if a pass-through or not. Uses 'target' to determine
@@ -2166,7 +2158,8 @@ namespace Slang
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
-        SourceResult&           outSource);
+        ExtensionTracker*       extensionTracker,
+        String&                 outSource);
 
     SlangResult emitEntryPointSource(
         BackEndCompileRequest*  compileRequest,
@@ -2174,7 +2167,8 @@ namespace Slang
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
-        SourceResult&           outSource);
+        ExtensionTracker*       extensionTracker,
+        String&                 outSource);
 
     //
 

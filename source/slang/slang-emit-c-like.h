@@ -36,6 +36,9 @@ public:
             /// The capabilities of the target
         CapabilitySet targetCaps;
 
+            /// The associated extension tracker
+        ExtensionTracker* extensionTracker = nullptr;
+
         SourceWriter* sourceWriter = nullptr;
     };
 

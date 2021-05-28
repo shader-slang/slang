@@ -41,6 +41,7 @@ namespace Slang
         const List<Int>&        entryPointIndices,
         CodeGenTarget           target,
         TargetRequest*          targetRequest,
-        SourceResult&           outSource);
+        ExtensionTracker*       extensionTracker, 
+        String&                 outSource);
 }
 #endif
