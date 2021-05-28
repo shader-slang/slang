@@ -886,7 +886,8 @@ namespace Slang
 
         PassThroughMode downstreamCompiler = endToEndReq ? endToEndReq->m_passThrough : PassThroughMode::None;
 
-        
+        RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
+
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
         {
@@ -936,9 +937,15 @@ namespace Slang
                 downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage)));
             }
         }
+        else
+        {
+            // If we are pass through, we may need to set extension tracker state. 
+            if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
+            {
+                trackGLSLTargetCaps(glslTracker, targetReq->getTargetCaps());
+            }
+        }
 
-        RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
- 
         // We should have a downstream compiler set at this point
         SLANG_ASSERT(downstreamCompiler != PassThroughMode::None);
 
@@ -1098,8 +1105,6 @@ namespace Slang
             }
             else if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
             {
-                trackGLSLTargetCaps(glslTracker, targetReq->getTargetCaps());
-
                 DownstreamCompiler::CapabilityVersion version;
                 version.kind = DownstreamCompiler::CapabilityVersion::Kind::SPIRV;
                 version.version = glslTracker->getSPIRVVersion();
