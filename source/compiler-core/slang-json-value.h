@@ -164,7 +164,10 @@ protected:
         Index capacity;
     };
 
-    Index _addRange();
+    template <typename T>
+    static void _add(Range& range, List<T>& list, const T& value);
+
+    Index _addRange(Range::Type type, Index startIndex, Index count);
     void _removeKey(JSONValue& obj, Index globalIndex);
         /// Note does not destroy values in range.
     void _destroyRange(Index rangeIndex);
