@@ -4,6 +4,8 @@
 
 #include "test-context.h"
 
+#include <math.h>
+
 #include <sstream>
 
 using namespace Slang;
