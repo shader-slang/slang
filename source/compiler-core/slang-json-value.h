@@ -45,7 +45,13 @@ struct JSONValue
 
     static JSONValue makeLexeme(Type type, SourceLoc loc,  Index length) { SLANG_ASSERT(isLexeme(type)); JSONValue value; value.type = type; value.loc = loc; value.length = length; return value; }
 
+        /// True if this is a object like
+    bool isObjectLike() const { return Index(type) >= Index(Type::Array); }
+
     bool isValid() const { return type != JSONValue::Type::Invalid; }
+
+        /// True if needs destroy
+    bool needsDestroy() const { return isObjectLike() && rangeIndex != 0; }
 
     Type type;
     SourceLoc loc;
@@ -125,6 +131,11 @@ public:
         /// Get the string from the key
     UnownedStringSlice getStringFromKey(JSONKey key) const { return m_slicePool.getSlice(StringSlicePool::Handle(key)); }
 
+        /// Destroy value
+    void destroy(JSONValue& value);
+        /// Destroy recursively from value
+    void destroyRecursively(JSONValue& value);
+
         //
     JSONContainer(SourceManager* sourceManger);
 
@@ -139,9 +150,13 @@ protected:
         enum class Type
         {
             None,
+            Destroyed,
             Object,
             Array,
         };
+
+            /// Is active if it consuming some part of a value list (even if zero count)
+        SLANG_FORCE_INLINE bool isActive() const { return Index(type) >= Index(Type::Object); }
 
         Type type;
         Index startIndex;
@@ -151,6 +166,8 @@ protected:
 
     Index _addRange();
     void _removeKey(JSONValue& obj, Index globalIndex);
+        /// Note does not destroy values in range.
+    void _destroyRange(Index rangeIndex);
 
     StringBuilder m_buf;                        ///< A temporary buffer used to hold unescaped strings
 

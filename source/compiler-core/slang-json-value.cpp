@@ -514,5 +514,104 @@ void JSONContainer::setKeyValue(JSONValue& obj, JSONKey key, const JSONValue& va
     range.capacity++;
 }
 
+void JSONContainer::_destroyRange(Index rangeIndex)
+{
+    auto& range = m_ranges[rangeIndex];
+
+    // If the range is at the end, shrink it
+    switch (range.type)
+    {
+        case Range::Type::Array:
+        {
+            if (range.startIndex + range.capacity == m_arrayValues.getCount())
+            {
+                m_arrayValues.setCount(range.startIndex);
+            }
+            break;
+        }
+        case Range::Type::Object:
+        {
+            if (range.startIndex + range.capacity == m_objectValues.getCount())
+            {
+                m_objectValues.setCount(range.startIndex);
+            }
+            break;
+        }
+        default: break;
+    }
+
+    range.type = Range::Type::Destroyed;
+    m_freeRangeIndices.add(rangeIndex);
+}
+
+void JSONContainer::destroy(JSONValue& value)
+{
+    if (value.needsDestroy())
+    {
+        _destroyRange(value.rangeIndex);
+    }
+    value.type = JSONValue::Type::Invalid;
+}
+
+void JSONContainer::destroyRecursively(JSONValue& inValue)
+{    
+    if (!(inValue.needsDestroy() && m_ranges[inValue.rangeIndex].isActive()))
+    {
+        inValue.type = JSONValue::Type::Invalid;
+        return;
+    }
+
+    inValue.type = JSONValue::Type::Invalid;
+
+    List<Range> activeRanges;
+
+    activeRanges.add(m_ranges[inValue.rangeIndex]);
+    _destroyRange(inValue.rangeIndex);
+
+    while (activeRanges.getCount())
+    {
+        const Range range = activeRanges.getLast();
+        activeRanges.removeLast();
+
+        auto type = range.type;
+        const Index count = range.count;
+
+        if (type == Range::Type::Array)
+        {
+            auto* buf = m_arrayValues.getBuffer() + range.startIndex;
+
+            for (Index i = 0; i < count; ++i)
+            {
+                auto& value = buf[i];
+                // If we have an active range, add to work list, and destroy 
+                if (value.needsDestroy() && m_ranges[value.rangeIndex].isActive())
+                {
+                    activeRanges.add(m_ranges[value.rangeIndex]);
+                    _destroyRange(value.rangeIndex);
+                }
+                value.type = JSONValue::Type::Invalid;
+            }
+        }
+        else 
+        {
+            SLANG_ASSERT(type == Range::Type::Object);
+
+            auto* buf = m_objectValues.getBuffer() + range.startIndex;
+
+            for (Index i = 0; i < count; ++i)
+            {
+                auto& keyValue = buf[i];
+                auto& value = keyValue.value;
+                // We want to mark that it's in the list so that if we have a badly formed tree we don't read
+                if (value.needsDestroy() && m_ranges[value.rangeIndex].isActive())
+                {
+                    activeRanges.add(m_ranges[value.rangeIndex]);
+                    _destroyRange(value.rangeIndex);
+                }
+                value.type = JSONValue::Type::Invalid;
+            }
+        }
+    }
+}
 
 } // namespace Slang
