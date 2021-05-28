@@ -646,7 +646,11 @@ bool JSONContainer::areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index
         return true;
     }
 
-    if (_sameKeyOrder(a, b, count))
+    if (count == 1)
+    {
+        return _areEqualOrderedKeys(a, b, count);
+    }
+    else if (_sameKeyOrder(a, b, count))
     {
         return _areEqualValues(a, b, count);
     }
