@@ -1002,6 +1002,8 @@ namespace Slang
             /// True if non empty (equivalent to getCount() != 0 but faster)
         bool isNonEmpty() const { return isFilterNonEmpty<T>(m_filterStyle, m_decls.begin(), m_decls.end()); }
 
+        DeclRef<T> getFirstOrNull() { return isEmpty() ? DeclRef<T>() : (*this)[0]; }
+
         DeclRef<T> operator[](Index index) const
         {
              Decl*const* decl = getFilterCursorByIndex<T>(m_filterStyle, m_decls.begin(), m_decls.end(), index);
