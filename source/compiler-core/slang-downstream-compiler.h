@@ -512,6 +512,9 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static void updateDefaults(DownstreamCompilerSet* set);
 
     static void setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);
+
+    static SlangResult loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependantNames, const char* libraryName, ComPtr<ISlangSharedLibrary>& outSharedLib);
+
 };
 
 }

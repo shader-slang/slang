@@ -737,6 +737,83 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
 }
 
+
+/* static */SlangResult DownstreamCompilerUtil::loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependentNames, const char* inLibraryName, ComPtr<ISlangSharedLibrary>& outSharedLib)
+{
+    String parentPath;
+    String libraryPath;
+
+    // If a path is passed in lets, try and determine what kind of path it is.
+    if (path.getLength())
+    {
+        SlangPathType pathType;
+        if (SLANG_SUCCEEDED(Path::getPathType(path, &pathType)))
+        {
+            if (pathType == SLANG_PATH_TYPE_DIRECTORY)
+            {
+                parentPath = path;
+                libraryPath = Path::combine(parentPath, inLibraryName);
+            }
+            else
+            {
+                SLANG_ASSERT(pathType == SLANG_PATH_TYPE_FILE);
+
+                // If we can get the canonical path, we'll do that before getting the parent
+                String canonicalPath;
+                if (SLANG_SUCCEEDED(Path::getCanonical(path, canonicalPath)))
+                {
+                    parentPath = Path::getParentDirectory(canonicalPath);
+                }
+                else
+                {
+                    parentPath = Path::getParentDirectory(path);
+                }
+
+                // It's a file - we'll use this to load with
+                libraryPath = path;
+            }
+        }
+    }
+
+    // Keep all dependent libs in scope, before we load the library we want
+    List<ComPtr<ISlangSharedLibrary>> dependentLibs;
+
+    // Try to load any dependent libs from the parent path
+    if (dependentNames)
+    {
+        for (const char*const* cur = dependentNames; *cur; ++cur)
+        {
+            const char* dependentName = *cur;
+            ComPtr<ISlangSharedLibrary> lib;
+            if (parentPath.getLength())
+            {
+                String dependentPath = Path::combine(parentPath, dependentName);
+                loader->loadSharedLibrary(dependentPath.getBuffer(), lib.writeRef());
+            }
+            else
+            {
+                loader->loadSharedLibrary(dependentName, lib.writeRef());
+            }
+
+            if (lib)
+            {
+                dependentLibs.add(lib);
+            }
+        }
+    }
+
+    if (libraryPath.getLength())
+    {
+        // If we hare a library path use that
+        return loader->loadSharedLibrary(libraryPath.getBuffer(), outSharedLib.writeRef());
+    }
+    else
+    {
+        // Else just use the name that was passed in.
+        return loader->loadSharedLibrary(inLibraryName, outSharedLib.writeRef());
+    }
+}
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamCompilerSet !!!!!!!!!!!!!!!!!!!!!!*/
 
 void DownstreamCompilerSet::getCompilerDescs(List<DownstreamCompiler::Desc>& outCompilerDescs) const
@@ -812,5 +889,7 @@ void DownstreamCompilerSet::addCompiler(DownstreamCompiler* compiler)
         m_compilers.add(compiler);
     }
 }
+
+
 
 }
