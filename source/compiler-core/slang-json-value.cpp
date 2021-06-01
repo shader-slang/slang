@@ -350,7 +350,7 @@ int64_t JSONContainer::asInteger(const JSONValue& value)
         {
             UnownedStringSlice slice = getLexeme(value);
             int64_t intValue;
-            if (SLANG_SUCCEEDED(StringUtil::parseInt64(slice, intValue)) && slice.getLength() == 0)
+            if (SLANG_SUCCEEDED(StringUtil::parseInt64(slice, intValue)))
             {
                 return intValue;
             }
@@ -371,7 +371,7 @@ double JSONContainer::asFloat(const JSONValue& value)
         {
             UnownedStringSlice slice = getLexeme(value);
             double floatValue;
-            if (SLANG_SUCCEEDED(StringUtil::parseDouble(slice, floatValue)) && slice.getLength() == 0)
+            if (SLANG_SUCCEEDED(StringUtil::parseDouble(slice, floatValue)))
             {
                 return floatValue;
             }
@@ -808,7 +808,7 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
     return false;
 }
 
-void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listener)
+void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* listener)
 {
     typedef JSONValue::Type Type;
 
@@ -826,7 +826,8 @@ void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listen
         case Type::FloatValue:      return listener->addFloatValue(value.floatValue, value.loc);
         case Type::StringValue:
         {
-
+            const auto slice = getStringFromKey(value.stringKey);
+            return listener->addStringValue(slice, value.loc);
         }
         case Type::Array:
         {
@@ -836,7 +837,7 @@ void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listen
 
             for (const auto arrayValue : arr)
             {
-                emitRecursively(arrayValue, listener);
+                traverseRecursively(arrayValue, listener);
             }
 
             listener->endArray(SourceLoc());
@@ -855,7 +856,7 @@ void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listen
                 listener->addKey(keyString, objKeyValue.keyLoc);
 
                 // Emit the value associated with the key
-                emitRecursively(objKeyValue.value, listener);
+                traverseRecursively(objKeyValue.value, listener);
             }
 
             listener->endObject(SourceLoc());
@@ -867,6 +868,205 @@ void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listen
             return;
         }
     }
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                          JSONBuilder
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+JSONBuilder::JSONBuilder(JSONContainer* container):
+    m_container(container)
+{
+    m_state.m_kind = State::Kind::Root;
+    m_state.m_startIndex = 0;
+
+    m_keyValue.reset();
+
+    m_rootValue.reset();
+}
+
+void JSONBuilder::_popState()
+{
+    SLANG_ASSERT(m_stateStack.getCount() > 0);
+
+    // Reset the end depending on typpe
+    switch (m_state.m_kind)
+    {
+        case State::Kind::Array:
+        {
+            m_values.setCount(m_state.m_startIndex);
+            break;
+        }
+        case State::Kind::Object:
+        {
+            m_keyValues.setCount(m_state.m_startIndex);
+            break;
+        }
+    }
+
+    // Pop from the stack
+    m_state = m_stateStack.getLast();
+    m_stateStack.removeLast();
+}
+
+Index JSONBuilder::_findKeyIndex(JSONKey key) const
+{
+    SLANG_ASSERT(m_state.m_kind == State::Kind::Object);
+    const Index count = m_keyValues.getCount();
+    for (Index i = m_state.m_startIndex; i < count; ++i)
+    {
+        auto& keyValue = m_keyValues[i];
+        // If we find the key return it's index
+        if (keyValue.key == key)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void JSONBuilder::_add(const JSONValue& value)
+{
+    SLANG_ASSERT(value.isValid());
+    switch (m_state.m_kind)
+    {
+        case State::Kind::Root:
+        {
+            SLANG_ASSERT(!m_rootValue.isValid());
+            m_rootValue = value;
+            break;
+        }
+        case State::Kind::Array:
+        {
+            m_values.add(value);
+            break;
+        }
+        case State::Kind::Object:
+        {
+            m_keyValue.value = value;
+            const Index index = _findKeyIndex(m_keyValue.key);
+            if (index >= 0)
+            {
+                m_keyValues[index] = m_keyValue;
+            }
+            else
+            {
+                m_keyValues.add(m_keyValue);
+            }
+            m_keyValue.reset();
+            break;
+        }
+    }
+}
+
+void JSONBuilder::startObject(SourceLoc loc)
+{
+    m_stateStack.add(m_state);
+    m_state.m_kind = State::Kind::Object;
+    m_state.m_startIndex = m_keyValues.getCount();
+    m_state.m_loc = loc;
+}
+
+void JSONBuilder::endObject(SourceLoc loc)
+{
+    SLANG_UNUSED(loc);
+
+    SLANG_ASSERT(m_state.m_kind == State::Kind::Object);
+
+    const Index count = m_keyValues.getCount() - m_state.m_startIndex;
+    const JSONValue value = m_container->createObject(m_keyValues.getBuffer() + m_state.m_startIndex, count, m_state.m_loc);
+
+    // Pop current state
+    _popState();
+    // Add the value to the current state
+    _add(value);
+}
+
+void JSONBuilder::startArray(SourceLoc loc)
+{
+    m_stateStack.add(m_state);
+    m_state.m_kind = State::Kind::Array;
+    m_state.m_startIndex = m_values.getCount();
+    m_state.m_loc = loc;
+}
+
+void JSONBuilder::endArray(SourceLoc loc)
+{
+    SLANG_UNUSED(loc);
+
+    SLANG_ASSERT(m_state.m_kind == State::Kind::Array);
+
+    const Index count = m_values.getCount() - m_state.m_startIndex;
+    const JSONValue value = m_container->createArray(m_values.getBuffer() + m_state.m_startIndex, count, m_state.m_loc);
+
+    // Pop current state
+    _popState();
+    // Add the value to the current state
+    _add(value);
+}
+
+void JSONBuilder::addKey(const UnownedStringSlice& key, SourceLoc loc)
+{
+    SLANG_ASSERT(m_keyValue.key == JSONKey(0));
+    m_keyValue.key = m_container->getKey(key);
+    m_keyValue.keyLoc = loc;
+}
+
+void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc)
+{
+    switch (type)
+    {
+        case JSONTokenType::True:       return _add(JSONValue::makeBool(true, loc)); 
+        case JSONTokenType::False:      return _add(JSONValue::makeBool(false, loc));
+        case JSONTokenType::Null:       return _add(JSONValue::makeNull(loc));
+        
+        case JSONTokenType::IntegerLiteral:
+        {
+            SLANG_ASSERT(loc.isValid());
+            return _add(JSONValue::makeLexeme(JSONValue::Type::IntegerLexeme, loc, value.getLength()));
+        }
+        case JSONTokenType::FloatLiteral:
+        {
+            SLANG_ASSERT(loc.isValid());
+            return _add(JSONValue::makeLexeme(JSONValue::Type::FloatLexeme, loc, value.getLength()));
+        }
+        case JSONTokenType::StringLiteral:
+        {
+            SLANG_ASSERT(loc.isValid());
+            return _add(JSONValue::makeLexeme(JSONValue::Type::StringLexeme, loc, value.getLength()));
+        }
+        default:
+        {
+            SLANG_ASSERT(!"Unhandled type");
+        }
+    }
+}
+
+void JSONBuilder::addIntegerValue(int64_t value, SourceLoc loc)
+{
+    _add(JSONValue::makeInt(value, loc));
+}
+
+void JSONBuilder::addFloatValue(double value, SourceLoc loc)
+{
+    _add(JSONValue::makeFloat(value, loc));
+}
+
+void JSONBuilder::addBoolValue(bool value, SourceLoc loc)
+{
+    _add(JSONValue::makeBool(value, loc));
+}
+
+void JSONBuilder::addStringValue(const UnownedStringSlice& slice, SourceLoc loc)
+{
+    _add(m_container->createString(slice, loc));
+}
+
+void JSONBuilder::addNullValue(SourceLoc loc)
+{
+    _add(JSONValue::makeNull(loc));
 }
 
 } // namespace Slang

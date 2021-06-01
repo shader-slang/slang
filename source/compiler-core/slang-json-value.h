@@ -88,6 +88,12 @@ struct JSONValue
         /// Get the kind
     SLANG_FORCE_INLINE Kind getKind() const { return getKindForType(type); }
 
+    void reset()
+    {
+        type = Type::Invalid;
+        loc = SourceLoc();
+    }
+
         /// Given a type return the associated kind
     static Kind getKindForType(Type type) { return g_typeToKind[Index(type)]; }
 
@@ -110,6 +116,13 @@ struct JSONKeyValue
 {
         /// True if it's valid
     bool isValid() const { return value.type != JSONValue::Type::Invalid; }
+
+    void reset()
+    {
+        key = JSONKey(0);
+        keyLoc = SourceLoc();
+        value.reset();
+    }
 
     JSONKey key;
     SourceLoc keyLoc;
@@ -185,10 +198,10 @@ public:
         /// Destroy recursively from value
     void destroyRecursively(JSONValue& value);
 
-        /// Emit a JSON hierarchy from value to the listener
-    void emitRecursively(const JSONValue& value, JSONListener* listener);
+        /// Traverse a JSON hierarchy from value, outputting to the listener
+    void traverseRecursively(const JSONValue& value, JSONListener* listener);
 
-        //
+        // Ctor
     JSONContainer(SourceManager* sourceManger);
 
         /// Returns true if all the keys are unique
@@ -240,7 +253,59 @@ protected:
     List<Index> m_freeRangeIndices;
     List<JSONValue> m_arrayValues;
     List<JSONKeyValue> m_objectValues;
+};
 
+class JSONBuilder : public JSONListener
+{
+public:
+
+    virtual void startObject(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addBoolValue(bool value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addStringValue(const UnownedStringSlice& string, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addNullValue(SourceLoc loc) SLANG_OVERRIDE;
+
+        /// Get the root value. Will be set after valid construction
+    const JSONValue& getRootValue() const { return m_rootValue; }
+
+    JSONBuilder(JSONContainer* container);
+
+protected:
+
+    struct State
+    {
+        enum class Kind : uint8_t
+        {
+            Root,
+            Object,
+            Array,
+        };
+        Kind m_kind;
+        Index m_startIndex;
+        SourceLoc m_loc;
+    };
+
+    void _popState();
+    void _add(const JSONValue& value);
+
+    Index _findKeyIndex(JSONKey key) const;
+
+    List<JSONKeyValue> m_keyValues;
+    List<JSONValue> m_values;
+    List<State> m_stateStack;
+
+    State m_state;
+
+    JSONContainer* m_container;
+
+    JSONKeyValue m_keyValue;
+    JSONValue m_rootValue;
 };
 
 } // namespace Slang

@@ -50,7 +50,7 @@ static SlangResult _lex(const char* in, DiagnosticSink* sink, List<JSONToken>& t
     return SLANG_OK;
 }
 
-static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONWriter& writer)
+static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONListener* listener)
 {
     SourceManager* sourceManager = sink->getSourceManager();
 
@@ -62,7 +62,7 @@ static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONWriter& writ
     lexer.init(sourceView, sink);
 
     JSONParser parser;
-    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &writer, sink));
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, listener, sink));
     return SLANG_OK;
 }
 
@@ -201,10 +201,10 @@ static void jsonUnitTest()
             auto style = JSONWriter::IndentationStyle::Allman;
 
             JSONWriter writer(style);
-            _parse(in, &sink, writer);
+            _parse(in, &sink, &writer);
 
             JSONWriter writerCheck(style);
-            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+            _parse(writer.getBuilder().getBuffer(), &sink, &writerCheck);
 
             SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
         }
@@ -213,14 +213,36 @@ static void jsonUnitTest()
             auto style = JSONWriter::IndentationStyle::KNR;
 
             JSONWriter writer(style, 80);
-            _parse(in, &sink, writer);
+            _parse(in, &sink, &writer);
 
             JSONWriter writerCheck(style);
-            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+            _parse(writer.getBuilder().getBuffer(), &sink, &writerCheck);
 
             SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
         }
 
+        {
+            // Let's parse into a Value
+            RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+            JSONValue value;
+            {
+                JSONBuilder builder(container);
+
+                SLANG_CHECK(SLANG_SUCCEEDED(_parse(in, &sink, &builder)));
+                value = builder.getRootValue();
+            }
+            // Let's recreate
+            JSONValue copy;
+            {
+                JSONBuilder builder(container);
+                container->traverseRecursively(value, &builder);
+                copy = builder.getRootValue();
+            }
+
+            SLANG_CHECK(container->areEqual(value, copy));
+
+        }
     }
 
 
@@ -254,7 +276,7 @@ static void jsonUnitTest()
             {
                 JSONWriter writer(JSONWriter::IndentationStyle::KNR, 80);
                 
-                container->emitRecursively(array, &writer);
+                container->traverseRecursively(array, &writer);
             }
         }
         {
