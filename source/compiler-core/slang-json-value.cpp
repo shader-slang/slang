@@ -36,6 +36,99 @@ static JSONKeyValue _makeInvalidKeyValue()
 
 /* static */JSONKeyValue g_invalid = _makeInvalidKeyValue();
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                             JSONValue
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+bool JSONValue::asBool() const
+{
+    switch (type)
+    {
+        case JSONValue::Type::True:             return true;
+        case JSONValue::Type::False:
+        case JSONValue::Type::Null:
+        {
+            return false;
+        }
+        case JSONValue::Type::IntegerValue:     return intValue != 0;
+        case JSONValue::Type::FloatValue:       return floatValue != 0;
+        default: break;
+    }
+
+    if (isLexeme(type))
+    {
+        SLANG_ASSERT(!"Lexeme values can only be accessed through container");
+    }
+    else
+    {
+        SLANG_ASSERT(!"Not bool convertable");
+    }
+   
+    return false;
+}
+
+int64_t JSONValue::asInteger() const
+{
+    switch (type)
+    {
+        case JSONValue::Type::True:             return 1;
+        case JSONValue::Type::False:
+        case JSONValue::Type::Null:
+        {
+            return 0;
+        }
+        case JSONValue::Type::IntegerValue:     return intValue;
+        case JSONValue::Type::FloatValue:       return int64_t(floatValue);
+        break;
+    }
+
+    if (isLexeme(type))
+    {
+        SLANG_ASSERT(!"Lexeme values can only be accessed through container");
+    }
+    else
+    {
+        SLANG_ASSERT(!"Not int convertable");
+    }
+
+    return 0;
+}
+
+double JSONValue::asFloat() const
+{
+    switch (type)
+    {
+        case JSONValue::Type::True:             return 1.0;
+        case JSONValue::Type::False:
+        case JSONValue::Type::Null:
+        {
+            return 0.0;
+        }
+        case JSONValue::Type::IntegerValue:     return double(intValue);
+        case JSONValue::Type::FloatValue:       return floatValue;
+        default: break;
+    }
+
+    if (isLexeme(type))
+    {
+        SLANG_ASSERT(!"Lexeme values can only be accessed through container");
+    }
+    else
+    {
+        SLANG_ASSERT(!"Not float convertable");
+    }
+  
+    return 0;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                             JSONContainer
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
 JSONContainer::JSONContainer(SourceManager* sourceManager):
     m_slicePool(StringSlicePool::Style::Default),
     m_sourceManager(sourceManager)
@@ -243,66 +336,36 @@ bool JSONContainer::asBool(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::True:             return true;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
-        {
-            return false;
-        }
-        case JSONValue::Type::IntegerValue:     return value.intValue != 0;
-        case JSONValue::Type::FloatValue:       return value.floatValue != 0;
         case JSONValue::Type::IntegerLexeme:    return asInteger(value) != 0;
         case JSONValue::Type::FloatLexeme:      return asFloat(value) != 0.0;
-        default: break;
+        default:                                return value.asBool();
     }
-    SLANG_ASSERT(!"Not bool convertable");
-    return false;
 }
 
 int64_t JSONContainer::asInteger(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::True:             return 1;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
-        {
-            return 0;
-        }
-        case JSONValue::Type::IntegerValue:     return value.intValue;
-        case JSONValue::Type::FloatValue:       return int64_t(value.floatValue);
         case JSONValue::Type::IntegerLexeme:
         {
             UnownedStringSlice slice = getLexeme(value);
-
             int64_t intValue;
             if (SLANG_SUCCEEDED(StringUtil::parseInt64(slice, intValue)) && slice.getLength() == 0)
             {
                 return intValue;
             }
-
             SLANG_ASSERT(!"Couldn't convert int");
             return 0;
         }
         case JSONValue::Type::FloatLexeme:      return int64_t(asFloat(value));
-        default: break;
+        default:                                return value.asInteger();
     }
-    SLANG_ASSERT(!"Not int convertable");
-    return 0;
 }
 
 double JSONContainer::asFloat(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::True:             return 1.0;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
-        {
-            return 0.0;
-        }
-        case JSONValue::Type::IntegerValue:     return double(value.intValue);
-        case JSONValue::Type::FloatValue:       return value.floatValue;
         case JSONValue::Type::IntegerLexeme:    return double(asInteger(value));
         case JSONValue::Type::FloatLexeme:  
         {
@@ -315,10 +378,8 @@ double JSONContainer::asFloat(const JSONValue& value)
             SLANG_ASSERT(!"Couldn't convert double");
             return 0.0;
         }
-        default: break;
+        default:                                return value.asFloat();
     }
-    SLANG_ASSERT(!"Not float convertable");
-    return 0;
 }
 
 JSONValue& JSONContainer::getAt(const JSONValue& array, Index index)

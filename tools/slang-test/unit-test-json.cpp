@@ -263,7 +263,7 @@ static void jsonUnitTest()
 
             SLANG_CHECK(objView.getCount() == 1);
 
-            SLANG_CHECK(container->asInteger(objView[0].value) == 10);
+            SLANG_CHECK(objView[0].value.asInteger() == 10);
         }
     }
 }

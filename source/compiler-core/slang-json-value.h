@@ -64,6 +64,16 @@ struct JSONValue
     static JSONValue makeEmptyArray(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Array; value.loc = loc; value.rangeIndex = 0; return value; }
     static JSONValue makeEmptyObject(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Object; value.loc = loc; value.rangeIndex = 0; return value; }
 
+    // The following functions only work if the value is stored directly NOT as a lexeme. Use the methods on the container
+    // to access values if it is potentially stored as a lexeme
+
+        /// As a boolean value 
+    bool asBool() const;
+        /// As an integer value
+    int64_t asInteger() const;
+        /// As a float value
+    double asFloat() const;
+
         /// True if this is a object like
     bool isObjectLike() const { return Index(type) >= Index(Type::Array); }
 
