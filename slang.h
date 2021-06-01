@@ -3857,6 +3857,9 @@ namespace slang
         PreprocessorMacroDesc const*    preprocessorMacros = nullptr;
         SlangInt                        preprocessorMacroCount = 0;
 
+            /** The line directive mode for output source code.
+            */
+        SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
     enum class ContainerType

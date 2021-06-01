@@ -26,6 +26,7 @@ namespace gfx
             slangSessionDesc.searchPaths = desc.searchPaths;
             slangSessionDesc.preprocessorMacroCount = desc.preprocessorMacroCount;
             slangSessionDesc.preprocessorMacros = desc.preprocessorMacros;
+            slangSessionDesc.lineDirectiveMode = desc.lineDirectiveMode;
             slang::TargetDesc targetDesc = {};
             targetDesc.format = compileTarget;
             auto targetProfile = desc.targetProfile;

@@ -1961,7 +1961,6 @@ namespace Slang
             m_program->getLinkage(),
             sink,
             m_program);
-
         backEndRequest->shouldDumpIR =
             (m_targetReq->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR) != 0;
 

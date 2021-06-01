@@ -1318,6 +1318,8 @@ namespace Slang
             char const* value);
         SlangResult setMatrixLayoutMode(
             SlangMatrixLayoutMode mode);
+        LineDirectiveMode getLineDirectiveMode() { return m_lineDirectiveMode; }
+        SlangResult setLineDirectiveMode(LineDirectiveMode mode);
 
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
@@ -1407,6 +1409,8 @@ namespace Slang
         
         /// Set if fileSystemExt is a cache file system
         RefPtr<CacheFileSystem> m_cacheFileSystem;
+
+        LineDirectiveMode m_lineDirectiveMode = LineDirectiveMode::Default;
 
         ISlangFileSystemExt* getFileSystemExt() { return m_fileSystemExt; }
         CacheFileSystem* getCacheFileSystem() const { return m_cacheFileSystem; }
@@ -2083,7 +2087,11 @@ namespace Slang
         {
             return m_specializedEntryPoints[index];
         }
-
+        ~EndToEndCompileRequest()
+        {
+            m_linkage = nullptr;
+            m_frontEndReq = nullptr;
+        }
     private:
 
         ISlangUnknown* getInterface(const Guid& guid);

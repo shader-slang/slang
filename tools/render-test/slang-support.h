@@ -67,10 +67,10 @@ struct ShaderCompilerUtil
         IShaderProgram::Desc desc = {};
 
             /// Compile request that owns the lifetime of compiled kernel code.
-        SlangCompileRequest* m_requestForKernels = nullptr;
+        ComPtr<SlangCompileRequest> m_requestForKernels = nullptr;
 
             /// Compile request that owns the lifetime of reflection information.
-        SlangCompileRequest* m_extraRequestForReflection = nullptr;
+        ComPtr<SlangCompileRequest> m_extraRequestForReflection = nullptr;
 
         SlangCompileRequest* getRequestForKernels() const { return m_requestForKernels; }
         SlangCompileRequest* getRequestForReflection() const { return m_extraRequestForReflection ? m_extraRequestForReflection : m_requestForKernels; }
@@ -86,12 +86,12 @@ struct ShaderCompilerUtil
         Slang::String sourcePath;
     };
 
-    static SlangResult compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
+    static SlangResult compileWithLayout(slang::ISession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
 
     static SlangResult readSource(const Slang::String& inSourcePath, Slang::List<char>& outSourceText);
 
-    static SlangResult _compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
-    static SlangResult compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
+    static SlangResult _compileProgramImpl(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
+    static SlangResult compileProgram(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
 };
 
 

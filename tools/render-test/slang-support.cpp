@@ -66,26 +66,19 @@ void ShaderCompilerUtil::Output::reset()
         desc.slangProgram = nullptr;
     }
 
-    if (m_requestForKernels && session)
-    {
-        spDestroyCompileRequest(m_requestForKernels);
-    }
-    if (m_extraRequestForReflection && session)
-    {
-        spDestroyCompileRequest(m_extraRequestForReflection);
-    }
     session = nullptr;
     m_requestForKernels = nullptr;
     m_extraRequestForReflection = nullptr;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
+/* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     out.reset();
 
-    SlangCompileRequest* slangRequest = spCreateCompileRequest(session);
+    ComPtr<SlangCompileRequest> slangRequest = nullptr;
+    session->createCompileRequest(slangRequest.writeRef());
     out.m_requestForKernels = slangRequest;
-    out.session = session;
+    out.session = session->getGlobalSession();
 
     // Parse all the extra args
     {
@@ -102,7 +95,7 @@ void ShaderCompilerUtil::Output::reset()
     }
 
     spSetCodeGenTarget(slangRequest, input.target);
-    spSetTargetProfile(slangRequest, 0, spFindProfile(session, input.profile.getBuffer()));
+    spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
 
     // Define a macro so that shader code in a test can detect what language we
     // are nominally working with.
@@ -241,11 +234,10 @@ void ShaderCompilerUtil::Output::reset()
     }
 
     out.set(input.pipelineType, linkedSlangProgram);
-
     return SLANG_OK;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(SlangSession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
+/* static */ SlangResult ShaderCompilerUtil::compileProgram(slang::ISession* session, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out)
 {
     if( input.passThrough == SLANG_PASS_THROUGH_NONE )
     {
@@ -319,7 +311,7 @@ void ShaderCompilerUtil::Output::reset()
     return SLANG_OK;
 }
 
-/* static */SlangResult ShaderCompilerUtil::compileWithLayout(SlangSession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
+/* static */SlangResult ShaderCompilerUtil::compileWithLayout(slang::ISession* session, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output)
 {
     String sourcePath = options.sourcePath;
     auto shaderType = options.shaderType;
@@ -331,7 +323,7 @@ void ShaderCompilerUtil::Output::reset()
     {
         // Add an include of the prelude
         ComPtr<ISlangBlob> prelude;
-        session->getLanguagePrelude(input.sourceLanguage, prelude.writeRef());
+        session->getGlobalSession()->getLanguagePrelude(input.sourceLanguage, prelude.writeRef());
 
         String preludeString = StringUtil::getString(prelude);
 
@@ -421,7 +413,6 @@ void ShaderCompilerUtil::Output::reset()
     }
     compileRequest.globalSpecializationArgs = layout.globalSpecializationArgs;
     compileRequest.entryPointSpecializationArgs = layout.entryPointSpecializationArgs;
-
     return ShaderCompilerUtil::compileProgram(session, options, input, compileRequest, output.output);
 }
 

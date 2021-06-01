@@ -195,6 +195,19 @@ ShaderCursor ShaderCursor::getElement(SlangInt index) const
             return fieldCursor;
         }
         break;
+
+    case slang::TypeReflection::Kind::Vector:
+    case slang::TypeReflection::Kind::Matrix:
+        {
+            ShaderCursor fieldCursor;
+            fieldCursor.m_baseObject = m_baseObject;
+            fieldCursor.m_typeLayout = m_typeLayout->getElementTypeLayout();
+            fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) * index;
+            fieldCursor.m_offset.bindingRangeIndex = m_offset.bindingRangeIndex;
+            fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
+            return fieldCursor;
+        }
+        break;
     }
 
     return ShaderCursor();

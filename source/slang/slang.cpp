@@ -457,6 +457,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
+    linkage->setLineDirectiveMode(LineDirectiveMode(desc.lineDirectiveMode));
+
     Int searchPathCount = desc.searchPathCount;
     for(Int ii = 0; ii < searchPathCount; ++ii)
     {
@@ -1034,6 +1036,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     SlangCompileRequest**   outCompileRequest)
 {
     auto compileRequest = new EndToEndCompileRequest(this);
+    compileRequest->addRef();
     *outCompileRequest = asExternal(compileRequest);
     return SLANG_OK;
 }
@@ -1057,6 +1060,12 @@ SlangResult Linkage::setMatrixLayoutMode(
     SlangMatrixLayoutMode mode)
 {
     defaultMatrixLayoutMode = MatrixLayoutMode(mode);
+    return SLANG_OK;
+}
+
+SlangResult Linkage::setLineDirectiveMode(LineDirectiveMode mode)
+{
+    m_lineDirectiveMode = mode;
     return SLANG_OK;
 }
 
@@ -2009,7 +2018,10 @@ BackEndCompileRequest::BackEndCompileRequest(
     : CompileRequestBase(linkage, sink)
     , m_program(program)
     , m_dumpIntermediatePrefix("slang-dump-")
-{}
+    , lineDirectiveMode(linkage->getLineDirectiveMode())
+
+{
+}
 
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
@@ -3842,6 +3854,7 @@ void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
 {
     // TODO: validation
     getBackEndReq()->lineDirectiveMode = LineDirectiveMode(mode);
+    m_linkage->setLineDirectiveMode(LineDirectiveMode(mode));
 }
 
 void EndToEndCompileRequest::setCommandLineCompilerMode()
