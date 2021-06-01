@@ -835,7 +835,7 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
 
             const auto arr = getArray(value);
 
-            for (const auto arrayValue : arr)
+            for (const auto& arrayValue : arr)
             {
                 traverseRecursively(arrayValue, listener);
             }
@@ -849,7 +849,7 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
 
             const auto obj = getObject(value);
 
-            for (const auto objKeyValue : obj)
+            for (const auto& objKeyValue : obj)
             {
                 // Emit the key
                 const auto keyString = getStringFromKey(objKeyValue.key);
