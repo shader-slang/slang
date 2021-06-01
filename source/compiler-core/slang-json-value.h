@@ -74,7 +74,7 @@ struct JSONValue
         /// As a float value
     double asFloat() const;
 
-        /// True if this is a object like
+        /// True if this is a object like (array or object)
     bool isObjectLike() const { return Index(type) >= Index(Type::Array); }
 
         /// True if this appears to be a valid value
