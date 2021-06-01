@@ -1045,6 +1045,7 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
             {
                 int64_t intValue = -1;
                 auto res = StringUtil::parseInt64(value, intValue);
+                SLANG_UNUSED(res);
                 SLANG_ASSERT(SLANG_SUCCEEDED(res));
                 _add(JSONValue::makeInt(intValue, loc));
             }
@@ -1061,6 +1062,7 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
             {
                 double floatValue = 0;
                 auto res = StringUtil::parseDouble(value, floatValue);
+                SLANG_UNUSED(res);
                 SLANG_ASSERT(SLANG_SUCCEEDED(res));
                 _add(JSONValue::makeFloat(floatValue, loc));
             }
