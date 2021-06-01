@@ -808,4 +808,65 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
     return false;
 }
 
+void JSONContainer::emitRecursively(const JSONValue& value, JSONListener* listener)
+{
+    typedef JSONValue::Type Type;
+
+    switch (value.type)
+    {    
+        case Type::True:            return listener->addBoolValue(true, value.loc);
+        case Type::False:           return listener->addBoolValue(false, value.loc);
+        case Type::Null:            return listener->addNullValue(value.loc);
+
+        case Type::StringLexeme:    return listener->addLexemeValue(JSONTokenType::StringLiteral, getLexeme(value), value.loc);
+        case Type::IntegerLexeme:   return listener->addLexemeValue(JSONTokenType::IntegerLiteral, getLexeme(value), value.loc);
+        case Type::FloatLexeme:     return listener->addLexemeValue(JSONTokenType::FloatLiteral, getLexeme(value), value.loc);
+
+        case Type::IntegerValue:    return listener->addIntegerValue(value.intValue, value.loc); 
+        case Type::FloatValue:      return listener->addFloatValue(value.floatValue, value.loc);
+        case Type::StringValue:
+        {
+
+        }
+        case Type::Array:
+        {
+            listener->startArray(value.loc);
+
+            const auto arr = getArray(value);
+
+            for (const auto arrayValue : arr)
+            {
+                emitRecursively(arrayValue, listener);
+            }
+
+            listener->endArray(SourceLoc());
+            break;
+        }
+        case Type::Object:
+        {
+            listener->startObject(value.loc);
+
+            const auto obj = getObject(value);
+
+            for (const auto objKeyValue : obj)
+            {
+                // Emit the key
+                const auto keyString = getStringFromKey(objKeyValue.key);
+                listener->addKey(keyString, objKeyValue.keyLoc);
+
+                // Emit the value associated with the key
+                emitRecursively(objKeyValue.value, listener);
+            }
+
+            listener->endObject(SourceLoc());
+            break;
+        }
+        default:
+        {
+            SLANG_ASSERT(!"Invalid type");
+            return;
+        }
+    }
+}
+
 } // namespace Slang

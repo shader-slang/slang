@@ -19,10 +19,24 @@ public:
         /// End and array
     virtual void endArray(SourceLoc loc) = 0;
 
-        /// Add the key lexeme. Must be followed by addLexemeValue.
-    virtual void addLexemeKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
+
+        /// Add the key. Must be followed by addXXXValue.
+    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
         /// Can be performed in an array or after an addLexemeKey in an object
-    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) = 0; 
+    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) = 0;
+
+        /// An integer value
+    virtual void addIntegerValue(int64_t value, SourceLoc loc) = 0;
+        /// Add a floating point value
+    virtual void addFloatValue(double value, SourceLoc loc) = 0;
+        /// Add a boolean value
+    virtual void addBoolValue(bool value, SourceLoc loc) = 0;
+
+        /// Add a string value. NOTE! string is unescaped/quoted
+    virtual void addStringValue(const UnownedStringSlice& string, SourceLoc loc) = 0;
+
+        /// Add a null value
+    virtual void addNullValue(SourceLoc loc) = 0;
 };
 
 class JSONWriter : public JSONListener
@@ -79,8 +93,13 @@ public:
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
-    virtual void addLexemeKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addBoolValue(bool value, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addStringValue(const UnownedStringSlice& string, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addNullValue(SourceLoc loc) SLANG_OVERRIDE;
 
         /// Get the builder
     StringBuilder& getBuilder() { return m_builder; }
@@ -141,6 +160,9 @@ protected:
 
     void _maybeEmitComma();
     void _maybeEmitFieldComma();
+
+    void _preValue(SourceLoc loc);
+    void _postValue();
 
     void _indent() { m_currentIndent++; }
     void _dedent() { --m_currentIndent; SLANG_ASSERT(m_currentIndent >= 0); }

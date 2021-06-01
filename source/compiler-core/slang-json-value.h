@@ -7,6 +7,8 @@
 #include "slang-source-loc.h"
 #include "slang-diagnostic-sink.h"
 
+#include "slang-json-parser.h"
+
 namespace Slang {
 
 typedef uint32_t JSONKey;
@@ -182,6 +184,9 @@ public:
     void destroy(JSONValue& value);
         /// Destroy recursively from value
     void destroyRecursively(JSONValue& value);
+
+        /// Emit a JSON hierarchy from value to the listener
+    void emitRecursively(const JSONValue& value, JSONListener* listener);
 
         //
     JSONContainer(SourceManager* sourceManger);

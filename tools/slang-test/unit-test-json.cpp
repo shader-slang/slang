@@ -250,6 +250,12 @@ static void jsonUnitTest()
 
             // Check the values are the same
             SLANG_CHECK(container->areEqual(arrayView.getBuffer(), values.getBuffer(), arrayView.getCount()));
+
+            {
+                JSONWriter writer(JSONWriter::IndentationStyle::KNR, 80);
+                
+                container->emitRecursively(array, &writer);
+            }
         }
         {
             JSONValue obj = JSONValue::makeEmptyObject();
