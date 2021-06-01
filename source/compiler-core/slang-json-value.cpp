@@ -172,8 +172,8 @@ ArrayView<JSONValue> JSONContainer::getArray(const JSONValue& in)
 
 ArrayView<JSONKeyValue> JSONContainer::getObject(const JSONValue& in)
 {
-    SLANG_ASSERT(in.type == JSONValue::Type::Array);
-    if (in.type != JSONValue::Type::Array || in.rangeIndex == 0)
+    SLANG_ASSERT(in.type == JSONValue::Type::Object);
+    if (in.type != JSONValue::Type::Object || in.rangeIndex == 0)
     {
         return ArrayView<JSONKeyValue>((JSONKeyValue*)nullptr, 0);
     }
