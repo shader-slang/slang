@@ -11,18 +11,18 @@ class JSONListener
 {
 public:
         /// Start an object
-    virtual void startObject() = 0;
+    virtual void startObject(SourceLoc loc) = 0;
         /// End an object
-    virtual void endObject() = 0;
+    virtual void endObject(SourceLoc loc) = 0;
         /// Start an array
-    virtual void startArray() = 0;
+    virtual void startArray(SourceLoc loc) = 0;
         /// End and array
-    virtual void endArray() = 0;
+    virtual void endArray(SourceLoc loc) = 0;
 
         /// Add the key lexeme. Must be followed by addLexemeValue.
-    virtual void addLexemeKey(const UnownedStringSlice& key) = 0;
+    virtual void addLexemeKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
         /// Can be performed in an array or after an addLexemeKey in an object
-    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value) = 0; 
+    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) = 0; 
 };
 
 class JSONWriter : public JSONListener
@@ -75,12 +75,12 @@ public:
     static bool isAfter(Location loc) { return isObjectLike(loc) && (Index(loc) & 2) != 0; }
 
     // Implement JSONListener
-    virtual void startObject() SLANG_OVERRIDE;
-    virtual void endObject() SLANG_OVERRIDE;
-    virtual void startArray() SLANG_OVERRIDE;
-    virtual void endArray() SLANG_OVERRIDE;
-    virtual void addLexemeKey(const UnownedStringSlice& key) SLANG_OVERRIDE;
-    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value) SLANG_OVERRIDE;
+    virtual void startObject(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addLexemeKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
 
         /// Get the builder
     StringBuilder& getBuilder() { return m_builder; }
