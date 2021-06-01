@@ -100,6 +100,12 @@ struct StringUtil
 
         /// Convert in to int. Returns SLANG_FAIL on error
     static SlangResult parseInt(const UnownedStringSlice& in, Int& outValue);
+
+        /// Convert ioText into double. Returns SLANG_OK on success.
+    static SlangResult parseDouble(const UnownedStringSlice& text, double& out);
+
+        /// Convert into int64_t. Returns SLANG_OK on success. 
+    static SlangResult parseInt64(const UnownedStringSlice& text, int64_t& out);
 };
 
 /* A helper class that allows parsing of lines from text with iteration. Uses StringUtil::extractLine for the actual underlying implementation. */

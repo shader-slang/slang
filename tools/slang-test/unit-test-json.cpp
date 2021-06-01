@@ -2,6 +2,7 @@
 #include "../../source/compiler-core/slang-json-lexer.h"
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/compiler-core/slang-json-parser.h"
+#include "../../source/compiler-core/slang-json-value.h"
 
 #include "test-context.h"
 
@@ -220,6 +221,50 @@ static void jsonUnitTest()
             SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
         }
 
+    }
+
+
+    {
+        JSONValue value;
+
+        value = JSONValue::makeBool(true);
+
+        // Only need a SourceManager if we are going to store lexemes
+        RefPtr<JSONContainer> container = new JSONContainer(nullptr);
+
+        {
+            List<JSONValue> values;
+
+            for (Int i = 0; i < 100; ++i)
+            {
+            
+                values.add(JSONValue::makeInt(i));
+                values.add(JSONValue::makeFloat(-double(i)));
+            }
+
+            JSONValue array = container->createArray(values.getBuffer(), values.getCount());
+
+            auto arrayView = container->getArray(array);
+
+            SLANG_CHECK(arrayView.getCount() == values.getCount());
+
+            // Check the values are the same
+            SLANG_CHECK(container->areEqual(arrayView.getBuffer(), values.getBuffer(), arrayView.getCount()));
+        }
+        {
+            JSONValue obj = JSONValue::makeEmptyObject();
+
+            JSONKey key = container->getKey(UnownedStringSlice::fromLiteral("Hello"));
+
+            container->setKeyValue(obj, key, JSONValue::makeNull());
+            container->setKeyValue(obj, key, JSONValue::makeInt(10));
+
+            auto objView = container->getObject(obj);
+
+            SLANG_CHECK(objView.getCount() == 1);
+
+            SLANG_CHECK(objView[0].value.asInteger() == 10);
+        }
     }
 }
 
