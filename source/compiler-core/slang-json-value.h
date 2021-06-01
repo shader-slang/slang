@@ -201,6 +201,9 @@ public:
         /// Traverse a JSON hierarchy from value, outputting to the listener
     void traverseRecursively(const JSONValue& value, JSONListener* listener);
 
+        /// Returns the source manager used. 
+    SourceManager* getSourceManager() const { return m_sourceManager; } 
+
         // Ctor
     JSONContainer(SourceManager* sourceManger);
 
@@ -259,6 +262,16 @@ class JSONBuilder : public JSONListener
 {
 public:
 
+    typedef uint32_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            ConvertLexemes = 0x01,
+        };
+    };
+
+
     virtual void startObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
@@ -271,10 +284,13 @@ public:
     virtual void addStringValue(const UnownedStringSlice& string, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addNullValue(SourceLoc loc) SLANG_OVERRIDE;
 
+        /// Reset the state
+    void reset();
+
         /// Get the root value. Will be set after valid construction
     const JSONValue& getRootValue() const { return m_rootValue; }
 
-    JSONBuilder(JSONContainer* container);
+    JSONBuilder(JSONContainer* container, Flags flags = 0);
 
 protected:
 
@@ -295,6 +311,8 @@ protected:
     void _add(const JSONValue& value);
 
     Index _findKeyIndex(JSONKey key) const;
+
+    Flags m_flags;
 
     List<JSONKeyValue> m_keyValues;
     List<JSONValue> m_values;

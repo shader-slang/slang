@@ -876,8 +876,9 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-JSONBuilder::JSONBuilder(JSONContainer* container):
-    m_container(container)
+JSONBuilder::JSONBuilder(JSONContainer* container, Flags flags):
+    m_container(container),
+    m_flags(flags)
 {
     m_state.m_kind = State::Kind::Root;
     m_state.m_startIndex = 0;
@@ -885,6 +886,22 @@ JSONBuilder::JSONBuilder(JSONContainer* container):
     m_keyValue.reset();
 
     m_rootValue.reset();
+}
+
+void JSONBuilder::reset()
+{
+    // Reset the state
+    m_state.m_kind = State::Kind::Root;
+    m_state.m_startIndex = 0;
+
+    // Clear the work values
+    m_keyValue.reset();
+    m_rootValue.reset();
+
+    // Clear the lists
+    m_stateStack.clear();
+    m_values.clear();
+    m_keyValues.clear();
 }
 
 void JSONBuilder::_popState()
@@ -1024,18 +1041,52 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
         
         case JSONTokenType::IntegerLiteral:
         {
-            SLANG_ASSERT(loc.isValid());
-            return _add(JSONValue::makeLexeme(JSONValue::Type::IntegerLexeme, loc, value.getLength()));
+            if (m_flags & Flag::ConvertLexemes)
+            {
+                int64_t intValue = -1;
+                auto res = StringUtil::parseInt64(value, intValue);
+                SLANG_ASSERT(SLANG_SUCCEEDED(res));
+                _add(JSONValue::makeInt(intValue, loc));
+            }
+            else
+            {
+                SLANG_ASSERT(loc.isValid());
+                _add(JSONValue::makeLexeme(JSONValue::Type::IntegerLexeme, loc, value.getLength()));
+            }
+            break;
         }
         case JSONTokenType::FloatLiteral:
         {
-            SLANG_ASSERT(loc.isValid());
-            return _add(JSONValue::makeLexeme(JSONValue::Type::FloatLexeme, loc, value.getLength()));
+            if (m_flags & Flag::ConvertLexemes)
+            {
+                double floatValue = 0;
+                auto res = StringUtil::parseDouble(value, floatValue);
+                SLANG_ASSERT(SLANG_SUCCEEDED(res));
+                _add(JSONValue::makeFloat(floatValue, loc));
+            }
+            else
+            {
+                SLANG_ASSERT(loc.isValid());
+                _add(JSONValue::makeLexeme(JSONValue::Type::FloatLexeme, loc, value.getLength()));
+            }
+            break;
         }
         case JSONTokenType::StringLiteral:
         {
-            SLANG_ASSERT(loc.isValid());
-            return _add(JSONValue::makeLexeme(JSONValue::Type::StringLexeme, loc, value.getLength()));
+            if (m_flags & Flag::ConvertLexemes)
+            {
+                auto handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+                StringBuilder buf;
+                StringEscapeUtil::appendUnquoted(handler, value, buf);
+
+                _add(m_container->createString(buf.getUnownedSlice(), loc));
+            }
+            else
+            {
+                SLANG_ASSERT(loc.isValid());
+                _add(JSONValue::makeLexeme(JSONValue::Type::StringLexeme, loc, value.getLength()));
+            }
+            break;
         }
         default:
         {

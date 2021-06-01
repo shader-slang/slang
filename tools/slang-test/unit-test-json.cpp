@@ -245,12 +245,7 @@ static void jsonUnitTest()
         }
     }
 
-
     {
-        JSONValue value;
-
-        value = JSONValue::makeBool(true);
-
         // Only need a SourceManager if we are going to store lexemes
         RefPtr<JSONContainer> container = new JSONContainer(nullptr);
 
@@ -293,6 +288,33 @@ static void jsonUnitTest()
 
             SLANG_CHECK(objView[0].value.asInteger() == 10);
         }
+    }
+
+    // Check repeated keys works out
+    // Check out comparison works with different key orders
+    {
+        RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+        const char aText[] = "{ \"a\" : 10, \"b\" : 20.0, \"a\" : \"Hello\" }";
+
+        
+        JSONBuilder builder(container);
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &builder)));
+        const JSONValue a = builder.getRootValue();
+
+        builder.reset();
+
+        const char bText[] = "{ \"b\" : 20.0, \"a\" : \"Hello\"}";
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(bText, &sink, &builder)));
+        const JSONValue b = builder.getRootValue();
+
+        SLANG_CHECK(container->areEqual(a, b));
+
+        JSONBuilder convertBuilder(container, JSONBuilder::Flag::ConvertLexemes);
+
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &convertBuilder)));
+        const JSONValue c = builder.getRootValue();
+
+        SLANG_CHECK(container->areEqual(a, c));
     }
 }
 
