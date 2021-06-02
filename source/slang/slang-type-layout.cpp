@@ -2819,7 +2819,7 @@ static RefPtr<TypeLayout> maybeAdjustLayoutForArrayElementType(
 
         // If nothing needed to be changed on the inner element type,
         // then we are done.
-        if(adjustedInnerElementTypeLayout == originalInnerElementTypeLayout)
+        if (originalInnerElementTypeLayout == adjustedInnerElementTypeLayout)
             return originalTypeLayout;
 
         // TODO: actually adjust the element type, and create all the required bits and
