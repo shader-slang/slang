@@ -3,6 +3,8 @@
 
 #include "slang-json-diagnostics.h"
 
+#include "../core/slang-string-escape-util.h"
+
 /*
 https://www.json.org/json-en.html
 */
@@ -11,21 +13,26 @@ namespace Slang {
 
 SlangResult JSONParser::_parseObject()
 {
-    SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::LBrace));
-
-    m_listener->startObject();
-
-    if (m_lexer->advanceIf(JSONTokenType::RBrace))
     {
-        m_listener->endObject();
-        return SLANG_OK;
+        const SourceLoc loc = m_lexer->peekLoc();
+        SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::LBrace));
+        m_listener->startObject(loc);
+    }
+
+    {
+        const SourceLoc loc = m_lexer->peekLoc();
+        if (m_lexer->advanceIf(JSONTokenType::RBrace))
+        {
+            m_listener->endObject(loc);
+            return SLANG_OK;
+        }
     }
 
     while (true)
     {
         JSONToken keyToken;
         SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::StringLiteral, keyToken));
-        m_listener->addLexemeKey(m_lexer->getLexeme(keyToken));
+        m_listener->addKey(m_lexer->getLexeme(keyToken), keyToken.loc);
 
         SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::Colon));
 
@@ -38,21 +45,29 @@ SlangResult JSONParser::_parseObject()
         break;
     }
 
-    SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::RBrace));
-    m_listener->endObject();
+    {
+        const SourceLoc loc = m_lexer->peekLoc();
+        SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::RBrace));
+        m_listener->endObject(loc);
+    }
     return SLANG_OK;
 }
 
 SlangResult JSONParser::_parseArray()
 {
-    SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::LBracket));
-
-    m_listener->startArray();
-
-    if (m_lexer->advanceIf(JSONTokenType::RBracket))
     {
-        m_listener->endArray();
-        return SLANG_OK;
+        const SourceLoc loc = m_lexer->peekLoc();
+        SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::LBracket));
+        m_listener->startArray(loc);
+    }
+
+    {
+        const SourceLoc loc = m_lexer->peekLoc();
+        if (m_lexer->advanceIf(JSONTokenType::RBracket))
+        {
+            m_listener->endArray(loc);
+            return SLANG_OK;
+        }
     }
 
     while (true)
@@ -65,8 +80,11 @@ SlangResult JSONParser::_parseArray()
         break;
     }
 
-    SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::RBracket));
-    m_listener->endArray();
+    {
+        const SourceLoc loc = m_lexer->peekLoc();
+        SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::RBracket));
+        m_listener->endArray(loc);
+    }
     return SLANG_OK;
 }
 
@@ -81,7 +99,8 @@ SlangResult JSONParser::_parseValue()
         case JSONTokenType::FloatLiteral:
         case JSONTokenType::StringLiteral:
         {
-            m_listener->addLexemeValue(m_lexer->peekType(), m_lexer->peekLexeme());
+            const JSONToken& tok = m_lexer->peekToken();
+            m_listener->addLexemeValue(tok.type, m_lexer->peekLexeme(), tok.loc);
             m_lexer->advance();
             return SLANG_OK;
         }
@@ -256,8 +275,9 @@ void JSONWriter::_maybeEmitFieldComma()
     }
 }
 
-void JSONWriter::startObject()
+void JSONWriter::startObject(SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.canEmitValue());
 
     _maybeEmitComma();
@@ -276,8 +296,9 @@ void JSONWriter::startObject()
     m_state.m_flags = 0;
 }
 
-void JSONWriter::endObject()
+void JSONWriter::endObject(SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.m_kind == State::Kind::Object);
 
     _handleFormat(Location::BeforeCloseObject);
@@ -289,8 +310,9 @@ void JSONWriter::endObject()
     m_stack.removeLast();
 }
 
-void JSONWriter::startArray()
+void JSONWriter::startArray(SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.canEmitValue());
 
     _maybeEmitComma();
@@ -309,8 +331,9 @@ void JSONWriter::startArray()
     m_state.m_flags = 0;
 }
 
-void JSONWriter::endArray()
+void JSONWriter::endArray(SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.m_kind == State::Kind::Array);
 
     _handleFormat(Location::BeforeCloseArray);
@@ -322,8 +345,9 @@ void JSONWriter::endArray()
     m_stack.removeLast();
 }
 
-void JSONWriter::addLexemeKey(const UnownedStringSlice& key)
+void JSONWriter::addKey(const UnownedStringSlice& key, SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
 
     _maybeEmitFieldComma();
@@ -339,12 +363,27 @@ void JSONWriter::addLexemeKey(const UnownedStringSlice& key)
     m_state.m_flags &= ~State::Flag::HasPrevious;
 }
 
-void JSONWriter::addLexemeValue(JSONTokenType type, const UnownedStringSlice& value)
+void JSONWriter::_preValue(SourceLoc loc)
 {
+    SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.canEmitValue());
 
     _maybeEmitComma();
     _maybeEmitIndent();
+}
+
+void JSONWriter::_postValue()
+{
+    // We have a previous
+    m_state.m_flags |= State::Flag::HasPrevious;
+    // We don't have a key
+    m_state.m_flags &= ~State::Flag::HasKey;
+}
+
+
+void JSONWriter::addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc)
+{
+    _preValue(loc);
 
     switch (type)
     {
@@ -375,10 +414,45 @@ void JSONWriter::addLexemeValue(JSONTokenType type, const UnownedStringSlice& va
             SLANG_ASSERT(!"Can only emit values");
         }
     }
-    // We have a previous
-    m_state.m_flags |= State::Flag::HasPrevious;
-    // We don't have a key
-    m_state.m_flags &= ~State::Flag::HasKey;
+
+    _postValue();
+}
+
+void JSONWriter::addIntegerValue(int64_t value, SourceLoc loc)
+{
+    _preValue(loc);
+    m_builder << value;
+    _postValue();
+}
+
+void JSONWriter::addFloatValue(double value, SourceLoc loc)
+{
+    _preValue(loc);
+    m_builder << value;
+    _postValue();
+}
+
+void JSONWriter::addBoolValue(bool inValue, SourceLoc loc)
+{
+    _preValue(loc);
+    const UnownedStringSlice slice = inValue ? UnownedStringSlice::fromLiteral("true") : UnownedStringSlice::fromLiteral("false");
+    m_builder << slice;
+    _postValue();
+}
+
+void JSONWriter::addNullValue(SourceLoc loc)
+{
+    _preValue(loc);
+    m_builder << UnownedStringSlice::fromLiteral("null");
+    _postValue();
+}
+
+void JSONWriter::addStringValue(const UnownedStringSlice& slice, SourceLoc loc)
+{
+    _preValue(loc);
+    StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+    StringEscapeUtil::appendQuoted(handler, slice, m_builder);
+    _postValue();
 }
 
 } // namespace Slang
