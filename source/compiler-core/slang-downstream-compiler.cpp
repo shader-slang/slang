@@ -795,7 +795,24 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
     // If a path is passed in lets, try and determine what kind of path it is.
     if (path.getLength())
     {
-        _findPaths(path, inLibraryName, parentPath, libraryPath);
+        if (SLANG_FAILED(_findPaths(path, inLibraryName, parentPath, libraryPath)))
+        {
+            // We have a few scenarios here.
+            // 1) The path could be the shared library/dll filename, that will be found through some operating system mechanism
+            // 2) That the shared library is *NOT* on the filesystem directly (the loader does something different)
+            // 3) Permissions or some other mechanism stops the lookup from working
+
+            // We should probably assume that the path means something, else why set it.
+            // It's probably less likely that it is a directory that we can't detect - as if it's a directory as part of an app
+            // it's permissions should allow detection, or be made to allow it.
+
+            // All this being the case we should probably assume that it is the shared library name.
+            libraryPath = path;
+
+            // Attempt to get a parent. If there isn't one this will be empty, which will mean it will be ignored, which is probably
+            // what we want if path is just a shared library name
+            parentPath = Path::getParentDirectory(libraryPath);
+        }
     }
 
     // Keep all dependent libs in scope, before we load the library we want
