@@ -512,6 +512,14 @@ struct DownstreamCompilerUtil: public DownstreamCompilerBaseUtil
     static void updateDefaults(DownstreamCompilerSet* set);
 
     static void setDefaultLocators(DownstreamCompilerLocatorFunc outFuncs[int(SLANG_PASS_THROUGH_COUNT_OF)]);
+
+        /// Attempts to determine what 'path' is and load appropriately. Is it a path to a shared library? Is it a directory holding the libraries?
+        /// Some downstream shared libraries need other shared libraries to be loaded before the main shared library, such that they are in the same directory
+        /// otherwise the shared library could come from some unwanted location.
+        /// dependentNames names shared libraries which should be attempted to be loaded in the path of the main shared library.
+        /// The list is optional (nullptr can be passed in), and the list is terminated by nullptr.
+    static SlangResult loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependantNames, const char* libraryName, ComPtr<ISlangSharedLibrary>& outSharedLib);
+
 };
 
 }

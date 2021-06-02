@@ -397,30 +397,9 @@ SlangResult DXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    // If the user supplies a path to their preferred version of DXC
-    // we just use this.
-    if (path.getLength() != 0)
-    {
-        // We *assume* path is the path to d3dcompiler.
-        ComPtr<ISlangSharedLibrary> dxil;
-
-        // Attempt to load dxil from same path that d3dcompiler is located
-        const String parentPath = Path::getParentDirectory(path);
-        if (parentPath.getLength())
-        {
-            String dxilPath = Path::combine(parentPath, "dxil");
-            // Try to load dxil along this path first
-            // If it fails - then DXC may load from a different place and thats ok.
-            loader->loadSharedLibrary(dxilPath.getBuffer(), dxil.writeRef());
-        }
-
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(path.getBuffer(), library.writeRef()));
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("dxcompiler", library.writeRef()));
-    }
-     
+    const char* dependentNames[] = {"dxil", nullptr } ;
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, dependentNames, "dxcompiler", library));
+ 
     SLANG_ASSERT(library);
     if (!library)
     {
