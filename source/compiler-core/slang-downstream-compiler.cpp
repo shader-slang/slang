@@ -782,6 +782,8 @@ static SlangResult _findPaths(const String& path, const char* libraryName, Strin
         // The original path should work as is for the SharedLibrary load. Notably we don't use the sharedLibraryFilePath
         // as this is the wrong name to do a SharedLibrary load with.
         outLibraryPath = path;
+
+        return SLANG_OK;
     }
 
     return SLANG_FAIL;
