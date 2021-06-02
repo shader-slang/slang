@@ -272,6 +272,70 @@ namespace Slang
     private:
         T* m_ptr;
     };
-}
 
+    // A pointer that can be transformed to hold either a weak reference or a strong reference.
+    template<typename T>
+    class TransformablePtr
+    {
+    private:
+        T* m_weakPtr = nullptr;
+        RefPtr<T> m_strongPtr;
+
+    public:
+        TransformablePtr() = default;
+        TransformablePtr(T* ptr) { *this = ptr; }
+        TransformablePtr(RefPtr<T> ptr) { *this = ptr; }
+        TransformablePtr(const TransformablePtr<T>& ptr) = default;
+
+        void promoteToStrongReference() { m_strongPtr = m_weakPtr; }
+        void demoteToWeakReference() { m_strongPtr = nullptr; }
+        bool isStrongReference() const { return m_strongPtr != nullptr; }
+
+        T& operator*() const { return *m_weakPtr; }
+
+        T* operator->() const { return m_weakPtr; }
+
+        T* Ptr() const { return m_weakPtr; }
+        T* get() const { return m_weakPtr; }
+
+        operator T*() const { return m_weakPtr; }
+        operator RefPtr<T>() const { return m_weakPtr; }
+
+
+        TransformablePtr<T>& operator=(T* ptr)
+        {
+            m_weakPtr = ptr;
+            m_strongPtr = ptr;
+            return *this;
+        }
+        template<typename U>
+        TransformablePtr<T>& operator=(const RefPtr<U>& ptr)
+        {
+            m_weakPtr = ptr.Ptr();
+            m_strongPtr = ptr;
+            return *this;
+        }
+        
+        HashCode getHashCode() const
+        {
+            // Note: We need a `RefPtr<T>` to hash the same as a `T*`,
+            // so that a `T*` can be used as a key in a dictionary with
+            // `RefPtr<T>` keys, and vice versa.
+            //
+            return Slang::getHashCode(m_weakPtr);
+        }
+
+        bool operator==(const T* ptr) const { return m_weakPtr == ptr; }
+
+        bool operator!=(const T* ptr) const { return m_weakPtr != ptr; }
+
+        bool operator==(RefPtr<T> const& ptr) const { return m_weakPtr == ptr.Ptr(); }
+
+        bool operator!=(RefPtr<T> const& ptr) const { return m_weakPtr != ptr.Ptr(); }
+
+        bool operator==(TransformablePtr<T> const& ptr) const { return m_weakPtr == ptr.m_weakPtr; }
+
+        bool operator!=(TransformablePtr<T> const& ptr) const { return m_weakPtr != ptr.m_weakPtr; }
+    };
+}
 #endif
