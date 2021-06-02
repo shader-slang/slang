@@ -1405,6 +1405,7 @@ namespace Slang
 
             RefPtr<VarLayout> varLayout = new VarLayout();
             varLayout->typeLayout = typeLayout;
+            varLayout->typeLayout.demoteToWeakReference();
 
             for(auto typeResInfo : typeLayout->resourceInfos)
             {

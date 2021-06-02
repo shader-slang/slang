@@ -2961,6 +2961,16 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
+
+                if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
+                {
+                    if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
+                    {
+                        auto irBaseVal = getSimpleVal(context, getDefaultVal(baseStructType));
+                        args.add(irBaseVal);
+                    }
+                }
+
                 for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
                     auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
@@ -3082,6 +3092,30 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
             if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 UInt argCounter = 0;
+
+                // If the type is a structure type that inherits from another
+                // structure type, then we need to treat the base type as
+                // an implicit first field.
+                //
+                if(auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
+                {
+                    if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
+                    {
+                        UInt argIndex = argCounter++;
+                        if (argIndex < argCount)
+                        {
+                            auto argExpr = expr->args[argIndex];
+                            LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                            args.add(getSimpleVal(context, argVal));
+                        }
+                        else
+                        {
+                            auto irDefaultValue = getSimpleVal(context, getDefaultVal(baseStructType));
+                            args.add(irDefaultValue);
+                        }
+                    }
+                }
+
                 for (auto ff : getMembersOfType<VarDecl>(aggTypeDeclRef, MemberFilterStyle::Instance))
                 {
                     UInt argIndex = argCounter++;
@@ -5475,6 +5509,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 // a field that holds the base type...
                 //
                 auto irKey = getBuilder()->createStructKey();
+                addLinkageDecoration(context, irKey, inheritanceDecl);
                 auto keyVal = LoweredValInfo::simple(irKey);
                 setGlobalValue(context, inheritanceDecl, keyVal);
                 return keyVal;

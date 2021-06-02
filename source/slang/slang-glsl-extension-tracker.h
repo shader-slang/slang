@@ -12,7 +12,7 @@
 namespace Slang
 {
 
-class GLSLExtensionTracker : public RefObject
+class GLSLExtensionTracker : public ExtensionTracker
 {
 public:
     

@@ -1416,8 +1416,8 @@ TestResult runCompile(TestContext* context, TestInput& input)
 
     for (auto arg : input.testOptions->args)
     {
-        // If there is a quote in the string, assume it is 'escaped'. 
-        if (arg.indexOf(escapeHandler->getQuoteChar()) >= 0)
+        // If unescaping is needed, do it
+        if (StringEscapeUtil::isUnescapeShellLikeNeeded(escapeHandler, arg.getUnownedSlice()))
         {
             StringBuilder buf;
             StringEscapeUtil::unescapeShellLike(escapeHandler, arg.getUnownedSlice(), buf);

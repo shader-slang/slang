@@ -45,6 +45,58 @@ JSONTokenType JSONLexer::_setInvalidToken()
     return _setToken(JSONTokenType::Invalid, m_lexemeStart);
 }
 
+SlangResult JSONLexer::expect(JSONTokenType type)
+{
+    if (type != peekType())
+    {
+        m_sink->diagnose(m_token.loc, JSONDiagnostics::unexpectedTokenExpectedTokenType, getJSONTokenAsText(peekType()), getJSONTokenAsText(type));
+        return SLANG_FAIL;
+    }
+
+    advance();
+    return SLANG_OK;
+}
+
+SlangResult JSONLexer::expect(JSONTokenType type, JSONToken& out)
+{
+    if (type != peekType())
+    {
+        m_sink->diagnose(m_token.loc, JSONDiagnostics::unexpectedTokenExpectedTokenType, getJSONTokenAsText(peekType()), getJSONTokenAsText(type));
+        return SLANG_FAIL;
+    }
+
+    out = m_token;
+    advance();
+    return SLANG_OK;
+}
+
+bool JSONLexer::advanceIf(JSONTokenType type)
+{
+    if (type == peekType())
+    {
+        advance();
+        return true;
+    }
+    return false;
+}
+
+bool JSONLexer::advanceIf(JSONTokenType type, JSONToken& out)
+{
+    if (type == peekType())
+    {
+        out = m_token;
+        advance();
+        return true;
+    }
+    return false;
+}
+
+UnownedStringSlice JSONLexer::getLexeme(const JSONToken& tok) const
+{
+    auto offset = m_sourceView->getRange().getOffset(tok.loc);
+    return UnownedStringSlice(m_sourceView->getContent().begin() + offset, tok.length);
+}
+
 JSONTokenType JSONLexer::advance()
 {
     const char* cursor = m_cursor;
@@ -380,6 +432,29 @@ const char* JSONLexer::_lexWhitespace(const char* cursor)
         }
 
     }
+}
+
+UnownedStringSlice getJSONTokenAsText(JSONTokenType type)
+{
+    switch (type)
+    {
+        case JSONTokenType::Invalid:        return UnownedStringSlice::fromLiteral("invalid");
+        case JSONTokenType::IntegerLiteral: return UnownedStringSlice::fromLiteral("integer literal");
+        case JSONTokenType::FloatLiteral:   return UnownedStringSlice::fromLiteral("float literal");
+        case JSONTokenType::StringLiteral:  return UnownedStringSlice::fromLiteral("string literal");
+        case JSONTokenType::LBracket:       return UnownedStringSlice::fromLiteral("[");
+        case JSONTokenType::RBracket:       return UnownedStringSlice::fromLiteral("]");
+        case JSONTokenType::LBrace:         return UnownedStringSlice::fromLiteral("{");
+        case JSONTokenType::RBrace:         return UnownedStringSlice::fromLiteral("}");
+        case JSONTokenType::Comma:          return UnownedStringSlice::fromLiteral(",");
+        case JSONTokenType::Colon:          return UnownedStringSlice::fromLiteral(":");
+        case JSONTokenType::True:           return UnownedStringSlice::fromLiteral("true");
+        case JSONTokenType::False:          return UnownedStringSlice::fromLiteral("false");
+        case JSONTokenType::Null:           return UnownedStringSlice::fromLiteral("null");
+        case JSONTokenType::EndOfFile:      return UnownedStringSlice::fromLiteral("end of file");
+        default: break;
+    }
+    SLANG_UNEXPECTED("JSONTokenType not known");
 }
 
 } // namespace Slang

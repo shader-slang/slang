@@ -147,8 +147,8 @@ struct DownstreamArgs
         /// Get the args at the nameIndex
     CommandLineArgs& getArgsAt(Index nameIndex) { return m_entries[nameIndex].args; }
         /// Get args by name - will assert if name isn't found
-    CommandLineArgs& getArgsByName(char* name);
-    const CommandLineArgs& getArgsByName(char* name) const;
+    CommandLineArgs& getArgsByName(const char* name);
+    const CommandLineArgs& getArgsByName(const char* name) const;
 
         /// Looks for '-X' expressions, removing them from ioArgs and putting in appropriate args 
     SlangResult stripDownstreamArgs(CommandLineArgs& ioArgs, Flags flags, DiagnosticSink* sink);

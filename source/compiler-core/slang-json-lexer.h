@@ -35,14 +35,35 @@ struct JSONToken
     uint32_t length;            ///< The length of the token in bytes
 };
 
+UnownedStringSlice getJSONTokenAsText(JSONTokenType type);
+
 class JSONLexer
 {
 public:
+        /// Peek the current token
     JSONToken& peekToken() { return m_token; }
+        /// Peek the current type
     JSONTokenType peekType() { return m_token.type; }
+        /// Peek the current SourceLoc
+    SourceLoc peekLoc() { return m_token.loc; }
 
+        /// Get the lexeme of JSONToken
+    UnownedStringSlice getLexeme(const JSONToken& tok) const;
+        /// Peek the lexeme at the current position
+    UnownedStringSlice peekLexeme() const { return getLexeme(m_token); }
+    
     JSONTokenType advance();
 
+        /// Expects a token of type type. If found advances, if not returns an error and outputs to diagnostic sink
+    SlangResult expect(JSONTokenType type);
+        /// Same as expect except out will hold the token.
+    SlangResult expect(JSONTokenType type, JSONToken& out);
+
+        /// Returns true and advances if current token is type
+    bool advanceIf(JSONTokenType type);
+    bool advanceIf(JSONTokenType type, JSONToken& out);
+
+        /// Must be called before use
     SlangResult init(SourceView* sourceView, DiagnosticSink* sink);
 
 protected:

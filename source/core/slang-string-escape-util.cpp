@@ -18,6 +18,8 @@ public:
     virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { return isEscapingNeeded(slice); }
  
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+
     virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
@@ -28,6 +30,13 @@ public:
 bool SpaceStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
     return slice.indexOf(' ') >= 0;
+}
+
+bool SpaceStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
+{
+    SLANG_UNUSED(slice);
+    // As it stands we never have to unescape
+    return false;
 }
 
 SlangResult SpaceStringEscapeHandler::appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out)
@@ -98,6 +107,7 @@ public:
 
     virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
@@ -165,6 +175,12 @@ static char _getCppUnescapedChar(char c)
         case '\\':      return '\\';
         default:        return 0;
     }
+}
+
+
+bool CppStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
+{
+    return slice.indexOf('\\') >= 0;
 }
 
 /* static */bool CppStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
@@ -456,12 +472,18 @@ public:
 
     virtual bool isQuotingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE { SLANG_UNUSED(slice); return true; }
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult appendUnescaped(const UnownedStringSlice& slice, StringBuilder& out) SLANG_OVERRIDE;
     virtual SlangResult lexQuoted(const char* cursor, const char** outCursor) SLANG_OVERRIDE;
 
     JSONStringEscapeHandler() : Super('"') {}
 };
+
+bool JSONStringEscapeHandler::isUnescapingNeeeded(const UnownedStringSlice& slice)
+{
+    return slice.indexOf('\\') >= 0;
+}
 
 bool JSONStringEscapeHandler::isEscapingNeeded(const UnownedStringSlice& slice)
 {
@@ -868,6 +890,23 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
+/* static */bool StringEscapeUtil::isQuoted(char quoteChar, UnownedStringSlice& slice)
+{
+    const Index len = slice.getLength();
+    return len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar;
+}
+
+/* static */UnownedStringSlice StringEscapeUtil::unquote(char quoteChar, const UnownedStringSlice& slice)
+{
+    const Index len = slice.getLength();
+    if (len >= 2 && slice[0] == quoteChar && slice[len - 1] == quoteChar)
+    {
+        return UnownedStringSlice(slice.begin() + 1, len - 2);
+    }
+    SLANG_ASSERT(!"Not quoted!");
+    return UnownedStringSlice();
+}
+
 /* static */SlangResult StringEscapeUtil::appendMaybeUnquoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
 {
     const char quoteChar = handler->getQuoteChar();
@@ -885,6 +924,10 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     }
 }
 
+/* static */SlangResult StringEscapeUtil::isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice)
+{
+    return slice.indexOf(handler->getQuoteChar()) >= 0;
+}
 
 /* static */SlangResult StringEscapeUtil::unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out)
 {

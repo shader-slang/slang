@@ -1,8 +1,7 @@
 result code = -1
 standard error = {
-glslang: ERROR: tests/cross-compile/glslang-error.glsl:6: '' :  syntax error, unexpected SEMICOLON
-ERROR: 1 compilation errors.  No code generated.
-
+glslang:  tests/cross-compile/glslang-error.glsl(6): error :  '' :  syntax error, unexpected SEMICOLON
+glslang: note : ERROR: 1 compilation errors.  No code generated.
 }
 standard output = {
 }

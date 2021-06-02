@@ -33,5 +33,7 @@ DIAGNOSTIC(20003, Error, endOfFileInComment, "end of file in comment")
 DIAGNOSTIC(20004, Error, expectingAHexDigit, "expecting a hex digit")
 DIAGNOSTIC(20005, Error, expectingADigit, "expecting a digit")
 DIAGNOSTIC(20006, Error, expectingValueName, "expecting value name [null, true, false]")
+DIAGNOSTIC(20007, Error, unexpectedTokenExpectedTokenType, "unexpected '$0', expected '$1'")
+DIAGNOSTIC(20008, Error, unexpectedToken, "unexpected '$0'")
 
 #undef DIAGNOSTIC

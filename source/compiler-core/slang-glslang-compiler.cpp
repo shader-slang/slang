@@ -221,7 +221,6 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
 
     StringBuilder builder;
     
-    String output;
     auto outputFunc = [](void const* data, size_t size, void* userData)
     {
         (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
@@ -239,7 +238,7 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
     request.inputEnd = (char*)blob + blobSize;
 
     request.outputFunc = outputFunc;
-    request.outputUserData = &output;
+    request.outputUserData = &builder;
 
     SLANG_RETURN_ON_FAIL(_invoke(request));
 
@@ -257,20 +256,13 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
     // On unix systems we need to ensure pthread is loaded first.
     // TODO(JS):
     // There is an argument that this should be performed through the loader....
+    // NOTE! We don't currently load through a dependent library, as it is *assumed* something as core as 'ptheads'
+    // isn't going to be distributed with the shader compiler. 
     ComPtr<ISlangSharedLibrary> pthreadLibrary;
     DefaultSharedLibraryLoader::load(loader, path, "pthread", pthreadLibrary.writeRef());
 #endif
 
-    // If the user supplies a path to their preferred version of FXC,
-    // we just use this.
-    if (path.getLength() != 0)
-    {
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(path.getBuffer(), library.writeRef()));
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-glslang", library.writeRef()));
-    }
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "slang-glslang", library));
 
     SLANG_ASSERT(library);
     if (!library)

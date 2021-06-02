@@ -7,7 +7,7 @@
 namespace Slang
 {
 
-class CUDAExtensionTracker : public RefObject
+class CUDAExtensionTracker : public ExtensionTracker
 {
 public:
 
@@ -54,9 +54,11 @@ public:
     virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     CUDASourceEmitter(const Desc& desc) :
-        Super(desc),
-        m_extensionTracker(new CUDAExtensionTracker)
-    {}
+        Super(desc)
+    {
+        m_extensionTracker = dynamicCast<CUDAExtensionTracker>(desc.extensionTracker);
+        SLANG_ASSERT(m_extensionTracker);
+    }
 
 protected:
 

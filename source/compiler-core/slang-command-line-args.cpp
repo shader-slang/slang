@@ -171,14 +171,14 @@ Index DownstreamArgs::_findOrAddName(SourceLoc loc, const UnownedStringSlice& na
     return -1;
 }
 
-CommandLineArgs& DownstreamArgs::getArgsByName(char* name)
+CommandLineArgs& DownstreamArgs::getArgsByName(const char* name)
 {
     const Index index = findName(name);
     SLANG_ASSERT(index >= 0);
     return m_entries[index].args;
 }
 
-const CommandLineArgs& DownstreamArgs::getArgsByName(char* name) const
+const CommandLineArgs& DownstreamArgs::getArgsByName(const char* name) const
 {
     const Index index = findName(name);
     SLANG_ASSERT(index >= 0);

@@ -136,6 +136,12 @@ namespace Slang
         return getMembersOfType<VarDecl>(declRef, filterStyle);
     }
 
+            /// If the given `structTypeDeclRef` inherits from another struct type, return that base type
+    DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef);
+
+        /// If the given `structTypeDeclRef` inherits from another struct type, return that base struct decl
+    DeclRef<StructDecl> findBaseStructDeclRef(ASTBuilder* astBuilder, DeclRef<StructDecl> const& structTypeDeclRef);
+
     inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> const& declRef)
     {
         return declRef.substitute(astBuilder, declRef.getDecl()->tagType);
