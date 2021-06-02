@@ -470,7 +470,7 @@ SlangResult RenderTestApp::initialize(
 
     // We begin by compiling the shader file and entry points that specified via the options.
     //
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, options, input, m_compilationOutput));
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(device->getSlangSession(), options, input, m_compilationOutput));
     m_shaderInputLayout = m_compilationOutput.layout;
 
     // Once the shaders have been compiled we load them via the underlying API.
@@ -551,7 +551,7 @@ Result RenderTestApp::_initializeShaders(
     Options::ShaderProgramType shaderType,
     const ShaderCompilerUtil::Input& input)
 {
-    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(session, m_options, input,  m_compilationOutput));
+    SLANG_RETURN_ON_FAIL(ShaderCompilerUtil::compileWithLayout(device->getSlangSession(), m_options, input,  m_compilationOutput));
     m_shaderInputLayout = m_compilationOutput.layout;
     m_shaderProgram = device->createProgram(m_compilationOutput.output.desc);
     return m_shaderProgram ? SLANG_OK : SLANG_FAIL;
@@ -672,6 +672,7 @@ void RenderTestApp::runCompute(IComputeCommandEncoder* encoder)
 
 void RenderTestApp::finalize()
 {
+    m_compilationOutput.output.reset();
 }
 
 Result RenderTestApp::writeBindingOutput(const String& fileName)
@@ -1098,6 +1099,8 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         IDevice::Desc desc = {};
         desc.deviceType = options.deviceType;
         desc.adapter = options.adapter.getBuffer();
+
+        desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
 
         List<const char*> requiredFeatureList;
         for (auto& name : options.renderFeatures)

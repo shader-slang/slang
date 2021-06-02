@@ -445,9 +445,16 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
     Int targetCount = desc.targetCount;
+    const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
     for(Int ii = 0; ii < targetCount; ++ii)
     {
-        linkage->addTarget(desc.targets[ii]);
+        slang::TargetDesc targetDesc;
+        // Copy the size field first.
+        memcpy(&targetDesc.structureSize, targetDescPtr, sizeof(size_t));
+        // Copy the entire desc structure.
+        memcpy(&targetDesc, targetDescPtr, targetDesc.structureSize);
+        linkage->addTarget(targetDesc);
+        targetDescPtr += targetDesc.structureSize;
     }
 
     if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
@@ -793,6 +800,7 @@ void Linkage::addTarget(
     target->setFloatingPointMode(FloatingPointMode(desc.floatingPointMode));
     target->addTargetFlags(desc.flags);
     target->setTargetProfile(Profile(desc.profile));
+    target->setLineDirectiveMode(LineDirectiveMode(desc.lineDirectiveMode));
 }
 
 #if 0
@@ -1034,6 +1042,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     SlangCompileRequest**   outCompileRequest)
 {
     auto compileRequest = new EndToEndCompileRequest(this);
+    compileRequest->addRef();
     *outCompileRequest = asExternal(compileRequest);
     return SLANG_OK;
 }
@@ -1059,7 +1068,6 @@ SlangResult Linkage::setMatrixLayoutMode(
     defaultMatrixLayoutMode = MatrixLayoutMode(mode);
     return SLANG_OK;
 }
-
 
 //
 // TargetRequest
@@ -2009,7 +2017,9 @@ BackEndCompileRequest::BackEndCompileRequest(
     : CompileRequestBase(linkage, sink)
     , m_program(program)
     , m_dumpIntermediatePrefix("slang-dump-")
-{}
+
+{
+}
 
 EndToEndCompileRequest::EndToEndCompileRequest(
     Session* session)
@@ -3840,8 +3850,16 @@ void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)
 
 void EndToEndCompileRequest::setLineDirectiveMode(SlangLineDirectiveMode mode)
 {
-    // TODO: validation
-    getBackEndReq()->lineDirectiveMode = LineDirectiveMode(mode);
+    // This method is deprecated and user should call `setTargetLineDirectiveMode` instead.
+    // We provide the implementation here for backward compatibility.
+    // Targets added later will use `m_lineDirectiveMode`, so we update it to the new `mode`
+    // set by the user.
+    m_lineDirectiveMode = LineDirectiveMode(mode);
+
+    // Change all existing targets to use the new mode.
+    auto linkage = getLinkage();
+    for (auto& target : linkage->targets)
+        target->setLineDirectiveMode(m_lineDirectiveMode);
 }
 
 void EndToEndCompileRequest::setCommandLineCompilerMode()
@@ -3854,11 +3872,14 @@ void EndToEndCompileRequest::setCodeGenTarget(SlangCompileTarget target)
     auto linkage = getLinkage();
     linkage->targets.clear();
     linkage->addTarget(CodeGenTarget(target));
+    linkage->targets[0]->setLineDirectiveMode(m_lineDirectiveMode);
 }
 
 int EndToEndCompileRequest::addCodeGenTarget(SlangCompileTarget target)
 {
-    return (int)getLinkage()->addTarget(CodeGenTarget(target));
+    int targetIndex = (int)getLinkage()->addTarget(CodeGenTarget(target));
+    getLinkage()->targets[targetIndex]->setLineDirectiveMode(m_lineDirectiveMode);
+    return targetIndex;
 }
 
 void EndToEndCompileRequest::setTargetProfile(int targetIndex, SlangProfileID profile)
@@ -3885,6 +3906,13 @@ void EndToEndCompileRequest::setTargetMatrixLayoutMode(int targetIndex, SlangMat
 {
     SLANG_UNUSED(targetIndex);
     setMatrixLayoutMode(mode);
+}
+
+void EndToEndCompileRequest::setTargetLineDirectiveMode(
+    SlangInt targetIndex,
+    SlangLineDirectiveMode mode)
+{
+    getLinkage()->targets[targetIndex]->setLineDirectiveMode(LineDirectiveMode(mode));
 }
 
 SlangResult EndToEndCompileRequest::addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability)

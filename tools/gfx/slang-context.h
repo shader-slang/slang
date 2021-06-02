@@ -34,6 +34,7 @@ namespace gfx
             targetDesc.profile = globalSession->findProfile(targetProfile);
             targetDesc.optimizationLevel = desc.optimizationLevel;
             targetDesc.floatingPointMode = desc.floatingPointMode;
+            targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;
             slangSessionDesc.targetCount = 1;
             slangSessionDesc.targets = &targetDesc;

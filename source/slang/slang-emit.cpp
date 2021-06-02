@@ -729,7 +729,7 @@ SlangResult emitEntryPointsSourceFromIR(
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
 
-    auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
+    auto lineDirectiveMode = targetRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
     // always use C-style line directives (to give the user
     // good source locations on error messages from downstream

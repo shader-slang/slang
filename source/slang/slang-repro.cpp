@@ -363,7 +363,6 @@ static String _scrubName(const String& in)
 
         dst->compileFlags = request->getFrontEndReq()->compileFlags;
         dst->shouldDumpIntermediates = request->getBackEndReq()->shouldDumpIntermediates;
-        dst->lineDirectiveMode = request->getBackEndReq()->lineDirectiveMode;
 
         dst->debugInfoLevel = linkage->debugInfoLevel;
         dst->optimizationLevel = linkage->optimizationLevel;
