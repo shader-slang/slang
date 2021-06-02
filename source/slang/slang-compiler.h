@@ -1178,6 +1178,10 @@ namespace Slang
         {
             floatingPointMode = mode;
         }
+        void setLineDirectiveMode(LineDirectiveMode mode)
+        {
+            lineDirectiveMode = mode;
+        }
         void addCapability(CapabilityAtom capability);
 
 
@@ -1190,6 +1194,7 @@ namespace Slang
         CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
         FloatingPointMode getFloatingPointMode() { return floatingPointMode; }
+        LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
         SlangTargetFlags getTargetFlags() { return targetFlags; }
         CapabilitySet getTargetCaps();
 
@@ -1211,6 +1216,7 @@ namespace Slang
         FloatingPointMode       floatingPointMode = FloatingPointMode::Default;
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
+        LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
     };
 
         /// Are we generating code for a D3D API?
@@ -1318,8 +1324,6 @@ namespace Slang
             char const* value);
         SlangResult setMatrixLayoutMode(
             SlangMatrixLayoutMode mode);
-        LineDirectiveMode getLineDirectiveMode() { return m_lineDirectiveMode; }
-        SlangResult setLineDirectiveMode(LineDirectiveMode mode);
 
             /// Create an initially-empty linkage
         Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinkage);
@@ -1409,8 +1413,6 @@ namespace Slang
         
         /// Set if fileSystemExt is a cache file system
         RefPtr<CacheFileSystem> m_cacheFileSystem;
-
-        LineDirectiveMode m_lineDirectiveMode = LineDirectiveMode::Default;
 
         ISlangFileSystemExt* getFileSystemExt() { return m_fileSystemExt; }
         CacheFileSystem* getCacheFileSystem() const { return m_cacheFileSystem; }
@@ -1871,11 +1873,6 @@ namespace Slang
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
 
-        // How should `#line` directives be emitted (if at all)?
-        LineDirectiveMode lineDirectiveMode = LineDirectiveMode::Default;
-
-        LineDirectiveMode getLineDirectiveMode() { return lineDirectiveMode; }
-
         ComponentType* getProgram() { return m_program; }
         void setProgram(ComponentType* program) { m_program = program; }
 
@@ -1980,7 +1977,9 @@ namespace Slang
         virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL addTargetCapability(SlangInt targetIndex, SlangCapabilityID capability) SLANG_OVERRIDE;
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(slang::IComponentType** outProgram) SLANG_OVERRIDE;
-
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
+            SlangInt targetIndex,
+            SlangLineDirectiveMode mode) SLANG_OVERRIDE;
 
         EndToEndCompileRequest(
             Session* session);
@@ -2021,6 +2020,11 @@ namespace Slang
 
             /// A blob holding the diagnostic output
         ComPtr<ISlangBlob> m_diagnosticOutputBlob;
+
+            /// Line directive mode for new targets to be added to this request.
+            /// This is needed to support the legacy `setLineDirectiveMode` API.
+            /// We can remove this field if we move to `setTargetLineDirectiveMode`.
+        LineDirectiveMode m_lineDirectiveMode = LineDirectiveMode::Default;
 
             /// Per-entry-point information not tracked by other compile requests
         class EntryPointInfo : public RefObject

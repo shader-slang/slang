@@ -26,7 +26,6 @@ namespace gfx
             slangSessionDesc.searchPaths = desc.searchPaths;
             slangSessionDesc.preprocessorMacroCount = desc.preprocessorMacroCount;
             slangSessionDesc.preprocessorMacros = desc.preprocessorMacros;
-            slangSessionDesc.lineDirectiveMode = desc.lineDirectiveMode;
             slang::TargetDesc targetDesc = {};
             targetDesc.format = compileTarget;
             auto targetProfile = desc.targetProfile;
@@ -35,6 +34,7 @@ namespace gfx
             targetDesc.profile = globalSession->findProfile(targetProfile);
             targetDesc.optimizationLevel = desc.optimizationLevel;
             targetDesc.floatingPointMode = desc.floatingPointMode;
+            targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;
             slangSessionDesc.targetCount = 1;
             slangSessionDesc.targets = &targetDesc;

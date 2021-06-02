@@ -195,7 +195,6 @@ public:
 
         /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_compileRequest->getSink();}
-    LineDirectiveMode getLineDirectiveMode() { return m_compileRequest->getLineDirectiveMode(); }
 
         /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
@@ -493,6 +492,9 @@ public:
 
         /// The capabilities of the target
     CapabilitySet m_targetCaps;
+
+    // The line directive mode of the target.
+    LineDirectiveMode m_lineDirectiveMode;
 
     // Source language (based on the more nuanced m_target)
     SourceLanguage m_sourceLanguage;
