@@ -221,7 +221,6 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
 
     StringBuilder builder;
     
-    String output;
     auto outputFunc = [](void const* data, size_t size, void* userData)
     {
         (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size);
@@ -239,7 +238,7 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
     request.inputEnd = (char*)blob + blobSize;
 
     request.outputFunc = outputFunc;
-    request.outputUserData = &output;
+    request.outputUserData = &builder;
 
     SLANG_RETURN_ON_FAIL(_invoke(request));
 

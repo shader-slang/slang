@@ -458,9 +458,31 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     }
 }
 
-SLANG_FORCE_INLINE static bool _isDigit(char c)
+/* static */SlangResult StringUtil::parseDouble(const UnownedStringSlice& text, double& out)
 {
-    return (c >= '0' && c <= '9');
+    const Index bufSize = 32;
+
+    const auto len = text.getLength();
+
+    if (len > bufSize - 1)
+    {
+        List<char> work;
+        work.setCount(len + 1);
+        char* dst = work.getBuffer();
+
+        ::memcpy(dst, text.begin(), len * sizeof(char));
+        dst[len] = 0;
+
+        out = atof(dst);
+    }
+    else
+    {
+        char buf[bufSize];
+        ::memcpy(buf, text.begin(), len * sizeof(char));
+        buf[len] = 0;
+        out = atof(buf);
+    }
+    return SLANG_OK;
 }
 
 /* static */SlangResult StringUtil::parseInt(const UnownedStringSlice& in, Int& outValue)
@@ -476,7 +498,7 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     }
 
     // We need at least one digit
-    if (cur >= end || !_isDigit(*cur))
+    if (cur >= end || !CharUtil::isDigit(*cur))
     {
         return SLANG_FAIL;
     }
@@ -486,7 +508,7 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
     for (; cur < end; ++cur)
     {
         const char c = *cur;
-        if (!_isDigit(c))
+        if (!CharUtil::isDigit(c))
         {
             return SLANG_FAIL;
         }
@@ -497,6 +519,76 @@ SLANG_FORCE_INLINE static bool _isDigit(char c)
 
     outValue = value;
     return SLANG_OK;
+}
+
+/* static */SlangResult StringUtil::parseInt64(const UnownedStringSlice& text, int64_t& out)
+{
+    bool negate = false;
+
+    const char* cur = text.begin();
+    const char* end = text.end();
+
+    if (cur < end)
+    {
+        if (*cur == '-')
+        {
+            negate = true;
+            cur++;
+        }
+        else if (*cur == '+')
+        {
+            cur++;
+        }
+    }
+
+    // Must have at least one digit
+    if (cur >= end || !CharUtil::isDigit(*cur))
+    {
+        return SLANG_FAIL;
+    }
+
+    uint64_t value = 0;
+    // We can have 20 digits, but the last digit can cause overflow.
+    // Lets do the easy first digits first
+    Index numSimple = 19;
+    for (; cur < end && CharUtil::isDigit(*cur) && numSimple > 0; ++cur, --numSimple)
+    {
+        value = value * 10 + (*cur - '0');
+    }
+
+    if (cur < end && CharUtil::isDigit(*cur))
+    {
+        const auto prevValue = value;
+        value = value * 10 + (*cur - '0');
+        cur++;
+
+        if (value < prevValue)
+        {
+            // We have overflow
+            return SLANG_FAIL;
+        }
+    }
+
+    if (negate)
+    {
+        if (value > ~((~uint64_t(0)) >> 1))
+        {
+            // Overflow
+            return SLANG_FAIL;
+        }
+        out = -int64_t(value);
+    }
+    else
+    {
+        if (value > ((~uint64_t(0)) >> 1))
+        {
+            // Overflow
+            return SLANG_FAIL;
+        }
+        out = value;
+    }
+
+    return (cur == end) ? SLANG_OK : SLANG_FAIL;
 }
 
 } // namespace Slang
