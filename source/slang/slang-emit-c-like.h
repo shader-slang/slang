@@ -493,9 +493,6 @@ public:
         /// The capabilities of the target
     CapabilitySet m_targetCaps;
 
-    // The line directive mode of the target.
-    LineDirectiveMode m_lineDirectiveMode;
-
     // Source language (based on the more nuanced m_target)
     SourceLanguage m_sourceLanguage;
 
