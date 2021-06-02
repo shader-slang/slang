@@ -50,7 +50,7 @@ static SlangResult _lex(const char* in, DiagnosticSink* sink, List<JSONToken>& t
     return SLANG_OK;
 }
 
-static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONWriter& writer)
+static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONListener* listener)
 {
     SourceManager* sourceManager = sink->getSourceManager();
 
@@ -62,7 +62,7 @@ static SlangResult _parse(const char* in, DiagnosticSink* sink, JSONWriter& writ
     lexer.init(sourceView, sink);
 
     JSONParser parser;
-    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, &writer, sink));
+    SLANG_RETURN_ON_FAIL(parser.parse(&lexer, sourceView, listener, sink));
     return SLANG_OK;
 }
 
@@ -201,10 +201,10 @@ static void jsonUnitTest()
             auto style = JSONWriter::IndentationStyle::Allman;
 
             JSONWriter writer(style);
-            _parse(in, &sink, writer);
+            _parse(in, &sink, &writer);
 
             JSONWriter writerCheck(style);
-            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+            _parse(writer.getBuilder().getBuffer(), &sink, &writerCheck);
 
             SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
         }
@@ -213,22 +213,39 @@ static void jsonUnitTest()
             auto style = JSONWriter::IndentationStyle::KNR;
 
             JSONWriter writer(style, 80);
-            _parse(in, &sink, writer);
+            _parse(in, &sink, &writer);
 
             JSONWriter writerCheck(style);
-            _parse(writer.getBuilder().getBuffer(), &sink, writerCheck);
+            _parse(writer.getBuilder().getBuffer(), &sink, &writerCheck);
 
             SLANG_CHECK(writerCheck.getBuilder() == writer.getBuilder());
         }
 
+        {
+            // Let's parse into a Value
+            RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+            JSONValue value;
+            {
+                JSONBuilder builder(container);
+
+                SLANG_CHECK(SLANG_SUCCEEDED(_parse(in, &sink, &builder)));
+                value = builder.getRootValue();
+            }
+            // Let's recreate
+            JSONValue copy;
+            {
+                JSONBuilder builder(container);
+                container->traverseRecursively(value, &builder);
+                copy = builder.getRootValue();
+            }
+
+            SLANG_CHECK(container->areEqual(value, copy));
+
+        }
     }
 
-
     {
-        JSONValue value;
-
-        value = JSONValue::makeBool(true);
-
         // Only need a SourceManager if we are going to store lexemes
         RefPtr<JSONContainer> container = new JSONContainer(nullptr);
 
@@ -250,6 +267,12 @@ static void jsonUnitTest()
 
             // Check the values are the same
             SLANG_CHECK(container->areEqual(arrayView.getBuffer(), values.getBuffer(), arrayView.getCount()));
+
+            {
+                JSONWriter writer(JSONWriter::IndentationStyle::KNR, 80);
+                
+                container->traverseRecursively(array, &writer);
+            }
         }
         {
             JSONValue obj = JSONValue::makeEmptyObject();
@@ -265,6 +288,33 @@ static void jsonUnitTest()
 
             SLANG_CHECK(objView[0].value.asInteger() == 10);
         }
+    }
+
+    // Check repeated keys works out
+    // Check out comparison works with different key orders
+    {
+        RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+        const char aText[] = "{ \"a\" : 10, \"b\" : 20.0, \"a\" : \"Hello\" }";
+
+        
+        JSONBuilder builder(container);
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &builder)));
+        const JSONValue a = builder.getRootValue();
+
+        builder.reset();
+
+        const char bText[] = "{ \"b\" : 20.0, \"a\" : \"Hello\"}";
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(bText, &sink, &builder)));
+        const JSONValue b = builder.getRootValue();
+
+        SLANG_CHECK(container->areEqual(a, b));
+
+        JSONBuilder convertBuilder(container, JSONBuilder::Flag::ConvertLexemes);
+
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &convertBuilder)));
+        const JSONValue c = builder.getRootValue();
+
+        SLANG_CHECK(container->areEqual(a, c));
     }
 }
 

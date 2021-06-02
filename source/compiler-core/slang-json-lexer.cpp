@@ -80,6 +80,17 @@ bool JSONLexer::advanceIf(JSONTokenType type)
     return false;
 }
 
+bool JSONLexer::advanceIf(JSONTokenType type, JSONToken& out)
+{
+    if (type == peekType())
+    {
+        out = m_token;
+        advance();
+        return true;
+    }
+    return false;
+}
+
 UnownedStringSlice JSONLexer::getLexeme(const JSONToken& tok) const
 {
     auto offset = m_sourceView->getRange().getOffset(tok.loc);

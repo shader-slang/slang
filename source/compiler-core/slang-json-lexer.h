@@ -61,6 +61,7 @@ public:
 
         /// Returns true and advances if current token is type
     bool advanceIf(JSONTokenType type);
+    bool advanceIf(JSONTokenType type, JSONToken& out);
 
         /// Must be called before use
     SlangResult init(SourceView* sourceView, DiagnosticSink* sink);
