@@ -285,7 +285,7 @@ namespace Slang
         TransformablePtr() = default;
         TransformablePtr(T* ptr) { *this = ptr; }
         TransformablePtr(RefPtr<T> ptr) { *this = ptr; }
-        TransformablePtr(const TransformablePtr<T>& ptr) { *this = ptr; }
+        TransformablePtr(const TransformablePtr<T>& ptr) = default;
 
         void promoteToStrongReference() { m_strongPtr = m_weakPtr; }
         void demoteToWeakReference() { m_strongPtr = nullptr; }
@@ -315,14 +315,6 @@ namespace Slang
             m_strongPtr = ptr;
             return *this;
         }
-        template <typename U>
-        TransformablePtr<T>& operator=(const TransformablePtr<U>& ptr)
-        {
-            m_weakPtr = ptr.m_weakPtr;
-            m_strongPtr = ptr.m_strongPtr;
-            return *this;
-        }
-
         
         HashCode getHashCode() const
         {
