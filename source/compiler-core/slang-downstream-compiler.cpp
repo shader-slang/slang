@@ -737,6 +737,55 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
 }
 
+static String _getParentPath(const String& path)
+{
+    // If we can get the canonical path, we'll do that before getting the parent
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(path, canonicalPath)))
+    {
+        return Path::getParentDirectory(canonicalPath);
+    }
+    else
+    {
+        return Path::getParentDirectory(path);
+    }
+}
+
+static SlangResult _findPaths(const String& path, const char* libraryName, String& outParentPath, String& outLibraryPath)
+{
+    // Try to determine what the path is by looking up the path type
+    SlangPathType pathType;
+    if (SLANG_SUCCEEDED(Path::getPathType(path, &pathType)))
+    {
+        if (pathType == SLANG_PATH_TYPE_DIRECTORY)
+        {
+            outParentPath = path;
+            outLibraryPath = Path::combine(outParentPath, libraryName);
+        }
+        else
+        {
+            SLANG_ASSERT(pathType == SLANG_PATH_TYPE_FILE);
+
+            outParentPath = _getParentPath(path);
+            outLibraryPath = path;
+        }
+
+        return SLANG_OK;
+    }
+
+    // If this failed the path could be to a shared library, but we may need to convert to the shared library filename first
+    const String sharedLibraryFilePath = SharedLibrary::calcPlatformPath(path.getUnownedSlice());
+    if (SLANG_SUCCEEDED(Path::getPathType(sharedLibraryFilePath, &pathType)) && pathType == SLANG_PATH_TYPE_FILE)
+    {
+        // We pass in the shared library path, as canonical paths can sometimes only apply to pre-existing objects. 
+        outParentPath = _getParentPath(sharedLibraryFilePath);
+        // The original path should work as is for the SharedLibrary load. Notably we don't use the sharedLibraryFilePath
+        // as this is the wrong name to do a SharedLibrary load with.
+        outLibraryPath = path;
+    }
+
+    return SLANG_FAIL;
+}
 
 /* static */SlangResult DownstreamCompilerUtil::loadSharedLibrary(const String& path, ISlangSharedLibraryLoader* loader, const char*const* dependentNames, const char* inLibraryName, ComPtr<ISlangSharedLibrary>& outSharedLib)
 {
@@ -746,33 +795,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     // If a path is passed in lets, try and determine what kind of path it is.
     if (path.getLength())
     {
-        SlangPathType pathType;
-        if (SLANG_SUCCEEDED(Path::getPathType(path, &pathType)))
-        {
-            if (pathType == SLANG_PATH_TYPE_DIRECTORY)
-            {
-                parentPath = path;
-                libraryPath = Path::combine(parentPath, inLibraryName);
-            }
-            else
-            {
-                SLANG_ASSERT(pathType == SLANG_PATH_TYPE_FILE);
-
-                // If we can get the canonical path, we'll do that before getting the parent
-                String canonicalPath;
-                if (SLANG_SUCCEEDED(Path::getCanonical(path, canonicalPath)))
-                {
-                    parentPath = Path::getParentDirectory(canonicalPath);
-                }
-                else
-                {
-                    parentPath = Path::getParentDirectory(path);
-                }
-
-                // It's a file - we'll use this to load with
-                libraryPath = path;
-            }
-        }
+        _findPaths(path, inLibraryName, parentPath, libraryPath);
     }
 
     // Keep all dependent libs in scope, before we load the library we want
