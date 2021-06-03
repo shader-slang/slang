@@ -16,13 +16,7 @@ public:
 
     virtual SlangResult init() SLANG_OVERRIDE;
 
-    GLSLSourceEmitter(const Desc& desc) :
-        Super(desc)
-    {
-        m_glslExtensionTracker = new GLSLExtensionTracker;
-    }
-
-    
+    GLSLSourceEmitter(const Desc& desc);
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_glslExtensionTracker; }
 

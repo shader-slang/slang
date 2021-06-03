@@ -1,11 +1,14 @@
 // default-major.slang
 
-// The default layout should be column. Unfortunately CPU and CUDA only work with row layout, so they have to be disabled here.
+// The default layout should be column. 
+// This test is disabled because `gfx` layer always initializes Slang to use row-major layout.
+// To test this behavior we need to find a way to make `gfx` use Slang default instead.
+// Unfortunately CPU and CUDA only work with row layout, so they have to be disabled here.
 
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -compile-arg -O3 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -dx12 -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -output-using-type -dx12 -shaderobj
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
 // This data is in column major layout order.... 

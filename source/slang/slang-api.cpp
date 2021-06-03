@@ -272,6 +272,15 @@ SLANG_API void spSetLineDirectiveMode(
     request->setLineDirectiveMode(mode);
 }
 
+SLANG_API void spSetTargetLineDirectiveMode(
+    slang::ICompileRequest* request,
+    int targetIndex,
+    SlangLineDirectiveMode mode)
+{
+    SLANG_ASSERT(request);
+    request->setTargetLineDirectiveMode(targetIndex, mode);
+}
+
 SLANG_API void spSetCommandLineCompilerMode(
     slang::ICompileRequest* request)
 {

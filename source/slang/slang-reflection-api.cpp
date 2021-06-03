@@ -946,6 +946,12 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(SlangReflectionTypeLayo
             return 0;
         }
     }
+    else if (auto vectorTypeLayout = as<VectorTypeLayout>(typeLayout))
+    {
+        auto resInfo = vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
+        if (!resInfo) return 0;
+        return resInfo->count.getFiniteValue();
+    }
 
     return 0;
 }
@@ -971,7 +977,14 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     {
         return convert(specializedTypeLayout->baseTypeLayout.Ptr());
     }
-
+    else if (auto vectorTypeLayout = as<VectorTypeLayout>(typeLayout))
+    {
+        return convert(vectorTypeLayout->elementTypeLayout);
+    }
+    else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
+    {
+        return convert(matrixTypeLayout->elementTypeLayout);
+    }
     return nullptr;
 }
 
@@ -1405,6 +1418,7 @@ namespace Slang
 
             RefPtr<VarLayout> varLayout = new VarLayout();
             varLayout->typeLayout = typeLayout;
+            varLayout->typeLayout.demoteToWeakReference();
 
             for(auto typeResInfo : typeLayout->resourceInfos)
             {

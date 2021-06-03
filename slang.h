@@ -1317,9 +1317,16 @@ extern "C"
         SlangCompileRequest*    request,
         const char* prefix);
 
-    /*! @see slang::ICompileRequest::setLineDirectiveMode */
+    /*! DEPRECATED: use `spSetTargetLineDirectiveMode` instead.
+        @see slang::ICompileRequest::setLineDirectiveMode */
     SLANG_API void spSetLineDirectiveMode(
         SlangCompileRequest*    request,
+        SlangLineDirectiveMode  mode);
+        
+    /*! @see slang::ICompileRequest::setTargetLineDirectiveMode */
+    SLANG_API void spSetTargetLineDirectiveMode(
+        SlangCompileRequest*    request,
+        int targetIndex,
         SlangLineDirectiveMode  mode);
 
     /*! @see slang::ICompileRequest::setCodeGenTarget */
@@ -3784,6 +3791,11 @@ namespace slang
         virtual SLANG_NO_THROW SlangResult SLANG_MCALL getProgramWithEntryPoints(
             slang::IComponentType** outProgram) = 0;
 
+            /** Set the line directive mode for a target.
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setTargetLineDirectiveMode(
+            SlangInt targetIndex,
+            SlangLineDirectiveMode mode) = 0;
     };
 
     #define SLANG_UUID_ICompileRequest ICompileRequest::getTypeGuid()
@@ -3792,6 +3804,10 @@ namespace slang
         */
     struct TargetDesc
     {
+            /** The size of this structure, in bytes.
+            */
+        size_t structureSize = sizeof(TargetDesc);
+
             /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
             */
         SlangCompileTarget      format = SLANG_TARGET_UNKNOWN;
@@ -3810,6 +3826,10 @@ namespace slang
             /** Optimization level to use for the target.
             */
         SlangOptimizationLevel optimizationLevel = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
+
+            /** The line directive mode for output source code.
+            */
+        SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
     typedef uint32_t SessionFlags;
@@ -3836,6 +3856,10 @@ namespace slang
 
     struct SessionDesc
     {
+            /** The size of this structure, in bytes.
+             */
+        size_t structureSize = sizeof(SessionDesc);
+
             /** Code generation targets to include in the session.
             */
         TargetDesc const*   targets = nullptr;
@@ -3856,7 +3880,6 @@ namespace slang
 
         PreprocessorMacroDesc const*    preprocessorMacros = nullptr;
         SlangInt                        preprocessorMacroCount = 0;
-
     };
 
     enum class ContainerType

@@ -721,14 +721,15 @@ SlangResult emitEntryPointsSourceFromIR(
     const List<Int>&        entryPointIndices,
     CodeGenTarget           target,
     TargetRequest*          targetRequest,
-    SourceResult&           outSource)
+    ExtensionTracker*       extensionTracker, 
+    String&                 outSource)
 {
-    outSource.reset();
+    outSource = String();
 
     auto sink = compileRequest->getSink();
     auto program = compileRequest->getProgram();
 
-    auto lineDirectiveMode = compileRequest->getLineDirectiveMode();
+    auto lineDirectiveMode = targetRequest->getLineDirectiveMode();
     // To try to make the default behavior reasonable, we will
     // always use C-style line directives (to give the user
     // good source locations on error messages from downstream
@@ -760,6 +761,7 @@ SlangResult emitEntryPointsSourceFromIR(
     }
     desc.targetCaps = targetRequest->getTargetCaps();
     desc.sourceWriter = &sourceWriter;
+    desc.extensionTracker = extensionTracker;
 
     // Define here, because must be in scope longer than the sourceEmitter, as sourceEmitter might reference
     // items in the linkedIR module
@@ -866,8 +868,6 @@ SlangResult emitEntryPointsSourceFromIR(
     sourceEmitter->emitPreprocessorDirectives();
     sourceWriter.resumeLineDirective();
 
-    RefObject* extensionTracker = sourceEmitter->getExtensionTracker();
-
     if (auto glslExtensionTracker = as<GLSLExtensionTracker>(extensionTracker))
     {
         trackGLSLTargetCaps(glslExtensionTracker, targetRequest->getTargetCaps());
@@ -887,9 +887,7 @@ SlangResult emitEntryPointsSourceFromIR(
     finalResultBuilder << code;
 
     // Write out the result
-    outSource.source = finalResultBuilder.ProduceString();
-    outSource.extensionTracker = extensionTracker;
-
+    outSource = finalResultBuilder.ProduceString();
     return SLANG_OK;
 }
 

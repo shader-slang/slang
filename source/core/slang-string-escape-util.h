@@ -14,6 +14,9 @@ public:
     virtual bool isQuotingNeeded(const UnownedStringSlice& slice) = 0;
         /// True if any escaping is needed. If not slice can be used (assuming appropriate quoting) as is
     virtual bool isEscapingNeeded(const UnownedStringSlice& slice) = 0;
+        /// True if we need to unescape
+    virtual bool isUnescapingNeeeded(const UnownedStringSlice& slice) = 0;
+
         /// Takes slice and adds any appropriate escaping (for example C++/C type escaping for special characters like '\', '"' and if not ascii will write out as hex sequence)
         /// Does not append quotes
     virtual SlangResult appendEscaped(const UnownedStringSlice& slice, StringBuilder& out) = 0;
@@ -57,6 +60,14 @@ struct StringEscapeUtil
         /// Given a style returns a handler
     static Handler* getHandler(Style style);
 
+        /// Get without quotes. Will assert if not correctly quoted
+    static UnownedStringSlice unquote(char quoteChar, const UnownedStringSlice& slice);
+    static UnownedStringSlice unquote(Handler* handler, const UnownedStringSlice& slice) { return unquote(handler->getQuoteChar(), slice); }
+
+    /// True is slice is quoted
+    static bool isQuoted(char quoteChar, UnownedStringSlice& slice);
+    static bool isQuoted(Handler* handler, UnownedStringSlice& slice) { return isQuoted(handler->getQuoteChar(), slice); } 
+
         /// If quoting is needed appends to out quoted
     static SlangResult appendMaybeQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
 
@@ -68,6 +79,11 @@ struct StringEscapeUtil
 
         /// Append with quotes (even if not needed)
     static SlangResult appendQuoted(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);
+
+
+        /// True if requires 'shell-like' unescape. With shell-like, quoting does *not* have to start at the start of the slice.
+        /// and there may be multiple quoted section
+    static SlangResult isUnescapeShellLikeNeeded(Handler* handler, const UnownedStringSlice& slice);
 
         /// Shells can have multiple quoted sections. This function makes a string with out quoting
     static SlangResult unescapeShellLike(Handler* handler, const UnownedStringSlice& slice, StringBuilder& out);

@@ -4,6 +4,10 @@
 
 #include "test-context.h"
 
+//#include <math.h>
+
+#include <sstream>
+
 using namespace Slang;
 
 static bool _areEqual(const List<UnownedStringSlice>& lines, const UnownedStringSlice* checkLines, Int checkLinesCount)
@@ -41,6 +45,71 @@ static bool _checkLineParser(const UnownedStringSlice& input)
         }
     }
     return StringUtil::extractLine(remaining, line) == false;
+}
+
+static void _append(double v, StringBuilder& buf)
+{
+    std::ostringstream stream;
+    stream.imbue(std::locale::classic());
+    stream.setf(std::ios::fixed, std::ios::floatfield);
+    stream.precision(20);
+
+    stream << std::scientific << v;
+
+    buf << stream.str().c_str();
+}
+
+// Unit of least precision
+static int64_t _calcULPDistance(double a, double b)
+{
+    // Save work if the floats are equal.
+    // Also handles +0 == -0
+    if (a == b)
+    {
+        return 0;
+    }
+
+    const int64_t max = int64_t((~uint64_t(0)) >> 1);
+
+#if 0
+    // Max distance for NaN
+    if (isnan(a) || isnan(b))
+    {
+        return max;
+    }
+
+    // If one's infinite and they're not equal, max distance.
+    if (isinf(a) || isinf(b))
+    {
+        return max;
+    }
+#endif
+
+    int64_t ia, ib;
+    memcpy(&ia, &a, sizeof(a));
+    memcpy(&ib, &b, sizeof(b));
+
+    // Don't compare differently-signed floats.
+    if ((ia < 0) != (ib < 0))
+    {
+        return max;
+    }
+
+    // Return the absolute value of the distance in ULPs.
+    int64_t distance = ia - ib;
+    return distance < 0 ? -distance : distance;
+}
+
+static bool _areApproximatelyEqual(double a, double b, double fixedEpsilon = 1e-10, int ulpsEpsilon = 100)
+{
+    // Handle the near-zero case.
+    const double difference = abs(a - b);
+    if (difference <= fixedEpsilon)
+    {
+        return true;
+    }
+
+    return _calcULPDistance(a, b) <= ulpsEpsilon;
 }
 
 static void stringUnitTest()
@@ -120,6 +189,74 @@ static void stringUnitTest()
 
             StringUtil::split(builder.getUnownedSlice(), UnownedStringSlice("ab"), checkValues);
             SLANG_CHECK(checkValues.getArrayView() == ArrayView<UnownedStringSlice>(values, 3));
+        }
+    }
+    {
+       
+        List<double> values;
+        values.add(0.0);
+        values.add(-0.0);
+
+        for (Index i = -300; i < 300; ++i)
+        {
+            double value = pow(10, i);
+
+            values.add(value);
+            values.add(-value);
+
+            values.addRange(value / 3);
+            values.addRange(-value / 3);
+        }
+
+        StringBuilder buf;
+
+        for (auto value : values)
+        {
+            buf.Clear();
+            _append(value, buf);
+
+            UnownedStringSlice slice = buf.getUnownedSlice();
+
+            double parsedValue;
+            SlangResult res = StringUtil::parseDouble(slice, parsedValue);
+
+            auto ulpsParsed = _calcULPDistance(value, parsedValue);
+            
+            SLANG_CHECK(SLANG_SUCCEEDED(res));
+
+            // Check that they are equal
+            SLANG_CHECK(_areApproximatelyEqual(value, parsedValue));
+        }
+    }
+    {
+        List<int64_t> values;
+        values.add(0);
+
+        for (Index i = 0; i < 63; ++i)
+        {
+            auto value = int64_t(1) << i;
+
+            values.add(value);
+            values.add(-value);
+        }
+
+        StringBuilder buf;
+
+        for (auto value : values)
+        {
+            buf.Clear();
+            buf << value;
+
+
+            int64_t parsedValue;
+
+            UnownedStringSlice slice = buf.getUnownedSlice();
+            SlangResult res = StringUtil::parseInt64(slice, parsedValue);
+
+            SLANG_CHECK(SLANG_SUCCEEDED(res));
+            
+            // Check that they are equal
+            SLANG_CHECK(value == parsedValue);
         }
     }
 }

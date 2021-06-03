@@ -326,16 +326,7 @@ SlangResult FXCDownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarg
 {
     ComPtr<ISlangSharedLibrary> library;
 
-    // If the user supplies a path to their preferred version of FXC,
-    // we just use this.
-    if (path.getLength() != 0)
-    {
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(path.getBuffer(), library.writeRef()));
-    }
-    else
-    {
-        SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("d3dcompiler_47", library.writeRef()));
-    }
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "d3dcompiler_47", library));
 
     SLANG_ASSERT(library);
     if (!library)

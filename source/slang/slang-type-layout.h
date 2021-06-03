@@ -467,7 +467,7 @@ public:
     Name* getName() { return getVariable()->getName(); }
 
     // The result of laying out the variable's type
-    RefPtr<TypeLayout>      typeLayout;
+    TransformablePtr<TypeLayout> typeLayout;
     TypeLayout* getTypeLayout() { return typeLayout.Ptr(); }
 
     // Additional flags

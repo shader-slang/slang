@@ -368,17 +368,10 @@ namespace Slang
     SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)
     {
         // Check if the type is supported on this compile
-        switch (passThrough)
+        if (passThrough == PassThroughMode::None)
         {
-            case PassThroughMode::None:
-            {
-                // If no pass through -> that will always work!
-                return SLANG_OK;
-            }
-#if !SLANG_ENABLE_GLSLANG_SUPPORT
-            case PassThroughMode::Glslang: return SLANG_E_NOT_IMPLEMENTED;
-#endif
-            default: break;
+            // If no pass through -> that will always work!
+            return SLANG_OK;
         }
 
         return session->getOrLoadDownstreamCompiler(passThrough, nullptr) ? SLANG_OK: SLANG_E_NOT_FOUND;
@@ -522,24 +515,6 @@ namespace Slang
         outCodeBuilder << fileContent << "\n";
     }
 
-    static void _maybeCreatePassThroughExtensionTracker(
-        CodeGenTarget           target,
-        EndToEndCompileRequest* endToEndReq,
-        SourceResult&           outSource)
-    {
-        if(!isPassThroughEnabled(endToEndReq))
-            return;
-
-        if(target != CodeGenTarget::GLSL)
-            return;
-
-        if(outSource.extensionTracker)
-            return;
-
-        RefPtr<GLSLExtensionTracker> extensionTracker = new GLSLExtensionTracker();
-        outSource.extensionTracker = extensionTracker;
-    }
-
     void trackGLSLTargetCaps(
         GLSLExtensionTracker*   extensionTracker,
         CapabilitySet const&    caps)
@@ -567,9 +542,10 @@ namespace Slang
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
-        SourceResult&           outSource)
+        ExtensionTracker*       extensionTracker, 
+        String&                 outSource)
     {
-        outSource.reset();
+        outSource = String();
 
         if(isPassThroughEnabled(endToEndReq))
         {
@@ -586,10 +562,6 @@ namespace Slang
                 StringBuilder codeBuilder;
                 if (target == CodeGenTarget::GLSL)
                 {
-                    _maybeCreatePassThroughExtensionTracker(target, endToEndReq, outSource);
-                    if(auto extensionTracker = as<GLSLExtensionTracker>(outSource.extensionTracker))
-                        trackGLSLTargetCaps(extensionTracker, targetReq->getTargetCaps());
-
                     // Special case GLSL
                     int translationUnitCounter = 0;
                     for (auto sourceFile : translationUnit->getSourceFiles())
@@ -616,7 +588,7 @@ namespace Slang
                     }
                 }
 
-                outSource.source = codeBuilder.ProduceString();
+                outSource = codeBuilder.ProduceString();
             }
             return SLANG_OK;
         }
@@ -627,6 +599,7 @@ namespace Slang
                 entryPointIndices,
                 target,
                 targetReq,
+                extensionTracker,
                 outSource);
         }
     }
@@ -637,12 +610,13 @@ namespace Slang
         TargetRequest*          targetReq,
         CodeGenTarget           target,
         EndToEndCompileRequest* endToEndReq,
-        SourceResult&           outSource)
+        ExtensionTracker*       extensionTracker,
+        String&                 outSource)
     {
         List<Int> entryPointIndices;
         entryPointIndices.add(entryPointIndex);
         return emitEntryPointsSource(compileRequest, entryPointIndices, targetReq,
-            target, endToEndReq, outSource);
+            target, endToEndReq, extensionTracker, outSource);
     }
 
     String GetHLSLProfileName(Profile profile)
@@ -874,6 +848,24 @@ namespace Slang
         }
     }
 
+    static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
+    {
+        switch (target)
+        {
+            case CodeGenTarget::PTX:
+            case CodeGenTarget::CUDASource:
+            {
+                return new CUDAExtensionTracker;
+            }
+            case CodeGenTarget::SPIRV:
+            case CodeGenTarget::GLSL:
+            {
+                return new GLSLExtensionTracker;
+            }
+            default:                            return nullptr;
+        }
+    }
+
     SlangResult emitWithDownstreamForEntryPoints(
         ComponentType*          program,
         BackEndCompileRequest*  slangRequest,
@@ -893,6 +885,8 @@ namespace Slang
         SourceLanguage sourceLanguage = SourceLanguage::Unknown;
 
         PassThroughMode downstreamCompiler = endToEndReq ? endToEndReq->m_passThrough : PassThroughMode::None;
+
+        RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
 
         // If we are not in pass through, lookup the default compiler for the emitted source type
         if (downstreamCompiler == PassThroughMode::None)
@@ -943,7 +937,14 @@ namespace Slang
                 downstreamCompiler = PassThroughMode(session->getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage)));
             }
         }
-        
+        else
+        {
+            // If we are pass through, we may need to set extension tracker state. 
+            if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
+            {
+                trackGLSLTargetCaps(glslTracker, targetReq->getTargetCaps());
+            }
+        }
 
         // We should have a downstream compiler set at this point
         SLANG_ASSERT(downstreamCompiler != PassThroughMode::None);
@@ -982,6 +983,7 @@ namespace Slang
             }
         }
 
+        
         /* This is more convoluted than the other scenarios, because when we invoke C/C++ compiler we would ideally like
         to use the original file. We want to do this because we want includes relative to the source file to work, and
         for that to work most easily we want to use the original file, if there is one */
@@ -1051,10 +1053,7 @@ namespace Slang
                 // If it's not file based we can set an appropriate path name, and it doesn't matter if it doesn't
                 // exist on the file system
                 options.sourceContentsPath = calcSourcePathForEntryPoints(endToEndReq, entryPointIndices);
-
-                SourceResult source;
-                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, source));
-                options.sourceContents = source.source;
+                SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
             }
             else
             {
@@ -1070,11 +1069,16 @@ namespace Slang
         }
         else
         {
-            SourceResult source;
-            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, source));
+            SLANG_RETURN_ON_FAIL(emitEntryPointsSource(slangRequest, entryPointIndices, targetReq, sourceTarget, endToEndReq, extensionTracker, options.sourceContents));
+            maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
+        }
 
+        // If we have an extension tracker, we may need to set options such as SPIR-V version
+        // and CUDA Shader Model.
+        if (extensionTracker)
+        {
             // Look for the version
-            if (auto cudaTracker = as<CUDAExtensionTracker>(source.extensionTracker))
+            if (auto cudaTracker = as<CUDAExtensionTracker>(extensionTracker))
             {
                 cudaTracker->finalize();
 
@@ -1092,18 +1096,14 @@ namespace Slang
                     options.flags |= CompileOptions::Flag::EnableFloat16;
                 }
             }
-            else if (GLSLExtensionTracker* tracker = as<GLSLExtensionTracker>(source.extensionTracker.Ptr()))
+            else if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
             {
                 DownstreamCompiler::CapabilityVersion version;
                 version.kind = DownstreamCompiler::CapabilityVersion::Kind::SPIRV;
-                version.version = tracker->getSPIRVVersion();
+                version.version = glslTracker->getSPIRVVersion();
 
                 options.requiredCapabilityVersions.add(version);
             }
-
-            options.sourceContents = source.source;
-            
-            maybeDumpIntermediate(slangRequest, options.sourceContents.getBuffer(), sourceTarget);
         }
 
         // Set the file sytem and source manager, as *may* be used by downstream compiler
@@ -1164,7 +1164,7 @@ namespace Slang
                 // Set the matrix layout
                 options.matrixLayout = targetReq->getDefaultMatrixLayoutMode();
             }
-            else
+            else if (downstreamCompiler == PassThroughMode::Fxc)
             {
                 // Set the profile
                 options.profileName = GetHLSLProfileName(profile);
@@ -1517,14 +1517,20 @@ namespace Slang
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CSource:
             {
-                SourceResult source;
-                if (SLANG_FAILED(emitEntryPointsSource(compileRequest, entryPointIndices,
-                    targetReq, target, endToEndReq, source)))
+                RefPtr<ExtensionTracker> extensionTracker = _newExtensionTracker(target);
+
+                String code;
+                if (SLANG_FAILED(emitEntryPointsSource(compileRequest,
+                    entryPointIndices,
+                    targetReq,
+                    target,
+                    endToEndReq,
+                    extensionTracker,
+                    code)))
                 {
                     return result;
                 }
 
-                const auto& code = source.source;
                 maybeDumpIntermediate(compileRequest, code.getBuffer(), target);
                 result = CompileResult(code);
             }
@@ -1955,7 +1961,6 @@ namespace Slang
             m_program->getLinkage(),
             sink,
             m_program);
-
         backEndRequest->shouldDumpIR =
             (m_targetReq->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR) != 0;
 
