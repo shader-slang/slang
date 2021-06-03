@@ -148,7 +148,9 @@ struct App
                 case '\t':
                     fprintf(outputFile, "\\t");
                     break;
-
+                case '\\':
+                    fprintf(outputFile, "\\\\");
+                    break;
                 default:
                     // For all other cases, we detect if the byte
                     // is in the printable ASCII range, and emit
