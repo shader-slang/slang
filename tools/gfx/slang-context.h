@@ -1,6 +1,7 @@
 #pragma once
 
 #include "slang-gfx.h"
+#include "core/slang-basic.h"
 
 namespace gfx
 {
@@ -9,7 +10,8 @@ namespace gfx
     public:
         Slang::ComPtr<slang::IGlobalSession> globalSession;
         Slang::ComPtr<slang::ISession> session;
-        Result initialize(const gfx::IDevice::SlangDesc& desc, SlangCompileTarget compileTarget, const char* defaultProfileName)
+        Result initialize(const gfx::IDevice::SlangDesc& desc, SlangCompileTarget compileTarget, const char* defaultProfileName,
+            Slang::ConstArrayView<slang::PreprocessorMacroDesc> additionalMacros)
         {
             if (desc.slangGlobalSession)
             {
@@ -24,8 +26,11 @@ namespace gfx
             slangSessionDesc.defaultMatrixLayoutMode = desc.defaultMatrixLayoutMode;
             slangSessionDesc.searchPathCount = desc.searchPathCount;
             slangSessionDesc.searchPaths = desc.searchPaths;
-            slangSessionDesc.preprocessorMacroCount = desc.preprocessorMacroCount;
-            slangSessionDesc.preprocessorMacros = desc.preprocessorMacros;
+            slangSessionDesc.preprocessorMacroCount = desc.preprocessorMacroCount + additionalMacros.getCount();
+            Slang::List<slang::PreprocessorMacroDesc> macros;
+            macros.addRange(desc.preprocessorMacros, desc.preprocessorMacroCount);
+            macros.addRange(additionalMacros.getBuffer(), additionalMacros.getCount());
+            slangSessionDesc.preprocessorMacros = macros.getBuffer();
             slang::TargetDesc targetDesc = {};
             targetDesc.format = compileTarget;
             auto targetProfile = desc.targetProfile;
