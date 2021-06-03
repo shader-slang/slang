@@ -1067,6 +1067,58 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return LayoutResourceKind::None;
     }
 
+    IRInst* emitOptiXAttributeFetch(int& ioBaseAttributeIndex, IRType* typeToFetch, IRBuilder* builder) {
+
+        if (auto structType = as<IRStructType>(typeToFetch))
+        {
+            IRInst** args = nullptr;
+            UInt argCount = 0;
+            // todo, recurse
+            // kIROp_makeStruct
+            return builder->emitMakeStruct(typeToFetch, argCount, args);
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
+        {
+            IRInst** args = nullptr;
+            UInt argCount = 0;
+            return builder->emitMakeArray(typeToFetch, argCount, args);
+        }
+        else if (auto matType = as<IRMatrixType>(typeToFetch))
+        {
+            IRInst** args = nullptr;
+            UInt argCount = 0;
+            return builder->emitMakeMatrix(typeToFetch, argCount, args);
+        }
+        else if (auto vecType = as<IRVectorType>(typeToFetch))
+        {
+            // todo, recurse
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            IRType* elementType = vecType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeVector(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+        }
+        else if (auto basicType = as<IRBasicType>(typeToFetch))
+        {
+            IRIntegerValue idx = ioBaseAttributeIndex;
+            auto idxInst = builder->getIntValue(builder->getIntType(), idx);
+            ioBaseAttributeIndex++;
+            IRInst* args[] = { typeToFetch, idxInst };
+            IRInst* getAttr = builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
+            return getAttr;
+        }
+
+        //return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
+        return nullptr;
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -1198,9 +1250,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         {
         case LayoutResourceKind::RayPayload: {
             IRBuilder builder(m_sharedBuilder);
-			builder.setInsertBefore(m_firstOrdinaryInst);
-			IRPtrType* ptrType = builder.getPtrType(info.type);
-			IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+            builder.setInsertBefore(m_firstOrdinaryInst);
+            IRPtrType* ptrType = builder.getPtrType(info.type);
+            IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
             return LegalizedVaryingVal::makeAddress(getRayPayload);
             // Todo: compute how many registers are required for the current payload. 
             // If more than 32, use the above logic. 
@@ -1213,6 +1265,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             else {
                 return diagnoseUnsupportedUserVal(info);
             }*/ 
+        }
+        case LayoutResourceKind::HitAttributes: {
+			IRBuilder builder(m_sharedBuilder);
+			builder.setInsertBefore(m_firstOrdinaryInst);
+			//IRPtrType* ptrType = builder.getPtrType(info.type);
+			//IRInst* getHitAttributes = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXHitAttributes, 0, nullptr);
+            int ioBaseAttributeIndex = 0;
+            IRInst* getHitAttributes = emitOptiXAttributeFetch(/*ioBaseAttributeIndex*/ ioBaseAttributeIndex, /* type to fetch */info.type, /*the builder in use*/ &builder);
+			return LegalizedVaryingVal::makeValue(getHitAttributes);
         }
         default:
             return diagnoseUnsupportedUserVal(info);
