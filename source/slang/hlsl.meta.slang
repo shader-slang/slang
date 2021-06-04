@@ -4220,18 +4220,23 @@ static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES       = 0x200;
 // 10.1.2 - Ray Description Structure
 
 __target_intrinsic(hlsl, RayDesc)
+__target_intrinsic(cuda, RayDesc)
 struct RayDesc
 {
     __target_intrinsic(hlsl, Origin)
+    __target_intrinsic(cuda, Origin)
     float3 Origin;
 
     __target_intrinsic(hlsl, TMin)
+    __target_intrinsic(cuda, TMin)
     float  TMin;
 
     __target_intrinsic(hlsl, Direction)
+    __target_intrinsic(cuda, Direction)
     float3 Direction;
 
     __target_intrinsic(hlsl, TMax)
+    __target_intrinsic(cuda, TMax)
     float  TMax;
 };
 
@@ -4303,6 +4308,7 @@ void CallShader(uint shaderIndex, inout Payload payload)
 
 // 10.3.2
 __target_intrinsic(hlsl)
+__target_intrinsic(cuda, "traceOptiXRay")
 void TraceRay<payload_t>(
     RaytracingAccelerationStructure AccelerationStructure,
     uint                            RayFlags,
