@@ -154,6 +154,7 @@ enableOptix = not not (_OPTIONS["enable-optix"] == "true" or optixPath)
 enableProfile = (_OPTIONS["enable-profile"] == "true")
 enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
 enableXlib = (_OPTIONS["enable-xlib"] == "true")
+
 -- This is the path where nvapi is expected to be found
 
 nvapiPath = "external/nvapi"
@@ -216,6 +217,12 @@ workspace "slang"
     if buildLocation then
         location(buildLocation)
     end
+        
+    -- 
+    -- Make slang-test the startup project.
+    --
+    -- https://premake.github.io/docs/startproject
+    startproject "slang-test"
     
     -- The output binary directory will be derived from the OS
     -- and configuration options, e.g. `bin/windows-x64/debug/`
@@ -242,7 +249,6 @@ workspace "slang"
         architecture "x86"
     filter { "platforms:aarch64"}
         architecture "ARM"
-
 
 
     filter { "toolset:clang or gcc*" }
@@ -1412,3 +1418,5 @@ standardProject("slang-glslang", "source/slang-glslang")
 --
 
 end
+
+
