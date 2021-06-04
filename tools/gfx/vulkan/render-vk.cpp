@@ -6473,4 +6473,4 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     return SLANG_OK;
 }
 
-} // renderer_test
+} //  renderer_test
