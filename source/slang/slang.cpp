@@ -2397,6 +2397,15 @@ Module* Linkage::loadModule(String const& name)
         sink);
 }
 
+void Linkage::_diagnoseErrorInImportedModule(
+    DiagnosticSink*     sink)
+{
+    for(auto info = m_modulesBeingImported; info; info = info->next)
+    {
+        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+    }
+    sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+}
 
 RefPtr<Module> Linkage::loadModule(
     Name*               name,
@@ -2418,7 +2427,9 @@ RefPtr<Module> Linkage::loadModule(
 
     ModuleBeingImportedRAII moduleBeingImported(
         this,
-        module);
+        module,
+        name,
+        srcLoc);
 
     // Create with the 'friendly' name
     SourceFile* sourceFile = getSourceManager()->createSourceFileWithBlob(filePathInfo, sourceBlob);
@@ -2431,7 +2442,7 @@ RefPtr<Module> Linkage::loadModule(
 
     if( errorCountAfter != errorCountBefore )
     {
-        sink->diagnose(srcLoc, Diagnostics::errorInImportedModule);
+        _diagnoseErrorInImportedModule(sink);
     }
     if (errorCountAfter)
     {
@@ -2449,7 +2460,7 @@ RefPtr<Module> Linkage::loadModule(
 
     if (errorCountAfter != errorCountBefore)
     {
-        sink->diagnose(srcLoc, Diagnostics::errorInImportedModule);
+        _diagnoseErrorInImportedModule(sink);
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
