@@ -1517,12 +1517,6 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 auto nextStream = m_inputStreams.getNextStream();
                 auto busyMacrosForFunctionLikeInvocation = nextStream->getFirstBusyMacroInvocation();
 
-#define LPAREN (
-#define RPAREN )
-#define INNER(X) LPAREN X RPAREN
-#define OUTER(X) INNER LPAREN X RPAREN
-                int x[ OUTER(3) ];
-                x;
                 invocation->prime(busyMacrosForFunctionLikeInvocation);
                 _pushMacroInvocation(invocation);
             }
