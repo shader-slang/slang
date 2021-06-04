@@ -1404,6 +1404,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         case kIROp_BitCast:
         {
             auto toType = extractBaseType(inst->getDataType());
+            auto fromType = extractBaseType(inst->getOperand(0)->getDataType());
             switch (toType)
             {
                 default:
@@ -1411,14 +1412,40 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     break;
 
                 case BaseType::UInt:
+                    if (fromType == BaseType::Float)
+                    {
+                        m_writer->emit("floatBitsToUint");
+                    }
+                    else
+                    {
+                        emitType(inst->getDataType());
+                    }
                     break;
 
                 case BaseType::Int:
-                    emitType(inst->getDataType());
+                    if (fromType == BaseType::Float)
+                    {
+                        m_writer->emit("floatBitsToInt");
+                    }
+                    else
+                    {
+                        emitType(inst->getDataType());
+                    }
                     break;
 
                 case BaseType::Float:
-                    m_writer->emit("uintBitsToFloat");
+                    switch (fromType)
+                    {
+                    case BaseType::Int:
+                        m_writer->emit("intBitsToFloat");
+                        break;
+                    case BaseType::UInt:
+                        m_writer->emit("uintBitsToFloat");
+                        break;
+                    default:
+                        emitType(inst->getDataType());
+                        break;
+                    }
                     break;
             }
 

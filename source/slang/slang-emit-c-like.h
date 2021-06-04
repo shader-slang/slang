@@ -195,7 +195,6 @@ public:
 
         /// Get the diagnostic sink
     DiagnosticSink* getSink() { return m_compileRequest->getSink();}
-    LineDirectiveMode getLineDirectiveMode() { return m_compileRequest->getLineDirectiveMode(); }
 
         /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }

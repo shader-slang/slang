@@ -5225,13 +5225,13 @@ Result D3D12Device::readBufferResource(
 
     // Resource to readback to
     D3D12_RESOURCE_DESC stagingDesc;
-    _initBufferResourceDesc(bufferSize, stagingDesc);
+    _initBufferResourceDesc(size, stagingDesc);
 
     D3D12Resource stageBuf;
     SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
 
     // Do the copy
-    encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, 0, bufferSize);
+    encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
 
     // Wait until complete
     submitResourceCommandsAndWait(encodeInfo);
@@ -5240,13 +5240,13 @@ Result D3D12Device::readBufferResource(
     RefPtr<ListBlob> blob = new ListBlob();
     {
         UINT8* data;
-        D3D12_RANGE readRange = { 0, bufferSize };
+        D3D12_RANGE readRange = { 0, size };
 
         SLANG_RETURN_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
-        blob->m_data.setCount(bufferSize);
-        ::memcpy(blob->m_data.getBuffer(), data, bufferSize);
+        blob->m_data.setCount(size);
+        ::memcpy(blob->m_data.getBuffer(), data, size);
 
         stageBuf.getResource()->Unmap(0, nullptr);
     }
