@@ -117,7 +117,7 @@ public:
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
-    virtual void unmap(IBufferResource* buffer) override;
+    virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) override;
     virtual void copyBuffer(
         IBufferResource* dst,
         size_t dstOffset,
@@ -181,8 +181,10 @@ protected:
         }
 
         MapFlavor m_mapFlavor;
+        D3D11_USAGE m_d3dUsage;
         ComPtr<ID3D11Buffer> m_buffer;
         ComPtr<ID3D11Buffer> m_staging;
+        List<uint8_t> m_uploadStagingBuffer;
     };
     class TextureResourceImpl : public TextureResource
     {
@@ -1462,7 +1464,7 @@ protected:
 
             auto ordinaryData = device->map(m_ordinaryDataBuffer, gfx::MapFlavor::WriteDiscard);
             auto result = _writeOrdinaryData(ordinaryData, specializedOrdinaryDataSize, specializedLayout);
-            device->unmap(m_ordinaryDataBuffer);
+            device->unmap(m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize);
             
             return result;
         }
@@ -2013,7 +2015,11 @@ static bool _isSupportedNVAPIOp(IUnknown* dev, uint32_t op)
 
 SlangResult D3D11Device::initialize(const Desc& desc)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_DXBC, "sm_5_0"));
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(
+        desc.slang,
+        SLANG_DXBC,
+        "sm_5_0",
+        makeArray(slang::PreprocessorMacroDesc{ "__D3D11__", "1" }).getView()));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -2603,8 +2609,10 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
 
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
+    buffer->m_d3dUsage = bufferDesc.Usage;
 
-    if (srcDesc.cpuAccessFlags & IResource::AccessFlag::Read)
+    if ((srcDesc.cpuAccessFlags & IResource::AccessFlag::Read) ||
+        ((srcDesc.cpuAccessFlags & IResource::AccessFlag::Write) && bufferDesc.Usage != D3D11_USAGE_DYNAMIC))
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;
@@ -2614,7 +2622,6 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
 
         SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufDesc, nullptr, buffer->m_staging.writeRef()));
     }
-
     returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
@@ -2981,19 +2988,34 @@ void* D3D11Device::map(IBufferResource* bufferIn, MapFlavor flavor)
             break;
         case MapFlavor::HostRead:
             mapType = D3D11_MAP_READ;
-
-            buffer = bufferResource->m_staging;
-            if (!buffer)
-            {
-                return nullptr;
-            }
-
-            // Okay copy the data over
-            m_immediateContext->CopyResource(buffer, bufferResource->m_buffer);
-
             break;
         default:
             return nullptr;
+    }
+
+    bufferResource->m_mapFlavor = flavor;
+
+    switch (flavor)
+    {
+    case MapFlavor::WriteDiscard:
+    case MapFlavor::HostWrite:
+        // If buffer is not dynamic, we need to use staging buffer.
+        if (bufferResource->m_d3dUsage != D3D11_USAGE_DYNAMIC)
+        {
+            bufferResource->m_uploadStagingBuffer.setCount(bufferResource->getDesc()->sizeInBytes);
+            return bufferResource->m_uploadStagingBuffer.getBuffer();
+        }
+        break;
+    case MapFlavor::HostRead:
+        buffer = bufferResource->m_staging;
+        if (!buffer)
+        {
+            return nullptr;
+        }
+
+        // Okay copy the data over
+        m_immediateContext->CopyResource(buffer, bufferResource->m_buffer);
+
     }
 
     // We update our constant buffer per-frame, just for the purposes
@@ -3002,16 +3024,36 @@ void* D3D11Device::map(IBufferResource* bufferIn, MapFlavor flavor)
     D3D11_MAPPED_SUBRESOURCE mappedSub;
     SLANG_RETURN_NULL_ON_FAIL(m_immediateContext->Map(buffer, 0, mapType, 0, &mappedSub));
 
-    bufferResource->m_mapFlavor = flavor;
-
     return mappedSub.pData;
 }
 
-void D3D11Device::unmap(IBufferResource* bufferIn)
+void D3D11Device::unmap(IBufferResource* bufferIn, size_t offsetWritten, size_t sizeWritten)
 {
     BufferResourceImpl* bufferResource = static_cast<BufferResourceImpl*>(bufferIn);
-    ID3D11Buffer* buffer = (bufferResource->m_mapFlavor == MapFlavor::HostRead) ? bufferResource->m_staging : bufferResource->m_buffer;
-    m_immediateContext->Unmap(buffer, 0);
+    switch (bufferResource->m_mapFlavor)
+    {
+    case MapFlavor::WriteDiscard:
+    case MapFlavor::HostWrite:
+        // If buffer is not dynamic, the CPU has already written to the staging buffer,
+        // and we need to copy the content over to the GPU buffer.
+        if (bufferResource->m_d3dUsage != D3D11_USAGE_DYNAMIC && sizeWritten != 0)
+        {
+            D3D11_BOX dstBox = {};
+            dstBox.left = (UINT)offsetWritten;
+            dstBox.right = (UINT)(offsetWritten + sizeWritten);
+            dstBox.back = 1;
+            dstBox.bottom = 1;
+            m_immediateContext->UpdateSubresource(
+                bufferResource->m_buffer,
+                0,
+                &dstBox,
+                bufferResource->m_uploadStagingBuffer.getBuffer() + offsetWritten,
+                0,
+                0);
+            return;
+        }
+    }
+    m_immediateContext->Unmap(bufferResource->m_mapFlavor == MapFlavor::HostRead ? bufferResource->m_staging : bufferResource->m_buffer, 0);
 }
 
 #if 0

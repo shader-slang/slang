@@ -1176,7 +1176,11 @@ public:
 public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override
     {
-        SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_PTX, "sm_5_1"));
+        SLANG_RETURN_ON_FAIL(slangContext.initialize(
+            desc.slang,
+            SLANG_PTX,
+            "sm_5_1",
+            makeArray(slang::PreprocessorMacroDesc{ "__CUDA_COMPUTE__", "1" }).getView()));
 
         SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
