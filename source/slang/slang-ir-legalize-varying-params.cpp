@@ -1068,30 +1068,56 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     }
 
     IRInst* emitOptiXAttributeFetch(int& ioBaseAttributeIndex, IRType* typeToFetch, IRBuilder* builder) {
-
         if (auto structType = as<IRStructType>(typeToFetch))
         {
-            IRInst** args = nullptr;
-            UInt argCount = 0;
-            // todo, recurse
-            // kIROp_makeStruct
-            return builder->emitMakeStruct(typeToFetch, argCount, args);
+            List<IRInst*> fieldVals;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, fieldType, builder);
+                if (!fieldVal)
+                    return nullptr;
+
+                fieldVals.add(fieldVal);
+            }
+            return builder->emitMakeStruct(typeToFetch, fieldVals);
         }
         else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
         {
-            IRInst** args = nullptr;
-            UInt argCount = 0;
-            return builder->emitMakeArray(typeToFetch, argCount, args);
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            auto elementType = arrayType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeArray(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
         }
         else if (auto matType = as<IRMatrixType>(typeToFetch))
         {
-            IRInst** args = nullptr;
-            UInt argCount = 0;
-            return builder->emitMakeMatrix(typeToFetch, argCount, args);
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            if (rowCountInst)
+            {
+                auto rowType = builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+                IRType* elementType = rowType;
+                IRIntegerValue elementCount = rowCountInst->getValue();
+                List<IRInst*> elementVals;
+                for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+                {
+                    auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                    if (!elementVal)
+                        return nullptr;
+                    elementVals.add(elementVal);
+                }
+                return builder->emitIntrinsicInst(typeToFetch, kIROp_MakeMatrix, elementVals.getCount(), elementVals.getBuffer());
+            }
         }
         else if (auto vecType = as<IRVectorType>(typeToFetch))
         {
-            // todo, recurse
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
             IRIntegerValue elementCount = elementCountInst->getValue();
             IRType* elementType = vecType->getElementType();
@@ -1115,7 +1141,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             return getAttr;
         }
 
-        //return emitSimpleLoad(type, buffer, baseOffset, immediateOffset);
         return nullptr;
     }
 
@@ -1267,13 +1292,15 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             }*/ 
         }
         case LayoutResourceKind::HitAttributes: {
-			IRBuilder builder(m_sharedBuilder);
-			builder.setInsertBefore(m_firstOrdinaryInst);
-			//IRPtrType* ptrType = builder.getPtrType(info.type);
-			//IRInst* getHitAttributes = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXHitAttributes, 0, nullptr);
+            IRBuilder builder(m_sharedBuilder);
+            builder.setInsertBefore(m_firstOrdinaryInst);
             int ioBaseAttributeIndex = 0;
             IRInst* getHitAttributes = emitOptiXAttributeFetch(/*ioBaseAttributeIndex*/ ioBaseAttributeIndex, /* type to fetch */info.type, /*the builder in use*/ &builder);
-			return LegalizedVaryingVal::makeValue(getHitAttributes);
+            if (ioBaseAttributeIndex > 8) {
+                m_sink->diagnose(m_param, Diagnostics::unexpected, "the supplied hit attribute exceeds the maximum hit attribute structure size (32 bytes)");
+                return LegalizedVaryingVal();
+            }
+            return LegalizedVaryingVal::makeValue(getHitAttributes);
         }
         default:
             return diagnoseUnsupportedUserVal(info);
