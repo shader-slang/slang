@@ -719,7 +719,7 @@ HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(LayoutR
 //
 CUDARayTracingLayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl(LayoutResourceKind::RayPayload);
 //CUDARayTracingLayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
-//CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
+CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(LayoutResourceKind::HitAttributes);
 
 struct GLSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
@@ -945,6 +945,10 @@ LayoutRulesImpl kCUDAAnyValueLayoutRulesImpl_ = {
 // copying payload registers vs reading / writing to and from memory
 LayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl, &kCUDARayPayloadParameterLayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl, &kCUDAHitAttributesParameterLayoutRulesImpl, &kCUDAObjectLayoutRulesImpl,
 };
 
 // GLSL cases
@@ -1303,7 +1307,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
-    return nullptr;
+    return &kCUDAHitAttributesParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
 {
