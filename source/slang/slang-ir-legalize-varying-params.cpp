@@ -1067,6 +1067,83 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return LayoutResourceKind::None;
     }
 
+    IRInst* emitOptiXAttributeFetch(int& ioBaseAttributeIndex, IRType* typeToFetch, IRBuilder* builder) {
+        if (auto structType = as<IRStructType>(typeToFetch))
+        {
+            List<IRInst*> fieldVals;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, fieldType, builder);
+                if (!fieldVal)
+                    return nullptr;
+
+                fieldVals.add(fieldVal);
+            }
+            return builder->emitMakeStruct(typeToFetch, fieldVals);
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            auto elementType = arrayType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeArray(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+        }
+        else if (auto matType = as<IRMatrixType>(typeToFetch))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            if (rowCountInst)
+            {
+                auto rowType = builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+                IRType* elementType = rowType;
+                IRIntegerValue elementCount = rowCountInst->getValue();
+                List<IRInst*> elementVals;
+                for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+                {
+                    auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                    if (!elementVal)
+                        return nullptr;
+                    elementVals.add(elementVal);
+                }
+                return builder->emitIntrinsicInst(typeToFetch, kIROp_MakeMatrix, elementVals.getCount(), elementVals.getBuffer());
+            }
+        }
+        else if (auto vecType = as<IRVectorType>(typeToFetch))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            IRType* elementType = vecType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXAttributeFetch(ioBaseAttributeIndex, elementType, builder);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeVector(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+        }
+        else if (auto basicType = as<IRBasicType>(typeToFetch))
+        {
+            IRIntegerValue idx = ioBaseAttributeIndex;
+            auto idxInst = builder->getIntValue(builder->getIntType(), idx);
+            ioBaseAttributeIndex++;
+            IRInst* args[] = { typeToFetch, idxInst };
+            IRInst* getAttr = builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXHitAttribute, 2, args);
+            return getAttr;
+        }
+
+        return nullptr;
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -1198,9 +1275,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         {
         case LayoutResourceKind::RayPayload: {
             IRBuilder builder(m_sharedBuilder);
-			builder.setInsertBefore(m_firstOrdinaryInst);
-			IRPtrType* ptrType = builder.getPtrType(info.type);
-			IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+            builder.setInsertBefore(m_firstOrdinaryInst);
+            IRPtrType* ptrType = builder.getPtrType(info.type);
+            IRInst* getRayPayload = builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
             return LegalizedVaryingVal::makeAddress(getRayPayload);
             // Todo: compute how many registers are required for the current payload. 
             // If more than 32, use the above logic. 
@@ -1213,6 +1290,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             else {
                 return diagnoseUnsupportedUserVal(info);
             }*/ 
+        }
+        case LayoutResourceKind::HitAttributes: {
+            IRBuilder builder(m_sharedBuilder);
+            builder.setInsertBefore(m_firstOrdinaryInst);
+            int ioBaseAttributeIndex = 0;
+            IRInst* getHitAttributes = emitOptiXAttributeFetch(/*ioBaseAttributeIndex*/ ioBaseAttributeIndex, /* type to fetch */info.type, /*the builder in use*/ &builder);
+            if (ioBaseAttributeIndex > 8) {
+                m_sink->diagnose(m_param, Diagnostics::unexpected, "the supplied hit attribute exceeds the maximum hit attribute structure size (32 bytes)");
+                return LegalizedVaryingVal();
+            }
+            return LegalizedVaryingVal::makeValue(getHitAttributes);
         }
         default:
             return diagnoseUnsupportedUserVal(info);
