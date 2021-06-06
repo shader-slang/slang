@@ -5120,7 +5120,11 @@ SlangResult VKDevice::initialize(const Desc& desc)
         SLANG_RETURN_ON_FAIL(m_deviceQueue.init(m_api, queue, m_queueFamilyIndex));
     }
 
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_SPIRV, "sm_5_1"));
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(
+        desc.slang,
+        SLANG_SPIRV,
+        "sm_5_1",
+        makeArray(slang::PreprocessorMacroDesc{ "__VK__", "1" }).getView()));
     return SLANG_OK;
 }
 
@@ -6469,4 +6473,4 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     return SLANG_OK;
 }
 
-} // renderer_test
+} //  renderer_test

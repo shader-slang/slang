@@ -1085,7 +1085,11 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override
     {
-        SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_HOST_CALLABLE, "sm_5_1"));
+        SLANG_RETURN_ON_FAIL(slangContext.initialize(
+            desc.slang,
+            SLANG_HOST_CALLABLE,
+            "sm_5_1",
+            makeArray(slang::PreprocessorMacroDesc{ "__CPU__", "1" }).getView()));
 
         SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -1244,7 +1248,12 @@ public:
         auto bufferImpl = static_cast<CPUBufferResource*>(buffer);
         return bufferImpl->m_data;
     }
-    virtual void unmap(IBufferResource* buffer) override { SLANG_UNUSED(buffer); }
+    virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) override
+    {
+        SLANG_UNUSED(buffer);
+        SLANG_UNUSED(offsetWritten);
+        SLANG_UNUSED(sizeWritten);
+    }
 };
 
 SlangResult CPUShaderObject::init(IDevice* device, CPUShaderObjectLayout* typeLayout)

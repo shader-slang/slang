@@ -74,7 +74,7 @@ public:
     virtual void submitGpuWork() = 0;
     virtual void waitForGpu() = 0;
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) = 0;
-    virtual void unmap(IBufferResource* buffer) = 0;
+    virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) = 0;
 
 public:
     Slang::RefPtr<ImmediateCommandQueueBase> m_queue;

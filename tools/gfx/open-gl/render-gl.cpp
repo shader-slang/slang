@@ -152,7 +152,7 @@ public:
         ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
-    virtual void unmap(IBufferResource* buffer) override;
+    virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) override;
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual void setVertexBuffers(
@@ -1937,7 +1937,12 @@ HGLRC GLDevice::createGLContext(HDC hdc)
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::initialize(const Desc& desc)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_GLSL, "glsl_440"));
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(
+        desc.slang,
+        SLANG_GLSL,
+        "glsl_440",
+        makeArray(
+            slang::PreprocessorMacroDesc{ "__GL__", "1" }).getView()));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -2557,8 +2562,10 @@ void* GLDevice::map(IBufferResource* bufferIn, MapFlavor flavor)
     return glMapBuffer(buffer->m_target, access);
 }
 
-void GLDevice::unmap(IBufferResource* bufferIn)
+void GLDevice::unmap(IBufferResource* bufferIn, size_t offsetWritten, size_t sizeWritten)
 {
+    SLANG_UNUSED(offsetWritten);
+    SLANG_UNUSED(sizeWritten);
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
     glUnmapBuffer(buffer->m_target);
 }

@@ -501,6 +501,9 @@ INST(GpuForeach, gpuForeach, 3, 0)
 // a pointer represented by two payload registers.
 INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
 
+// Wrapper for OptiX intrinsics used to load a single hit attribute
+INST(GetOptiXHitAttribute, getOptiXHitAttribute, 1, 0)
+
 /* Decoration */
 
 INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
