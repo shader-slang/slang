@@ -451,6 +451,8 @@ struct InputStreamStack
     }
 
         /// Get the input stream that the next token would come from
+        ///
+        /// If the input stack is at its end, this will just be the top-most stream.
     InputStream* getNextStream()
     {
         SLANG_ASSERT(m_top);
@@ -673,14 +675,13 @@ struct MacroInvocation : InputStream
     MacroInvocation(
         Preprocessor*       preprocessor,
         MacroDefinition*    macro,
-        MacroInvocation*    nextBusyMacroInvocation,
         SourceLoc           macroInvocationLoc,
         SourceLoc           initiatingMacroInvocationLoc);
 
         /// Prime the input stream
         ///
         /// This operation *must* be called before the first `readToken()` or `peekToken()`
-    void prime();
+    void prime(MacroInvocation* nextBusyMacroInvocation);
 
     // The `readToken()` and `peekToken()` operations for a macro invocation
     // will be implemented by using one token of lookahead, which makes the
@@ -729,7 +730,7 @@ private:
     List<Arg> m_args;
 
         /// Additional macros that should be considered "busy" during this expansion
-    MacroInvocation* m_nextBusyMacroInvocation;
+    MacroInvocation* m_nextBusyMacroInvocation = nullptr;
 
         /// Locatin of the macro invocation that led to this expansion
     SourceLoc m_macroInvocationLoc;
@@ -1088,20 +1089,20 @@ bool MacroInvocation::isBusy(MacroDefinition* macro, MacroInvocation* duringMacr
 MacroInvocation::MacroInvocation(
     Preprocessor*       preprocessor,
     MacroDefinition*    macro,
-    MacroInvocation*    nextBusyMacroInvocation,
     SourceLoc           macroInvocationLoc,
     SourceLoc           initiatingMacroInvocationLoc)
     : Super(preprocessor)
 {
     m_macro = macro;
-    m_nextBusyMacroInvocation = nextBusyMacroInvocation;
     m_firstBusyMacroInvocation = this;
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
 }
 
-void MacroInvocation::prime()
+void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
 {
+    m_nextBusyMacroInvocation = nextBusyMacroInvocation;
+
     _initCurrentOpStream();
     m_lookaheadToken = _readTokenImpl();
 }
@@ -1388,8 +1389,12 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // prime its input stream, and then push it onto our stack of active
                 // macro invocations.
                 //
-                MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, busyMacros, token.loc, m_initiatingMacroInvocationLoc);
-                invocation->prime();
+                // Note: the macros that should be considered "busy" during the invocation
+                // are all those that were busy at the time we read the name of the macro
+                // to be expanded.
+                //
+                MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, token.loc, m_initiatingMacroInvocationLoc);
+                invocation->prime(busyMacros);
                 _pushMacroInvocation(invocation);
             }
             break;
@@ -1441,7 +1446,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // If we saw an opening `(`, then we know we are starting some kind of
                 // macro invocation, although we don't yet know if it is well-formed.
                 //
-                MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, busyMacros, token.loc, m_initiatingMacroInvocationLoc);
+                MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, token.loc, m_initiatingMacroInvocationLoc);
 
                 // We start by consuming the opening `(` that we checked for above.
                 //
@@ -1483,7 +1488,36 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // Now that the arguments have been parsed and validated,
                 // we are ready to proceed with expansion of the macro invocation.
                 //
-                invocation->prime();
+                // The main subtle thing we have to figure out is which macros should be considered "busy"
+                // during the expansion of this function-like macro invocation.
+                //
+                // In the case of an object-like macro invocation:
+                //
+                //      1 + M + 2
+                //            ^
+                //
+                // Input will have just read in the `M` token that names the macro
+                // so we needed to consider whatever macro invocations had been in
+                // flight (even if they were at their end) when checking if `M`
+                // was busy.
+                //
+                // In contrast, for a function-like macro invocation:
+                //
+                //      1 + F ( A, B, C ) + 2
+                //                        ^
+                //
+                // We will have just read in the `)` from the argument list, but
+                // we don't actually need/want to worry about any macro invocation
+                // that might have yielded the `)` token, since expanding that macro
+                // again would *not* be able to lead to a recursive case.
+                //
+                // Instead, we really only care about the active stream that the
+                // next token would be read from.
+                //
+                auto nextStream = m_inputStreams.getNextStream();
+                auto busyMacrosForFunctionLikeInvocation = nextStream->getFirstBusyMacroInvocation();
+
+                invocation->prime(busyMacrosForFunctionLikeInvocation);
                 _pushMacroInvocation(invocation);
             }
             break;
@@ -3708,8 +3742,12 @@ Result findMacroValue(
     if(macro->flavor != MacroDefinition::Flavor::ObjectLike)
         return SLANG_FAIL;
 
-    MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, nullptr, SourceLoc(), SourceLoc());
-    invocation->prime();
+    MacroInvocation* invocation = new MacroInvocation(preprocessor, macro, SourceLoc(), SourceLoc());
+
+    // Note: Since we are only expanding the one macro, we should not treat any
+    // other macros as "busy" at the start of expansion.
+    //
+    invocation->prime(/*nextBusyMacroInvocation:*/ nullptr);
 
     String value;
     for(bool first = true;;first = false)

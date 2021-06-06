@@ -1176,7 +1176,11 @@ public:
 public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc) override
     {
-        SLANG_RETURN_ON_FAIL(slangContext.initialize(desc.slang, SLANG_PTX, "sm_5_1"));
+        SLANG_RETURN_ON_FAIL(slangContext.initialize(
+            desc.slang,
+            SLANG_PTX,
+            "sm_5_1",
+            makeArray(slang::PreprocessorMacroDesc{ "__CUDA_COMPUTE__", "1" }).getView()));
 
         SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -1225,6 +1229,8 @@ public:
         tex->m_cudaContext = m_context;
 
         CUresourcetype resourceType;
+
+        // The size of the element/texel in bytes
         size_t elementSize = 0;
 
         // Our `ITextureResource::Desc` uses an enumeration to specify
@@ -1262,7 +1268,7 @@ public:
         {
             CUarray_format format = CU_AD_FORMAT_FLOAT;
             int numChannels = 0;
-
+            
             switch (desc.format)
             {
             case Format::RGBA_Float32:
@@ -1274,7 +1280,7 @@ public:
                     const FormatInfo info = gfxGetFormatInfo(desc.format);
                     format = CU_AD_FORMAT_FLOAT;
                     numChannels = info.channelCount;
-                    elementSize = sizeof(float);
+                    elementSize = sizeof(float) * numChannels;
                     break;
                 }
             case Format::RGBA_Float16:
@@ -1284,7 +1290,7 @@ public:
                     const FormatInfo info = gfxGetFormatInfo(desc.format);
                     format = CU_AD_FORMAT_HALF;
                     numChannels = info.channelCount;
-                    elementSize = sizeof(uint16_t);
+                    elementSize = sizeof(uint16_t) * numChannels;
                     break;
                 }
             case Format::RGBA_Unorm_UInt8:
