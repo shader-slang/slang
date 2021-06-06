@@ -433,7 +433,8 @@ DIAGNOSTIC(38027, Error, mismatchExistentialSlotArgCount, "expected $0 existenti
 DIAGNOSTIC(38029, Error,typeArgumentDoesNotConformToInterface, "type argument '$0' does not conform to the required interface '$1'")
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
-DIAGNOSTIC(39999, Fatal, errorInImportedModule, "error in imported module, compilation ceased.")
+DIAGNOSTIC(39999, Error, errorInImportedModule, "import of module '$0' failed because of a compilation error")
+DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
 // 39xxx - Type layout and parameter binding.
 
