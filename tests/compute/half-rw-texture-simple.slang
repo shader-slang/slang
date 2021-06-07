@@ -10,6 +10,9 @@
 //DIABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
 
+//TEST_INPUT: RWTexture1D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt1D
+RWTexture1D<half> rwt1D;
+
 //TEST_INPUT: RWTexture2D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt2D
 RWTexture2D<half> rwt2D;
 
@@ -26,7 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     float val = 0.0f;
  
-    //val += rwt1D[idx];
+    val += rwt1D[idx];
     
     half h0 = rwt2D[uint2(idx, idx)];
 
