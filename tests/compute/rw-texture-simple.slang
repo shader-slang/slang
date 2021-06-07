@@ -30,10 +30,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     val += rwt2D[uint2(idx, idx)];
     val += rwt3D[uint3(idx, idx, idx)];
     
-    // NOTE! This is disabled because on CUDA, whilst this has an effect it is not what is expected.
-    // The value read back has changed but seems to always be 1.
-    // rwt1D[idx] = idx;
-    
+    rwt1D[idx] = idx;
     rwt2D[uint2(idx, idx)] = idx;    
     rwt3D[uint3(idx, idx, idx)] = idx;    
             
