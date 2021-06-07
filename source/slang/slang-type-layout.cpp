@@ -465,6 +465,18 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         return arrayInfo;
     }
 
+    // Given `size` between [0, 16] return the smallest power-of-2 that is greater than or equal to `size`.
+    uint32_t getVectorAlignment(uint32_t size)
+    {
+        SLANG_ASSERT(size <= 16);
+        --size;
+        // Set every bit after the highest bit.
+        size |= (size >> 1);
+        size |= (size >> 2);
+        ++size;
+        return size;
+    }
+
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
     {
         // Special case bool
@@ -479,8 +491,8 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
         vectorInfo.size = elementInfo.size * elementCount;
-        vectorInfo.alignment = elementInfo.alignment;
-    
+        vectorInfo.alignment = getVectorAlignment(
+            (uint32_t)(elementInfo.size.getFiniteValue() * elementCount));
         return vectorInfo;
     }
 
