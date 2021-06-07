@@ -471,7 +471,7 @@ void ImmediateRendererBase::uploadBufferData(
 {
     auto buffer = map(dst, gfx::MapFlavor::WriteDiscard);
     memcpy((uint8_t*)buffer + offset, data, size);
-    unmap(dst);
+    unmap(dst, offset, size);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ImmediateRendererBase::readBufferResource(
@@ -486,7 +486,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ImmediateRendererBase::readBufferResource
     if (!content)
         return SLANG_FAIL;
     memcpy(blob->m_data.getBuffer(), content + offset, size);
-    unmap(buffer);
+    unmap(buffer, offset, size);
     returnComPtr(outBlob, blob);
     return SLANG_OK;
 }

@@ -1519,10 +1519,14 @@ namespace Slang
         {
         public:
             ModuleBeingImportedRAII(
-                Linkage*    linkage,
-                Module*     module)
+                Linkage*            linkage,
+                Module*             module,
+                Name*               name,
+                SourceLoc const&    importLoc)
                 : linkage(linkage)
                 , module(module)
+                , name(name)
+                , importLoc(importLoc)
             {
                 next = linkage->m_modulesBeingImported;
                 linkage->m_modulesBeingImported = this;
@@ -1535,14 +1539,20 @@ namespace Slang
 
             Linkage* linkage;
             Module* module;
+            Name* name;
+            SourceLoc importLoc;
             ModuleBeingImportedRAII* next;
         };
 
         // Any modules currently being imported will be listed here
-        ModuleBeingImportedRAII* m_modulesBeingImported = nullptr;
+        ModuleBeingImportedRAII*m_modulesBeingImported = nullptr;
 
             /// Is the given module in the middle of being imported?
         bool isBeingImported(Module* module);
+
+            /// Diagnose that an error occured in the process of importing a module
+        void _diagnoseErrorInImportedModule(
+            DiagnosticSink*     sink);
 
         List<Type*> m_specializedTypes;
 

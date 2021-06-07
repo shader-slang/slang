@@ -928,7 +928,6 @@ namespace renderer_test
         {
             // TODO(JS):
             // Bool is here, because it's not clear across APIs how bool is laid out in memory
-            // Float16 is here as we don't have a convert Float16 to float function laying around
             default:
             case ScalarType::None:
             case ScalarType::Void:
@@ -1180,10 +1179,10 @@ namespace renderer_test
                             for (Index j = 0; j < pixelCount; ++j, srcPixels += 4, dstPixels += 4)
                             {
                                 // Copy out rgba
-                                dstPixels[0] = FloatToHalf(srcPixels[0] * 1.0f / 255);
-                                dstPixels[1] = FloatToHalf(srcPixels[1] * 1.0f / 255);
-                                dstPixels[2] = FloatToHalf(srcPixels[2] * 1.0f / 255);
-                                dstPixels[3] = FloatToHalf(srcPixels[3] * 1.0f / 255);
+                                dstPixels[0] = srcPixels[0] * (1.0f / 255);
+                                dstPixels[1] = srcPixels[1] * (1.0f / 255);
+                                dstPixels[2] = srcPixels[2] * (1.0f / 255);
+                                dstPixels[3] = srcPixels[3] * (1.0f / 255);
                             }
                             break;
                         }

@@ -788,6 +788,29 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")getOptiXRayPayloadPtr()");
             return true;
         }
+        case kIROp_GetOptiXHitAttribute:
+        {
+            auto typeToFetch = inst->getOperand(0);
+            auto idxInst = as<IRIntLit>(inst->getOperand(1));
+            IRIntegerValue idx = idxInst->getValue();
+            if (typeToFetch->getOp() == kIROp_FloatType) {
+                m_writer->emit("__int_as_float(optixGetAttribute_");
+            }
+            else
+            {
+                m_writer->emit("optixGetAttribute_");
+            }
+            m_writer->emit(idx);
+            if (typeToFetch->getOp() == kIROp_FloatType)
+            {
+                m_writer->emit("())");
+            }
+            else
+            {
+                m_writer->emit("()");
+            }
+            return true;
+        }
         default: break;
     }
 
