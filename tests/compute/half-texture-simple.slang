@@ -2,7 +2,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12  -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj
-// TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
+// TODO(JS): Doesn't work on vk currently
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 
