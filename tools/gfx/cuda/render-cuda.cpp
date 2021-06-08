@@ -98,7 +98,7 @@ static SlangResult _handleCUDAError(cudaError_t error, const char* file, int lin
     return CUDAErrorInfo(file, line, cudaGetErrorName(error), cudaGetErrorString(error)).handle();
 }
 
-#    define SLANG_CUDA_HANDLE_ERROR(x) _handleCUDAError(_res, __FILE__, __LINE__)
+#    define SLANG_CUDA_HANDLE_ERROR(x) _handleCUDAError(x, __FILE__, __LINE__)
 
 #    define SLANG_CUDA_RETURN_ON_FAIL(x)              \
         {                                             \
@@ -431,7 +431,7 @@ public:
     Slang::RefPtr<MemoryCUDAResource> m_bufferResource;
     Slang::RefPtr<CUDAResourceView> m_bufferView;
     Slang::List<uint8_t> m_cpuBuffer;
-    void setCount(Index count)
+    Result setCount(Index count)
     {
         if (isHostOnly)
         {
@@ -444,7 +444,7 @@ public:
                 m_bufferView->proxyBuffer = m_cpuBuffer.getBuffer();
                 m_bufferView->desc = viewDesc;
             }
-            return;
+            return SLANG_OK;
         }
 
         if (!m_bufferResource)
@@ -454,7 +454,9 @@ public:
             desc.sizeInBytes = count;
             m_bufferResource = new MemoryCUDAResource(desc);
             if (count)
-                cudaMalloc(&m_bufferResource->m_cudaMemory, (size_t)count);
+            {
+                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&m_bufferResource->m_cudaMemory, (size_t)count));
+            }
             IResourceView::Desc viewDesc = {};
             viewDesc.type = IResourceView::Type::UnorderedAccess;
             m_bufferView = new CUDAResourceView();
@@ -467,20 +469,21 @@ public:
             void* newMemory = nullptr;
             if (count)
             {
-                cudaMalloc(&newMemory, (size_t)count);
+                SLANG_CUDA_RETURN_ON_FAIL(cudaMalloc(&newMemory, (size_t)count));
             }
             if (oldSize)
             {
-                cudaMemcpy(
+                SLANG_CUDA_RETURN_ON_FAIL(cudaMemcpy(
                     newMemory,
                     m_bufferResource->m_cudaMemory,
                     Math::Min((size_t)count, oldSize),
-                    cudaMemcpyDefault);
+                    cudaMemcpyDefault));
             }
             cudaFree(m_bufferResource->m_cudaMemory);
             m_bufferResource->m_cudaMemory = newMemory;
             m_bufferResource->getDesc()->sizeInBytes = count;
         }
+        return SLANG_OK;
     }
 
     Slang::Index getCount()
@@ -1021,7 +1024,9 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL wait() override
         {
-            cuStreamSynchronize(stream);
+            auto resultCode = cuStreamSynchronize(stream);
+            if (resultCode != cudaSuccess)
+                SLANG_CUDA_HANDLE_ERROR(resultCode);
         }
 
     public:
