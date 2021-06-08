@@ -1794,6 +1794,17 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
         break;
 
+    case kIROp_WrapExistential:
+        {
+            // Normally `WrapExistential` shouldn't exist in user code at this point.
+            // The only exception is when the user is calling a stdlib generic
+            // function that has an existential type argument, for example
+            // `StructuredBuffer<ISomething>.Load()`.
+            // We can safely ignore the `wrapExistential` operation in this case.
+            emitOperand(inst->getOperand(0), outerPrec);
+        }
+        break;
+
     case kIROp_Select:
         {
             
