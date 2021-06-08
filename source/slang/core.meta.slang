@@ -934,6 +934,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                     {
                                         sb << '.' << char(i + 'x');
                                     }
+
+                                    // Surface access is *byte* addressed in x in CUDA
+                                    if (i == 0) 
+                                    {
+                                        sb << " * $E";
+                                    }
                                 }
                                 if (isArray)
                                 {
@@ -949,7 +955,9 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                     sb << "Layered";
                                 }
                                 sb << "read";
-                                sb << "<$T0>($0, ($1).x, ($1).y, ($1).z"; 
+
+                                // Surface access is *byte* addressed in x in CUDA
+                                sb << "<$T0>($0, ($1).x * $E, ($1).y, ($1).z"; 
                                 if (isArray)
                                 {
                                     sb << ", int(($1).w)";
@@ -1090,12 +1098,12 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                                 sb << ", ($1)";
                                 if (vecCount > 1)
                                 {
-                                    sb << '.' << char(i + 'x');
-                                    // Surface access is *byte* addressed in x in CUDA
-                                    if (i == 0)
-                                    {
-                                        sb << " * $E";
-                                    }
+                                    sb << '.' << char(i + 'x');    
+                                }
+                                // Surface access is *byte* addressed in x in CUDA
+                                if (i == 0)
+                                {
+                                    sb << " * $E";
                                 }
                             }
 
