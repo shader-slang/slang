@@ -1625,6 +1625,9 @@ public:
             //
             if (desc.allowedStates.contains(ResourceState::UnorderedAccess))
             {
+                // On CUDA surfaces only support a single MIP map
+                SLANG_ASSERT(desc.numMipLevels == 1);
+
                 SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&tex->m_cudaSurfObj, &resDesc));
             }
 
