@@ -474,8 +474,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Here I am assuming it's reasonable for the size to be the aligned size. That being the case the GetArrayLayout/GetMatrixLayout will be
         // correct without special handling.
         // 
-        // The assert below checks that is indeed the case.
-        
+        // The assert/s below checks that is indeed the case.
+
+        // Make sure the alignment is power of 2
+        SLANG_ASSERT(alignment > 0 && ((alignment - 1) & alignment) == 0);
+
         // The size must be a multiple of the alignment
         SLANG_ASSERT((size & (alignment - 1)) == 0);
 
