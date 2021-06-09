@@ -8,29 +8,51 @@
 
 namespace Slang {
 
-size_t RoundToAlignment(size_t offset, size_t alignment)
+static bool _isPow2(size_t v)
 {
-    // It must be > 0 and it must also be a power of 2
-    SLANG_ASSERT(alignment > 0 && ((alignment - 1) & alignment) == 0);
-    return (offset + (alignment - 1)) & ~(alignment - 1);
+    return v > 0 && ((v - 1) & v) == 0;
 }
 
-LayoutSize RoundToAlignment(LayoutSize offset, size_t alignment)
+static size_t _roundToAlignment(size_t offset, size_t alignment)
+{
+    // Must also be a power of 2
+    SLANG_ASSERT(_isPow2(alignment));
+
+    const size_t mask = alignment - 1;
+    return (offset + mask) & ~mask;
+}
+
+static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
 {
     // An infinite size is assumed to be maximally aligned.
     if(offset.isInfinite())
         return LayoutSize::infinite();
 
-    return RoundToAlignment(offset.getFiniteValue(), alignment);
+    return _roundToAlignment(offset.getFiniteValue(), alignment);
 }
 
-static size_t RoundUpToPowerOfTwo( size_t value )
+static size_t _roundUpToPowerOfTwo( size_t value )
 {
     // TODO(tfoley): I know this isn't a fast approach
     size_t result = 1;
     while (result < value)
         result *= 2;
     return result;
+}
+
+static bool _isAligned(size_t size, size_t alignment)
+{
+    SLANG_ASSERT(_isPow2(alignment));
+    return ((alignment - 1) & size) == 0;
+}
+
+// This is a workaround to keep functions from causing warnings in release builds, and therefore causing compilation to fail.
+void _typeLayout_keepFunctions()
+{
+    auto a = _isAligned;
+    auto b = _isPow2;
+    SLANG_UNUSED(a);
+    SLANG_UNUSED(b);
 }
 
 //
@@ -79,7 +101,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
         auto elementSize = elementInfo.size.getFiniteValue();
         auto elementAlignment = elementInfo.alignment;
-        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
+        auto elementStride = _roundToAlignment(elementSize, elementAlignment);
 
         // An array with no elements will have zero size.
         //
@@ -153,7 +175,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         auto fieldBaseOffset = ioStructInfo->size;
 
         // We need to ensure that the offset for the field will respect its alignment
-        auto fieldOffset = RoundToAlignment(fieldBaseOffset, fieldInfo.alignment);
+        auto fieldOffset = _roundToAlignment(fieldBaseOffset, fieldInfo.alignment);
 
         // The size of the struct must be adjusted to cover the bytes consumed
         // by this field.
@@ -220,7 +242,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo vectorInfo(
             LayoutResourceKind::Uniform,
             size,
-            RoundUpToPowerOfTwo(size));
+            _roundUpToPowerOfTwo(size));
         return vectorInfo;
     }
 
@@ -229,7 +251,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of an array must be rounded up to be a multiple of its alignment.
         //
         auto info = Super::GetArrayLayout(elementInfo, elementCount);
-        info.size = RoundToAlignment(info.size, info.alignment);
+        info.size = _roundToAlignment(info.size, info.alignment);
         return info;
     }
 
@@ -237,7 +259,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // The size of a `struct` must be rounded up to be a multiple of its alignment.
         //
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
@@ -327,7 +349,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
             return ioStructInfo->size;
 
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
         LayoutSize fieldOffset = ioStructInfo->size;
         LayoutSize fieldSize = fieldInfo.size;
@@ -338,7 +360,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         auto endRegister = (fieldOffset + fieldSize - 1) / registerSize;
         if (startRegister != endRegister)
         {
-            ioStructInfo->size = RoundToAlignment(ioStructInfo->size, size_t(registerSize));
+            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, size_t(registerSize));
             fieldOffset = ioStructInfo->size;
         }
 
@@ -394,7 +416,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to C/C++ size is adjusted to the largest alignment
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
@@ -430,9 +452,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             info.alignment = SLANG_ALIGN_OF(void*);
             return info;
         }
-
+        
         // It's fine to use the Default impl, as long as any elements size is alignment rounded (as happen in EndStructLayout).
         // If that weren't the case the array may be smaller than elementSize * elementCount which would be wrong for CUDA.
+        SLANG_ASSERT(_isAligned(elementInfo.size.getFiniteValue(), elementInfo.alignment));
+
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
@@ -461,11 +485,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         if (elementType == BaseType::Half && elementCount >= 3)
         {
             alignment = elementSize * 2;
-            size = RoundToAlignment(size, alignment);
+            size = _roundToAlignment(size, alignment);
         }
 
         // Nothing is aligned more than 16
-        alignment = (alignment > 16) ? 16 : alignment;
+        alignment = std::min(alignment, size_t(16));
 
         // TODO(JS): It's not 100% clear what is right in terms of size in respect of *alignment*. If the size is the 'used' bytes, then
         // it can be less that the aligned size. If that's the case the GetArrayLayout (and MatrixLayout) is *wrong* in that on the last element
@@ -474,13 +498,10 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Here I am assuming it's reasonable for the size to be the aligned size. That being the case the GetArrayLayout/GetMatrixLayout will be
         // correct without special handling.
         // 
-        // The assert/s below checks that is indeed the case.
-
-        // Make sure the alignment is power of 2
-        SLANG_ASSERT(alignment > 0 && ((alignment - 1) & alignment) == 0);
+        // The assert below checks that is indeed the case.
 
         // The size must be a multiple of the alignment
-        SLANG_ASSERT((size & (alignment - 1)) == 0);
+        SLANG_ASSERT(_isAligned(size, alignment));
 
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
@@ -504,7 +525,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
@@ -4000,7 +4021,7 @@ static TypeLayoutResult _createTypeLayout(
             // The tag is always a `uint` for now.
             //
             auto tagInfo = context.rules->GetScalarLayout(BaseType::UInt);
-            info.size = RoundToAlignment(info.size, tagInfo.alignment);
+            info.size = _roundToAlignment(info.size, tagInfo.alignment);
 
             taggedUnionLayout->tagOffset = info.size;
 
