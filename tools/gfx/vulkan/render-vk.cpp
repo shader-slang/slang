@@ -3451,7 +3451,7 @@ public:
         // a `CommandBuffer` created from the heap. We need to break the cycle when
         // the public reference count of a command buffer drops to 0.
         SLANG_COM_OBJECT_IUNKNOWN_ALL
-            ICommandBuffer* getInterface(const Guid& guid)
+        ICommandBuffer* getInterface(const Guid& guid)
         {
             if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ICommandBuffer)
                 return static_cast<ICommandBuffer*>(this);
