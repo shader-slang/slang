@@ -467,6 +467,15 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Nothing is aligned more than 16
         alignment = (alignment > 16) ? 16 : alignment;
 
+        // TODO(JS): It's not 100% clear what is right in terms of size in respect of *alignment*. If the size is the 'used' bytes, then
+        // it can be less that the aligned size. If that's the case the GetArrayLayout (and MatrixLayout) is *wrong* in that on the last element
+        // it uses the size (not the aligned size/stride).
+        //
+        // Here I am assuming it's reasonable for the size to be the aligned size. That being the case the GetArrayLayout/GetMatrixLayout will be
+        // correct without special handling.
+        // 
+        // The assert below checks that is indeed the case.
+        
         // The size must be a multiple of the alignment
         SLANG_ASSERT((size & (alignment - 1)) == 0);
 
