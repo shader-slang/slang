@@ -32,6 +32,7 @@ public:
 
 public:
     CommandWriter m_writer;
+    bool m_hasWriteTimestamps = false;
     RefPtr<ImmediateRendererBase> m_renderer;
     RefPtr<ShaderObjectBase> m_rootShaderObject;
 
@@ -163,6 +164,11 @@ public:
         {
             m_writer->setStencilReference(referenceValue);
         }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+        {
+            m_writer->writeTimestamp(pool, index);
+        }
     };
 
     RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -227,6 +233,11 @@ public:
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->dispatchCompute(x, y, z);
         }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+        {
+            m_writer->writeTimestamp(pool, index);
+        }
     };
 
     ComputeCommandEncoderImpl m_computeCommandEncoder;
@@ -279,6 +290,11 @@ public:
             uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
         {
             m_writer->uploadBufferData(dst, offset, size, data);
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+        {
+            m_writer->writeTimestamp(pool, index);
         }
     };
 
@@ -375,6 +391,9 @@ public:
                     cmd.operands[3],
                     cmd.operands[4]);
                 break;
+            case CommandName::WriteTimestamp:
+                m_renderer->writeTimestamp(m_writer.getObject<IQueryPool>(cmd.operands[0]), (SlangInt)cmd.operands[1]);
+                break;
             default:
                 assert(!"unknown command");
                 break;
@@ -411,10 +430,17 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
     {
+        CommandBufferInfo info = {};
+        for (uint32_t i = 0; i < count; i++)
+        {
+            info.hasWriteTimestamps |= static_cast<CommandBufferImpl*>(commandBuffers[i])->m_writer.m_hasWriteTimestamps;
+        }
+        static_cast<ImmediateRendererBase*>(m_renderer.get())->beginCommandBuffer(info);
         for (uint32_t i = 0; i < count; i++)
         {
             static_cast<CommandBufferImpl*>(commandBuffers[i])->execute();
         }
+        static_cast<ImmediateRendererBase*>(m_renderer.get())->endCommandBuffer(info);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }

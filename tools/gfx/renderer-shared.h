@@ -35,6 +35,7 @@ struct GfxGUID
     static const Slang::Guid IID_IResourceCommandEncoder;
     static const Slang::Guid IID_ICommandBuffer;
     static const Slang::Guid IID_ICommandQueue;
+    static const Slang::Guid IID_IQueryPool;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.

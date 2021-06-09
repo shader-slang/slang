@@ -31,6 +31,8 @@ const Slang::Guid GfxGUID::IID_IComputeCommandEncoder = SLANG_UUID_IComputeComma
 const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = SLANG_UUID_IResourceCommandEncoder;
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
 const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
+const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
+
 
 StageType translateStage(SlangStage slangStage)
 {

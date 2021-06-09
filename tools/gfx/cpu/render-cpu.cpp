@@ -1,6 +1,8 @@
 // render-cpu.cpp
 #include "render-cpu.h"
 
+#include <chrono>
+
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include "slang-com-helper.h"
@@ -999,6 +1001,34 @@ public:
     }
 };
 
+class CPUQueryPool : public IQueryPool, public ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    IQueryPool* getInterface(const Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+            return static_cast<IQueryPool*>(this);
+        return nullptr;
+    }
+public:
+    List<uint64_t> m_queries;
+    Result init(const IQueryPool::Desc& desc)
+    {
+        m_queries.setCount(desc.count);
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
+        SlangInt queryIndex, SlangInt count, uint64_t* data) override
+    {
+        for (SlangInt i = 0; i < count; i++)
+        {
+            data[i] = m_queries[queryIndex + i];
+        }
+        return SLANG_OK;
+    }
+};
+
 class CPUDevice : public ImmediateComputeDeviceBase
 {
 private:
@@ -1223,6 +1253,20 @@ public:
         state->init(desc);
         returnComPtr(outState, state);
         return Result();
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** outPool) override
+    {
+        RefPtr<CPUQueryPool> pool = new CPUQueryPool();
+        returnComPtr(outPool, pool);
+        return SLANG_OK;
+    }
+
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    {
+        static_cast<CPUQueryPool*>(pool)->m_queries[index] =
+            std::chrono::high_resolution_clock::now().time_since_epoch().count();
     }
 
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override

@@ -140,6 +140,8 @@ SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderObject)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderProgram)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Swapchain)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(TransientResourceHeap)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(QueryPool)
+
 
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT
@@ -477,6 +479,16 @@ const DeviceInfo& DebugDevice::getDeviceInfo() const
     return baseObject->getDeviceInfo();
 }
 
+Result DebugDevice::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool)
+{
+    SLANG_GFX_API_FUNC;
+    RefPtr<DebugQueryPool> result = new DebugQueryPool();
+    result->desc = desc;
+    SLANG_RETURN_ON_FAIL(baseObject->createQueryPool(desc, result->baseObject.writeRef()));
+    returnComPtr(outPool, result);
+    return SLANG_OK;
+}
+
 IResource::Type DebugBufferResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -624,6 +636,12 @@ void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
     baseObject->dispatchCompute(x, y, z);
 }
 
+void DebugComputeCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
+}
+
 void DebugRenderCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
@@ -706,10 +724,22 @@ void DebugRenderCommandEncoder::setStencilReference(uint32_t referenceValue)
     return baseObject->setStencilReference(referenceValue);
 }
 
+void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
+}
+
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
     baseObject->endEncoding();
+}
+
+void DebugResourceCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
 }
 
 void DebugResourceCommandEncoder::copyBuffer(
@@ -975,6 +1005,13 @@ Result DebugRootShaderObject::setSpecializationArgs(
     uint32_t count)
 {
     return baseObject->setSpecializationArgs(offset, args, count);
+}
+
+Result DebugQueryPool::getResult(SlangInt index, SlangInt count, uint64_t* data)
+{
+    if (index < 0 || index + count >= desc.count)
+        GFX_DIAGNOSE_ERROR("index is out of bounds.");
+    return baseObject->getResult(index, count, data);
 }
 
 } // namespace gfx

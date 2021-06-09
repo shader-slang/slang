@@ -91,6 +91,10 @@ namespace gfx {
     x(vkCmdCopyBufferToImage)\
     x(vkCmdPushConstants) \
     x(vkCmdSetStencilReference) \
+    x(vkCmdWriteTimestamp) \
+    x(vkCmdBeginQuery) \
+    x(vkCmdEndQuery) \
+    x(vkCmdResetQueryPool) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -116,6 +120,10 @@ namespace gfx {
     \
     x(vkBindImageMemory) \
     x(vkBindBufferMemory) \
+    \
+    x(vkCreateQueryPool) \
+    x(vkGetQueryPoolResults) \
+    x(vkDestroyQueryPool) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
