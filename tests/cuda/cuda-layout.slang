@@ -3,12 +3,6 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer : register(u0);
 
-struct HalfStruct
-{
-    half3 a[1];
-    half b;
-};
-
 #define WRITE_TYPE_ALIGN(base, type) \
     outputBuffer[base * 4 + 0] = __alignOf<type>(); \
     outputBuffer[base * 4 + 1] = __alignOf<vector<type, 2> >(); \

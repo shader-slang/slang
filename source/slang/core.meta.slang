@@ -1987,8 +1987,8 @@ int __alignOf(T v);
 // It would be nice to have offsetof equivalent, but it's not clear how that would work in terms of the Slang language.
 // Here we allow calculating the offset of a field in bytes from an *instance* of the type.
 __generic<T,F>
-__target_intrinsic(cuda, "int(((char*)&f) - ((char*)&t))")
-__target_intrinsic(cpp, "int(((char*)&f) - ((char*)&t))")
+__target_intrinsic(cuda, "int(((char*)&($1)) - ((char*)&($0)))")
+__target_intrinsic(cpp, "int(((char*)&($1)) - ((char*)&($0))")
 int __offsetOf(in T t, in F field);
 
 /// Mark beginning of "interlocked" operations in a fragment shader.

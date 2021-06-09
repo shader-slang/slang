@@ -10,11 +10,9 @@ namespace Slang {
 
 size_t RoundToAlignment(size_t offset, size_t alignment)
 {
-    size_t remainder = offset % alignment;
-    if (remainder == 0)
-        return offset;
-    else
-        return offset + (alignment - remainder);
+    // It must be > 0 and it must also be a power of 2
+    SLANG_ASSERT(alignment > 0 && ((alignment - 1) & alignment) == 0);
+    return (offset + (alignment - 1)) & ~(alignment - 1);
 }
 
 LayoutSize RoundToAlignment(LayoutSize offset, size_t alignment)
@@ -421,10 +419,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
-        auto elementSize = elementInfo.size.getFiniteValue();
-        auto elementAlignment = elementInfo.alignment;
-        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
-
+        
         if (elementCount.isInfinite())
         {
             // This is an unsized array, get information for element
@@ -436,45 +431,9 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             return info;
         }
 
-        // An array with no elements will have zero size.
-        //
-        LayoutSize arraySize = 0;
-        //
-        // Any array with a non-zero number of elements will need
-        // to have space for N elements of size `elementSize`, with
-        // the constraints that there must be `elementStride` bytes
-        // between consecutive elements.
-        //
-        if (elementCount > 0)
-        {
-            // We can think of this as either allocating (N-1)
-            // chunks of size `elementStride` (for most of the elements)
-            // and then one final chunk of size `elementSize`  for
-            // the last element, or equivalently as allocating
-            // N chunks of size `elementStride` and then "giving back"
-            // the final `elementStride - elementSize` bytes.
-            //
-            arraySize = (elementStride * (elementCount - 1)) + elementSize;
-        }
-
-        SimpleArrayLayoutInfo arrayInfo;
-        arrayInfo.kind = elementInfo.kind;
-        arrayInfo.size = arraySize;
-        arrayInfo.alignment = elementAlignment;
-        arrayInfo.elementStride = elementStride;
-        return arrayInfo;
-    }
-
-    // Given `size` between [0, 16] return the smallest power-of-2 that is greater than or equal to `size`.
-    uint32_t getVectorAlignment(uint32_t size)
-    {
-        SLANG_ASSERT(size <= 16);
-        --size;
-        // Set every bit after the highest bit.
-        size |= (size >> 1);
-        size |= (size >> 2);
-        ++size;
-        return size;
+        // It's fine to use the Default impl, as long as any elements size is alignment rounded (as happen in EndStructLayout).
+        // If that weren't the case the array may be smaller than elementSize * elementCount which would be wrong for CUDA.
+        return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
@@ -484,29 +443,44 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         {
             SimpleLayoutInfo fixInfo(elementInfo);
             fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
+            fixInfo.alignment = sizeof(int32_t);
             return GetVectorLayout(BaseType::Int, fixInfo, elementCount);
         }
+        
+        const auto elementSize = elementInfo.size.getFiniteValue();
+
+        // These rules can largely be determines by looking at
+        // 'vector_types.h' in the CUDA SDK
+
+        // Size in bytes of vector
+        size_t size = elementSize * elementCount;
+        // Special case 3, as uses alignment of the elementSize
+        size_t alignment = (elementCount == 3) ? elementSize : size;
+
+        // special case half
+        if (elementType == BaseType::Half && elementCount >= 3)
+        {
+            alignment = elementSize * 2;
+            size = RoundToAlignment(size, alignment);
+        }
+
+        // Nothing is aligned more than 16
+        alignment = (alignment > 16) ? 16 : alignment;
+
+        // The size must be a multiple of the alignment
+        SLANG_ASSERT((size & (alignment - 1)) == 0);
 
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = elementInfo.size * elementCount;
-        vectorInfo.alignment = getVectorAlignment(
-            (uint32_t)(elementInfo.size.getFiniteValue() * elementCount));
+        vectorInfo.size = size;
+        vectorInfo.alignment = alignment;
+     
         return vectorInfo;
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
-        // Special case bool
-        if (elementType == BaseType::Bool)
-        {
-            SimpleLayoutInfo fixInfo(elementInfo);
-            fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
-            return GetMatrixLayout(BaseType::Int, fixInfo, rowCount, columnCount);
-        }
-
+        // The default behavior is to calculate the size as an array of rowCount vectors, which is correct here
         return Super::GetMatrixLayout(elementType, elementInfo, rowCount, columnCount);
     }
 

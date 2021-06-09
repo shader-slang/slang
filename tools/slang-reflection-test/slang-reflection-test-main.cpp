@@ -489,10 +489,16 @@ static void emitReflectionScalarTypeInfoJSON(
 #define CASE(TAG, ID) case slang::TypeReflection::ScalarType::TAG: write(writer, #ID); break
         CASE(Void, void);
         CASE(Bool, bool);
+
+        CASE(Int8, int8);
+        CASE(UInt8, uint8);
+        CASE(Int16, int16);
+        CASE(UInt16, uint16);
         CASE(Int32, int32);
         CASE(UInt32, uint32);
         CASE(Int64, int64);
         CASE(UInt64, uint64);
+
         CASE(Float16, float16);
         CASE(Float32, float32);
         CASE(Float64, float64);
