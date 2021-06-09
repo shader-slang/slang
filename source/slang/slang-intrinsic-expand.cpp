@@ -248,6 +248,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 
             {
                 auto argCount = Index(specialize->getArgCount());
+                SLANG_UNUSED(argCount);
                 SLANG_ASSERT(argIndex < argCount);
 
                 auto arg = specialize->getArg(argIndex);
