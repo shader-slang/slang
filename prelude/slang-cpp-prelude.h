@@ -102,13 +102,13 @@ Any compilers not detected by the above logic are now now explicitly zeroed out.
 
 // Microsoft VC specific
 #if SLANG_VC
-#	define SLANG_ALIGN_OF(T) __alignof(T)
+#   define SLANG_ALIGN_OF(T) __alignof(T)
 #endif // SLANG_VC
 
 // Default impls
 
 #ifndef SLANG_OFFSET_OF
-#	define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
+#   define SLANG_OFFSET_OF(X, Y) offsetof(X, Y)
 #endif
 
 #include "slang-cpp-types.h"
