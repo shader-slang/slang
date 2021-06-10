@@ -438,6 +438,11 @@ typedef uint64_t CUDAUSize;
 
 // A type that is the size of a pointer
 typedef CUDASize CUDAPtr;
+// For CUtexObject and CUsurfObject
+typedef CUDAPtr CUDAHandle;
+
+// This is not strictly speaking needed - but exists to be consistent with cuda-prelude.h and the current CUDA emit.
+typedef CUDAPtr CUDASamplerState;
 
 // TODO(JS): Perhaps there is an argument these should be 32 bit?
 typedef CUDASize CUDACount;
@@ -911,9 +916,10 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         switch (kind)
         {
             case ShaderParameterKind::ConstantBuffer:
+            {
                 // It's a pointer to the actual uniform data
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
-
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDAPtr), sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
                 // That there is no distinct Sampler on CUDA, so TextureSampler is the same as a Texture
@@ -921,29 +927,37 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
-                // It's a pointer to a texture interface 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(ObjectHandle), SLANG_ALIGN_OF(ObjectHandle));
+            {
+                // It's a CUtexObject or CUsurfObject which is an opaque CUDAHandle sized
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDAHandle), sizeof(CUDAPtr));
+            }
 
             case ShaderParameterKind::StructuredBuffer:
             case ShaderParameterKind::MutableStructuredBuffer:
-                // It's a pointer and a size
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
-
+            {
+                // It's a ptr and a count of the amount of elements
+                const size_t size = _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
             case ShaderParameterKind::MutableRawBuffer:
             case ShaderParameterKind::MutableBuffer:
-                // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
-
+            {
+                // It's a ptr and a count of the amount of elements
+                const size_t size = _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::SamplerState:
+            {
                 // In CUDA it seems that sampler states are combined into texture objects.
                 // So it's a binding issue to combine a sampler with a texture - and sampler are ignored
                 // For simplicity here though - we do create a variable and that variable takes up
                 // uniform binding space.
                 // TODO(JS): If we wanted to remove these variables we'd want to do it as a pass. The pass
                 // would presumably have to remove use of variables of this kind throughout IR. 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDASamplerState), sizeof(CUDAPtr));
+            }
 
             case ShaderParameterKind::InputRenderTarget:
                 // TODO: how to handle these?
