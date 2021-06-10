@@ -104,6 +104,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc,
+        IQueryPool** outPool) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* texture,
@@ -3498,7 +3501,7 @@ public:
             VkCommandBufferBeginInfo beginInfo = {
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 nullptr,
-                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
             api.vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
             if (m_preCommandBuffer)
             {
@@ -3520,7 +3523,7 @@ public:
             VkCommandBufferBeginInfo beginInfo = {
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 nullptr,
-                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
             api.vkBeginCommandBuffer(m_preCommandBuffer, &beginInfo);
             return SLANG_OK;
         }
@@ -3532,6 +3535,20 @@ public:
                 return m_preCommandBuffer;
             createPreCommandBuffer();
             return m_preCommandBuffer;
+        }
+
+        static void _writeTimestamp(
+            VulkanApi* api,
+            VkCommandBuffer vkCmdBuffer,
+            IQueryPool* queryPool,
+            SlangInt index)
+        {
+            auto queryPoolImpl = static_cast<QueryPoolImpl*>(queryPool);
+            api->vkCmdResetQueryPool(vkCmdBuffer, queryPoolImpl->m_pool, (uint32_t)index, 1);
+            api->vkCmdWriteTimestamp(vkCmdBuffer,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                queryPoolImpl->m_pool,
+                (uint32_t)index);
         }
 
     public:
@@ -3590,6 +3607,11 @@ public:
                 auto& api = *m_api;
                 api.vkCmdEndRenderPass(m_vkCommandBuffer);
                 endEncodingImpl();
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(m_api, m_vkCommandBuffer, queryPool, index);
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -3843,6 +3865,11 @@ public:
                 flushBindingState(VK_PIPELINE_BIND_POINT_COMPUTE);
                 m_api->vkCmdDispatch(m_vkCommandBuffer, x, y, z);
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(m_api, m_vkCommandBuffer, queryPool, index);
+            }
         };
 
         RefPtr<ComputeCommandEncoder> m_computeCommandEncoder;
@@ -3938,6 +3965,15 @@ public:
                     nullptr,
                     0,
                     nullptr);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(
+                    &m_commandBuffer->m_renderer->m_api,
+                    m_commandBuffer->m_commandBuffer,
+                    queryPool,
+                    index);
             }
 
             void init(CommandBufferImpl* commandBuffer)
@@ -4118,6 +4154,59 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
         virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
+    };
+
+    class QueryPoolImpl
+        : public IQueryPool
+        , public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+    public:
+        Result init(const IQueryPool::Desc& desc, VKDevice* device)
+        {
+            m_device = device;
+            VkQueryPoolCreateInfo createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+            createInfo.queryCount = (uint32_t)desc.count;
+            switch (desc.type)
+            {
+            case QueryType::Timestamp:
+                createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+                break;
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateQueryPool(
+                m_device->m_api.m_device, &createInfo, nullptr, &m_pool));
+            return SLANG_OK;
+        }
+        ~QueryPoolImpl()
+        {
+            m_device->m_api.vkDestroyQueryPool(m_device->m_api.m_device, m_pool, nullptr);
+        }
+    public:
+        virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt index, SlangInt count, uint64_t* data) override
+        {
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetQueryPoolResults(
+                m_device->m_api.m_device,
+                m_pool,
+                (uint32_t)index,
+                (uint32_t)count,
+                sizeof(uint64_t) * count,
+                data,
+                sizeof(uint64_t), 0));
+            return SLANG_OK;
+        }
+    public:
+        VkQueryPool m_pool;
+        RefPtr<VKDevice> m_device;
     };
 
     class SwapchainImpl
@@ -4934,6 +5023,9 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     VkPhysicalDeviceProperties basicProps = {};
     m_api.vkGetPhysicalDeviceProperties(m_api.m_physicalDevice, &basicProps);
+
+    // Compute timestamp frequency.
+    m_info.timestampFrequency = uint64_t(1e9 / basicProps.limits.timestampPeriod);
 
     // Get the API version
     const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
@@ -6470,6 +6562,16 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     pipelineStateImpl->establishStrongDeviceReference();
     returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+Result VKDevice::createQueryPool(
+    const IQueryPool::Desc& desc,
+    IQueryPool** outPool)
+{
+    RefPtr<QueryPoolImpl> result = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
+    returnComPtr(outPool, result);
     return SLANG_OK;
 }
 

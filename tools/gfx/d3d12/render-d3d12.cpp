@@ -124,6 +124,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** outState) override;
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* resource,
         ResourceState state,
@@ -314,6 +317,56 @@ public:
             pipelineDesc.compute = inDesc;
             initializeBase(pipelineDesc);
         }
+    };
+
+    class QueryPoolImpl : public IQueryPool, public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+    public:
+        Result init(const IQueryPool::Desc& desc, D3D12Device* device);
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        {
+            m_commandList->Reset(m_commandAllocator, nullptr);
+            m_commandList->ResolveQueryData(m_queryHeap, m_queryType, (UINT)queryIndex, (UINT)count, m_readBackBuffer, 0);
+            m_commandList->Close();
+            ID3D12CommandList* cmdList = m_commandList;
+            m_commandQueue->ExecuteCommandLists(1, &cmdList);
+            m_eventValue++;
+            m_fence->SetEventOnCompletion(m_eventValue, m_waitEvent);
+            m_commandQueue->Signal(m_fence, m_eventValue);
+            WaitForSingleObject(m_waitEvent, INFINITE);
+
+            int8_t* mappedData = nullptr;
+            D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex,sizeof(uint64_t) * (queryIndex + count) };
+            m_readBackBuffer.getResource()->Map(0, &readRange, (void**)&mappedData);
+            memcpy(data, mappedData + sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * count);
+            m_readBackBuffer.getResource()->Unmap(0, nullptr);
+            return SLANG_OK;
+        }
+
+        void writeTimestamp(ID3D12GraphicsCommandList* cmdList, SlangInt index)
+        {
+            cmdList->EndQuery(m_queryHeap, D3D12_QUERY_TYPE_TIMESTAMP, (UINT)index);
+        }
+
+    public:
+        D3D12_QUERY_TYPE m_queryType;
+        ComPtr<ID3D12QueryHeap> m_queryHeap;
+        D3D12Resource m_readBackBuffer;
+        ComPtr<ID3D12CommandAllocator> m_commandAllocator;
+        ComPtr<ID3D12GraphicsCommandList> m_commandList;
+        ComPtr<ID3D12Fence> m_fence;
+        ComPtr<ID3D12CommandQueue> m_commandQueue;
+        HANDLE m_waitEvent;
+        UINT64 m_eventValue = 0;
     };
 
     struct BoundVertexBuffer
@@ -3391,6 +3444,11 @@ public:
                 m_framebuffer = nullptr;
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+            {
+                static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_d3dCmdList, index);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setStencilReference(uint32_t referenceValue) override
             {
@@ -3437,6 +3495,10 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
                 PipelineCommandEncoder::endEncodingImpl();
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+            {
+                static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_d3dCmdList, index);
             }
             void init(
                 D3D12Device* renderer,
@@ -3533,6 +3595,10 @@ public:
                     data);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
+            {
+                static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_commandBuffer->m_cmdList, index);
+            }
         };
 
         ResourceCommandEncoderImpl m_resourceCommandEncoder;
@@ -4422,6 +4488,8 @@ Result D3D12Device::initialize(const Desc& desc)
     // `CommandQueueImpl` holds a back reference to `D3D12Device`, make it a weak reference here
     // since this object is already owned by `D3D12Device`.
     m_resourceCommandQueue->breakStrongReferenceToDevice();
+    // Retrieve timestamp frequency.
+    m_resourceCommandQueue->m_d3dQueue->GetTimestampFrequency(&m_info.timestampFrequency);
 
     SLANG_RETURN_ON_FAIL(createTransientResourceHeapImpl(0, 8, 4, m_resourceCommandTransientHeap.writeRef()));
     // `TransientResourceHeap` holds a back reference to `D3D12Device`, make it a weak reference here
@@ -5517,6 +5585,82 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
     pipelineStateImpl->m_pipelineState = pipelineState;
     pipelineStateImpl->init(desc);
     returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+Result D3D12Device::QueryPoolImpl::init(const IQueryPool::Desc& desc, D3D12Device* device)
+{
+    // Translate query type.
+    D3D12_QUERY_HEAP_DESC heapDesc = {};
+    heapDesc.Count = (UINT)desc.count;
+    heapDesc.NodeMask = 1;
+    switch (desc.type)
+    {
+    case QueryType::Timestamp:
+        heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
+        m_queryType = D3D12_QUERY_TYPE_TIMESTAMP;
+        break;
+    default:
+        return SLANG_E_INVALID_ARG;
+    }
+
+    // Create query heap.
+    auto d3dDevice = device->m_device;
+    SLANG_RETURN_ON_FAIL(d3dDevice->CreateQueryHeap(
+        &heapDesc, IID_PPV_ARGS(m_queryHeap.writeRef())));
+
+    // Create readback buffer.
+    D3D12_HEAP_PROPERTIES heapProps;
+    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProps.CreationNodeMask = 1;
+    heapProps.VisibleNodeMask = 1;
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    _initBufferResourceDesc(sizeof(uint64_t) * desc.count, resourceDesc);
+    SLANG_RETURN_ON_FAIL(m_readBackBuffer.initCommitted(
+        d3dDevice,
+        heapProps,
+        D3D12_HEAP_FLAG_NONE,
+        resourceDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr));
+
+    // Create command allocator.
+    SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
+        D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
+
+    // Create command list.
+    SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandList(
+        0,
+        D3D12_COMMAND_LIST_TYPE_DIRECT,
+        m_commandAllocator,
+        nullptr,
+        IID_PPV_ARGS(m_commandList.writeRef())));
+    m_commandList->Close();
+
+    // Create fence.
+    SLANG_RETURN_ON_FAIL(d3dDevice->CreateFence(
+        0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.writeRef())));
+
+    // Get command queue from device.
+    m_commandQueue = device->m_resourceCommandQueue->m_d3dQueue;
+
+    // Create wait event.
+    m_waitEvent = CreateEventEx(
+        nullptr,
+        false,
+        0,
+        EVENT_ALL_ACCESS);
+
+    return SLANG_OK;
+}
+
+Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outState)
+{
+    RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
+    returnComPtr(outState, queryPoolImpl);
     return SLANG_OK;
 }
 
