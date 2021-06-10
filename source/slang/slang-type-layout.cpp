@@ -420,6 +420,29 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+// The CUDA compiler NVRTC only works on 64 bit operating systems.
+// So instead of using native host type sizes we use these types instead
+//
+// NOTE! This implies that our CUDA reflection (even if produced on 32 bit host environment) is always 64 bit.
+// This is unlikely to be a problem in practice.
+
+// NOTE! For the moment the CUDA prelude we use size_t - but that's ok as we currently use these types for
+// sizes
+
+// Memory sizes, and memory offsets (signed)
+typedef int64_t CUDASize;
+typedef int64_t CUDAOffset;
+
+// TODO(JS): This could be better as CudaUSize if we accepted LowerCamel Acronyms...
+typedef uint64_t CUDAUSize;
+
+// A type that is the size of a pointer
+typedef CUDASize CUDAPtr;
+
+// TODO(JS): Perhaps there is an argument these should be 32 bit?
+typedef CUDASize CUDACount;
+typedef CUDASize CUDAIndex;
+
 struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
@@ -448,8 +471,8 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
 
             // So it is actually a Array<T> on CUDA which is a pointer and a size
-            info.size = sizeof(void*) * 2;
-            info.alignment = SLANG_ALIGN_OF(void*);
+            info.size = _roundToAlignment((CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+            info.alignment = sizeof(CUDAPtr);
             return info;
         }
         
