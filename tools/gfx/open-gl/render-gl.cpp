@@ -170,6 +170,18 @@ public:
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    {
+        SLANG_UNUSED(pool);
+        SLANG_UNUSED(index);
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** pool) override
+    {
+        SLANG_UNUSED(desc);
+        *pool = nullptr;
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;

@@ -23,7 +23,8 @@ enum class CommandName
     SetStencilReference,
     DispatchCompute,
     UploadBufferData,
-    CopyBuffer
+    CopyBuffer,
+    WriteTimestamp,
 };
 
 const uint8_t kMaxCommandOperands = 5;
@@ -82,6 +83,7 @@ public:
     Slang::List<Command> m_commands;
     Slang::List<Slang::ComPtr<ISlangUnknown>> m_objects;
     Slang::List<uint8_t> m_data;
+    bool m_hasWriteTimestamps = false;
 
 public:
     void clear()
@@ -91,6 +93,7 @@ public:
             obj = nullptr;
         m_objects.clear();
         m_data.clear();
+        m_hasWriteTimestamps = false;
     }
 
     // Copies user data into `m_data` buffer and returns the offset to retrieve the data.
@@ -247,6 +250,14 @@ public:
     {
         m_commands.add(
             Command(CommandName::DispatchCompute, (uint32_t)x, (uint32_t)y, (uint32_t)z));
+    }
+
+    void writeTimestamp(IQueryPool* pool, SlangInt index)
+    {
+        auto poolOffset = encodeObject(pool);
+        m_commands.add(
+            Command(CommandName::WriteTimestamp, poolOffset, (uint32_t)index));
+        m_hasWriteTimestamps = true;
     }
 };
 }

@@ -40,6 +40,11 @@ public:
     void establishStrongReferenceToDevice() { m_renderer.establishStrongReference(); }
 };
 
+struct CommandBufferInfo
+{
+    bool hasWriteTimestamps;
+};
+
 class ImmediateRendererBase : public RendererBase
 {
 public:
@@ -75,6 +80,9 @@ public:
     virtual void waitForGpu() = 0;
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) = 0;
     virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) = 0;
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) = 0;
+    virtual void beginCommandBuffer(const CommandBufferInfo&) {}
+    virtual void endCommandBuffer(const CommandBufferInfo&) {}
 
 public:
     Slang::RefPtr<ImmediateCommandQueueBase> m_queue;
