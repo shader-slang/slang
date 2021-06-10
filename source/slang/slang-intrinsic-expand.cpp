@@ -236,6 +236,35 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
+        case 'G':
+        {
+            // Get the type/value at the index of the specialization of this generic
+
+            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+            Index argIndex = (*cursor++) - '0';
+            
+            IRSpecialize* specialize = as<IRSpecialize>(m_callInst->getCallee());
+            SLANG_ASSERT(specialize);
+
+            {
+                auto argCount = Index(specialize->getArgCount());
+                SLANG_UNUSED(argCount);
+                SLANG_ASSERT(argIndex < argCount);
+
+                auto arg = specialize->getArg(argIndex);
+
+                if (auto type = as<IRType>(arg))
+                {
+                    m_emitter->emitType(type);
+                }
+                else
+                {
+                    m_emitter->emitVal(arg, getInfo(EmitOp::General));
+                }
+            }
+        }
+        break;
+
         case 'T':
             // Get the the 'element' type for the type of the param at the index
         {

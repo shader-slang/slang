@@ -1962,6 +1962,35 @@ __target_intrinsic(cuda, " @ ")
 __target_intrinsic(cpp, " @ ")
 int __SyntaxError();
 
+/// For downstream compilers that allow sizeof/alignof/offsetof
+/// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
+__generic<T>
+__target_intrinsic(cuda, "sizeof($G0)")
+__target_intrinsic(cpp, "sizeof($G0)")
+int __sizeOf();
+
+__generic<T>
+__target_intrinsic(cuda, "sizeof($T0)")
+__target_intrinsic(cpp, "sizeof($T0)")
+int __sizeOf(T v);
+
+__generic<T>
+__target_intrinsic(cuda, "SLANG_ALIGN_OF($G0)")
+__target_intrinsic(cpp, "SLANG_ALIGN_OF($G0)")
+int __alignOf();
+
+__generic<T>
+__target_intrinsic(cuda, "SLANG_ALIGN_OF($T0)")
+__target_intrinsic(cpp, "SLANG_ALIGN_OF($T0)")
+int __alignOf(T v);
+
+// It would be nice to have offsetof equivalent, but it's not clear how that would work in terms of the Slang language.
+// Here we allow calculating the offset of a field in bytes from an *instance* of the type.
+__generic<T,F>
+__target_intrinsic(cuda, "int(((char*)&($1)) - ((char*)&($0)))")
+__target_intrinsic(cpp, "int(((char*)&($1)) - ((char*)&($0))")
+int __offsetOf(in T t, in F field);
+
 /// Mark beginning of "interlocked" operations in a fragment shader.
 __target_intrinsic(glsl, "beginInvocationInterlockARB")
 __glsl_extension(GL_ARB_fragment_shader_interlock)
