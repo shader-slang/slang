@@ -161,7 +161,7 @@ The mechanism used here is based on the `-X` mechanism used in GCC, to specify a
 -Xlinker option
 ```
 
-When used, option is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang. These different stages are known as `SlangPassThrough` types in the API and have the following names
+When used, `option` is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang than just `linker`. These different stages are known as `SlangPassThrough` types in the API and have the following names
 
 * `fxc` - FXC HLSL compiler
 * `dxc` - DXC HLSL compiler
@@ -172,18 +172,24 @@ When used, option is not interpreted by GCC, but is passed to the linker once co
 * `genericcpp` - A generic C++ compiler (can be any one of visual studio, clang or gcc depending on system and availability)
 * `nvrtc` - NVRTC CUDA compiler
 
-The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the -X. So for example to send an option `-Gfa` through to DXC you can use 
+The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example to send an option `-Gfa` through to DXC you can use 
 
 ```
 -Xdxc -Gfa
 ```
 
-Note that if an option is available via normal Slang command line options then these should be used. This will work on multiple targets, but also avoids options clashing. As it stands Slang does not determine if a command line setting using the `-X` option clashes with regular Slang options in any way. This mechanism is best used for options that are unavailable through normal Slang mechanisms. 
+Note that if an option is available via normal Slang command line options then these should be used. This will generally work across multiple targets, but also avoids options clashing which is undefined behavior currently. The `-X` mechanism is best used for options that are unavailable through normal Slang mechanisms. 
 
 If you want to pass multiple options using this mechanism the `-Xdxc` needs to be in front of every options. For example 
 
 ```
 -Xdxc -Gfa -Xdxc -Vd
+```
+
+Would reach `dxc\` as 
+
+```
+-Gfa -Vd
 ```
 
 This can get a little repetitive especially if there are many parameters, so Slang adds a mechanism to have multiple options passed by using an ellipsis `...`. The syntax is as follows
@@ -192,24 +198,41 @@ This can get a little repetitive especially if there are many parameters, so Sla
 -Xdxc... -Gfa -Vd -X.
 ```
 
-The `...` at the end indicates all the following parameters should be sent to DXC until it reaches the terminating `-X` or the end of the command line. 
+The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the terminating `-X.` or the end of the command line. 
 
 It is also worth noting that `-X...` options can be nested. This would allow a GCC downstream compilation to control linking, for example with
 
 ```
--Xgcc -Xlinker --split -X
+-Xgcc -Xlinker --split -X.
+```
+
+In this example gcc would see
+
+```
+-Xlinker --split
+```
+
+And the linker would see (as passed through by gcc) 
+
+```
+--split
 ```
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
 
-NOTE! Not all tools that Slang uses downstream make command line argument parsing available. Of note `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration.
+NOTE! Not all tools that Slang uses downstream make command line argument parsing available. Of note `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
-The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the DXC option `-Gfa` in a render-test via 
+The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the `dxc` option `-Gfa` in a render-test via 
 
 ```
 -Xslang... -Xdxc -Gfa -X.
 ```
 
+Means that the dxc compilation in the render test (assuming dxc is invoked) will receive 
+
+```
+-Gfa
+```
 
 ### Specifying where dlls/shared libraries are loaded from
 
