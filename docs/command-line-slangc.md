@@ -186,7 +186,7 @@ If you want to pass multiple options using this mechanism the `-Xdxc` needs to b
 -Xdxc -Gfa -Xdxc -Vd
 ```
 
-Would reach `dxc\` as 
+Would reach `dxc` as 
 
 ```
 -Gfa -Vd
@@ -198,7 +198,7 @@ This can get a little repetitive especially if there are many parameters, so Sla
 -Xdxc... -Gfa -Vd -X.
 ```
 
-The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the terminating `-X.` or the end of the command line. 
+The `...` at the end indicates all the following parameters should be sent to `dxc` until it reaches the matching terminating `-X.` or the end of the command line. 
 
 It is also worth noting that `-X...` options can be nested. This would allow a GCC downstream compilation to control linking, for example with
 
@@ -220,7 +220,7 @@ And the linker would see (as passed through by gcc)
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
 
-NOTE! Not all tools that Slang uses downstream make command line argument parsing available. Of note `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
+NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
 The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus you can use the `dxc` option `-Gfa` in a render-test via 
 
@@ -240,11 +240,19 @@ On windows if you want a dll loaded from a specific path, the path must be speci
 
 On linux it's similar, but any path (relative or not) will override the regular search mechanism. See *'dlopen'* for more details. 
 
-* `-dxc-path`: Sets the path where dxc dlls are loaded from (dxcompiler.dll & dxil).
+* `-dxc-path`: Sets the path where dxc dll/shared libraries are loaded from (dxcompiler & dxil).
 
 * `-fxc-path`: Sets the path where fxc dll is loaded from (d3dcompiler_47.dll). 
 
-* `-glslang-path`: Sets where the slang specific 'slang-glslang' is loaded from
+* `-glslang-path`: Sets where the Slang specific 'slang-glslang' is loaded from
+
+Paths can specify a directory that holds the appropriate binaries. It can also be used to name a specific downstream binary - be it a shared library or an executable. Note that if it is a shared library, it is not necessary to provide the full filesystem name - just the path and/or name that will be used to load it. For example on windows `fxc` can be loaded from `D:/mydlls` with
+
+* `D:/mydlls' - will look for `d3dcompiler_47.dll` in this directory
+* `D:/mydlls/d3dcompiler_47` - it's not necessary to specify .dll to load a dll on windows
+* `D:/mydlls/d3dcompiler_47.dll` - it is also possible name the shared library explicitly for example
+
+That if you name the shared library/executable you can use a name other than the default for a specific version, for example by using `D:/mydlls/dxcompiler-some-version` for a specific version of `dxc`. 
 
 Limitations
 -----------
