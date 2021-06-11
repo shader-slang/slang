@@ -100,6 +100,9 @@ public:
         UInt inputElementCount,
         IInputLayout** outLayout) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** outPool) override;
+
     virtual Result createShaderObjectLayout(
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
@@ -143,10 +146,32 @@ public:
     virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
-    virtual void waitForGpu() override {}
+    virtual void waitForGpu() override
+    {
+
+    }
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
+    }
+    virtual void beginCommandBuffer(const CommandBufferInfo& info) override
+    {
+        if (info.hasWriteTimestamps)
+        {
+            m_immediateContext->Begin(m_disjointQuery);
+        }
+    }
+    virtual void endCommandBuffer(const CommandBufferInfo& info) override
+    {
+        if (info.hasWriteTimestamps)
+        {
+            m_immediateContext->End(m_disjointQuery);
+        }
+    }
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    {
+        auto poolImpl = static_cast<QueryPoolImpl*>(pool);
+        m_immediateContext->End(poolImpl->getQuery(index));
     }
 
 protected:
@@ -336,6 +361,62 @@ protected:
     public:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
+
+    class QueryPoolImpl : public IQueryPool, public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL;
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+    public:
+        List<ComPtr<ID3D11Query>> m_queries;
+        RefPtr<D3D11Device> m_device;
+        D3D11_QUERY_DESC m_queryDesc;
+        Result init(const IQueryPool::Desc& desc, D3D11Device* device)
+        {
+            m_device = device;
+            m_queryDesc.MiscFlags = 0;
+            switch (desc.type)
+            {
+            case QueryType::Timestamp:
+                m_queryDesc.Query = D3D11_QUERY_TIMESTAMP;
+                break;
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+            m_queries.setCount(desc.count);
+            return SLANG_OK;
+        }
+        ID3D11Query* getQuery(SlangInt index)
+        {
+            if (!m_queries[index])
+                m_device->m_device->CreateQuery(&m_queryDesc, m_queries[index].writeRef());
+            return m_queries[index].get();
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
+            SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        {
+            D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData;
+            while (S_OK != m_device->m_immediateContext->GetData(
+                m_device->m_disjointQuery, &disjointData, sizeof(D3D11_QUERY_DATA_TIMESTAMP_DISJOINT), 0))
+            {
+                Sleep(1);
+            }
+            m_device->m_info.timestampFrequency = disjointData.Frequency;
+
+            for (SlangInt i = 0; i < count; i++)
+            {
+                SLANG_RETURN_ON_FAIL(m_device->m_immediateContext->GetData(
+                    m_queries[queryIndex + i], data + i, sizeof(uint64_t), 0));
+            }
+            return SLANG_OK;
+        }
+    };
 
     class PipelineStateImpl : public PipelineStateBase
     {
@@ -1937,10 +2018,11 @@ protected:
     ComPtr<ID3D11DeviceContext> m_immediateContext;
     ComPtr<ID3D11Texture2D> m_backBufferTexture;
     ComPtr<IDXGIFactory> m_dxgiFactory;
-
     RefPtr<FramebufferImpl> m_currentFramebuffer;
 
     RefPtr<PipelineStateImpl> m_currentPipelineState;
+
+    ComPtr<ID3D11Query> m_disjointQuery;
 
     uint32_t m_stencilRef = 0;
     bool m_depthStencilStateDirty = true;
@@ -2188,6 +2270,19 @@ SlangResult D3D11Device::initialize(const Desc& desc)
 
         m_nvapi = true;
 #endif
+    }
+
+    {
+        // Create a TIMESTAMP_DISJOINT query object to query/update frequency info.
+        D3D11_QUERY_DESC disjointQueryDesc = {};
+        disjointQueryDesc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+        SLANG_RETURN_ON_FAIL(m_device->CreateQuery(
+            &disjointQueryDesc, m_disjointQuery.writeRef()));
+        m_immediateContext->Begin(m_disjointQuery);
+        m_immediateContext->End(m_disjointQuery);
+        D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjointData = {};
+        m_immediateContext->GetData(m_disjointQuery, &disjointData, sizeof(disjointData), 0);
+        m_info.timestampFrequency = disjointData.Frequency;
     }
     return SLANG_OK;
 }
@@ -2968,6 +3063,14 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
     impl->m_layout.swap(inputLayout);
 
     returnComPtr(outLayout, impl);
+    return SLANG_OK;
+}
+
+Result D3D11Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool)
+{
+    RefPtr<QueryPoolImpl> result = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
+    returnComPtr(outPool, result);
     return SLANG_OK;
 }
 

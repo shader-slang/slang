@@ -849,10 +849,31 @@ public:
         0xdaab0b1a, 0xf45d, 0x4ae9, { 0xbf, 0x2c, 0xe0, 0xbb, 0x76, 0x7d, 0xfa, 0xd1 } \
     }
 
+enum class QueryType
+{
+    Timestamp,
+};
+
+class IQueryPool : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        QueryType type;
+        SlangInt count;
+    };
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) = 0;
+};
+#define SLANG_UUID_IQueryPool                                                         \
+    { 0xc2cc3784, 0x12da, 0x480a, { 0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 } }
+
+
 class ICommandEncoder : public ISlangUnknown
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt queryIndex) = 0;
 };
 #define SLANG_UUID_ICommandEncoder                                                     \
     {                                                                                  \
@@ -1104,6 +1125,9 @@ struct DeviceInfo
 
     /// The name of the graphics adapter.
     const char* adapterName = nullptr;
+
+    /// The clock frequency used in timestamp queries.
+    uint64_t timestampFrequency = 0;
 };
 
 enum class DebugMessageType
@@ -1378,6 +1402,9 @@ public:
 
         /// Get the type of this renderer
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** outPool) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                             \

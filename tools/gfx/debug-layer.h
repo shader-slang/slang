@@ -99,6 +99,20 @@ public:
         size_t size,
         ISlangBlob** outBlob) override;
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc,
+        IQueryPool** outPool) override;
+};
+
+class DebugQueryPool : public DebugObject<IQueryPool>
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+
+    IQueryPool::Desc desc;
+public:
+    IQueryPool* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt index, SlangInt count, uint64_t* data) override;
 };
 
 class DebugBufferResource : public DebugObject<IBufferResource>
@@ -227,6 +241,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
@@ -264,6 +279,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
@@ -289,6 +305,7 @@ public:
         size_t size) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
