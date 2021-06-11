@@ -257,10 +257,10 @@ VectorExpressionType* ASTBuilder::getVectorType(
     return as<VectorExpressionType>(DeclRefType::create(this, declRef));
 }
 
-DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* bubiltinMagicTypeName, ConstArrayView<Val*> genericArgs)
+DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs)
 {
     DeclRef<Decl> declRef;
-    declRef.decl = m_sharedASTBuilder->findMagicDecl(bubiltinMagicTypeName);
+    declRef.decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
     if (auto genericDecl = as<GenericDecl>(declRef.decl))
     {
         if (genericArgs.getCount())
