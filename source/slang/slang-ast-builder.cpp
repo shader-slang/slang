@@ -257,6 +257,29 @@ VectorExpressionType* ASTBuilder::getVectorType(
     return as<VectorExpressionType>(DeclRefType::create(this, declRef));
 }
 
+DeclRef<Decl> ASTBuilder::getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs)
+{
+    DeclRef<Decl> declRef;
+    declRef.decl = m_sharedASTBuilder->findMagicDecl(builtinMagicTypeName);
+    if (auto genericDecl = as<GenericDecl>(declRef.decl))
+    {
+        if (genericArgs.getCount())
+        {
+            auto substitutions = create<GenericSubstitution>();
+            substitutions->genericDecl = genericDecl;
+            for (auto arg : genericArgs)
+                substitutions->args.add(arg);
+            declRef.substitutions = substitutions;
+        }
+        declRef.decl = genericDecl->inner;
+    }
+    else
+    {
+        SLANG_ASSERT(genericArgs.getCount() == 0);
+    }
+    return declRef;
+}
+
 Type* ASTBuilder::getAndType(Type* left, Type* right)
 {
     auto type = create<AndType>();
