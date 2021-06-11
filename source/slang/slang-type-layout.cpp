@@ -369,6 +369,8 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+/* CPU layout requires that all sizes are a multiple of alignment.
+*/
 struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
@@ -385,6 +387,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
                 return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1, 1 );
             }
 
+            // This always returns a layout where the size is the same as the alignment.
             default: return Super::GetScalarLayout(baseType);
         }
     }
@@ -519,14 +522,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Nothing is aligned more than 16
         alignment = std::min(alignment, size_t(16));
 
-        // TODO(JS): It's not 100% clear what is right in terms of size in respect of *alignment*. If the size is the 'used' bytes, then
-        // it can be less that the aligned size. If that's the case the GetArrayLayout (and MatrixLayout) is *wrong* in that on the last element
-        // it uses the size (not the aligned size/stride).
-        //
-        // Here I am assuming it's reasonable for the size to be the aligned size. That being the case the GetArrayLayout/GetMatrixLayout will be
-        // correct without special handling.
-        // 
-        // The assert below checks that is indeed the case.
+        // For CUDA the size must be a multiple of alignment, as this is the amount of bytes used 'exclusively' by the type.
 
         // The size must be a multiple of the alignment
         SLANG_ASSERT(_isAligned(size, alignment));
