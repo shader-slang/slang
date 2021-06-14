@@ -18,22 +18,24 @@ void AbiSystem::addType(slang::AbiStructTypeValue typeValue, const String qualif
     auto categoryAndType = AbiUtil::getCategoryAndType(typeValue);
 
     // Look up in the dictionary
-
-    Index index = m_typeInfos.getCount();
-    if (auto indexPtr = m_typeToInfoIndex.TryGetValueOrAdd(categoryAndType, index))
+    if (auto indexPtr = m_typeToInfoIndex.TryGetValueOrAdd(categoryAndType, m_typeInfos.getCount()))
     {
-        index = *indexPtr;
+        TypeInfo& info = m_typeInfos[*indexPtr];
+
+        info.m_type = typeValue;
+        info.m_name = qualifiedName;
+        info.m_sizeInBytes = sizeInBytes;
     }
     else
     {
-        m_typeInfos.add(TypeInfo{}); 
+        TypeInfo info;
+
+        info.m_type = typeValue;
+        info.m_name = qualifiedName;
+        info.m_sizeInBytes = sizeInBytes;
+
+        m_typeInfos.add(info); 
     }
-
-    TypeInfo& info = m_typeInfos[index];
-
-    info.m_type = typeValue;
-    info.m_name = qualifiedName;
-    info.m_sizeInBytes = sizeInBytes;
 }
 
 const AbiSystem::TypeInfo* AbiSystem::getTypeInfo(slang::AbiStructTypeValue value)
