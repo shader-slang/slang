@@ -506,11 +506,22 @@ enum : uint32_t
 {
     kAbiPrimaryMask = 0x80000000,
 
+    kAbiCategoryMask = 0x7f000000,
+    kAbiCategoryShift = 24,
+
     kAbiCategoryTypeMask = 0x7fff0000,
     kAbiCategoryTypeShift = 16,
 
+    kAbiCategoryTypeMajorMask = 0xffffff00,
+
     kAbiVersionMask = 0x0000ffff,
     kAbiVersionShift = 0,
+
+    kAbiMajorMask = 0x0000ff00,
+    kAbiMajorShift = 8,
+
+    kAbiMinorMask = 0x000000ff,
+    kAbiMinorShift = 0,
 };
 
 #define SLANG_MAKE_ABI_PRIMARY_TYPE(category, type, major, minor) AbiPrimaryType(uint32_t(kAbiPrimaryMask) | (uint32_t(category) << 24) | (uint32_t(type) << 16) | (uint32_t(major) << 8) | uint32_t(minor))
@@ -529,11 +540,8 @@ in the `PrimaryStruct`.
 the `PrimaryStruct`. This also provides a mechanism such that a `PrimaryStruct` derived type does not need to include all the fields that will
 every be needed. Cross cutting aspects can have their own uniquely identified structs.
 
-For binary compatibility both `PrimaryStruct` and `ExtensionStruct` use the 
-
-As a mechanism to provide extensibility without having
-to modify a struct or to allow optional and/or additional information through ExtensionStruct set via the exts and extsCount
-members.
+As a mechanism to provide extensibility without having to modify a struct or to allow optional and/or additional information through
+ExtensionStruct set via the `exts` and `extsCount` members.
 
 A type that is ABI compatible with this mechanism must start with exactly the same fields as specified.
 When using extensions, the exts and extsCount should be set. `exts` points to the extension ids (which must be at the start of the types)

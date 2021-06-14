@@ -37,8 +37,9 @@ struct AbiUtil
         /// This will *only* determine if *just* this type is compatible for read and not if it contains other types (say in the form of extensions)
     static bool isReadCompatible(TypeValue value, TypeValue currentValue)
     {
-        const TypeValue typeMask = 0xffffff00;
-        const TypeValue minorMask = ~typeMask;
+        // Uniquely identifies the 'type'.
+        const TypeValue typeMask = slang::kAbiCategoryTypeMajorMask;
+        const TypeValue minorMask = slang::kAbiMinorMask;
 
         // If they are the same type, and the input types minor is greater than equal to current minor we can accept for read (singly)
         return ((value ^ currentValue) & typeMask) == 0 && (value & minorMask) >= (currentValue & minorMask);
@@ -49,10 +50,10 @@ private:
     {
         TypeInfo info;
         info.kind = kind;
-        info.category = slang::AbiCategory((value >> 24) & 0x7f);
-        info.type = uint8_t((value >> 16) & 0xff);
-        info.majorVersion = uint8_t((value >> 8) & 0xff);
-        info.minorVersion = uint8_t(value & 0xff);
+        info.category = slang::AbiCategory((value & slang::kAbiCategoryMask) >> slang::kAbiCategoryShift);
+        info.type = uint8_t((value & slang::kAbiCategoryTypeMask)  >> slang::kAbiCategoryShift);
+        info.majorVersion = uint8_t((value & slang::kAbiMajorMask) >> slang::kAbiMajorShift);
+        info.minorVersion = uint8_t((value & slang::kAbiMinorMask) >> slang::kAbiMinorShift);
         return info;
     }
 };
