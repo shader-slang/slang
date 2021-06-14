@@ -12,6 +12,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 
 #include "../core/slang-std-writers.h"
+#include "../core/slang-abi.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -1433,7 +1434,7 @@ namespace Slang
             Type* const*    args,
             DiagnosticSink* sink);
 
-            /// Add a mew target amd return its index.
+            /// Add a mew target and return its index.
         UInt addTarget(
             CodeGenTarget   target);
 
@@ -2318,6 +2319,9 @@ namespace Slang
             /// Get the built in linkage -> handy to get the stdlibs from
         Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
+            /// Get the Abi system used for managing binary compatibility of interface types (outside of COM mechanisms)
+        AbiSystem* getAbiSystem() const { return m_abiSystem; }
+
         void init();
 
         void addBuiltinSource(
@@ -2342,6 +2346,8 @@ namespace Slang
 
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
+
+        RefPtr<AbiSystem> m_abiSystem;
 
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];         ///< Paths for each pass through
         String m_languagePreludes[int(SourceLanguage::CountOf)];                  ///< Prelude for each source language

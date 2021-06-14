@@ -114,6 +114,24 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
+static RefPtr<AbiSystem> _createAbiSystem()
+{
+    RefPtr<AbiSystem> system = new AbiSystem;
+
+    typedef slang::AbiCategory Category;
+
+    system->addCategory(Category::Gfx, "gfx");
+    system->addCategory(Category::Core, "core");
+    system->addCategory(Category::Slang, "slang");
+
+    {
+#define SLANG_ABI_SLANG_TYPE_ADD(X) system->addType(slang::AbiStructTypeValue(slang::X::kAbiType), "slang::" #X, sizeof(slang::X));
+SLANG_ABI_SLANG_TYPE(SLANG_ABI_SLANG_TYPE_ADD)
+    }
+
+    return system;
+}
+
 void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
@@ -130,6 +148,8 @@ void Session::init()
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
+
+    m_abiSystem = _createAbiSystem();
 
     //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
@@ -444,17 +464,24 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    Int targetCount = desc.targetCount;
-    const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-    for(Int ii = 0; ii < targetCount; ++ii)
     {
-        slang::TargetDesc targetDesc;
-        // Copy the size field first.
-        memcpy(&targetDesc.structureSize, targetDescPtr, sizeof(size_t));
-        // Copy the entire desc structure.
-        memcpy(&targetDesc, targetDescPtr, targetDesc.structureSize);
-        linkage->addTarget(targetDesc);
-        targetDescPtr += targetDesc.structureSize;
+        MemoryArena arena(1024);
+        AbiSystem* abiSystem = getAbiSystem();
+
+        const Index targetCount = Index(desc.targetCount);
+        for(Index ii = 0; ii < targetCount; ++ii)
+        {
+            auto inTargetDesc = desc.targets[ii];
+            const slang::TargetDesc* abiTargetDesc = abiSystem->getReadCompatible<slang::TargetDesc>(inTargetDesc, arena);
+            if (!abiTargetDesc)
+            {
+                // We don't have a DiagnosticSink to report to, so for now lets, just output this
+                return SLANG_E_ABI_INCOMPATIBLE;
+            }
+
+            // It's the responsibility of addTarget to make a suitable copy, with an associated extensions
+            linkage->addTarget(*abiTargetDesc);
+        }
     }
 
     if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)

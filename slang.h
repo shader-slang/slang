@@ -450,6 +450,136 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+namespace slang
+{
+
+/* Slang provides a mechanism for value types (such as structures) to be able to provide forward and backward
+ABI compatibility through. 
+
+The type is made up of several parts.
+0) The kind primary or extension
+1) The category the type is in
+2) An id for the type in the category
+3) The major semantic version
+4) The minor semantic version
+
+Within the 'semantic versioning' a structure that has only a larger minor semantic version can be used (with some
+caveats) as is when being passed to a previous version of Slang. It may contain more fields.
+
+*/
+
+enum class AbiKind : uint8_t
+{
+    PrimaryStruct,
+    ExtensionStruct,
+};
+
+enum class AbiCategory : uint8_t
+{
+    Core,               ///< Core and compiler core
+    Slang,              ///< Slang API
+    Gfx,                ///< Gfx API
+};
+
+/* AbiStructType is laid out as follows
+
+     |Primary | Category     | Type      | Major version | Minor Version
+-----|--------|--------------|-----------|---------------|----------------
+Bits | 31     | 30-24        | 23-16     |     15-8      |     0-7
+Type |        | AbiCategory  | Cat Spec  |               |
+
+Type will be specified as something specific for the category. A typical implementation will have an enum that lists
+types for that category. 
+
+TODO(JS): This layout may need to be altered - too may bits are perhaps used by major/minor version for example. This should
+be fine for the immediate future though.
+*/
+
+typedef uint32_t AbiStructTypeValue;
+
+enum class AbiPrimaryType : AbiStructTypeValue;
+enum class AbiExtensionType : AbiStructTypeValue;
+
+enum class AbiCategoryAndType : AbiStructTypeValue;
+
+enum : uint32_t
+{
+    kAbiPrimaryMask = 0x80000000,
+
+    kAbiCategoryTypeMask = 0x7fff0000,
+    kAbiCategoryTypeShift = 16,
+
+    kAbiVersionMask = 0x0000ffff,
+    kAbiVersionShift = 0,
+};
+
+#define SLANG_MAKE_ABI_PRIMARY_TYPE(category, type, major, minor) AbiPrimaryType(uint32_t(kAbiPrimaryMask) | (uint32_t(category) << 24) | (uint32_t(type) << 16) | (uint32_t(major) << 8) | uint32_t(minor))
+#define SLANG_MAKE_ABI_EXTENSION_TYPE(category, type, major, minor) AbiExtensionType((uint32_t(category) << 24) | (uint32_t(type) << 16) | (uint32_t(major) << 8) | uint32_t(minor))
+
+
+/* 
+`PrimaryStruct`s are structs that are passed directly into API calls. They always contain a 'structType' that identifies the exact version
+and type of that is being passed in. `PrimaryStruct`s can also specify optional `ExtensionStruct` types that modify and/or add to the values
+in the `PrimaryStruct`.
+
+`ExtensionStruct` cannot contain optional other extensions as PrimaryStructs do - all required extensions have to be specified via the list set on the
+`PrimaryStruct`.
+
+`ExtensionStruct` is typically used when it is necessary to provide some special additional information that is not appropriate to place within
+the `PrimaryStruct`. This also provides a mechanism such that a `PrimaryStruct` derived type does not need to include all the fields that will
+every be needed. Cross cutting aspects can have their own uniquely identified structs.
+
+For binary compatibility both `PrimaryStruct` and `ExtensionStruct` use the 
+
+As a mechanism to provide extensibility without having
+to modify a struct or to allow optional and/or additional information through ExtensionStruct set via the exts and extsCount
+members.
+
+A type that is ABI compatible with this mechanism must start with exactly the same fields as specified.
+When using extensions, the exts and extsCount should be set. `exts` points to the extension ids (which must be at the start of the types)
+to provide some kind of type safely without requiring inheritance.
+*/
+
+#define SLANG_EXTENSION_TYPE(category, type, major, minor) \
+    static const AbiExtensionType kAbiType = SLANG_MAKE_ABI_EXTENSION_TYPE(category, type, major, minor); \
+    AbiExtensionType abiType = kAbiType;
+
+#define SLANG_PRIMARY_TYPE(category, type, major, minor) \
+    static const AbiPrimaryType kAbiType = SLANG_MAKE_ABI_PRIMARY_TYPE(category, type, major, minor); \
+    AbiPrimaryType abiType = kAbiType; \
+    const ExtensionStruct** exts = nullptr; \
+    int32_t extsCount = 0; 
+
+/* The following structs provide the layout of primary and extension structs. */
+struct PrimaryStruct
+{
+    AbiPrimaryType abiType;
+    const AbiExtensionType** exts;
+    int32_t extsCount = 0;
+};
+
+struct ExtensionStruct 
+{
+    AbiExtensionType abiType;
+};
+
+// Enumerate all of the types that want ABI handling as part of Slang API.
+// NOTE! That care is needed using the enumeration, because we want IDs to remain stable.
+// New types should be added to the end. Removed types should become Depreciated_Name (say).
+#define SLANG_ABI_SLANG_TYPE(x) \
+    x(TargetDesc) \
+    x(SessionDesc)
+
+// Define Slang 
+enum class AbiSlangType
+{
+#define SLANG_ABI_SLANG_TYPE_ENUM(x) x,
+    SLANG_ABI_SLANG_TYPE(SLANG_ABI_SLANG_TYPE_ENUM)
+#undef SLANG_ABI_SLANG_TYPE_ENUM
+};
+
+} // namespace slang
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -478,7 +608,7 @@ extern "C"
 
     typedef bool SlangBool;
 
-
+    
     /*!
     @brief Severity of a diagnostic generated by the compiler.
     Values come from the enum below, with higher values representing more severe
@@ -830,6 +960,10 @@ extern "C"
 #define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
     //! Could not complete because some underlying feature (hardware or software) was not available 
 #define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
+
+    //! A type specified is ABI incompatible with this version of slang
+#define SLANG_E_ABI_INCOMPATIBLE            SLANG_MAKE_CORE_ERROR(8)
+
 
     /** A "Universally Unique Identifier" (UUID)
 
@@ -3804,9 +3938,7 @@ namespace slang
         */
     struct TargetDesc
     {
-            /** The size of this structure, in bytes.
-            */
-        size_t structureSize = sizeof(TargetDesc);
+        SLANG_PRIMARY_TYPE(AbiCategory::Slang, AbiSlangType::TargetDesc, 0, 0)
 
             /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
             */
@@ -3856,13 +3988,11 @@ namespace slang
 
     struct SessionDesc
     {
-            /** The size of this structure, in bytes.
-             */
-        size_t structureSize = sizeof(SessionDesc);
+        SLANG_PRIMARY_TYPE(AbiCategory::Slang, AbiSlangType::SessionDesc, 0, 0)
 
             /** Code generation targets to include in the session.
             */
-        TargetDesc const*   targets = nullptr;
+        TargetDesc const**  targets = nullptr;
         SlangInt            targetCount = 0;
 
             /** Flags to configure the session.
