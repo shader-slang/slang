@@ -458,20 +458,33 @@ ISlangUnknown* Session::getInterface(const Guid& guid)
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
-    slang::SessionDesc const&  desc,
+    slang::SessionDesc const&  inDesc,
     slang::ISession**          outSession)
 {
+    MemoryArena arena(1024);
+    AbiSystem* abiSystem = getAbiSystem();
+
+    // TODO(JS): Doing a read compatibility conversion means the desc and the extensions
+    // are compatible. BUT! It does not mean any other structures are compatible that are
+    // pointed to in the desc (as in this example targets)
+    //
+    // It could be argued that support for such a transformation should be part of the AbiSystem
+    // Doing so requires at least knowing these fields. 
+
+    auto desc = abiSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
+    if (!desc)
+    {
+        return SLANG_E_ABI_INCOMPATIBLE;
+    }
+
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
     {
-        MemoryArena arena(1024);
-        AbiSystem* abiSystem = getAbiSystem();
-
-        const Index targetCount = Index(desc.targetCount);
+        const Index targetCount = Index(desc->targetCount);
         for(Index ii = 0; ii < targetCount; ++ii)
         {
-            auto inTargetDesc = desc.targets[ii];
+            auto inTargetDesc = desc->targets[ii];
             const slang::TargetDesc* abiTargetDesc = abiSystem->getReadCompatible<slang::TargetDesc>(inTargetDesc, arena);
             if (!abiTargetDesc)
             {
@@ -484,23 +497,23 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         }
     }
 
-    if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
+    if(desc->flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
     {
         linkage->m_useFalcorCustomSharedKeywordSemantics = true;
     }
 
-    linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
+    linkage->setMatrixLayoutMode(desc->defaultMatrixLayoutMode);
 
-    Int searchPathCount = desc.searchPathCount;
+    Int searchPathCount = desc->searchPathCount;
     for(Int ii = 0; ii < searchPathCount; ++ii)
     {
-        linkage->addSearchPath(desc.searchPaths[ii]);
+        linkage->addSearchPath(desc->searchPaths[ii]);
     }
 
-    Int macroCount = desc.preprocessorMacroCount;
+    Int macroCount = desc->preprocessorMacroCount;
     for(Int ii = 0; ii < macroCount; ++ii)
     {
-        auto& macro = desc.preprocessorMacros[ii];
+        auto& macro = desc->preprocessorMacros[ii];
         linkage->addPreprocessorDefine(macro.name, macro.value);
     }
 
