@@ -251,6 +251,10 @@ struct SimpleLayoutInfo
     LayoutResourceKind kind;
 
     // How many resources of that kind?
+    //
+    // For uniform, the size is the number of bytes "reserved" exclusively for an instance of that type.
+    // In *general* it is not necessary for a size to be rounded up to the alignment. Some targets do
+    // though - for example C++ and CUDA targets always have size as a multiple of alignment.
     LayoutSize size;
 
     // only useful in the uniform case

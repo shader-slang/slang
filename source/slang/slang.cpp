@@ -979,6 +979,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             {
                 ConstantBufferType* cbType = getASTBuilder()->create<ConstantBufferType>();
                 cbType->elementType = type;
+                cbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "ConstantBuffer", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = cbType;
             }
             break;
@@ -986,6 +988,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             {
                 ParameterBlockType* pbType = getASTBuilder()->create<ParameterBlockType>();
                 pbType->elementType = type;
+                pbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "ParameterBlock", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = pbType;
             }
             break;
@@ -994,14 +998,14 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                 HLSLStructuredBufferType* sbType =
                     getASTBuilder()->create<HLSLStructuredBufferType>();
                 sbType->elementType = type;
+                sbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "HLSLStructuredBufferType", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = sbType;
             }
             break;
         case slang::ContainerType::UnsizedArray:
             {
-                ArrayExpressionType* arrType = getASTBuilder()->create<ArrayExpressionType>();
-                arrType->baseType = type;
-                arrType->arrayLength = nullptr;
+                ArrayExpressionType* arrType = getASTBuilder()->getArrayType(type, nullptr);
                 containerTypeReflection = arrType;
             }
             break;

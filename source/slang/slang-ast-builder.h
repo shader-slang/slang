@@ -153,6 +153,8 @@ public:
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 
+    DeclRef<Decl> getBuiltinDeclRef(const char* builtinMagicTypeName, ConstArrayView<Val*> genericArgs);
+
     Type* getAndType(Type* left, Type* right);
 
     TypeType* getTypeType(Type* type);

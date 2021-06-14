@@ -1132,6 +1132,7 @@ public:
             static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
             ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
             m_info.adapterName = "CPU";
+            m_info.timestampFrequency = 1000000000;
         }
 
         return SLANG_OK;
@@ -1259,6 +1260,7 @@ public:
         const IQueryPool::Desc& desc, IQueryPool** outPool) override
     {
         RefPtr<CPUQueryPool> pool = new CPUQueryPool();
+        pool->init(desc);
         returnComPtr(outPool, pool);
         return SLANG_OK;
     }
