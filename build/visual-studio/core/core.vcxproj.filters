@@ -9,10 +9,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\source\core\slang-abi.h">
+    <ClInclude Include="..\..\..\source\core\slang-allocator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\core\slang-allocator.h">
+    <ClInclude Include="..\..\..\source\core\slang-api-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-archive-file-system.h">
@@ -173,7 +173,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\source\core\slang-abi.cpp">
+    <ClCompile Include="..\..\..\source\core\slang-api-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp">

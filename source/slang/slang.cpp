@@ -114,19 +114,19 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-static RefPtr<AbiSystem> _createAbiSystem()
+static RefPtr<ApiSystem> _createApiSystem()
 {
-    RefPtr<AbiSystem> system = new AbiSystem;
+    RefPtr<ApiSystem> system = new ApiSystem;
 
-    typedef slang::AbiCategory Category;
+    typedef slang::ApiCategory Category;
 
     system->addCategory(Category::Gfx, "gfx");
     system->addCategory(Category::Core, "core");
     system->addCategory(Category::Slang, "slang");
 
     {
-#define SLANG_ABI_SLANG_TYPE_ADD(X) system->addType(slang::AbiStructTypeValue(slang::X::kAbiType), "slang::" #X, sizeof(slang::X));
-SLANG_ABI_SLANG_TYPE(SLANG_ABI_SLANG_TYPE_ADD)
+#define SLANG_ABI_SLANG_TYPE_ADD(X) system->addType(slang::ApiStructTypeValue(slang::X::kApiType), "slang::" #X, sizeof(slang::X));
+SLANG_STRUCT_TYPES(SLANG_ABI_SLANG_TYPE_ADD)
     }
 
     return system;
@@ -149,7 +149,7 @@ void Session::init()
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
 
-    m_abiSystem = _createAbiSystem();
+    m_apiSystem = _createApiSystem();
 
     //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));

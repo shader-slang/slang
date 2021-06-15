@@ -12,7 +12,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 
 #include "../core/slang-std-writers.h"
-#include "../core/slang-abi.h"
+#include "../core/slang-api-system.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -2320,7 +2320,7 @@ namespace Slang
         Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
             /// Get the Abi system used for managing binary compatibility of interface types (outside of COM mechanisms)
-        AbiSystem* getAbiSystem() const { return m_abiSystem; }
+        ApiSystem* getApiSystem() const { return m_apiSystem; }
 
         void init();
 
@@ -2347,7 +2347,7 @@ namespace Slang
             /// Linkage used for all built-in (stdlib) code.
         RefPtr<Linkage> m_builtinLinkage;
 
-        RefPtr<AbiSystem> m_abiSystem;
+        RefPtr<ApiSystem> m_apiSystem;
 
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];         ///< Paths for each pass through
         String m_languagePreludes[int(SourceLanguage::CountOf)];                  ///< Prelude for each source language
