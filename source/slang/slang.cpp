@@ -462,7 +462,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::ISession**          outSession)
 {
     MemoryArena arena(1024);
-    AbiSystem* abiSystem = getAbiSystem();
+    ApiSystem* apiSystem = getApiSystem();
 
     // TODO(JS): Doing a read compatibility conversion means the desc and the extensions
     // are compatible. BUT! It does not mean any other structures are compatible that are
@@ -471,7 +471,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     // It could be argued that support for such a transformation should be part of the AbiSystem
     // Doing so requires at least knowing these fields. 
 
-    auto desc = abiSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
+    auto desc = apiSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
     if (!desc)
     {
         return SLANG_E_ABI_INCOMPATIBLE;
@@ -485,7 +485,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         for(Index ii = 0; ii < targetCount; ++ii)
         {
             auto inTargetDesc = desc->targets[ii];
-            const slang::TargetDesc* abiTargetDesc = abiSystem->getReadCompatible<slang::TargetDesc>(inTargetDesc, arena);
+            const slang::TargetDesc* abiTargetDesc = apiSystem->getReadCompatible<slang::TargetDesc>(inTargetDesc, arena);
             if (!abiTargetDesc)
             {
                 // We don't have a DiagnosticSink to report to, so for now lets, just output this
