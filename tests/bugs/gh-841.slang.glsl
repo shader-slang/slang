@@ -24,8 +24,8 @@ void main()
 
     if(bool(_S4.u_0 & uint(1)))
     {
-        vec4 _S5 = result_1 + 1.0;
-        result_0 = _S5;
+        vec4 result_2 = result_1 + 1.0;
+        result_0 = result_2;
     }
     else
     {

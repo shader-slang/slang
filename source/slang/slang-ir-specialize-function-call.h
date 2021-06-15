@@ -5,13 +5,16 @@ namespace Slang
 {
     class BackEndCompileRequest;
     class TargetRequest;
+    struct IRInst;
     struct IRModule;
     struct IRParam;
 
     class FunctionCallSpecializeCondition
     {
     public:
-        virtual bool doesParamNeedSpecialization(IRParam* param) = 0;
+        virtual bool doesParamWantSpecialization(IRParam* param, IRInst* arg) = 0;
+
+        virtual bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg);
     };
 
 

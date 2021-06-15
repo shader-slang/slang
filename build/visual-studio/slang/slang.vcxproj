@@ -256,6 +256,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-function-call.h" />
@@ -380,6 +381,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-function-call.cpp" />
