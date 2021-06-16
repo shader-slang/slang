@@ -467,17 +467,24 @@ Within the 'semantic versioning' a structure that has only a larger minor semant
 caveats) as is when being passed to a previous version of Slang. It may contain more fields.
 */
 
-enum class ApiStructKind : uint8_t
+enum class StructTagKind : uint8_t
 {
     Primary,                ///< A primary struct (contains optional extensions)
     Extension,              ///< An extension struct
 };
 
-enum class ApiCategory : uint8_t
+#define SLANG_STRUCT_TAG_ENUM(x) x,
+
+#define SLANG_STRUCT_TAG_CATEGORIES(x) \
+    x(Core) \
+    x(Slang) \
+    x(Gfx)
+
+
+enum class StructTagCategory : uint8_t
 {
-    Core,               ///< Core and compiler core
-    Slang,              ///< Slang API
-    Gfx,                ///< Gfx API
+    SLANG_STRUCT_TAG_CATEGORIES(SLANG_STRUCT_TAG_ENUM)
+    CountOf,
 };
 
 /* AbiStructType is laid out as follows
@@ -494,37 +501,39 @@ TODO(JS): This layout may need to be altered - too may bits are perhaps used by 
 be fine for the immediate future though.
 */
 
-typedef uint32_t ApiStructTypeValue;
+typedef uint32_t StructTagInt;
+typedef uint32_t StructSize;
 
-enum class ApiPrimaryType : ApiStructTypeValue;
-enum class ApiExtensionType : ApiStructTypeValue;
-
-enum class ApiCategoryAndType : ApiStructTypeValue;
+enum class StructTag : StructTagInt;
 
 enum : uint32_t
 {
-    kApiPrimaryMask = 0x80000000,
+    kStructTagPrimaryMask = 0x80000000,
 
-    kApiCategoryMask = 0x7f000000,
-    kApiCategoryShift = 24,
+    kStructTagCategoryMask = 0x7f000000,
+    kStructTagCategoryShift = 24,
 
-    kApiCategoryTypeMask = 0x7fff0000,
-    kApiCategoryTypeShift = 16,
+    // Combination of category and TypeIndex
+    kStructTagCategoryTypeIndexMask = 0x7fff0000,
+    kStructTagCategoryTypeIndexShift = 16,
 
-    kApiCategoryTypeMajorMask = 0xffffff00,
+    kStructTagCategoryTypeMajorMask = 0xffffff00,
 
-    kApiVersionMask = 0x0000ffff,
-    kApiVersionShift = 0,
+    kStructTagTypeIndexMask = 0x00ff0000,
+    kStructTagTypeIndexShift = 16,
 
-    kApiMajorMask = 0x0000ff00,
-    kApiMajorShift = 8,
+    kStructTagVersionMask = 0x0000ffff,
+    kStructTagVersionShift = 0,
 
-    kApiMinorMask = 0x000000ff,
-    kApiMinorShift = 0,
+    kStructTagMajorMask = 0x0000ff00,
+    kStructTagMajorShift = 8,
+
+    kStructTagMinorMask = 0x000000ff,
+    kStructTagMinorShift = 0,
 };
 
-#define SLANG_MAKE_API_PRIMARY_TYPE(category, type, major, minor) ApiPrimaryType(uint32_t(kApiPrimaryMask) | (uint32_t(category) << 24) | (uint32_t(type) << 16) | (uint32_t(major) << 8) | uint32_t(minor))
-#define SLANG_MAKE_API_EXTENSION_TYPE(category, type, major, minor) ApiExtensionType((uint32_t(category) << 24) | (uint32_t(type) << 16) | (uint32_t(major) << 8) | uint32_t(minor))
+#define SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag(StructTagInt(kStructTagPrimaryMask) | (StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
+#define SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag((StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
 
 /* 
 `PrimaryStruct`s are structs that are passed directly into API calls. They always contain a 'structType' that identifies the exact version
@@ -546,52 +555,63 @@ When using extensions, the exts and extsCount should be set. `exts` points to th
 to provide some kind of type safely without requiring inheritance.
 */
 
-#define SLANG_API_EXTENSION_TYPE(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
+#define SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
-    static const ApiExtensionType kApiType = SLANG_MAKE_API_EXTENSION_TYPE(CATEGORY, TYPE_ID, MAJOR, MINOR); \
-    ApiExtensionType abiType = kApiType; \
-    int32_t abiSizeInBytes = sizeof(ThisType);
+    static const StructTag kStructTag = SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    StructTag structTag = kStructTag; \
+    StructSize structSize = StructSize(sizeof(ThisType));
 
-#define SLANG_API_PRIMARY_TYPE(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
+#define SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
-    static const ApiPrimaryType kApiType = SLANG_MAKE_API_PRIMARY_TYPE(CATEGORY, TYPE_ID, MAJOR, MINOR); \
-    ApiPrimaryType abiType = kApiType; \
-    int32_t apiSizeInBytes = sizeof(ThisType); \
-    const ApiExtensionStruct** exts = nullptr; \
+    static const StructTag kStructTag = SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    StructTag structTag = kStructTag; \
+    StructSize structSize = StructSize(sizeof(ThisType)); \
+    const StructTag** exts = nullptr; \
     int32_t extsCount = 0; 
 
 #define SLANG_API_TYPE_ENUM(x) x,
 
-/* The following structs provide the layout of primary and extension structs. */
-struct ApiPrimaryStruct
+struct TaggedStructBase
 {
-    ApiPrimaryType apiType;             ///< Identity for the type
-    int32_t apiSizeInBytes;             ///< Size of the type in bytes
-    const ApiExtensionType** exts;      ///< Extensions (should be the first member of an extension struct) 
+    StructTag structTag;            ///< Identity for the type
+    StructSize structSize;             ///< Size of the type in bytes
+};
+
+/* Layout for a PrimaryTaggedStruct */
+struct PrimaryTaggedStruct
+{
+    StructTag structTag;                ///< Identity for the type
+    StructSize structSize;              ///< Size of the type in bytes
+    const StructTag** exts;             ///< Extensions - StructTag type should be the first member of Extension structs
     int32_t extsCount = 0;              ///< The number of extensions
 };
 
-struct ApiExtensionStruct 
+/* Layout for a Extension TaggedStruct */
+struct ExtensionTaggedStruct 
 {
-    ApiExtensionType abiType;           ///< Identity for the type
-    int32_t abiSizeInBytes;             ///< Size of the type in bytes
+    StructTag structTag;                ///< Identity for the type
+    StructSize structSize;              ///< Size of the type in bytes
 };
 
 // Enumerate all of the types that want ABI handling as part of Slang API.
+//
 // NOTE! That care is needed using the enumeration, because we want IDs to remain stable.
 // New types should be added to the end. Removed types should become Depreciated_Name (say).
-#define SLANG_STRUCT_TYPES(x) \
+//
+// NOTE! The names must match the type name for an active type exactly for the SLANG_PRIMARY_TAGGED_STRUCT and SLANG_EXTENSION_TAGGED_STRUCT
+// macros to work.
+#define SLANG_TAGGED_STRUCTS(x) \
     x(TargetDesc) \
     x(SessionDesc)
 
 // Define Slangs types in the enum
-enum class SlangStruct
+enum class SlangTaggedStruct
 {
-    SLANG_STRUCT_TYPES(SLANG_API_TYPE_ENUM)
+    SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ENUM)
 };
 
-#define SLANG_PRIMARY_TYPE(TYPE_NAME, MAJOR, MINOR)  SLANG_API_PRIMARY_TYPE(TYPE_NAME, ApiCategory::Slang, SlangStruct::TYPE_NAME, MAJOR, MINOR)
-#define SLANG_EXTENSION_TYPE(TYPE_NAME, MAJOR, MINOR)  SLANG_API_EXTENSION_TYPE(TYPE_NAME, ApiCategory::Slang, SlangStruct::TYPE_NAME, MAJOR, MINOR)
+#define SLANG_PRIMARY_TAGGED_STRUCT(TYPE_NAME, MAJOR, MINOR)  SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, StructTagCategory::Slang, SlangTaggedStruct::TYPE_NAME, MAJOR, MINOR)
+#define SLANG_EXTENSION_TAGGED_STRUCT(TYPE_NAME, MAJOR, MINOR)  SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, StructTagCategory::Slang, SlangTaggedStruct::TYPE_NAME, MAJOR, MINOR)
 
 } // namespace slang
 
@@ -3953,7 +3973,7 @@ namespace slang
         */
     struct TargetDesc
     {
-        SLANG_PRIMARY_TYPE(TargetDesc, 0, 0)
+        SLANG_PRIMARY_TAGGED_STRUCT(TargetDesc, 0, 0)
 
             /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
             */
@@ -4003,11 +4023,11 @@ namespace slang
 
     struct SessionDesc
     {
-        SLANG_PRIMARY_TYPE(SessionDesc, 0, 0)
+        SLANG_PRIMARY_TAGGED_STRUCT(SessionDesc, 0, 0)
 
             /** Code generation targets to include in the session.
             */
-        TargetDesc const**  targets = nullptr;
+        TargetDesc const*   targets = nullptr;
         SlangInt            targetCount = 0;
 
             /** Flags to configure the session.

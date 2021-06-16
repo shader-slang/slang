@@ -42,9 +42,8 @@ namespace gfx
             targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;
 
-            const slang::TargetDesc* targetDescs[] = { &targetDesc };
-            slangSessionDesc.targets = targetDescs;
-            slangSessionDesc.targetCount = SLANG_COUNT_OF(targetDescs);
+            slangSessionDesc.targets = &targetDesc;
+            slangSessionDesc.targetCount = 1;
 
             SLANG_RETURN_ON_FAIL(globalSession->createSession(slangSessionDesc, session.writeRef()));
             return SLANG_OK;

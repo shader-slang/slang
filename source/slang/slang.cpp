@@ -114,19 +114,18 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
-static RefPtr<ApiSystem> _createApiSystem()
+static RefPtr<StructTagSystem> _createStructTagSystem()
 {
-    RefPtr<ApiSystem> system = new ApiSystem;
-
-    typedef slang::ApiCategory Category;
-
-    system->addCategory(Category::Gfx, "gfx");
-    system->addCategory(Category::Core, "core");
-    system->addCategory(Category::Slang, "slang");
+    RefPtr<StructTagSystem> system = new StructTagSystem;
 
     {
-#define SLANG_ABI_SLANG_TYPE_ADD(X) system->addType(slang::ApiStructTypeValue(slang::X::kApiType), "slang::" #X, sizeof(slang::X));
-SLANG_STRUCT_TYPES(SLANG_ABI_SLANG_TYPE_ADD)
+#define SLANG_STRUCT_TAG_ADD_CATEGORY(x) system->addCategoryInfo(slang::StructTagCategory::x, #x);
+        SLANG_STRUCT_TAG_CATEGORIES(SLANG_STRUCT_TAG_ADD_CATEGORY)
+    }
+
+    {
+#define SLANG_STRUCT_TAG_ADD_TYPE(X) system->addType(slang::X::kStructTag, "slang::" #X, sizeof(slang::X));
+SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ADD_TYPE)
     }
 
     return system;
@@ -149,7 +148,7 @@ void Session::init()
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
 
-    m_apiSystem = _createApiSystem();
+    m_structTagSystem = _createStructTagSystem();
 
     //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
@@ -462,7 +461,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::ISession**          outSession)
 {
     MemoryArena arena(1024);
-    ApiSystem* apiSystem = getApiSystem();
+    StructTagSystem* structTagSystem = getStructTagSystem();
 
     // TODO(JS): Doing a read compatibility conversion means the desc and the extensions
     // are compatible. BUT! It does not mean any other structures are compatible that are
@@ -471,7 +470,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     // It could be argued that support for such a transformation should be part of the AbiSystem
     // Doing so requires at least knowing these fields. 
 
-    auto desc = apiSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
+    auto desc = structTagSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
     if (!desc)
     {
         return SLANG_E_ABI_INCOMPATIBLE;
@@ -485,7 +484,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         for(Index ii = 0; ii < targetCount; ++ii)
         {
             auto inTargetDesc = desc->targets[ii];
-            const slang::TargetDesc* abiTargetDesc = apiSystem->getReadCompatible<slang::TargetDesc>(inTargetDesc, arena);
+            const slang::TargetDesc* abiTargetDesc = structTagSystem->getReadCompatible<slang::TargetDesc>(&inTargetDesc, arena);
             if (!abiTargetDesc)
             {
                 // We don't have a DiagnosticSink to report to, so for now lets, just output this
