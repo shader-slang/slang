@@ -76,20 +76,26 @@ public:
     enum class FieldType : uint8_t
     {
         Unknown,
-        Ptr,
-        PtrPtr,
+        TaggedStruct,
+        PtrTaggedStruct,
+        PtrPtrTaggedStruct,
         I32,
         I64,
     };
 
+        /// True if it's an integral 
+    static bool isIntegral(FieldType type) { return Index(type) >= Index(FieldType::I32) && Index(type) <= Index(FieldType::I64);  }
+        /// True if it's a pointer or pointer to a pointer
+    static bool isPtrLike(FieldType type) { return Index(type) >= Index(FieldType::PtrTaggedStruct) && Index(type) <= Index(FieldType::PtrPtrTaggedStruct);  }
+
         /// We can have a 'field' that is made up of 2 elements, so we have two entries.
-        /// If m_typeB is Unknown, then the entry can be ignored
+        /// If m_countType is Unknown, then the entry can be ignored
     struct Field
     {
-        FieldType m_typeA;
-        FieldType m_typeB;
-        uint16_t m_offsetA;
-        uint16_t m_offsetB;
+        FieldType m_type;
+        FieldType m_countType;
+        uint16_t m_offset;
+        uint16_t m_countOffset;
     };
 
     StructTagType(slang::StructTag tag, const String& name, size_t sizeInBytes):
@@ -111,8 +117,24 @@ struct StructTagTypeTraits
     typedef StructTagType::FieldType Type;
     typedef StructTagType::Field Field;
 
+    // Use `substitution failure is not an error` (SFINAE) to detect tagged struct types
     template <typename T>
-    struct Impl { static Type getType() { return Type::Unknown; } };
+    struct IsTaggedStruct
+    {
+        typedef int32_t True;
+        typedef int8_t False;
+
+        template <typename C>
+        static True check(typename C::Tag*);
+        template <typename>
+        static False check(...);
+
+        // Is != 0 if it is a TaggedStruct type
+        enum { kValue = int(sizeof(check<T>(nullptr)) == sizeof(True)) };
+    };
+
+    template <typename T>
+    struct Impl { static Type getType() { return IsTaggedStruct<T>::kValue ? Type::TaggedStruct : Type::Unknown; } };
 
     // Doesn't currently handle fixed arrays, but could be added quite easily, with say a byte for the fixed size. 
     
@@ -123,16 +145,21 @@ struct StructTagTypeTraits
     template <> struct Impl<uint32_t> { static Type getType() { return Type::I32; } };
     template <> struct Impl<int32_t> { static Type getType() { return Type::I32; } };
 
+    // StructTag is used to indicate it can be any 'tagged struct type'
+    template <> struct Impl<slang::StructTag> { static Type getType() { return Type::TaggedStruct; } };
+
+    // Pointer
     template <typename T> struct Impl<T*>
     {
         static Type getType()
         {
             const Type innerType = Impl<T>::getType();
-            if (innerType == Type::PtrPtr)
+            switch (innerType)
             {
-                return Type::Unknown;
+                case Type::TaggedStruct:    return Type::PtrTaggedStruct;
+                case Type::PtrTaggedStruct: return Type::PtrPtrTaggedStruct;
+                default:                    return Type::Unknown;
             }
-            return innerType == Type::Ptr ? Type::PtrPtr : Type::Ptr;
         }
     };
 
@@ -147,10 +174,14 @@ struct StructTagTypeTraits
     static Field getFieldTypeWithCount(const T* obj, const F0* ptr, const F1* count)
     {
         Field field;
-        field.m_typeA = Impl<F0>::getType();
-        field.m_typeB = Impl<F1>::getType();
-        field.m_offsetA = getOffset(obj, ptr);
-        field.m_offsetB = getOffset(obj, count);
+        field.m_type = Impl<F0>::getType();
+        field.m_countType = Impl<F1>::getType();
+        field.m_offset = getOffset(obj, ptr);
+        field.m_countOffset = getOffset(obj, count);
+
+        SLANG_ASSERT(StructTagType::isPtrLike(field.m_type));
+        SLANG_ASSERT(StructTagType::isIntegral(field.m_countType));
+
         return field;
     }
 };

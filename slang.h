@@ -532,6 +532,11 @@ enum : uint32_t
     kStructTagMinorShift = 0,
 };
 
+// Types purely for use in template type identification
+// Any Primary or Extension TaggedStruct must have a typedef of one of these as Tag.
+enum class PrimaryTag;
+enum class ExtensionTag;
+
 #define SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag(StructTagInt(kStructTagPrimaryMask) | (StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
 #define SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag((StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
 
@@ -557,12 +562,14 @@ to provide some kind of type safely without requiring inheritance.
 
 #define SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
+    typedef ExtensionTag Tag; \
     static const StructTag kStructTag = SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
     StructTag structTag = kStructTag; \
     StructSize structSize = StructSize(sizeof(ThisType));
 
 #define SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
+    typedef PrimaryTag Tag; \
     static const StructTag kStructTag = SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
     StructTag structTag = kStructTag; \
     StructSize structSize = StructSize(sizeof(ThisType)); \

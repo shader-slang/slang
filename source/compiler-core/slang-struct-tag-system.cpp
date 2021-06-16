@@ -23,7 +23,10 @@ void StructTagCategoryInfo::addType(StructTagType* type)
 
     if (typeIndex >= m_types.getCount())
     {
+        Index prevCount = m_types.getCount();
         m_types.setCount(typeIndex + 1);
+        // Zero it
+        ::memset(m_types.getBuffer() + prevCount, 0, sizeof(StructTagType*) * (m_types.getCount() - prevCount));
     }
 
     SLANG_ASSERT(m_types[typeIndex] == nullptr);
