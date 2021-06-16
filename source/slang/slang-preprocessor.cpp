@@ -630,6 +630,12 @@ struct MacroDefinition
         Index index1 = 0;
     };
 
+    struct Param
+    {
+        NameLoc nameLoc;
+        bool    isVariadic = false;
+    };
+
         /// The flavor of macro
     MacroDefinition::Flavor     flavor;
 
@@ -643,7 +649,7 @@ struct MacroDefinition
     List<Op>                    ops;
 
         /// Parameters of the macro, in case of a function-like macro
-    List<NameLoc>               params;
+    List<Param>                 params;
 
     Name* getName()
     {
@@ -658,6 +664,17 @@ struct MacroDefinition
     bool isBuiltin()
     {
         return flavor == MacroDefinition::Flavor::BuiltinObjectLike;
+    }
+
+        /// Is this a variadic macro?
+    bool isVariadic()
+    {
+        // A macro is variadic if it has a last parameter and
+        // that last parameter is a variadic parameter.
+        //
+        auto paramCount = params.getCount();
+        if(paramCount == 0) return false;
+        return params[paramCount-1].isVariadic;
     }
 };
 
@@ -701,6 +718,8 @@ struct MacroInvocation : InputStream
 
         /// Is the given `macro` considered "busy" during the given macroinvocation?
     static bool isBusy(MacroDefinition* macro, MacroInvocation* duringMacroInvocation);
+
+    Index getArgCount() { return m_args.getCount(); }
 
 private:
     // Macro invocations are created as part of applying macro expansion
@@ -757,6 +776,9 @@ private:
 
         /// Initialize the input stream for the current macro op
     void _initCurrentOpStream();
+
+        /// Get a reader for the tokens that make up the macro argument at the given `paramIndex`
+    TokenReader _getArgTokens(Index paramIndex);
 
         /// Push a stream onto `m_currentOpStreams` that consists of a single token
     void _pushSingleTokenStream(TokenType tokenType, SourceLoc tokenLoc, UnownedStringSlice const& content);
@@ -860,7 +882,7 @@ private:
     MacroInvocation::Arg _parseMacroArg(MacroInvocation* macroInvocation);
 
         /// Parse all arguments to a macro invocation
-    Index _parseMacroArgs(
+    void _parseMacroArgs(
         MacroDefinition*    macro,
         MacroInvocation*    macroInvocation);
 
@@ -1194,14 +1216,13 @@ MacroInvocation::Arg ExpansionInputStream::_parseMacroArg(MacroInvocation* macro
     /// This function assumes the opening `(` has already been parsed,
     /// and it leaves the closing `)`, if any, for the caller to consume.
     ///
-    /// Returns the number of arguments parsed.
-    ///
-Index ExpansionInputStream::_parseMacroArgs(
+void ExpansionInputStream::_parseMacroArgs(
     MacroDefinition*    macro,
     MacroInvocation*    expansion)
 {
     // There is a subtle case here, which is when a macro expects
-    // exactly one parameter, but the argument list is empty. E.g.:
+    // exactly one non-variadic parameter, but the argument list is
+    // empty. E.g.:
     //
     //      #define M(x) /* whatever */
     //
@@ -1212,12 +1233,13 @@ Index ExpansionInputStream::_parseMacroArgs(
     // arguments.
     //
     // In all other cases (macros that do not have exactly one
-    // parameter) we should treat an empty argument list as zero
+    // parameter, plus macros with a single variadic parameter) we
+    // should treat an empty argument list as zero
     // arguments for the purposes of error messages (since that is
     // how a programmer is likely to view/understand it).
     //
-    Index paramCount = Index(macro->params.getCount());
-    if(paramCount != 1)
+    Index paramCount = macro->params.getCount();
+    if(paramCount != 1 || macro->isVariadic())
     {
         // If there appear to be no arguments because the next
         // token would close the argument list, then we bail
@@ -1227,37 +1249,16 @@ Index ExpansionInputStream::_parseMacroArgs(
         {
         case TokenType::RParent:
         case TokenType::EndOfFile:
-            return 0;
+            return;
         }
     }
 
     // Otherwise, we have one or more arguments.
-    Index argCount = 0;
     for(;;)
     {
         // Parse an argument.
         MacroInvocation::Arg arg = _parseMacroArg(expansion);
-
-        Index argIndex = argCount++;
-        if(argIndex < paramCount)
-        {
-            // The argument matches up with one of the declared
-            // parameters of the macro, so we will associate
-            // it with the parameter name.
-            //
-            expansion->m_args.add(arg);
-        }
-        else
-        {
-            // TODO: If we supported variadic macros, we would
-            // want to check if `arg` should be appended to the
-            // tokens for the last/variadic parameter.
-            //
-            // For now, we assume that any "extra" arguments
-            // need to be disposed of, so that we don't
-            // leak.
-            //
-        }
+        expansion->m_args.add(arg);
 
         // After consuming one macro argument, we look at
         // the next token to decide what to do.
@@ -1269,7 +1270,7 @@ Index ExpansionInputStream::_parseMacroArgs(
             // if we see a closing `)` or the end of
             // input, we know we are done with arguments.
             //
-            return argCount;
+            return;
 
         case TokenType::Comma:
             // If we see a comma, then we will
@@ -1280,7 +1281,7 @@ Index ExpansionInputStream::_parseMacroArgs(
             break;
 
         default:
-            // Another other token represents a syntax error.
+            // Any other token represents a syntax error.
             //
             // TODO: We could try to be clever here in deciding
             // whether to break out of parsing macro arguments,
@@ -1289,7 +1290,7 @@ Index ExpansionInputStream::_parseMacroArgs(
             // to just bail.
             //
             getSink()->diagnose(m_inputStreams.peekLoc(), Diagnostics::errorParsingToMacroInvocationArgument, paramCount, macro->getName());
-            return argCount;
+            return;
         }
     }
 }
@@ -1456,7 +1457,8 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // Next we parse any arguments to the macro invocation, which will
                 // consist of `()`-balanced sequences of tokens separated by `,`s.
                 //
-                Index argCount = _parseMacroArgs(macro, invocation);
+                _parseMacroArgs(macro, invocation);
+                Index argCount = invocation->getArgCount();
 
                 // We expect th arguments to be followed by a `)` to match the opening
                 // `(`, and if we don't find one we need to diagnose the issue.
@@ -1475,14 +1477,32 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // case we diagnose an issue *and* skip expansion of this invocation
                 // (it effectively expands to zero new tokens).
                 //
-                // TODO: If/when we support variadic macros, this check will need to
-                // handle cases where there are more arguments than declared parameters.
-                //
                 const Index paramCount = Index(macro->params.getCount());
-                if( argCount != paramCount )
+                if(!macro->isVariadic())
                 {
-                    GetSink(preprocessor)->diagnose(leftParen.loc, Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
-                    return;
+                    // The non-variadic case is simple enough: either the argument
+                    // count exactly matches the required parameter count, or we
+                    // diagnose an error.
+                    //
+                    if(argCount != paramCount)
+                    {
+                        GetSink(preprocessor)->diagnose(leftParen.loc, Diagnostics::wrongNumberOfArgumentsToMacro, paramCount, argCount);
+                        return;
+                    }
+                }
+                else
+                {
+                    // In the variadic case, we only require arguments for the
+                    // non-variadic parameters (all but the last one). In addition,
+                    // we do not consider it an error to have more than the required
+                    // number of arguments.
+                    //
+                    Index requiredArgCount = paramCount-1;
+                    if(argCount < requiredArgCount)
+                    {
+                        GetSink(preprocessor)->diagnose(leftParen.loc, Diagnostics::wrongNumberOfArgumentsToMacro, requiredArgCount, argCount);
+                        return;
+                    }
                 }
 
                 // Now that the arguments have been parsed and validated,
@@ -1687,10 +1707,39 @@ Token MacroInvocation::_readTokenImpl()
                 // expansion, then the `##` should treat that operand as empty.
                 //
                 // As such, there's a few cases to consider here.
+
+                // TODO: An extremely special case is the gcc-specific extension that allows
+                // the use of `##` for eliding a comma when there are no arguments for a
+                // variadic paameter, e.g.:
                 //
+                //      #define DEBUG(VALS...) debugImpl(__FILE__, __LINE__, ## VALS)
+                //
+                // Without the `##`, that case would risk producing an expression with a trailing
+                // comma when invoked with no arguments (e.g., `DEBUG()`). The gcc-specific
+                // behavior for `##` in this case discards the comma instead if the `VALS`
+                // parameter had no arguments (which is *not* the same as having a single empty
+                // argument).
+                //
+                // We could implement matching behavior in Slang with special-case logic here, but
+                // doing so adds extra complexity so we may be better off avoiding it.
+                //
+                // The Microsoft C++ compiler automatically discards commas in a case like this
+                // whether or not `##` has been used, except when certain flags to enable strict
+                // compliance to standards are used. Emulating this behavior would be another option.
+                //
+                // Later version of the C++ standard add `__VA_OPT__(...)` which can be used to
+                // include/exclude tokens in an expansion based on whether or not any arguments
+                // were provided for a variadic parameter. This is a relatively complicated feature
+                // to try and replicate
+                //
+                // For Slang it may be simplest to solve this problem at the parser level, by allowing
+                // trailing commas in argument lists without error/warning. However, if we *do* decide
+                // to implement the gcc extension for `##` it would be logical to try to detect and
+                // intercept that special case here.
+
                 // If the `tokenOpIndex` that `token` was read from is the op right
                 // before the `##`, then we know it is the last token produced by
-                // the preceding op (or possibly an EOF if that ops expansion was empty).
+                // the preceding op (or possibly an EOF if that op's expansion was empty).
                 //
                 if(tokenOpIndex == nextOpIndex-1)
                 {
@@ -1870,6 +1919,65 @@ void MacroInvocation::_pushStreamForSourceLocBuiltin(TokenType tokenType, F cons
     _pushSingleTokenStream(tokenType, m_macroInvocationLoc, content.getUnownedSlice());
 }
 
+TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
+{
+    SLANG_ASSERT(paramIndex >= 0);
+    SLANG_ASSERT(paramIndex < m_macro->params.getCount());
+
+    // How we determine the range of argument tokens for a parameter
+    // depends on whether or not it is a variadic parameter.
+    //
+    auto& param = m_macro->params[paramIndex];
+    auto argTokens = m_argTokens.getBuffer();
+    if(!param.isVariadic)
+    {
+        // The non-variadic case is, as expected, the simpler one.
+        //
+        // We expect that there must be an argument at the index corresponding
+        // to the parameter, and we construct a `TokenReader` that will play
+        // back the tokens of that argument.
+        //
+        SLANG_ASSERT(paramIndex < m_args.getCount());
+        auto arg = m_args[paramIndex];
+        return TokenReader(argTokens + arg.beginTokenIndex, argTokens + arg.endTokenIndex);
+    }
+    else
+    {
+        // In the variadic case, it is possible that we have zero or more
+        // arguments that will all need to be played back in any place where
+        // the variadic parameter is referenced.
+        //
+        // The first relevant argument is the one at the index coresponding
+        // to the variadic parameter, if any. The last relevant argument is
+        // the last argument to the invocation, *if* there was a first
+        // relevant argument.
+        //
+        Index firstArgIndex = paramIndex;
+        Index lastArgIndex = m_args.getCount()-1;
+
+        // One special case is when there are *no* arguments coresponding
+        // to the variadic parameter.
+        //
+        if (firstArgIndex > lastArgIndex)
+        {
+            // When there are no arguments for the varaidic parameter we will
+            // construct an empty token range that comes after the other arguments.
+            //
+            auto arg = m_args[lastArgIndex];
+            return TokenReader(argTokens + arg.endTokenIndex, argTokens + arg.endTokenIndex);
+        }
+
+        // Because the `m_argTokens` array includes the commas between arguments,
+        // we can get the token sequence we want simply by making a reader that spans
+        // all the tokens between the first and last argument (inclusive) that correspond
+        // to the variadic parameter.
+        //
+        auto firstArg = m_args[firstArgIndex];
+        auto lastArg = m_args[lastArgIndex];
+        return TokenReader(argTokens + firstArg.beginTokenIndex, argTokens + lastArg.endTokenIndex);
+    }
+}
+
 void MacroInvocation::_initCurrentOpStream()
 {
     // The job of this function is to make sure that `m_currentOpStreams` is set up
@@ -1915,17 +2023,12 @@ void MacroInvocation::_initCurrentOpStream()
             // the `index1` operand to the macro op.
             //
             Index paramIndex = op.index1;
-            SLANG_ASSERT(paramIndex >= 0);
-            SLANG_ASSERT(paramIndex < m_macro->params.getCount());
-            SLANG_ASSERT(paramIndex < m_args.getCount());
 
             // We can look up the corresponding argument to the macro invocation,
             // which stores a begin/end pair of indices into the raw token stream
             // that makes up the macro arguments.
             //
-            auto arg = m_args[paramIndex];
-            auto argTokens = m_argTokens.getBuffer();
-            auto tokenReader = TokenReader(argTokens + arg.beginTokenIndex, argTokens + arg.endTokenIndex);
+            auto tokenReader = _getArgTokens(paramIndex);
 
             // Because expansion doesn't apply to this parameter reference, we can simply
             // play back those tokens exactly as they appeared in the argument list.
@@ -1942,14 +2045,7 @@ void MacroInvocation::_initCurrentOpStream()
             // The initial logic here is similar to the unexpanded case above.
             //
             Index paramIndex = op.index1;
-            SLANG_ASSERT(paramIndex >= 0);
-            SLANG_ASSERT(paramIndex < m_macro->params.getCount());
-            SLANG_ASSERT(paramIndex < m_args.getCount());
-
-            auto arg = m_args[paramIndex];
-            auto argTokens = m_argTokens.getBuffer();
-            auto tokenReader = TokenReader(argTokens + arg.beginTokenIndex, argTokens + arg.endTokenIndex);
-
+            auto tokenReader = _getArgTokens(paramIndex);
             PretokenizedInputStream* stream = new PretokenizedInputStream(m_preprocessor, tokenReader);
 
             // The only interesting addition to the unexpanded case is that we wrap
@@ -1973,34 +2069,23 @@ void MacroInvocation::_initCurrentOpStream()
             auto loc = m_macro->tokens.m_tokens[tokenIndex].loc;
 
             Index paramIndex = op.index1;
-            SLANG_ASSERT(paramIndex >= 0);
-            SLANG_ASSERT(paramIndex < m_macro->params.getCount());
-            SLANG_ASSERT(paramIndex < m_args.getCount());
-
-            auto arg = m_args[paramIndex];
-            auto argTokens = m_argTokens.getBuffer();
-
-            // We will now iterate over the argument tokens that were passed for
-            // this parameter, and use them to build a string.
-            //
-            auto beginToken = argTokens + arg.beginTokenIndex;
-            auto endToken = argTokens + arg.endTokenIndex;
+            auto tokenReader = _getArgTokens(paramIndex);
 
             // A stringized parameter is always a `"`-enclosed string literal
             // (there is no way to stringize things to form a character literal).
             //
             StringBuilder builder;
             builder.appendChar('"');
-            for(auto tokenCursor = beginToken; tokenCursor != endToken; tokenCursor++)
+            for(bool first = true; !tokenReader.isAtEnd(); first = false)
             {
-                auto token = *tokenCursor;
+                auto token = tokenReader.advanceToken();
 
                 // Any whitespace between the tokens of argument must be collapsed into
                 // a single space character. Fortunately for us, the lexer has tracked
                 // for each token whether it was immediately preceded by whitespace,
                 // so we can check for whitespace that precedes any token except the first.
                 //
-                if(tokenCursor != beginToken && (token.flags & TokenFlag::AfterWhitespace))
+                if(!first && (token.flags & TokenFlag::AfterWhitespace))
                 {
                     builder.appendChar(' ');
                 }
@@ -3088,25 +3173,79 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         {
             for (;;)
             {
-                // TODO: handle elipsis (`...`) for varags
+                // A macro parameter should follow one of three shapes:
+                //
+                //      NAME
+                //      NAME...
+                //      ...
+                //
+                // If we don't see an ellipsis ahead, we know we ought
+                // to find one of the two cases that starts with an
+                // identifier.
+                //
+                Token paramNameToken;
+                if(PeekRawTokenType(context) != TokenType::Ellipsis)
+                {
+                    if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInMacroParameters, &paramNameToken))
+                        break;
+                }
 
-                // A macro parameter name should be a raw identifier
-                Token paramToken;
-                if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInMacroParameters, &paramToken))
-                    break;
+                // Whether or not a name was seen, we allow an ellipsis
+                // to indicate a variadic macro parameter.
+                //
+                // Note: a variadic parameter, if any, should always be
+                // the last parameter of a macro, but we do not enforce
+                // that requirement here.
+                //
+                Token ellipsisToken;
+                MacroDefinition::Param param;
+                if(PeekRawTokenType(context) == TokenType::Ellipsis)
+                {
+                    ellipsisToken = AdvanceRawToken(context);
+                    param.isVariadic = true;
+                }
 
-                // TODO(tfoley): some validation on parameter name.
-                // Certain names (e.g., `defined` and `__VA_ARGS__`
-                // are not allowed to be used as macros or parameters).
+                if(paramNameToken.type != TokenType::Unknown)
+                {
+                    // If we read an explicit name for the parameter, then we can use
+                    // that name directly.
+                    //
+                    param.nameLoc.name = paramNameToken.getName();
+                    param.nameLoc.loc = paramNameToken.loc;
+                }
+                else
+                {
+                    // If an explicit name was not read for the parameter, we *must*
+                    // have an unnamed variadic parameter. We know this because the
+                    // only case where the logic above doesn't require a name to
+                    // be read is when it already sees an ellipsis ahead.
+                    //
+                    SLANG_ASSERT(ellipsisToken.type != TokenType::Unknown);
+
+                    // Any unnamed variadic parameter is treated as one named `__VA_ARGS__`
+                    //
+                    param.nameLoc.name = context->m_preprocessor->getNamePool()->getName("__VA_ARGS__");
+                    param.nameLoc.loc = ellipsisToken.loc;
+                }
+
+                // TODO(tfoley): The C standard seems to disallow certain identifiers
+                // (e.g., `defined` and `__VA_ARGS__`) from being used as the names
+                // of user-defined macros or macro parameters. This choice seemingly
+                // supports implementation flexibility in how the special meanings of
+                // those identifiers are handled.
+                //
+                // We could consider issuing diagnostics for cases where a macro or parameter
+                // uses such names, or we could simply provide guarantees about what those
+                // names *do* in the context of the Slang preprocessor.
 
                 // Add the parameter to the macro being deifned
                 auto paramIndex = macro->params.getCount();
-                macro->params.add(paramToken);
+                macro->params.add(param);
 
-                auto paramName = paramToken.getName();
+                auto paramName = param.nameLoc.name;
                 if(mapParamNameToIndex.ContainsKey(paramName))
                 {
-                    GetSink(context)->diagnose(paramToken.loc, Diagnostics::duplicateMacroParameterName, name);
+                    GetSink(context)->diagnose(param.nameLoc.loc, Diagnostics::duplicateMacroParameterName, name);
                 }
                 else
                 {
@@ -3123,6 +3262,24 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
         }
 
         ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInMacroParameters);
+
+        // Once we have parsed the macro parameters, we can perform the additional validation
+        // step of checking that any parameters before the last parameter are not variadic.
+        //
+        Index lastParamIndex = macro->params.getCount()-1;
+        for(Index i = 0; i < lastParamIndex; ++i)
+        {
+            auto& param = macro->params[i];
+            if(!param.isVariadic) continue;
+
+            GetSink(context)->diagnose(param.nameLoc.loc, Diagnostics::variadicMacroParameterMustBeLast, param.nameLoc.name);
+
+            // As a precaution, we will unmark the variadic-ness of the parameter, so that
+            // logic downstream from this step doesn't have to deal with the possibility
+            // of a variadic parameter in the middle of the parameter list.
+            //
+            param.isVariadic = false;
+        }
 
     }
     else
