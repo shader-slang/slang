@@ -172,6 +172,7 @@ DIAGNOSTIC(15405, Error, tokenPasteAtStart, "'##' is not allowed at the start of
 DIAGNOSTIC(15406, Error, tokenPasteAtEnd, "'##' is not allowed at the end of a macro body")
 DIAGNOSTIC(15407, Error, expectedMacroParameterAfterStringize, "'#' in macro body must be followed by the name of a macro parameter")
 DIAGNOSTIC(15408, Error, duplicateMacroParameterName, "redefinition of macro parameter '$0'")
+DIAGNOSTIC(15409, Error, variadicMacroParameterMustBeLast, "a variadic macro parameter is only allowed at the end of the parameter list")
 
 // 155xx - macro expansion
 DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
