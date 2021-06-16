@@ -126,6 +126,15 @@ static RefPtr<StructTagSystem> _createStructTagSystem()
     {
 #define SLANG_STRUCT_TAG_ADD_TYPE(X) system->addType(slang::X::kStructTag, "slang::" #X, sizeof(slang::X));
 SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ADD_TYPE)
+
+        // Add field that references more tagged structs
+        {
+            slang::SessionDesc desc;
+            auto fieldType = StructTagTypeTraits::getFieldTypeWithCount(&desc, &desc.targets, &desc.targetCount);
+
+            auto type = system->getType(slang::SessionDesc::kStructTag);
+            type->m_fields.add(fieldType);
+        }
     }
 
     return system;

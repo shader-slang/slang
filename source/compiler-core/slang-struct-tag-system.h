@@ -73,6 +73,25 @@ struct StructTagType
 {
 public:
 
+    enum class FieldType : uint8_t
+    {
+        Unknown,
+        Ptr,
+        PtrPtr,
+        I32,
+        I64,
+    };
+
+        /// We can have a 'field' that is made up of 2 elements, so we have two entries.
+        /// If m_typeB is Unknown, then the entry can be ignored
+    struct Field
+    {
+        FieldType m_typeA;
+        FieldType m_typeB;
+        uint16_t m_offsetA;
+        uint16_t m_offsetB;
+    };
+
     StructTagType(slang::StructTag tag, const String& name, size_t sizeInBytes):
         m_tag(tag),
         m_name(name),
@@ -83,6 +102,57 @@ public:
     slang::StructTag m_tag;                 ///< The type/current version
     String m_name;                          ///< The name of the type
     slang::StructSize m_sizeInBytes;        ///< The size of this version in bytes
+
+    List<Field> m_fields;                   ///< Fields that need to be followed
+};
+
+struct StructTagTypeTraits
+{
+    typedef StructTagType::FieldType Type;
+    typedef StructTagType::Field Field;
+
+    template <typename T>
+    struct Impl { static Type getType() { return Type::Unknown; } };
+
+    // Doesn't currently handle fixed arrays, but could be added quite easily, with say a byte for the fixed size. 
+    
+    // Integer types
+    // We won't bother with sign for now
+    template <> struct Impl<uint64_t> { static Type getType() { return Type::I64; } };
+    template <> struct Impl<int64_t> { static Type getType() { return Type::I64; } };
+    template <> struct Impl<uint32_t> { static Type getType() { return Type::I32; } };
+    template <> struct Impl<int32_t> { static Type getType() { return Type::I32; } };
+
+    template <typename T> struct Impl<T*>
+    {
+        static Type getType()
+        {
+            const Type innerType = Impl<T>::getType();
+            if (innerType == Type::PtrPtr)
+            {
+                return Type::Unknown;
+            }
+            return innerType == Type::Ptr ? Type::PtrPtr : Type::Ptr;
+        }
+    };
+
+    template <typename T, typename F>
+    static uint16_t getOffset(T* obj, const F* f)
+    {
+        return uint16_t((const char*)f - (const char*)obj);
+    }
+
+        /// f1 should hold the count
+    template <typename T, typename F0, typename F1>
+    static Field getFieldTypeWithCount(const T* obj, const F0* ptr, const F1* count)
+    {
+        Field field;
+        field.m_typeA = Impl<F0>::getType();
+        field.m_typeB = Impl<F1>::getType();
+        field.m_offsetA = getOffset(obj, ptr);
+        field.m_offsetB = getOffset(obj, count);
+        return field;
+    }
 };
 
 class StructTagCategoryInfo
