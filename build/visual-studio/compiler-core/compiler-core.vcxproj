@@ -191,6 +191,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-name.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-struct-tag-converter.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-struct-tag-system.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token.h" />
@@ -216,6 +217,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-struct-tag-converter.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-struct-tag-system.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-token.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-visual-studio-compiler-util.cpp" />

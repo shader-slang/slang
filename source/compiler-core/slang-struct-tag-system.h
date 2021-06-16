@@ -211,40 +211,15 @@ public:
     List<StructTagType*> m_types;
 };
 
+/* Holds the information about TaggedStruct types. Use the StructTagConverter to actually convert to conforming
+types. */
 class StructTagSystem : public RefObject
 {
 public:
 
-    enum class CompatibilityResult
-    {
-        Compatible,                 ///< Compatible as is
-        ConvertCompatible,          ///< Compatible if converted
-        Incompatible,               ///< Cannot be made compatible
-    };
-
         /// Add a category
     StructTagCategoryInfo* addCategoryInfo(slang::StructTagCategory category, const String& name);
     StructTagCategoryInfo* getCategoryInfo(slang::StructTagCategory category);
-
-        /// Determine the compatibility
-    CompatibilityResult calcPtrArrayCompatible(const void*const* in, Index count);
-    CompatibilityResult calcArrayCompatible(const void* in, Index count);
-    CompatibilityResult calcCompatible(const void* in);
-
-    template <typename T>
-    const T* getReadCompatible(const void* in, MemoryArena& arena) { return reinterpret_cast<const T*>(getReadCompatible(in, arena)); }
-
-    const void* getReadCompatible(const void* in, MemoryArena& arena);
-
-    template <typename T>
-    const T* getReadArray(const void* in, MemoryArena& arena) { return reinterpret_cast<const T*>(getArray(in, arena)); }
-    const void* getReadArray(const void* in, Index count, MemoryArena& arena);
-
-        /// Copies type
-    SlangResult copy(const StructTagType* type, void* dst, const void* src);
-
-        /// Make a copy of the in structure (in the arena) such that it conforms to current versions, and return the copy
-    void* clone(const void* in, MemoryArena& arena);
 
         /// Get struct type 
     StructTagType* getType(slang::StructTag tag);

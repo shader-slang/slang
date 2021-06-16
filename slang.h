@@ -1003,9 +1003,8 @@ extern "C"
     //! Could not complete because some underlying feature (hardware or software) was not available 
 #define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
 
-    //! A type specified is ABI incompatible with this version of slang
-#define SLANG_E_ABI_INCOMPATIBLE            SLANG_MAKE_CORE_ERROR(8)
-
+    //! A type specified is StructTag incompatible with this version of slang
+#define SLANG_E_STRUCT_TAG_INCOMPATIBLE     SLANG_MAKE_CORE_ERROR(8)
 
     /** A "Universally Unique Identifier" (UUID)
 
