@@ -10,15 +10,30 @@ class StructTagConverter
 {
 public:
 
-    SlangResult getCurrent(const void* in, const void** out);
-    SlangResult getCurrentArray(const void* in, Index count, const void** out);
-    SlangResult getCurrentPtrArray(const void*const* in, Index count, const void*const** out);
+    const void* maybeConvertCurrent(const void* in);
+    const void* maybeConvertCurrent(slang::StructTag tag, const void* in);
 
-        /// Copies type
-    SlangResult copy(const StructTagType* type, void* dst, const void* src);
+    const void* maybeConvertCurrentArray(const void* in, Index count);
+    const void*const* maybeConvertCurrentPtrArray(const void*const* in, Index count);
+
+        /// Convert to current form
+    SlangResult convertCurrent(const StructTagType* type, const void* src, void* dst);
+
+        /// Convert all the referenced items starting at in.
+        /// Returns -1 if there was an error, else returns number converted.
+    Index convertCurrentContained(const StructTagType* structType, const void* in);
+
+    void setContained(Index stackIndex, const StructTagType* structType, void* dst);
 
         /// Make a copy of the in structure (in the arena) such that it conforms to current versions, and return the copy
     void* clone(const void* in);
+
+        /// Allocates of type from src
+    void* allocateAndCopy(const StructTagType* type, const void* src);
+    void copy(const StructTagType* type, const void* src, void* dst);
+
+    template <typename T>
+    const T* maybeConvertCurrent(const void* in) { return (const T*)maybeConvertCurrent(T::kStructTag, in); }
 
         /// Ctor. The sink and arena are optional. If the arena isn't set then it is not possible to copy convert anything
         /// and so if a copy convert is required, it will fail.
@@ -31,6 +46,8 @@ public:
     }
 
 protected:
+
+    List<const void*> m_stack;
 
     StructTagSystem* m_system;
     DiagnosticSink* m_sink;

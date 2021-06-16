@@ -41,6 +41,12 @@ struct StructTagUtil
         /// Get the category
     static slang::StructTagCategory getCategory(slang::StructTag tag) { return slang::StructTagCategory((slang::StructTagInt(tag) & slang::kStructTagCategoryMask) >> slang::kStructTagCategoryShift); }
 
+    static bool areSameType(slang::StructTag a, slang::StructTag b)
+    {
+        const auto typeMask = slang::StructTagInt(slang::kStructTagCategoryTypeMajorMask);
+        return ((slang::StructTagInt(a) ^ slang::StructTagInt(b)) & typeMask) == 0;
+    }
+
         /// This will *only* determine if *just* this type is compatible for read and not if it contains other types (say in the form of extensions)
     static bool isReadCompatible(slang::StructTag inTag, slang::StructTag inCurrentTag)
     {

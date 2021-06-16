@@ -23,6 +23,7 @@
 #include "../core/slang-writer.h"
 
 #include "../compiler-core/slang-source-loc.h"
+#include "../compiler-core/slang-struct-tag-converter.h"
 
 #include "slang-ast-dump.h"
 
@@ -470,19 +471,12 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
     slang::ISession**          outSession)
 {
     MemoryArena arena(1024);
-    StructTagSystem* structTagSystem = getStructTagSystem();
-
-    // TODO(JS): Doing a read compatibility conversion means the desc and the extensions
-    // are compatible. BUT! It does not mean any other structures are compatible that are
-    // pointed to in the desc (as in this example targets)
-    //
-    // It could be argued that support for such a transformation should be part of the AbiSystem
-    // Doing so requires at least knowing these fields. 
-
-    auto desc = structTagSystem->getReadCompatible<slang::SessionDesc>(&inDesc, arena);
+    
+    StructTagConverter converter(getStructTagSystem(), &arena, nullptr);
+    auto desc = converter.maybeConvertCurrent<slang::SessionDesc>(&inDesc);
     if (!desc)
     {
-        return SLANG_E_ABI_INCOMPATIBLE;
+        return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
     }
 
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
@@ -492,16 +486,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
         const Index targetCount = Index(desc->targetCount);
         for(Index ii = 0; ii < targetCount; ++ii)
         {
-            auto inTargetDesc = desc->targets[ii];
-            const slang::TargetDesc* abiTargetDesc = structTagSystem->getReadCompatible<slang::TargetDesc>(&inTargetDesc, arena);
-            if (!abiTargetDesc)
-            {
-                // We don't have a DiagnosticSink to report to, so for now lets, just output this
-                return SLANG_E_ABI_INCOMPATIBLE;
-            }
-
-            // It's the responsibility of addTarget to make a suitable copy, with an associated extensions
-            linkage->addTarget(*abiTargetDesc);
+            const auto& targetDesc = desc->targets[ii];
+            linkage->addTarget(targetDesc);
         }
     }
 
