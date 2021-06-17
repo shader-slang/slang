@@ -460,8 +460,6 @@ SlangResult LazyStructTagConverter::convertCurrentArray(const void* in, Index co
 
     for (Index i = 0; i < count; ++i)
     {
-        SLANG_ASSERT(structType->m_sizeInBytes == reinterpret_cast<const slang::TaggedStructBase*>(src)->structSize);
-
         // Do the straight copy
         copy(structType, src, dst);
 

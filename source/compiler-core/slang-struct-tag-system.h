@@ -180,7 +180,7 @@ struct StructTagTypeTraits
 
         /// f1 should hold the count
     template <typename T, typename F0, typename F1>
-    static Field getFieldTypeWithCount(const T* obj, const F0* ptr, const F1* count)
+    static Field getFieldWithCount(const T* obj, const F0* ptr, const F1* count)
     {
         Field field;
         field.m_type = Impl<F0>::getType();

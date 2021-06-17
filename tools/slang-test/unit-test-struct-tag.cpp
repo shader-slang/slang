@@ -20,7 +20,8 @@ namespace { // anonymous
 #define TAGGED_STRUCTS(x) \
     x(A) \
     x(B) \
-    x(ExtensionA)
+    x(ExtensionA) \
+    x(Desc)
 
 enum class TaggedStruct
 {
@@ -71,6 +72,34 @@ struct ExtensionA0_0
     EXTENSION_TAGGED_STRUCT(ExtensionA, 0, 0)
 
     int b = 20;
+};
+
+// I guess a Desc could be implemented as 'Primary' or 'Extension' with what we have, but probably makes more sense
+// for 'Desc' like things to be primary
+
+struct Desc0_0
+{
+    EXTENSION_TAGGED_STRUCT(Desc, 0, 0)
+    int a = 1;
+};
+
+struct Desc0_1
+{
+    EXTENSION_TAGGED_STRUCT(Desc, 0, 1)
+    int a = 1;
+    int b = 2;
+};
+
+
+struct A0_2
+{
+    PRIMARY_TAGGED_STRUCT(A, 0, 2)
+
+    int a = 10;
+    int b = 20;
+
+    Desc0_0* descs = nullptr;
+    Index descsCount = 0;
 };
 
 } // anonymous
@@ -157,6 +186,46 @@ static void structTagUnitTest()
             SLANG_CHECK(dstA->extsCount == 1);
             SLANG_CHECK(((ExtensionA0_0*)dstA->exts[0])->b == 20);
         }
+    }
+
+    // Let's try going from the future backwards
+    {
+        // Set up the system with the versions
+        auto system = _createSystem();
+
+        system->addType(B0_1::kStructTag, "B", sizeof(B0_1));
+        system->addType(A0_2::kStructTag, "A", sizeof(A0_2));
+        system->addType(ExtensionA0_0::kStructTag, "ExtensionA", sizeof(ExtensionA0_0));
+        system->addType(Desc0_0::kStructTag, "Desc", sizeof(Desc0_0));
+
+        // Add the fields
+        {
+            auto type = system->getType(A0_2::kStructTag);
+            A0_2 a;
+            auto field = StructTagTypeTraits::getFieldWithCount(&a, &a.descs, &a.descsCount);
+            type->m_fields.add(field);
+        }
+
+        //
+
+        A0_2 a;
+        Desc0_1 descs[2];
+        descs[0].a = 27;
+        descs[1].a = -1;
+
+        a.descs = (Desc0_0*)descs;
+        a.descsCount = SLANG_COUNT_OF(descs);
+
+        // Actually do a conversion from future
+        MemoryArena arena(1024);
+        LazyStructTagConverter converter(system, &arena, nullptr);
+
+        auto dstA = converter.convertToCurrent<A0_2>(&a);
+
+        SLANG_CHECK(dstA->descsCount == a.descsCount);
+
+        SLANG_CHECK(dstA->descs[0].a == 27 && dstA->descs[1].a == -1);
+
     }
 }
 

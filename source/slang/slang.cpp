@@ -131,10 +131,10 @@ SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ADD_TYPE)
         // Add field that references more tagged structs
         {
             slang::SessionDesc desc;
-            auto fieldType = StructTagTypeTraits::getFieldTypeWithCount(&desc, &desc.targets, &desc.targetCount);
+            auto field = StructTagTypeTraits::getFieldWithCount(&desc, &desc.targets, &desc.targetCount);
 
             auto type = system->getType(slang::SessionDesc::kStructTag);
-            type->m_fields.add(fieldType);
+            type->m_fields.add(field);
         }
     }
 
