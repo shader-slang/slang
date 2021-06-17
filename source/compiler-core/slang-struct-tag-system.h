@@ -126,9 +126,9 @@ namespace StructTagTypeTraits
 {
     typedef StructTagField Field;
     typedef Field::Type Type;
-
+    
     // Helper that works out what a pointer to the inner type is.
-    SLANG_FORCE_INLINE static Type getPtrType(Type innerType)
+    SLANG_FORCE_INLINE Type getPtrType(Type innerType)
     {
         switch (innerType)
         {
@@ -136,6 +136,12 @@ namespace StructTagTypeTraits
             case Type::PtrTaggedStruct: return Type::PtrPtrTaggedStruct;
             default:                    return Type::Unknown;
         }
+    }
+
+    template <typename T, typename F>
+    SLANG_FORCE_INLINE uint16_t getOffset(T* obj, const F* f)
+    {
+        return uint16_t((const char*)f - (const char*)obj);
     }
 
     // Use `substitution failure is not an error` (SFINAE) to detect tagged struct types
@@ -172,15 +178,9 @@ namespace StructTagTypeTraits
     // Pointer
     template <typename T> struct Impl<T*> { static Type getType() { return getPtrType(Impl<T>::getType()); } };
 
-    template <typename T, typename F>
-    static uint16_t getOffset(T* obj, const F* f)
-    {
-        return uint16_t((const char*)f - (const char*)obj);
-    }
-
         /// f1 should hold the count
     template <typename T, typename F0, typename F1>
-    static Field getFieldWithCount(const T* obj, const F0* ptr, const F1* count)
+    Field getFieldWithCount(const T* obj, const F0* ptr, const F1* count)
     {
         Field field;
         field.m_type = Impl<F0>::getType();
