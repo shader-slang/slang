@@ -41,7 +41,8 @@ struct StructTagUtil
         /// Get the category
     static slang::StructTagCategory getCategory(slang::StructTag tag) { return slang::StructTagCategory((slang::StructTagInt(tag) & slang::kStructTagCategoryMask) >> slang::kStructTagCategoryShift); }
 
-    static bool areSameType(slang::StructTag a, slang::StructTag b)
+        /// They are the same type and have same major version
+    static bool areSameMajorType(slang::StructTag a, slang::StructTag b)
     {
         const auto typeMask = slang::StructTagInt(slang::kStructTagCategoryTypeMajorMask);
         return ((slang::StructTagInt(a) ^ slang::StructTagInt(b)) & typeMask) == 0;

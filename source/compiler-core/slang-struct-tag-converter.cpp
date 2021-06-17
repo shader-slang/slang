@@ -82,7 +82,7 @@ bool StructTagConverterBase::canConvertToCurrent(slang::StructTag tag, StructTag
 
     // We may want to allow zero extension, or initialization
     // We can accept for conversion if it's the same type with only difference being the minor version.
-    return StructTagUtil::areSameType(tag, type->m_tag);
+    return StructTagUtil::areSameMajorType(tag, type->m_tag);
 }
 
 void StructTagConverterBase::copy(const StructTagType* structType, const void* src, void* dst)
@@ -121,7 +121,9 @@ SlangResult StructTagConverterBase::convertCurrent(slang::StructTag tag, const v
     auto base = reinterpret_cast<const slang::TaggedStructBase*>(in);
     auto inTag = base->structTag;
 
-    if (!StructTagUtil::areSameType(inTag, tag))
+    // Currently we can only convert if same major type.
+    // In future it might be possible to improve on this
+    if (!StructTagUtil::areSameMajorType(inTag, tag))
     {
         return _diagnoseDifferentTypes(inTag, tag);
     }
@@ -434,16 +436,17 @@ SlangResult LazyStructTagConverter::convertCurrentArray(const void* in, Index co
     {
         return _diagnoseUnknownType(tag);
     }
-    if (!canConvertToCurrent(tag, structType))
-    {
-        return _diagnoseCantConvert(tag, structType);
-    }
 
-    if (structType->m_sizeInBytes == arr[0].structSize)
+    if (StructTagUtil::areSameMajorType(tag, structType->m_tag) && structType->m_sizeInBytes == arr[0].structSize)
     {
         // Can just use what was passed in
         out = (void*)in;
         return SLANG_OK;
+    }
+
+    if (!canConvertToCurrent(tag, structType))
+    {
+        return _diagnoseCantConvert(tag, structType);
     }
 
     SLANG_RETURN_ON_FAIL(_requireArena());
@@ -490,12 +493,6 @@ SlangResult LazyStructTagConverter::convertCurrent(const void* in, void*& out)
         return _diagnoseUnknownType(tag);
     }
 
-    if (StructTagUtil::isReadCompatible(tag, structType->m_tag))
-    {
-        out = const_cast<void*>(in);
-        return SLANG_OK;
-    }
-
     if (!canConvertToCurrent(tag, structType))
     {
         return _diagnoseCantConvert(tag, structType);
@@ -506,11 +503,24 @@ SlangResult LazyStructTagConverter::convertCurrent(const void* in, void*& out)
     BitField fieldsSet;
     SLANG_RETURN_ON_FAIL(maybeConvertCurrentContained(structType, in, &fieldsSet));
 
+    // If there were no fields set
+    if (fieldsSet == 0)
+    {
+        // And it's the same major type, and is at least as big a the current struct
+        // We can just use as is
+        if (StructTagUtil::areSameMajorType(tag, structType->m_tag) && base->structSize >= structType->m_sizeInBytes)
+        {
+            out = (void*)in;
+            return SLANG_OK;
+        }
+    }
+
     // Okay we will need to allocate and copy
     void* dst = allocateAndCopy(structType, in);
 
     // Copy anything converted
     setContainedConverted(structType, stackScope, fieldsSet, dst);
+
     out = dst;
     return SLANG_OK;
 }
