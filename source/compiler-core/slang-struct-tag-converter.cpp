@@ -40,7 +40,7 @@ const void*const* StructTagConverter::maybeConvertCurrentPtrArray(const void*con
 
 static Index _getCount(const StructTagType::Field& field, const void* in)
 {
-    typedef StructTagType::FieldType FieldType;
+    typedef StructTagField::Type FieldType;
 
     const uint8_t* ptr = (const uint8_t*)in;
 
@@ -68,7 +68,6 @@ void StructTagConverter::setContained(Index stackIndex, const StructTagType* str
     }
 
     {
-        typedef StructTagType::FieldType FieldType;
         for (const auto& field : structType->m_fields)
         {
             switch (field.m_type)
@@ -110,8 +109,6 @@ Index StructTagConverter::convertCurrentContained(const StructTagType* structTyp
     // It may have fields that need to be converted
 
     {
-        typedef StructTagType::FieldType FieldType;
-
         for (const auto& field : structType->m_fields)
         {
             const Index count = _getCount(field, in);

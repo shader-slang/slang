@@ -62,7 +62,7 @@ struct StructTagUtil
     }
 };
 
-inline  /* static */StructTagUtil::TypeInfo StructTagUtil::getTypeInfo(slang::StructTag tag)
+/* static */ inline StructTagUtil::TypeInfo StructTagUtil::getTypeInfo(slang::StructTag tag)
 {
     const auto intTag = slang::StructTagInt(tag);
 
@@ -75,11 +75,11 @@ inline  /* static */StructTagUtil::TypeInfo StructTagUtil::getTypeInfo(slang::St
     return info;
 }
 
-struct StructTagType 
+/// We can have a 'field' that is made up of 2 elements, so we have two entries.
+/// If m_countType is Unknown, then the entry can be ignored
+struct StructTagField
 {
-public:
-
-    enum class FieldType : uint8_t
+    enum class Type : uint8_t
     {
         Unknown,
         TaggedStruct,
@@ -89,20 +89,23 @@ public:
         I64,
     };
 
-        /// True if it's an integral 
-    static bool isIntegral(FieldType type) { return Index(type) >= Index(FieldType::I32) && Index(type) <= Index(FieldType::I64);  }
-        /// True if it's a pointer or pointer to a pointer
-    static bool isPtrLike(FieldType type) { return Index(type) >= Index(FieldType::PtrTaggedStruct) && Index(type) <= Index(FieldType::PtrPtrTaggedStruct);  }
+    SLANG_FORCE_INLINE static bool isInRange(Type type, Type start, Type end) { return Index(type) >= Index(start) && Index(type) <= Index(end); }
 
-        /// We can have a 'field' that is made up of 2 elements, so we have two entries.
-        /// If m_countType is Unknown, then the entry can be ignored
-    struct Field
-    {
-        FieldType m_type;
-        FieldType m_countType;
-        uint16_t m_offset;
-        uint16_t m_countOffset;
-    };
+        /// True if it's an integral 
+    static bool isIntegral(Type type) { return isInRange(type, Type::I32, Type::I64); }
+        /// True if it's a pointer or pointer to a pointer
+    static bool isPtrLike(Type type) { return isInRange(type, Type::PtrTaggedStruct, Type::PtrPtrTaggedStruct); }
+
+    Type m_type;
+    Type m_countType;
+    uint16_t m_offset;
+    uint16_t m_countOffset;
+};
+
+struct StructTagType 
+{
+public:
+    typedef StructTagField Field;
 
     StructTagType(slang::StructTag tag, const String& name, size_t sizeInBytes):
         m_tag(tag),
@@ -120,8 +123,19 @@ public:
 
 struct StructTagTypeTraits
 {
-    typedef StructTagType::FieldType Type;
-    typedef StructTagType::Field Field;
+    typedef StructTagField Field;
+    typedef Field::Type Type;
+
+    // Helper that works out what a pointer to the inner type is.
+    SLANG_FORCE_INLINE static Type getPtrType(Type innerType)
+    {
+        switch (innerType)
+        {
+            case Type::TaggedStruct:    return Type::PtrTaggedStruct;
+            case Type::PtrTaggedStruct: return Type::PtrPtrTaggedStruct;
+            default:                    return Type::Unknown;
+        }
+    }
 
     // Use `substitution failure is not an error` (SFINAE) to detect tagged struct types
     template <typename T>
@@ -155,19 +169,7 @@ struct StructTagTypeTraits
     template <> struct Impl<slang::StructTag> { static Type getType() { return Type::TaggedStruct; } };
 
     // Pointer
-    template <typename T> struct Impl<T*>
-    {
-        static Type getType()
-        {
-            const Type innerType = Impl<T>::getType();
-            switch (innerType)
-            {
-                case Type::TaggedStruct:    return Type::PtrTaggedStruct;
-                case Type::PtrTaggedStruct: return Type::PtrPtrTaggedStruct;
-                default:                    return Type::Unknown;
-            }
-        }
-    };
+    template <typename T> struct Impl<T*> { static Type getType() { return getPtrType(Impl<T>::getType()); } };
 
     template <typename T, typename F>
     static uint16_t getOffset(T* obj, const F* f)
@@ -185,8 +187,8 @@ struct StructTagTypeTraits
         field.m_offset = getOffset(obj, ptr);
         field.m_countOffset = getOffset(obj, count);
 
-        SLANG_ASSERT(StructTagType::isPtrLike(field.m_type));
-        SLANG_ASSERT(StructTagType::isIntegral(field.m_countType));
+        SLANG_ASSERT(StructTagField::isPtrLike(field.m_type));
+        SLANG_ASSERT(StructTagField::isIntegral(field.m_countType));
 
         return field;
     }
@@ -209,9 +211,8 @@ public:
     }
     ~StructTagCategoryInfo();
 
-
-    slang::StructTagCategory m_category;      ///< The category type
-    String m_name;                              ///< The name
+    slang::StructTagCategory m_category;    ///< The category type
+    String m_name;                          ///< The name
     
     // All the types in this category
     List<StructTagType*> m_types;

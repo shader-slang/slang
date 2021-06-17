@@ -9,6 +9,9 @@ namespace Slang {
 class StructTagConverter
 {
 public:
+    typedef StructTagField Field;
+    typedef Field::Type FieldType;
+
 
     const void* maybeConvertCurrent(const void* in);
     const void* maybeConvertCurrent(slang::StructTag tag, const void* in);
