@@ -20,7 +20,7 @@ static Index _getCount(const StructTagType::Field& field, const void* in)
     return -1;
 }
 
-SlangResult StructTagConverter::_requireArena()
+SlangResult StructTagConverterBase::_requireArena()
 {
     if (!m_arena)
     {
@@ -34,7 +34,7 @@ SlangResult StructTagConverter::_requireArena()
     return SLANG_OK;
 }
 
-SlangResult StructTagConverter::_diagnoseCantConvert(slang::StructTag tag, StructTagType* structType)
+SlangResult StructTagConverterBase::_diagnoseCantConvert(slang::StructTag tag, StructTagType* structType)
 {
     SLANG_UNUSED(tag);
     SLANG_UNUSED(structType);
@@ -47,7 +47,7 @@ SlangResult StructTagConverter::_diagnoseCantConvert(slang::StructTag tag, Struc
     return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
 }
 
-SlangResult StructTagConverter::_diagnoseUnknownType(slang::StructTag tag)
+SlangResult StructTagConverterBase::_diagnoseUnknownType(slang::StructTag tag)
 {
     SLANG_UNUSED(tag);
 
@@ -59,7 +59,7 @@ SlangResult StructTagConverter::_diagnoseUnknownType(slang::StructTag tag)
     return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
 }
 
-SlangResult StructTagConverter::_diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB)
+SlangResult StructTagConverterBase::_diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB)
 {
     SLANG_UNUSED(tagA);
     SLANG_UNUSED(tagB);
@@ -72,7 +72,7 @@ SlangResult StructTagConverter::_diagnoseDifferentTypes(slang::StructTag tagA, s
     return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
 }
 
-bool StructTagConverter::canConvertToCurrent(slang::StructTag tag, StructTagType* type) const
+bool StructTagConverterBase::canConvertToCurrent(slang::StructTag tag, StructTagType* type) const
 {
     // Means can be used without any modification
     if (StructTagUtil::isReadCompatible(tag, type->m_tag))
@@ -85,7 +85,75 @@ bool StructTagConverter::canConvertToCurrent(slang::StructTag tag, StructTagType
     return StructTagUtil::areSameType(tag, type->m_tag);
 }
 
-SlangResult StructTagConverter::convertCurrentPtrArray(const void*const* in, Index count, void**& out)
+void StructTagConverterBase::copy(const StructTagType* structType, const void* src, void* dst)
+{
+    const slang::TaggedStructBase* srcBase = reinterpret_cast<const slang::TaggedStructBase*>(src);
+
+    const slang::StructSize size = std::min(structType->m_sizeInBytes, srcBase->structSize);
+
+    // Copy
+    ::memcpy(dst, src, size);
+
+    // TODO(JS): Alternatively if we have the default set on the structType, we could initialize
+    // other fields with the default values. For the moment we zero
+
+    // Zero any extra
+    if (size < structType->m_sizeInBytes)
+    {
+        ::memset((char*)dst + size, 0, structType->m_sizeInBytes - size);
+    }
+
+    // Set the type and the size
+    slang::TaggedStructBase* dstBase = reinterpret_cast<slang::TaggedStructBase*>(dst);
+    dstBase->structTag = structType->m_tag;
+    dstBase->structSize = structType->m_sizeInBytes;
+}
+
+void* StructTagConverterBase::allocateAndCopy(const StructTagType* structType, const void* src)
+{
+    uint8_t* dst = (uint8_t*)m_arena->allocate(structType->m_sizeInBytes);
+    copy(structType, src, dst);
+    return dst;
+}
+
+SlangResult StructTagConverterBase::convertCurrent(slang::StructTag tag, const void* in, void*& out)
+{
+    auto base = reinterpret_cast<const slang::TaggedStructBase*>(in);
+    auto inTag = base->structTag;
+
+    if (!StructTagUtil::areSameType(inTag, tag))
+    {
+        return _diagnoseDifferentTypes(inTag, tag);
+    }
+
+    return convertCurrent(in, out);
+}
+
+SlangResult StructTagConverterBase::convertArrayField(const FieldType type, const void* in, Index count, void*& out)
+{
+    if (count <= 0)
+    {
+        out = const_cast<void*>(in);
+        return SLANG_OK;
+    }
+
+    SLANG_ASSERT(in);
+    switch (type)
+    {
+        case FieldType::PtrTaggedStruct:        return convertCurrentArray(in, count, out);
+        case FieldType::PtrPtrTaggedStruct:     return convertCurrentPtrArray((const void*const*)in, count, (void**&)out);
+        default: break;
+    }
+    return SLANG_FAIL;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                  CopyStructTagConverter
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+SlangResult CopyStructTagConverter::convertCurrentPtrArray(const void*const* in, Index count, void**& out)
 {
     if (count == 0)
     {
@@ -101,7 +169,7 @@ SlangResult StructTagConverter::convertCurrentPtrArray(const void*const* in, Ind
     return SLANG_OK;
 }
 
-SlangResult StructTagConverter::convertCurrentArray(const void* in, Index count, void*& out)
+SlangResult CopyStructTagConverter::convertCurrentArray(const void* in, Index count, void*& out)
 {
     if (count <= 0)
     {
@@ -150,7 +218,36 @@ SlangResult StructTagConverter::convertCurrentArray(const void* in, Index count,
     return SLANG_OK;
 }
 
-SlangResult StructTagConverter::convertCurrent(const void* in, void*& out)
+SlangResult CopyStructTagConverter::convertCurrentContained(const StructTagType* structType, void* inout)
+{
+    // Convert primary
+    if (StructTagUtil::isPrimary(structType->m_tag))
+    {
+        // Copy extensions if needed
+        slang::PrimaryTaggedStruct* primary = reinterpret_cast<slang::PrimaryTaggedStruct*>(inout);
+        if (primary->extsCount > 0)
+        {
+            void** dstExts;
+            SLANG_RETURN_ON_FAIL(convertCurrentPtrArray((const void*const*)primary->exts, primary->extsCount, dstExts));
+            primary->exts = (const slang::StructTag**)dstExts;
+        }
+    }
+
+    // It may have fields that need to be converted
+    for (const auto& field : structType->m_fields)
+    {
+        const Index count = _getCount(field, inout);
+        if (count)
+        {
+            void*& ptrRef = *(void**)(reinterpret_cast<uint8_t*>(inout) + field.m_offset);
+            SLANG_RETURN_ON_FAIL(convertArrayField(field.m_type, ptrRef, count, ptrRef));
+        }
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult CopyStructTagConverter::convertCurrent(const void* in, void*& out)
 {
     auto tag = reinterpret_cast<const slang::TaggedStructBase*>(in)->structTag;
 
@@ -170,69 +267,17 @@ SlangResult StructTagConverter::convertCurrent(const void* in, void*& out)
     return SLANG_OK;
 }
 
-SlangResult StructTagConverter::convertCurrentContained(const StructTagType* structType, void* inout)
-{
-    // Convert primary
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    if (StructTagUtil::isPrimary(structType->m_tag))
-    {
-        // Copy extensions if needed
-        slang::PrimaryTaggedStruct* primary = reinterpret_cast<slang::PrimaryTaggedStruct*>(inout);
-        if (primary->extsCount > 0)
-        {
-            auto dstExts = convertCurrentPtrArray((const void*const*)primary->exts, primary->extsCount);
-            if (!dstExts)
-            {
-                return SLANG_FAIL;
-            }
-            primary->exts = (const slang::StructTag**)dstExts;
-        }
-    }
+                  LazyStructTagConverter
 
-    // It may have fields that need to be converted
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-    {
-        for (const auto& field : structType->m_fields)
-        {
-            const Index count = _getCount(field, inout);
-            if (count > 0)
-            {
-                void*& ptrRef = *(void**)(reinterpret_cast<uint8_t*>(inout) + field.m_offset);
-                SLANG_ASSERT(ptrRef);
-
-                const void* ptr = ptrRef;
-
-                void* dst = nullptr;
-                switch (field.m_type)
-                {
-                    case FieldType::PtrTaggedStruct:
-                    {
-                        SLANG_RETURN_ON_FAIL(convertCurrentArray(ptr, count, dst));
-                        break;
-                    }
-                    case FieldType::PtrPtrTaggedStruct:
-                    {
-                        void** dstPtr;
-                        SLANG_RETURN_ON_FAIL(convertCurrentPtrArray((const void*const*)ptr, count, dstPtr));
-                        dst = dstPtr;
-                        break;
-                    }
-                    default:    return SLANG_FAIL;                    
-                }
-
-                ptrRef = dst;
-            }
-        }
-    }
-
-    return SLANG_OK;
-}
-
-SlangResult StructTagConverter::maybeConvertCurrentPtrArray(const void*const* in, Index count, const void*const*& out)
+SlangResult LazyStructTagConverter::convertCurrentPtrArray(const void*const* in, Index count, void**& out)
 {
     if (count == 0)
     {
-        out = in;
+        out = (void**)in;
         return SLANG_OK;
     }
 
@@ -242,8 +287,8 @@ SlangResult StructTagConverter::maybeConvertCurrentPtrArray(const void*const* in
     for (Index i = 0; i < count; ++i)
     {
         const void* src = in[i];
-        const void* dst;
-        SLANG_RETURN_ON_FAIL(maybeConvertCurrent(src, dst));
+        void* dst;
+        SLANG_RETURN_ON_FAIL(convertCurrent(src, dst));
 
         // Make space if not set up
         numConverted += Index(dst != src);
@@ -254,18 +299,17 @@ SlangResult StructTagConverter::maybeConvertCurrentPtrArray(const void*const* in
     if (numConverted)
     {
         SLANG_RETURN_ON_FAIL(_requireArena());
-        out = (const void*const*)m_arena->allocateAndCopyArray(m_convertStack.getBuffer() + stackScope.getStartIndex(), count);
+        out = (void**)m_arena->allocateAndCopyArray(m_convertStack.getBuffer() + stackScope.getStartIndex(), count);
     }
     else
     {
-        out = in;
+        out = (void**)in;
     }
 
     return SLANG_OK;
 }
 
-
-void StructTagConverter::setContainedConverted(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* out)
+void LazyStructTagConverter::setContainedConverted(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* out)
 {
     if (fieldsSet == 0)
     {
@@ -313,7 +357,7 @@ void StructTagConverter::setContainedConverted(const StructTagType* structType, 
 }
 
 
-SlangResult StructTagConverter::maybeConvertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet)
+SlangResult LazyStructTagConverter::maybeConvertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet)
 {
     BitField fieldsSet = 0;
     BitField bit = 1;
@@ -325,8 +369,8 @@ SlangResult StructTagConverter::maybeConvertCurrentContained(const StructTagType
         if (primary->extsCount > 0)
         {
             auto srcExts = (const void*const*)primary->exts;
-            const void*const* dstExts;
-            SLANG_RETURN_ON_FAIL(maybeConvertCurrentPtrArray(srcExts, primary->extsCount, dstExts));
+            void** dstExts;
+            SLANG_RETURN_ON_FAIL(convertCurrentPtrArray(srcExts, primary->extsCount, dstExts));
 
             if (dstExts != srcExts)
             {
@@ -346,26 +390,9 @@ SlangResult StructTagConverter::maybeConvertCurrentContained(const StructTagType
             const Index count = _getCount(field, in);
             if (count > 0)
             {
+                void* dst = nullptr;
                 const void* src = *(const void**)(reinterpret_cast<const uint8_t*>(in) + field.m_offset);
-                SLANG_ASSERT(src);
-
-                const void* dst = nullptr;
-                switch (field.m_type)
-                {
-                    case FieldType::PtrTaggedStruct:
-                    {
-                        SLANG_RETURN_ON_FAIL(maybeConvertCurrentArray(src, count, dst));
-                        break;
-                    }
-                    case FieldType::PtrPtrTaggedStruct:
-                    {
-                        const void*const* ptrDst;
-                        SLANG_RETURN_ON_FAIL(maybeConvertCurrentPtrArray((const void*const*)src, count, ptrDst));
-                        dst = ptrDst;
-                        break;
-                    }
-                    default:    return SLANG_FAIL;
-                }
+                SLANG_RETURN_ON_FAIL(convertArrayField(field.m_type, src, count, dst));
 
                 if (dst != src)
                 {
@@ -383,44 +410,17 @@ SlangResult StructTagConverter::maybeConvertCurrentContained(const StructTagType
     return SLANG_OK;
 }
 
-void StructTagConverter::copy(const StructTagType* structType, const void* src, void* dst)
-{
-    const slang::TaggedStructBase* srcBase = reinterpret_cast<const slang::TaggedStructBase*>(src);
-    slang::StructSize size = std::min(structType->m_sizeInBytes, srcBase->structSize);
-
-    // Copy
-    ::memcpy(dst, src, size);
-
-    // Zero any extra
-    if (size < structType->m_sizeInBytes)
-    {
-        ::memset((char*)dst + size, 0, structType->m_sizeInBytes - size);
-    }
-
-    // Set the type and the size
-    slang::TaggedStructBase* dstBase = reinterpret_cast<slang::TaggedStructBase*>(dst);
-    dstBase->structTag = structType->m_tag;
-    dstBase->structSize = structType->m_sizeInBytes;
-}
-
-void* StructTagConverter::allocateAndCopy(const StructTagType* structType, const void* src)
-{
-    uint8_t* dst = (uint8_t*)m_arena->allocate(structType->m_sizeInBytes);
-    copy(structType, src, dst);
-    return dst;
-}
-
-SlangResult StructTagConverter::maybeConvertCurrentArray(const void* in, Index count, const void*& out)
+SlangResult LazyStructTagConverter::convertCurrentArray(const void* in, Index count, void*& out)
 {
     if (count == 0)
     {
-        out = in;
+        out = (void*)in;
         return SLANG_OK;
     }
 
     if (count == 1)
     {
-        return maybeConvertCurrent(in, out);
+        return convertCurrent(in, out);
     }
 
     const slang::TaggedStructBase* arr = reinterpret_cast<const slang::TaggedStructBase*>(in);
@@ -430,6 +430,10 @@ SlangResult StructTagConverter::maybeConvertCurrentArray(const void* in, Index c
 
     auto structType = m_system->getType(tag);
 
+    if (!structType)
+    {
+        return _diagnoseUnknownType(tag);
+    }
     if (!canConvertToCurrent(tag, structType))
     {
         return _diagnoseCantConvert(tag, structType);
@@ -438,7 +442,7 @@ SlangResult StructTagConverter::maybeConvertCurrentArray(const void* in, Index c
     if (structType->m_sizeInBytes == arr[0].structSize)
     {
         // Can just use what was passed in
-        out = in;
+        out = (void*)in;
         return SLANG_OK;
     }
 
@@ -453,16 +457,18 @@ SlangResult StructTagConverter::maybeConvertCurrentArray(const void* in, Index c
 
     for (Index i = 0; i < count; ++i)
     {
+        SLANG_ASSERT(structType->m_sizeInBytes == reinterpret_cast<const slang::TaggedStructBase*>(src)->structSize);
+
         // Do the straight copy
         copy(structType, src, dst);
 
         // Work out what was converted
-        ScopeStack stackScope(this);
+        ScopeStack scopeStack(this);
         BitField fieldsSet;
         SLANG_RETURN_ON_FAIL(maybeConvertCurrentContained(structType, in, &fieldsSet));
 
         // Copy anything converted
-        setContainedConverted(structType, stackScope, fieldsSet, dst);
+        setContainedConverted(structType, scopeStack, fieldsSet, dst);
 
         src += srcStride;
         dst += dstStride;
@@ -472,7 +478,7 @@ SlangResult StructTagConverter::maybeConvertCurrentArray(const void* in, Index c
     return SLANG_OK;
 }
 
-SlangResult StructTagConverter::maybeConvertCurrent(const void* in, const void*& out)
+SlangResult LazyStructTagConverter::convertCurrent(const void* in, void*& out)
 {
     auto base = reinterpret_cast<const slang::TaggedStructBase*>(in);
     auto tag = base->structTag;
@@ -486,7 +492,7 @@ SlangResult StructTagConverter::maybeConvertCurrent(const void* in, const void*&
 
     if (StructTagUtil::isReadCompatible(tag, structType->m_tag))
     {
-        out = in;
+        out = const_cast<void*>(in);
         return SLANG_OK;
     }
 
@@ -507,19 +513,6 @@ SlangResult StructTagConverter::maybeConvertCurrent(const void* in, const void*&
     setContainedConverted(structType, stackScope, fieldsSet, dst);
     out = dst;
     return SLANG_OK;
-}
-
-SlangResult StructTagConverter::maybeConvertCurrent(slang::StructTag tag, const void* in, const void*& out)
-{
-    auto base = reinterpret_cast<const slang::TaggedStructBase*>(in);
-    auto inTag = base->structTag;
-
-    if (!StructTagUtil::areSameType(inTag, tag))
-    {
-        return _diagnoseDifferentTypes(inTag, tag);
-    }
-
-    return maybeConvertCurrent(in, out);
 }
 
 } // namespace Slang

@@ -472,12 +472,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
 {
     MemoryArena arena(1024);
     
-    StructTagConverter converter(getStructTagSystem(), &arena, nullptr);
-    auto desc = converter.maybeConvertCurrent<slang::SessionDesc>(&inDesc);
-    if (!desc)
-    {
-        return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
-    }
+    LazyStructTagConverter converter(getStructTagSystem(), &arena, nullptr);
+
+    const slang::SessionDesc* desc = nullptr;
+    SLANG_RETURN_ON_FAIL(converter.convertToCurrent(&inDesc, &desc));
 
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());

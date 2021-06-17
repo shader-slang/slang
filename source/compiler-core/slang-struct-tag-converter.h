@@ -6,17 +6,96 @@
 
 namespace Slang {
 
-class StructTagConverter
+class StructTagConverterBase
 {
 public:
     typedef StructTagField Field;
     typedef Field::Type FieldType;
 
+    virtual SlangResult convertCurrent(const void* in, void*& out) = 0;
+    virtual SlangResult convertCurrentArray(const void* in, Index count, void*& out) = 0;
+    virtual SlangResult convertCurrentPtrArray(const void*const* in, Index count, void**& out) = 0;
+
+    SlangResult convertCurrent(slang::StructTag tag, const void* in, void*& out);
+
+        /// Allocates of type and copies src to dst
+    void* allocateAndCopy(const StructTagType* type, const void* src);
+        /// Copy from src to dst, zero extending or shrinking however structType requires
+    void copy(const StructTagType* structType, const void* src, void* dst);
+
+        /// Returns true if it's possible to convert tag to current type
+    bool canConvertToCurrent(slang::StructTag tag, StructTagType* type) const;
+
+    template <typename T>
+    const T* convertToCurrent(const void* in)
+    {
+        void* dst;
+        return SLANG_SUCCEEDED(convertCurrent(T::kStructTag, in, dst)) ? (const T*)dst : nullptr;
+    }
+
+    template <typename T>
+    SlangResult convertToCurrent(const void* in, const T** out)
+    {
+        void* dst;
+        SLANG_RETURN_ON_FAIL(convertCurrent(T::kStructTag, in, dst));
+        *out = (const T*)dst;
+        return SLANG_OK;
+    }
+
+        /// Convert a single field which is an array type
+    SlangResult convertArrayField(const FieldType type, const void* in, Index count, void*& out);
+
+        /// Ctor. Arena and sink can be optionally set (pass nullptr if not wanted)
+    StructTagConverterBase(StructTagSystem* system, MemoryArena* arena, DiagnosticSink* sink) :
+        m_system(system),
+        m_arena(arena),
+        m_sink(sink)
+    {
+    }
+
+protected:
+
+    SlangResult _requireArena();
+    SlangResult _diagnoseCantConvert(slang::StructTag tag, StructTagType* type);
+    SlangResult _diagnoseUnknownType(slang::StructTag tag);
+    SlangResult _diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB);
+
+    StructTagSystem* m_system;
+    DiagnosticSink* m_sink;
+    MemoryArena* m_arena;
+};
+
+class CopyStructTagConverter : public StructTagConverterBase
+{
+public:
+    typedef StructTagConverterBase Super;
+
+    // StructTagConverterBase
+    virtual SlangResult convertCurrent(const void* in, void*& out) SLANG_OVERRIDE;
+    virtual SlangResult convertCurrentArray(const void* in, Index count, void*& out) SLANG_OVERRIDE;
+    virtual SlangResult convertCurrentPtrArray(const void*const* in, Index count, void**& out) SLANG_OVERRIDE;
+
+    /// Convert the items contained in inout
+    SlangResult convertCurrentContained(const StructTagType* structType, void* inout);
+
+    CopyStructTagConverter(StructTagSystem* system, MemoryArena* arena, DiagnosticSink* sink) :
+        Super(system, arena, sink)
+    {
+        // If we are going to copy -> we have to have an arena
+        SLANG_ASSERT(arena);
+    }
+};
+
+class LazyStructTagConverter : public StructTagConverterBase
+{
+public:
+    typedef StructTagConverterBase Super;
+
     typedef uint32_t BitField;
 
     struct ScopeStack
     {
-        ScopeStack(StructTagConverter* converter):
+        ScopeStack(LazyStructTagConverter* converter):
             m_stack(converter->m_convertStack),
             m_startIndex(converter->m_convertStack.getCount())
         {
@@ -30,9 +109,14 @@ public:
         operator Index() const { return m_startIndex; }
 
     protected:
-        List<const void*>& m_stack;
+        List<void*>& m_stack;
         Index m_startIndex;
     };
+
+    // StructTagConverterBase
+    virtual SlangResult convertCurrent(const void* in, void*& out) SLANG_OVERRIDE;
+    virtual SlangResult convertCurrentArray(const void* in, Index count, void*& out) SLANG_OVERRIDE;
+    virtual SlangResult convertCurrentPtrArray(const void*const* in, Index count, void**& out) SLANG_OVERRIDE;
 
         /// Convert all the referenced items starting at in.
         /// Items that are converted are stored on the m_convertStack.
@@ -47,58 +131,18 @@ public:
         /// For every fieldSet bit set, copys over the data held in the m_convertStack (indexed from stackStartIndex).
     void setContainedConverted(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* dst);
 
-    SlangResult maybeConvertCurrent(const void* in, const void*& out);
-    SlangResult maybeConvertCurrent(slang::StructTag tag, const void* in, const void*& out);
-    SlangResult maybeConvertCurrentArray(const void* in, Index count, const void*& out);
-    SlangResult maybeConvertCurrentPtrArray(const void*const* in, Index count, const void*const*& out);
-
-    template <typename T>
-    const T* maybeConvertCurrent(const void* in)
-    {
-        const void* dst;
-        return SLANG_SUCCEEDED(maybeConvertCurrent(T::kStructTag, in, dst)) ? (const T*)dst : nullptr;
-    }
-
-        /// Convert an array (always copies). 
-    SlangResult convertCurrentArray(const void* in, Index count, void*& out);
-        /// Convert a pointer array (always copies)
-    SlangResult convertCurrentPtrArray(const void*const* in, Index count, void**& out );
-        /// Convert a single tagged object (always copies)
-    SlangResult convertCurrent(const void* in, void*& out );
-        /// Convert the items contained in inout
-    SlangResult convertCurrentContained(const StructTagType* structType, void* inout);
-
-        /// Allocates of type and copies src to dst
-    void* allocateAndCopy(const StructTagType* type, const void* src);
-        /// Copy from src to dst, zero extending or shrinking however structType requires
-    void copy(const StructTagType* structType, const void* src, void* dst);
-
-        /// Returns true if it's possible to convert tag to current type
-    bool canConvertToCurrent(slang::StructTag tag, StructTagType* type) const;
-
         /// Ctor. The sink and arena are optional. If the arena isn't set then it is not possible to copy convert anything
         /// and so if a copy convert is required, it will fail.
         /// The sink is optional - if it's set failures will occur silently.
-    StructTagConverter(StructTagSystem* system, MemoryArena* arena, DiagnosticSink* sink):
-        m_system(system),
-        m_arena(arena),
-        m_sink(sink)
+    LazyStructTagConverter(StructTagSystem* system, MemoryArena* arena, DiagnosticSink* sink):
+        Super(system, arena, sink)
     {
     }
 
 protected:
 
-    SlangResult _requireArena();
-    SlangResult _diagnoseCantConvert(slang::StructTag tag, StructTagType* type);
-    SlangResult _diagnoseUnknownType(slang::StructTag tag);
-    SlangResult _diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB);
-
         /// Used to hold pointers to things that have been converted.
-    List<const void*> m_convertStack;
-
-    StructTagSystem* m_system;
-    DiagnosticSink* m_sink;
-    MemoryArena* m_arena;
+    List<void*> m_convertStack;
 };
 
 } // namespace Slang
