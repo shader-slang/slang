@@ -12,6 +12,26 @@ public:
     typedef StructTagField Field;
     typedef Field::Type FieldType;
 
+    typedef uint32_t BitField;
+
+    struct StackScope
+    {
+        StackScope(StructTagConverter* converter):
+            m_stack(converter->m_stack),
+            m_startIndex(converter->m_stack.getCount())
+        {
+        }
+        ~StackScope()
+        {
+            m_stack.setCount(m_startIndex);
+        }
+
+        operator Index() const { return m_startIndex; }
+
+    protected:
+        List<const void*>& m_stack;
+        Index m_startIndex;
+    };
 
     const void* maybeConvertCurrent(const void* in);
     const void* maybeConvertCurrent(slang::StructTag tag, const void* in);
@@ -23,10 +43,13 @@ public:
     SlangResult convertCurrent(const StructTagType* type, const void* src, void* dst);
 
         /// Convert all the referenced items starting at in.
-        /// Returns -1 if there was an error, else returns number converted.
-    Index convertCurrentContained(const StructTagType* structType, const void* in);
+        ///
+        /// As an alternate plan we could have a bit field that recorded every field that is modified.
+        /// In this way the stack
+    SlangResult convertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet);
 
-    void setContained(Index stackIndex, const StructTagType* structType, void* dst);
+        /// 
+    void setContained(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* dst);
 
         /// Make a copy of the in structure (in the arena) such that it conforms to current versions, and return the copy
     void* clone(const void* in);

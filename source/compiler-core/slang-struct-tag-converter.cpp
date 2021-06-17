@@ -55,39 +55,58 @@ static Index _getCount(const StructTagType::Field& field, const void* in)
     return -1;
 }
 
-void StructTagConverter::setContained(Index stackIndex, const StructTagType* structType, void* out)
+void StructTagConverter::setContained(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* out)
 {
+    if (fieldsSet == 0)
+    {
+        return;
+    }
+
     if (StructTagUtil::isPrimary(structType->m_tag))
     {
-        // Copy extensions if needed
-        slang::PrimaryTaggedStruct* primary = reinterpret_cast<slang::PrimaryTaggedStruct*>(out);
-        if (primary->extsCount > 0)
+        if (fieldsSet & 1)
         {
+            // Copy extensions if needed
+            slang::PrimaryTaggedStruct* primary = reinterpret_cast<slang::PrimaryTaggedStruct*>(out);
             primary->exts = (const slang::StructTag**)m_stack[stackIndex++];
         }
+        fieldsSet >>= 1;
     }
 
     {
         for (const auto& field : structType->m_fields)
         {
-            switch (field.m_type)
+            if (fieldsSet == 0)
             {
-                case FieldType::PtrTaggedStruct:
-                case FieldType::PtrPtrTaggedStruct:
-                {
-                    *(const void**)(reinterpret_cast<const uint8_t*>(out) + field.m_offset) = m_stack[stackIndex++];
-                    break;
-                }
-                default: break;
+                return;
             }
+
+            // If the field is set, copy
+            if (fieldsSet & 1)
+            {
+                switch (field.m_type)
+                {
+                    case FieldType::PtrTaggedStruct:
+                    case FieldType::PtrPtrTaggedStruct:
+                    {
+                        *(const void**)(reinterpret_cast<const uint8_t*>(out) + field.m_offset) = m_stack[stackIndex++];
+                        break;
+                    }
+                    default: break;
+                }
+            }
+
+            // Remove the bit
+            fieldsSet >>= 1;
         }
     }
 }
 
-Index StructTagConverter::convertCurrentContained(const StructTagType* structType, const void* in)
+SlangResult StructTagConverter::convertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet)
 {
-    Index numConverted = 0;
-    
+    BitField fieldsSet = 0;
+    BitField bit = 1;
+
     if (StructTagUtil::isPrimary(structType->m_tag))
     {
         // Copy extensions if needed
@@ -99,11 +118,13 @@ Index StructTagConverter::convertCurrentContained(const StructTagType* structTyp
             dstExts = maybeConvertCurrentPtrArray(srcExts, primary->extsCount);
             if (dstExts == nullptr)
             {
-                return -1;
+                return SLANG_FAIL;
             }
-            numConverted += (dstExts != srcExts);
+
+            fieldsSet |= bit;
         }
-        m_stack.add(dstExts);
+
+        bit += bit;
     }
 
     // It may have fields that need to be converted
@@ -112,45 +133,46 @@ Index StructTagConverter::convertCurrentContained(const StructTagType* structTyp
         for (const auto& field : structType->m_fields)
         {
             const Index count = _getCount(field, in);
-            if (count <= 0)
+            if (count > 0)
             {
-                m_stack.add(nullptr);
-                continue;
-            }
+                const void* src = *(const void**)(reinterpret_cast<const uint8_t*>(in) + field.m_offset);
+                SLANG_ASSERT(src);
 
-            const void* src = *(const void**)(reinterpret_cast<const uint8_t*>(in) + field.m_offset);
-            SLANG_ASSERT(src);
+                const void* dst = nullptr;
+                switch (field.m_type)
+                {
+                    case FieldType::PtrTaggedStruct:
+                    {
+                        dst = maybeConvertCurrentArray(src, count);
+                        break;
+                    }
+                    case FieldType::PtrPtrTaggedStruct:
+                    {
+                        dst = maybeConvertCurrentPtrArray((const void*const*)src, count);
+                        break;
+                    }
+                    default:
+                    {
+                        return SLANG_FAIL;
+                    }
+                }
 
-            const void* dst = nullptr;
-            switch (field.m_type)
-            {
-                case FieldType::PtrTaggedStruct:
-                {
-                    dst = maybeConvertCurrentArray(src, count);
-                    break;
-                }
-                case FieldType::PtrPtrTaggedStruct:
-                {
-                    dst = maybeConvertCurrentPtrArray((const void*const*)src, count);
-                    break;
-                }
-                default:
+                if (dst == nullptr)
                 {
                     return SLANG_FAIL;
                 }
+
+                // Set the and add to the stack
+                m_stack.add(dst);
+                fieldsSet |= bit;
             }
 
-            if (dst == nullptr)
-            {
-                return -1;
-            }
-
-            m_stack.add(dst);
-            numConverted += (src != dst);
+            bit += bit;
         }
     }
 
-    return numConverted;
+    *outFieldsSet = fieldsSet;
+    return SLANG_OK;
 }
 
 void StructTagConverter::copy(const StructTagType* structType, const void* src, void* dst)
@@ -183,20 +205,11 @@ SlangResult StructTagConverter::convertCurrent(const StructTagType* structType, 
 {
     copy(structType, src, dst);
  
-    const Index stackIndex = m_stack.getCount();
+    const StackScope stackScope(this);
 
-    const Index numConverted = convertCurrentContained(structType, dst);
-    if (numConverted > 0)
-    {
-        setContained(stackIndex, structType, dst);
-    }
-
-    m_stack.setCount(stackIndex);
-    if (numConverted < 0)
-    {
-        return SLANG_FAIL;
-    }
-
+    BitField fieldsSet;
+    SLANG_RETURN_ON_FAIL(convertCurrentContained(structType, dst, &fieldsSet));
+    setContained(structType, stackScope, fieldsSet, dst);
     return SLANG_OK;
 }
 
@@ -291,20 +304,18 @@ const void* StructTagConverter::maybeConvertCurrent(const void* in)
     }
 
     // Let's see if how everything contained converts
-    const Index stackIndex = m_stack.getCount();
-    const Index numConverted = convertCurrentContained(structType, in);
-    if (numConverted <= 0)
+    StackScope stackScope(this);
+    BitField fieldsSet;
+    if (SLANG_FAILED(convertCurrentContained(structType, in, &fieldsSet)))
     {
-        m_stack.setCount(stackIndex);
-        return numConverted == 0 ? in : nullptr;
+        return nullptr;
     }
 
     // Okay we will need to allocate and copy
     void* dst = allocateAndCopy(structType, in);
 
-    setContained(stackIndex, structType, dst);
-    m_stack.setCount(stackIndex);
-
+    // Copy anything converted
+    setContained(structType, stackScope, fieldsSet, dst);
     return dst;
 }
 
