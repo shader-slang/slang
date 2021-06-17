@@ -122,7 +122,7 @@ public:
     List<Field> m_fields;                   ///< Fields that need to be followed
 };
 
-struct StructTagTypeTraits
+namespace StructTagTypeTraits
 {
     typedef StructTagField Field;
     typedef Field::Type Type;
@@ -193,7 +193,7 @@ struct StructTagTypeTraits
 
         return field;
     }
-};
+}
 
 class StructTagCategoryInfo
 {
