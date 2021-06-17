@@ -36,7 +36,7 @@ struct StructTagUtil
     static slang::StructTagInt getCategoryTypeIndex(slang::StructTag tag) { return (slang::StructTagInt(tag) & slang::kStructTagCategoryTypeIndexMask) >> slang::kStructTagCategoryTypeIndexShift; }
 
         /// Get the type index
-    static uint32_t getTypeIndex(slang::StructTag tag) { return uint32_t((slang::StructTagInt(tag) & slang::kStructTagTypeIndexMask)  >> slang::kStructTagTypeIndexShift); }
+    static Index getTypeIndex(slang::StructTag tag) { return Index((slang::StructTagInt(tag) & slang::kStructTagTypeIndexMask)  >> slang::kStructTagTypeIndexShift); }
 
         /// Get the category
     static slang::StructTagCategory getCategory(slang::StructTag tag) { return slang::StructTagCategory((slang::StructTagInt(tag) & slang::kStructTagCategoryMask) >> slang::kStructTagCategoryShift); }
