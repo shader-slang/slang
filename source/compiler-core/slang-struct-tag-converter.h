@@ -14,18 +14,19 @@ public:
 
     typedef uint32_t BitField;
 
-    struct StackScope
+    struct ScopeStack
     {
-        StackScope(StructTagConverter* converter):
-            m_stack(converter->m_stack),
-            m_startIndex(converter->m_stack.getCount())
+        ScopeStack(StructTagConverter* converter):
+            m_stack(converter->m_convertStack),
+            m_startIndex(converter->m_convertStack.getCount())
         {
         }
-        ~StackScope()
+        ~ScopeStack()
         {
             m_stack.setCount(m_startIndex);
         }
 
+        Index getStartIndex() const { return m_startIndex; }
         operator Index() const { return m_startIndex; }
 
     protected:
@@ -33,33 +34,46 @@ public:
         Index m_startIndex;
     };
 
-    const void* maybeConvertCurrent(const void* in);
-    const void* maybeConvertCurrent(slang::StructTag tag, const void* in);
-
-    const void* maybeConvertCurrentArray(const void* in, Index count);
-    const void*const* maybeConvertCurrentPtrArray(const void*const* in, Index count);
-
-        /// Convert to current form
-    SlangResult convertCurrent(const StructTagType* type, const void* src, void* dst);
-
         /// Convert all the referenced items starting at in.
+        /// Items that are converted are stored on the m_convertStack.
+        /// The BitField records a bit for every 'field' (where exts is the 0 field) where there is something converted.
+        /// If the BitField has no bits set -> then nothing was converted and can be used as is.
+        /// To write the converted data, use setContainedConverted.
         ///
-        /// As an alternate plan we could have a bit field that recorded every field that is modified.
-        /// In this way the stack
-    SlangResult convertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet);
+        /// NOTE! This method adds items to the end of the m_convertStack, it is the responsibility of the caller to clean up
+        /// This can be made simpler by just using ScopeStack.
+    SlangResult maybeConvertCurrentContained(const StructTagType* structType, const void* in, BitField* outFieldsSet);
 
-        /// 
-    void setContained(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* dst);
+        /// For every fieldSet bit set, copys over the data held in the m_convertStack (indexed from stackStartIndex).
+    void setContainedConverted(const StructTagType* structType, Index stackIndex, BitField fieldsSet, void* dst);
 
-        /// Make a copy of the in structure (in the arena) such that it conforms to current versions, and return the copy
-    void* clone(const void* in);
-
-        /// Allocates of type from src
-    void* allocateAndCopy(const StructTagType* type, const void* src);
-    void copy(const StructTagType* type, const void* src, void* dst);
+    SlangResult maybeConvertCurrent(const void* in, const void*& out);
+    SlangResult maybeConvertCurrent(slang::StructTag tag, const void* in, const void*& out);
+    SlangResult maybeConvertCurrentArray(const void* in, Index count, const void*& out);
+    SlangResult maybeConvertCurrentPtrArray(const void*const* in, Index count, const void*const*& out);
 
     template <typename T>
-    const T* maybeConvertCurrent(const void* in) { return (const T*)maybeConvertCurrent(T::kStructTag, in); }
+    const T* maybeConvertCurrent(const void* in)
+    {
+        const void* dst;
+        return SLANG_SUCCEEDED(maybeConvertCurrent(T::kStructTag, in, dst)) ? (const T*)dst : nullptr;
+    }
+
+    
+        /// Convert an array (always copies). 
+    void* convertCurrentArray(const void* in, Index count);
+        /// 
+    void** convertCurrentPtrArray(const void*const* in, Index count);
+    void* convertCurrent(const void* in);
+    SlangResult convertCurrentContained(const StructTagType* structType, void* inout);
+
+        /// Allocates of type and copies src to dst
+    void* allocateAndCopy(const StructTagType* type, const void* src);
+        /// Copy from src to dst, zero extending or shrinking however structType requires
+    void copy(const StructTagType* structType, const void* src, void* dst);
+
+        /// Returns true if it's possible to convert tag to current type
+    bool canConvertToCurrent(slang::StructTag tag, StructTagType* type) const;
 
         /// Ctor. The sink and arena are optional. If the arena isn't set then it is not possible to copy convert anything
         /// and so if a copy convert is required, it will fail.
@@ -73,7 +87,13 @@ public:
 
 protected:
 
-    List<const void*> m_stack;
+    SlangResult _requireArena();
+    SlangResult _diagnoseCantConvert(slang::StructTag tag, StructTagType* type);
+    SlangResult _diagnoseUnknownType(slang::StructTag tag);
+    SlangResult _diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB);
+
+        /// Used to hold pointers to things that have been converted.
+    List<const void*> m_convertStack;
 
     StructTagSystem* m_system;
     DiagnosticSink* m_sink;
