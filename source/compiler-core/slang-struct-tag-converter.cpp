@@ -1,5 +1,6 @@
 #include "slang-struct-tag-converter.h"
 
+#include "slang-core-diagnostics.h"
 
 namespace Slang {
 
@@ -27,6 +28,7 @@ SlangResult StructTagConverterBase::_requireArena()
         if (m_sink)
         {
             // Diagnose that we need an arena
+            m_sink->diagnose(SourceLoc(), MiscDiagnostics::structTagConversionFailureNoArena);
         }
         return SLANG_FAIL;
     }
@@ -42,6 +44,11 @@ SlangResult StructTagConverterBase::_diagnoseCantConvert(slang::StructTag tag, S
     if (m_sink)
     {
         // Diagnose why the tag couldn't be converted
+        StringBuilder from, to;
+        m_system->appendName(tag, from);
+        m_system->appendName(structType->m_tag, to);
+
+        m_sink->diagnose(SourceLoc(), MiscDiagnostics::cannotConvertStructTag, from, to);
     }
 
     return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
@@ -53,6 +60,9 @@ SlangResult StructTagConverterBase::_diagnoseUnknownType(slang::StructTag tag)
 
     if (m_sink)
     {
+        StringBuilder buf;
+        m_system->appendName(tag, buf);
+        m_sink->diagnose(SourceLoc(), MiscDiagnostics::unknownStructTag, buf);
     }
 
     // Perhaps this isn't quite right - but it's probably the most suitable error
@@ -61,11 +71,13 @@ SlangResult StructTagConverterBase::_diagnoseUnknownType(slang::StructTag tag)
 
 SlangResult StructTagConverterBase::_diagnoseDifferentTypes(slang::StructTag tagA, slang::StructTag tagB)
 {
-    SLANG_UNUSED(tagA);
-    SLANG_UNUSED(tagB);
-
     if (m_sink)
     {
+        StringBuilder a, b;
+        m_system->appendName(tagA, a);
+        m_system->appendName(tagB, b);
+
+        m_sink->diagnose(SourceLoc(), MiscDiagnostics::cannotConvertDifferentStructTag, a, b);
     }
 
     // Perhaps this isn't quite right - but it's probably the most suitable error

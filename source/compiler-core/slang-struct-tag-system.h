@@ -234,7 +234,10 @@ public:
 
         /// Add the struct type
     StructTagType* addType(slang::StructTag tag, const String& name, size_t sizeInBytes);
-    
+
+    void appendName(slang::StructTag tag, StringBuilder& out);
+    String getName(slang::StructTag tag) { StringBuilder buf; appendName(tag, buf); return buf.ProduceString(); }
+
     StructTagSystem():
         m_arena(1024)
     {

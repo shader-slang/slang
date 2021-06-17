@@ -118,9 +118,11 @@ static RefPtr<StructTagSystem> _createSystem()
 
 static void structTagUnitTest()
 {
-    DiagnosticSink sink;
-    sink.init(nullptr, nullptr);
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
 
+    DiagnosticSink sink;
+    sink.init(&sourceManager, nullptr);
 
     {
         StructTagUtil::TypeInfo info = StructTagUtil::getTypeInfo(A0_1::kStructTag);
@@ -225,8 +227,29 @@ static void structTagUnitTest()
         SLANG_CHECK(dstA->descsCount == a.descsCount);
 
         SLANG_CHECK(dstA->descs[0].a == 27 && dstA->descs[1].a == -1);
+    }
+
+    // Lets try some invalid conversions
+
+    {
+        // Set up the system with the versions
+        auto system = _createSystem();
+
+        system->addType(B0_1::kStructTag, "B", sizeof(B0_1));
+        system->addType(A0_2::kStructTag, "A", sizeof(A0_2));
+        system->addType(ExtensionA0_0::kStructTag, "ExtensionA", sizeof(ExtensionA0_0));
+        system->addType(Desc0_0::kStructTag, "Desc", sizeof(Desc0_0));
+
+        A1_0 a;
+
+        MemoryArena arena(1024);
+        LazyStructTagConverter converter(system, &arena, &sink);
+
+        void* dst;
+        SLANG_CHECK(SLANG_FAILED(converter.convertCurrent(&a, dst)));
 
     }
+
 }
 
 SLANG_UNIT_TEST("StructTag", structTagUnitTest);

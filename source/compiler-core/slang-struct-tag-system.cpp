@@ -90,4 +90,37 @@ StructTagType* StructTagSystem::getType(slang::StructTag tag)
     return nullptr;
 }
 
+void StructTagSystem::appendName(slang::StructTag tag, StringBuilder& out)
+{
+    auto info = StructTagUtil::getTypeInfo(tag);
+
+    auto categoryInfo = getCategoryInfo(info.category);
+    if (categoryInfo)
+    {
+        out << categoryInfo->m_name;
+    }
+    else
+    {
+        out << Index(info.category);
+    }
+
+    out << "::";
+
+    auto type = categoryInfo->getType(info.typeIndex);
+
+    if (type)
+    {
+        out << type->m_name;
+    }
+    else
+    {
+        out << "~" << Index(info.typeIndex) << "~";
+    }
+
+    out << "_";
+    out << Index(info.majorVersion);
+    out << ".";
+    out << Index(info.minorVersion);
+}
+
 } // namespace Slang
