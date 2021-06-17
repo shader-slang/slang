@@ -59,12 +59,13 @@ public:
         return SLANG_SUCCEEDED(maybeConvertCurrent(T::kStructTag, in, dst)) ? (const T*)dst : nullptr;
     }
 
-    
         /// Convert an array (always copies). 
-    void* convertCurrentArray(const void* in, Index count);
-        /// 
-    void** convertCurrentPtrArray(const void*const* in, Index count);
-    void* convertCurrent(const void* in);
+    SlangResult convertCurrentArray(const void* in, Index count, void*& out);
+        /// Convert a pointer array (always copies)
+    SlangResult convertCurrentPtrArray(const void*const* in, Index count, void**& out );
+        /// Convert a single tagged object (always copies)
+    SlangResult convertCurrent(const void* in, void*& out );
+        /// Convert the items contained in inout
     SlangResult convertCurrentContained(const StructTagType* structType, void* inout);
 
         /// Allocates of type and copies src to dst
