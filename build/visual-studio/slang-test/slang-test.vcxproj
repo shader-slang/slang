@@ -189,6 +189,7 @@
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-riff.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-short-list.cpp" />
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-string.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-test\unit-test-struct-tag.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

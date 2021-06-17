@@ -537,8 +537,8 @@ enum : uint32_t
 enum class PrimaryTag;
 enum class ExtensionTag;
 
-#define SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag(StructTagInt(kStructTagPrimaryMask) | (StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
-#define SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) StructTag((StructTagInt(CATEGORY) << 24) | (StructTagInt(TYPE_ID) << 16) | (StructTagInt(MAJOR) << 8) | StructTagInt(MINOR))
+#define SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) slang::StructTag(slang::StructTagInt(slang::kStructTagPrimaryMask) | (slang::StructTagInt(CATEGORY) << 24) | (slang::StructTagInt(TYPE_ID) << 16) | (slang::StructTagInt(MAJOR) << 8) | slang::StructTagInt(MINOR))
+#define SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) slang::StructTag((slang::StructTagInt(CATEGORY) << 24) | (slang::StructTagInt(TYPE_ID) << 16) | (slang::StructTagInt(MAJOR) << 8) | slang::StructTagInt(MINOR))
 
 /* 
 `PrimaryStruct`s are structs that are passed directly into API calls. They always contain a 'structType' that identifies the exact version
@@ -562,18 +562,18 @@ to provide some kind of type safely without requiring inheritance.
 
 #define SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
-    typedef ExtensionTag Tag; \
-    static const StructTag kStructTag = SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
-    StructTag structTag = kStructTag; \
-    StructSize structSize = StructSize(sizeof(ThisType));
+    typedef slang::ExtensionTag Tag; \
+    static const slang::StructTag kStructTag = SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    slang::StructTag structTag = kStructTag; \
+    slang::StructSize structSize = slang::StructSize(sizeof(ThisType));
 
 #define SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
     typedef TYPE_NAME ThisType; \
-    typedef PrimaryTag Tag; \
-    static const StructTag kStructTag = SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
-    StructTag structTag = kStructTag; \
-    StructSize structSize = StructSize(sizeof(ThisType)); \
-    const StructTag** exts = nullptr; \
+    typedef ::slang::PrimaryTag Tag; \
+    static const ::slang::StructTag kStructTag = SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    slang::StructTag structTag = kStructTag; \
+    slang::StructSize structSize = slang::StructSize(sizeof(ThisType)); \
+    const slang::StructTag** exts = nullptr; \
     int32_t extsCount = 0; 
 
 #define SLANG_API_TYPE_ENUM(x) x,

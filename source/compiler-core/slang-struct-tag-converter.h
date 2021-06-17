@@ -9,6 +9,7 @@ namespace Slang {
 class StructTagConverterBase
 {
 public:
+    typedef StructTagConverterBase ThisType;
     typedef StructTagField Field;
     typedef Field::Type FieldType;
 
@@ -54,6 +55,8 @@ public:
     }
 
 protected:
+    StructTagConverterBase(const ThisType& rhs) = delete;
+    void operator=(const ThisType& rhs) = delete;
 
     SlangResult _requireArena();
     SlangResult _diagnoseCantConvert(slang::StructTag tag, StructTagType* type);
