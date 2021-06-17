@@ -35,6 +35,8 @@ TOKEN(BlockComment,     "block comment")
 PUNCTUATION(Semicolon,  ";")
 PUNCTUATION(Comma,      ",")
 PUNCTUATION(Dot,        ".")
+PUNCTUATION(DotDot,     "..")
+PUNCTUATION(Ellipsis,   "...")
 
 PUNCTUATION(LBrace,     "{")
 PUNCTUATION(RBrace,     "}")

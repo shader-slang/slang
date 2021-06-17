@@ -951,7 +951,23 @@ namespace Slang
             case '5': case '6': case '7': case '8': case '9':
                 return _lexNumberAfterDecimalPoint(lexer, 10);
 
-            // TODO(tfoley): handle ellipsis (`...`)
+            case '.':
+                // Note: consuming the second `.` here means that
+                // we cannot back up and return a `.` token by itself
+                // any more. We thus end up having distinct tokens for
+                // `.`, `..`, and `...` even though the `..` case is
+                // not part of HLSL.
+                //
+                _advance(lexer);
+                switch(_peek(lexer))
+                {
+                case '.':
+                    _advance(lexer);
+                    return TokenType::Ellipsis;
+
+                default:
+                    return TokenType::DotDot;
+                }
 
             default:
                 return TokenType::Dot;
