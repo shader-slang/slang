@@ -86,5 +86,8 @@
     <ClCompile Include="..\..\..\tools\slang-test\unit-test-string.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-test\unit-test-struct-tag.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

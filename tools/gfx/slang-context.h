@@ -41,8 +41,10 @@ namespace gfx
             targetDesc.floatingPointMode = desc.floatingPointMode;
             targetDesc.lineDirectiveMode = desc.lineDirectiveMode;
             targetDesc.flags = desc.targetFlags;
-            slangSessionDesc.targetCount = 1;
+
             slangSessionDesc.targets = &targetDesc;
+            slangSessionDesc.targetCount = 1;
+
             SLANG_RETURN_ON_FAIL(globalSession->createSession(slangSessionDesc, session.writeRef()));
             return SLANG_OK;
         }
