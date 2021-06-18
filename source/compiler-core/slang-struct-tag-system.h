@@ -14,6 +14,29 @@
 
 namespace Slang {
 
+// Pre declare
+class DiagnosticSink;
+
+struct StructTagDesc
+{
+    SLANG_FORCE_INLINE static StructTagDesc make(slang::StructTag structTag, size_t size, const void* defaultInstance = nullptr) { return StructTagDesc{structTag, uint32_t(size), defaultInstance}; }
+
+    template <typename T>
+    SLANG_FORCE_INLINE static StructTagDesc make() { return StructTagDesc{T::kStructTag, uint32_t(sizeof(T)), nullptr}; }
+
+    template <typename T>
+    static StructTagDesc make(MemoryArena& arena)
+    {
+        T* defaultInitialize = arena.allocate<T>();
+        new (defaultInitialize) T;
+        return StructTagDesc{ T::kStructTag, uint32_t(sizeof(T)), defaultInitialize };
+    }
+
+    slang::StructTag structTag;
+    uint32_t sizeInBytes;
+    const void* defaultInstance;            ///< An optional default instance
+};
+
 struct StructTagUtil
 {
     struct TypeInfo
@@ -41,6 +64,9 @@ struct StructTagUtil
         /// Get the category
     static slang::StructTagCategory getCategory(slang::StructTag tag) { return slang::StructTagCategory((slang::StructTagInt(tag) & slang::kStructTagCategoryMask) >> slang::kStructTagCategoryShift); }
 
+        /// Get the minor version
+    static Index getMinorVersion(slang::StructTag tag) { return Index((slang::StructTagInt(tag) & slang::kStructTagMinorMask) >> slang::kStructTagMinorShift); }
+
         /// They are the same type and have same major version
     static bool areSameMajorType(slang::StructTag a, slang::StructTag b)
     {
@@ -61,6 +87,8 @@ struct StructTagUtil
         // If they are the same type, and the input types minor is greater than equal to current minor we can accept for read (singly)
         return ((tag ^ currentTag) & typeMask) == 0 && (tag & minorMask) >= (currentTag & minorMask);
     }
+
+  
 };
 
 /* static */ inline StructTagUtil::TypeInfo StructTagUtil::getTypeInfo(slang::StructTag tag)
@@ -275,6 +303,12 @@ public:
     template <typename T>
     T* getAs(void* in) { return canCast(T::kStructTag, in) ? reinterpret_cast<T*>(in) : nullptr; }
 
+        /// Get the size of the field in bytes. Note the tag is only needed if type is StructTag.
+    size_t getSize(const StructTagField::Type type, slang::StructTag tag) const;
+
+        /// Create a system that is compatible with the specified tags.
+        /// The DiagnosticSink is optional
+    SlangResult createCompatible(const StructTagDesc* descs, Index descsCount, DiagnosticSink* sink, RefPtr<StructTagSystem>& outSystem);
 
     StructTagSystem():
         m_arena(1024)

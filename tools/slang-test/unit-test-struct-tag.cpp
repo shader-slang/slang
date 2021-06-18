@@ -248,15 +248,52 @@ static void structTagUnitTest()
 
         // Actually do a conversion from future
         MemoryArena arena(1024);
-        LazyStructTagConverter converter(system, &arena, nullptr);
+        {
+            LazyStructTagConverter converter(system, &arena, nullptr);
 
-        auto dstA = converter.convertToCurrent<A0_2>(&a);
+            auto dstA = converter.convertToCurrent<A0_2>(&a);
+            SLANG_CHECK(dstA->descsCount == a.descsCount);
+            SLANG_CHECK(dstA->descs[0].a == 27 && dstA->descs[1].a == -1);
+        }
 
-        SLANG_CHECK(dstA->descsCount == a.descsCount);
+        {
+            // Lets create a new system and make it convert to it
+            const StructTagDesc tagDescs[] =
+            {
+                StructTagDesc::make<A0_0>(arena),
+                StructTagDesc::make<B0_0>(arena),
+                StructTagDesc::make<Desc0_0>(arena),
+                StructTagDesc::make<ExtensionA0_0>(arena)
+            };
 
-        SLANG_CHECK(dstA->descs[0].a == 27 && dstA->descs[1].a == -1);
+            // Create a system that uses older versions
+            RefPtr<StructTagSystem> previousSystem;
+            SLANG_CHECK(SLANG_SUCCEEDED(system->createCompatible(tagDescs, SLANG_COUNT_OF(tagDescs), nullptr, previousSystem)));
+
+            
+            {
+                LazyStructTagConverter converter(previousSystem, &arena, nullptr);
+
+                auto dstA = converter.convertToCurrent<A0_0>(&a);
+
+                SLANG_CHECK(dstA->a == a.a);
+                SLANG_CHECK(dstA->extsCount == a.extsCount);
+            }
+
+            {
+                CopyStructTagConverter converter(previousSystem, &arena, nullptr);
+
+                auto dstA = converter.convertToCurrent<A0_1>(&a);
+
+                // Won't convert because A0_1 is *not* the current type.
+                // We could do this if we passed in the size, but it wouldn't work for any contained types.
+                // To keep things safe we just reject
+                SLANG_ASSERT(dstA == nullptr);
+            }
+        }
     }
 
+  
     // Lets try some invalid conversions
 
     {

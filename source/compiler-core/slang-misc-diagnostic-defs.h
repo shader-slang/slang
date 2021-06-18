@@ -35,6 +35,9 @@ DIAGNOSTIC(110002, Error, unknownStructTag, "unknown StructTag $0")
 DIAGNOSTIC(110003, Error, cannotConvertStructTag, "cannot convert StructTag $0 to $1")
 DIAGNOSTIC(110004, Error, cannotConvertDifferentStructTag, "cannot convert different StructTag types $0 to $1")
 
+DIAGNOSTIC(120005, Error, unknownStructTagCategory, "unknown StructTag category $0")
+DIAGNOSTIC(120006, Error, structTagInconsistent, "StructTag $0 is inconsistently defined")
+
 DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "an internal error threw an exception while working on code near this location")
 
 #undef DIAGNOSTIC

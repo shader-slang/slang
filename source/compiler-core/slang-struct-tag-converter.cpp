@@ -150,6 +150,20 @@ SlangResult StructTagConverterBase::convertCurrent(slang::StructTag tag, const v
     auto base = reinterpret_cast<const slang::TaggedStructBase*>(in);
     auto inTag = base->structTag;
 
+    // The tag must be the same as the current
+    auto structType = m_system->getType(tag);
+    if (!structType || structType->m_tag != tag)
+    {
+        if (!structType)
+        {
+            return _diagnoseUnknownType(tag);
+        }
+        else
+        {
+            return _diagnoseCantConvert(tag, structType);
+        }
+    }
+
     // Currently we can only convert if same major type.
     // In future it might be possible to improve on this
     if (!StructTagUtil::areSameMajorType(inTag, tag))

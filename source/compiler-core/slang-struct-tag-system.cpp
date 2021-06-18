@@ -1,5 +1,7 @@
 #include "slang-struct-tag-system.h"
 
+#include "slang-diagnostic-sink.h"
+#include "slang-core-diagnostics.h"
 
 namespace Slang {
 
@@ -113,6 +115,34 @@ bool StructTagSystem::canCast(slang::StructTag tag, const void* in) const
     return StructTagUtil::isReadCompatible(tag, structType->m_tag);
 }
 
+size_t StructTagSystem::getSize(const StructTagField::Type fieldType, slang::StructTag tag) const
+{
+    typedef StructTagField::Type FieldType;
+
+    switch (fieldType)
+    {
+        case FieldType::TaggedStruct:
+        {
+            auto type = getType(tag);
+            if (type)
+            {
+                return type->m_sizeInBytes;
+            }
+            return 0;
+        }
+        case FieldType::PtrTaggedStruct:
+        case FieldType::PtrPtrTaggedStruct:
+        {
+            return sizeof(void*);
+        }
+        case FieldType::I32:     return sizeof(int32_t); 
+        case FieldType::I64:     return sizeof(int64_t);
+        default: break;
+    }
+
+    return 0;
+}
+
 void StructTagSystem::appendName(slang::StructTag tag, StringBuilder& out)
 {
     auto info = StructTagUtil::getTypeInfo(tag);
@@ -162,6 +192,124 @@ void StructTagSystem::setDefaultInstance(StructTagType* structType, const void* 
 
     // Copy it over
     ::memcpy(structType->m_defaultInstance, in, structType->m_sizeInBytes);
+}
+
+SlangResult StructTagSystem::createCompatible(const StructTagDesc* descs, Index descsCount, DiagnosticSink* sink, RefPtr<StructTagSystem>& outSystem)
+{
+    RefPtr<StructTagSystem> dstSystem = new StructTagSystem;
+
+    // We want to add all of the categories
+    for (auto categoryInfo : m_categories)
+    {
+        dstSystem->addCategoryInfo(categoryInfo->m_category, categoryInfo->m_name);
+    }
+
+    for (Index i = 0; i < descsCount; ++i)
+    {
+        const auto& desc = descs[i];
+
+        //
+        auto category = StructTagUtil::getCategory(desc.structTag);
+
+        auto dstCategoryInfo = dstSystem->getCategoryInfo(category);
+        if (!dstCategoryInfo)
+        {
+            if (sink)
+            {
+                sink->diagnose(SourceLoc(), MiscDiagnostics::unknownStructTagCategory, Index(category));
+            }
+            return SLANG_FAIL;
+        }
+
+        // If it's in dst it must be in source
+        auto srcCategoryInfo = getCategoryInfo(category);
+
+        const Index typeIndex = StructTagUtil::getTypeIndex(desc.structTag);
+
+        if (auto dstType = dstCategoryInfo->getType(typeIndex))
+        {
+            if (dstType->m_sizeInBytes != desc.sizeInBytes ||
+                dstType->m_tag != desc.structTag)
+            {
+                if (sink)
+                {
+                    sink->diagnose(SourceLoc(), MiscDiagnostics::structTagInconsistent, dstSystem->getName(desc.structTag));
+                }
+                return SLANG_FAIL;
+            }
+
+            // Multiply defined, but consistent so ignore
+            continue;
+        }
+
+        auto srcType = srcCategoryInfo->getType(typeIndex);
+        if (srcType == nullptr)
+        {
+            // We don't have a definition...
+            if (sink)
+            {
+                sink->diagnose(SourceLoc(), MiscDiagnostics::unknownStructTag, getName(desc.structTag));
+            }
+            return SLANG_FAIL;
+        }
+
+        if (!StructTagUtil::areSameMajorType(srcType->m_tag, desc.structTag))
+        {
+            if (sink)
+            {
+                sink->diagnose(SourceLoc(), MiscDiagnostics::cannotConvertStructTag, getName(desc.structTag), getName(srcType->m_tag));
+            }
+            return SLANG_E_STRUCT_TAG_INCOMPATIBLE;
+        }
+
+        // Okay lets copy
+        auto dstType = dstSystem->addType(desc.structTag, srcType->m_name, desc.sizeInBytes);
+
+
+        // Finally we need to copy the fiends which are still in range
+        for (const auto& srcField : srcType->m_fields)
+        {
+            if (srcField.m_offset + getSize(srcField.m_type, slang::StructTag(0)) > desc.sizeInBytes ||
+                (srcField.m_countType != StructTagField::Type::Unknown && srcField.m_countOffset + getSize(srcField.m_countType, slang::StructTag(0))))
+            {
+                // The field is not inside the destination
+                continue;
+            }
+
+            dstType->m_fields.add(srcField);
+        }
+        
+        // We need to work out which defaultInstance to use.
+
+        StructTagDesc instanceDesc;
+        const StructTagDesc currentDesc = StructTagDesc::make(srcType->m_tag, srcType->m_sizeInBytes, srcType->m_defaultInstance);
+
+        // If both have defaultInstance, we want to copy from the latest one.
+        if (srcType->m_defaultInstance && desc.defaultInstance)
+        {
+            instanceDesc = (StructTagUtil::getMinorVersion(srcType->m_tag) > StructTagUtil::getMinorVersion(desc.structTag)) ? currentDesc : desc;
+        }
+        else
+        {
+            instanceDesc = srcType->m_defaultInstance ? currentDesc : desc;
+        }
+
+        // Copy the default instance.
+        if (instanceDesc.defaultInstance)
+        {
+            void* dstDefaultInstance = dstSystem->m_arena.allocateAndZero(desc.sizeInBytes);
+
+            // Copy the minimum size
+            auto size = std::min(dstType->m_sizeInBytes, instanceDesc.sizeInBytes);
+            ::memcpy(dstDefaultInstance, instanceDesc.defaultInstance, size);
+
+            // Set the default instance.
+            dstType->m_defaultInstance = dstDefaultInstance;
+        }
+    }
+
+    outSystem = dstSystem;
+    return SLANG_OK;
 }
 
 } // namespace Slang
