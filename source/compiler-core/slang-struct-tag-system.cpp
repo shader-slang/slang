@@ -106,7 +106,7 @@ bool StructTagSystem::canCast(slang::StructTag tag, const void* in) const
     StructTagType* structType = getType(srcBase->structTag);
     if (!structType)
     {
-        return nullptr;
+        return false;
     }
 
     // It's okay if the in is a later version.
