@@ -14,7 +14,6 @@ StructTagCategoryInfo::~StructTagCategoryInfo()
             type->~StructTagType();
         }
     }
-
 }
 
 void StructTagCategoryInfo::addType(StructTagType* type)
@@ -46,7 +45,7 @@ StructTagSystem::~StructTagSystem()
     }
 }
 
-StructTagCategoryInfo* StructTagSystem::getCategoryInfo(slang::StructTagCategory category)
+StructTagCategoryInfo* StructTagSystem::getCategoryInfo(slang::StructTagCategory category) const
 {
     const Index index = Index(category);
     return (index < m_categories.getCount()) ? m_categories[index] : nullptr;
@@ -77,7 +76,7 @@ StructTagType* StructTagSystem::addType(slang::StructTag tag, const String& name
     return structType;
 }
 
-StructTagType* StructTagSystem::getType(slang::StructTag tag)
+StructTagType* StructTagSystem::getType(slang::StructTag tag) const
 {
     const auto category = StructTagUtil::getCategory(tag);
     auto categoryInfo = getCategoryInfo(category);
@@ -88,6 +87,30 @@ StructTagType* StructTagSystem::getType(slang::StructTag tag)
     }
 
     return nullptr;
+}
+
+bool StructTagSystem::canCast(slang::StructTag tag, const void* in) const
+{
+    if (in == nullptr)
+    {
+        return true;
+    }
+
+    const slang::TaggedStructBase* srcBase = reinterpret_cast<const slang::TaggedStructBase*>(in);
+    // If the tag is identical we can cast
+    if (srcBase->structTag == tag)
+    {
+        return true;
+    }
+
+    StructTagType* structType = getType(srcBase->structTag);
+    if (!structType)
+    {
+        return nullptr;
+    }
+
+    // It's okay if the in is a later version.
+    return StructTagUtil::isReadCompatible(tag, structType->m_tag);
 }
 
 void StructTagSystem::appendName(slang::StructTag tag, StringBuilder& out)
@@ -114,13 +137,31 @@ void StructTagSystem::appendName(slang::StructTag tag, StringBuilder& out)
     }
     else
     {
-        out << "~" << Index(info.typeIndex) << "~";
+        out << Index(info.typeIndex);
     }
 
     out << "_";
     out << Index(info.majorVersion);
     out << ".";
     out << Index(info.minorVersion);
+}
+
+void StructTagSystem::setDefaultInstance(StructTagType* structType, const void* in)
+{
+    if (structType->m_defaultInstance == nullptr)
+    {
+        structType->m_defaultInstance = m_arena.allocate(structType->m_sizeInBytes);
+    }
+
+    // We can check if this seems plausible
+    const slang::TaggedStructBase* srcBase = reinterpret_cast<const slang::TaggedStructBase*>(in);
+    SLANG_UNUSED(srcBase);
+
+    SLANG_ASSERT(srcBase->structTag == structType->m_tag);
+    SLANG_ASSERT(srcBase->structSize == structType->m_sizeInBytes);
+
+    // Copy it over
+    ::memcpy(structType->m_defaultInstance, in, structType->m_sizeInBytes);
 }
 
 } // namespace Slang

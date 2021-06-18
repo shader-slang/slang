@@ -125,7 +125,7 @@ static RefPtr<StructTagSystem> _createStructTagSystem()
     }
 
     {
-#define SLANG_STRUCT_TAG_ADD_TYPE(X) system->addType(slang::X::kStructTag, "slang::" #X, sizeof(slang::X));
+#define SLANG_STRUCT_TAG_ADD_TYPE(X) system->addTypeWithDefaultInstance<slang::X>("slang::" #X);
 SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ADD_TYPE)
 
         // Add field that references more tagged structs

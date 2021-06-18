@@ -146,9 +146,9 @@ static void structTagUnitTest()
         // Set up the system with the versions
         auto system = _createSystem();
 
-        system->addType(B0_1::kStructTag, "B", sizeof(B0_1));
-        system->addType(A0_1::kStructTag, "A", sizeof(A0_1));
-        system->addType(ExtensionA0_0::kStructTag, "ExtensionA", sizeof(ExtensionA0_0));
+        system->addTypeWithDefaultInstance<B0_1>("B");
+        system->addTypeWithDefaultInstance<A0_1>("A");
+        system->addTypeWithDefaultInstance<ExtensionA0_0>("ExtensionA");
 
         {
             //The null operation means we are converting everything that is current (as defined by the system)
@@ -159,13 +159,39 @@ static void structTagUnitTest()
             a.exts = exts;
             a.extsCount = SLANG_COUNT_OF(exts);
 
-            
-            LazyStructTagConverter converter(system, nullptr, nullptr);
+            a.a = 77;
+            a.b = -25;
 
-            auto dstA = converter.convertToCurrent<A0_1>(&a);
+            extA.b = 0xb;
 
-            // We shouldn't have to convert anything, so we should be done
-            SLANG_CHECK(dstA == &a);
+            {            
+                LazyStructTagConverter converter(system, nullptr, nullptr);
+
+                auto dstA = converter.convertToCurrent<A0_1>(&a);
+
+                // We shouldn't have to convert anything, so we should be done
+                SLANG_CHECK(dstA == &a);
+            }
+
+            // Make a copy
+            {
+                MemoryArena arena(1024);
+                CopyStructTagConverter converter(system, &arena, nullptr);
+
+                auto dstA = converter.convertToCurrent<A0_1>(&a);
+
+                SLANG_CHECK(dstA != &a);
+                SLANG_CHECK(dstA->a == 77 && dstA->b == -25);
+                SLANG_CHECK(dstA->extsCount == 1);
+
+                auto dstExtA = system->getAs<ExtensionA0_0>(dstA->exts[0]);
+
+                // Make sure it's a copy
+                SLANG_CHECK(dstExtA != &extA);
+                // With the same values
+                SLANG_CHECK(dstExtA->b == extA.b);
+            }
+
         }
 
         {
@@ -175,6 +201,7 @@ static void structTagUnitTest()
             a.exts = exts;
             a.extsCount = SLANG_COUNT_OF(exts);
 
+            a.a = -1;
 
             // Actually do a conversion from past
             MemoryArena arena(1024);
@@ -183,7 +210,7 @@ static void structTagUnitTest()
             auto dstA = converter.convertToCurrent<A0_1>(&a);
 
             SLANG_CHECK(dstA != nullptr);
-            SLANG_CHECK(dstA->a == 10 && dstA->b == 0);
+            SLANG_CHECK(dstA->a == -1 && dstA->b == 20);
 
             SLANG_CHECK(dstA->extsCount == 1);
             SLANG_CHECK(((ExtensionA0_0*)dstA->exts[0])->b == 20);
@@ -195,10 +222,11 @@ static void structTagUnitTest()
         // Set up the system with the versions
         auto system = _createSystem();
 
-        system->addType(B0_1::kStructTag, "B", sizeof(B0_1));
-        system->addType(A0_2::kStructTag, "A", sizeof(A0_2));
-        system->addType(ExtensionA0_0::kStructTag, "ExtensionA", sizeof(ExtensionA0_0));
-        system->addType(Desc0_0::kStructTag, "Desc", sizeof(Desc0_0));
+        system->addTypeWithDefaultInstance<B0_1>("B");
+        system->addTypeWithDefaultInstance<A0_2>("A");
+
+        system->addTypeWithDefaultInstance<ExtensionA0_0>("ExtensionA");
+        system->addTypeWithDefaultInstance<Desc0_0>("Desc");
 
         // Add the fields
         {
@@ -235,10 +263,10 @@ static void structTagUnitTest()
         // Set up the system with the versions
         auto system = _createSystem();
 
-        system->addType(B0_1::kStructTag, "B", sizeof(B0_1));
-        system->addType(A0_2::kStructTag, "A", sizeof(A0_2));
-        system->addType(ExtensionA0_0::kStructTag, "ExtensionA", sizeof(ExtensionA0_0));
-        system->addType(Desc0_0::kStructTag, "Desc", sizeof(Desc0_0));
+        system->addTypeWithDefaultInstance<B0_1>("B");
+        system->addTypeWithDefaultInstance<A0_2>("A");
+        system->addTypeWithDefaultInstance<ExtensionA0_0>("ExtensionA");
+        system->addTypeWithDefaultInstance<Desc0_0>("Desc");
 
         A1_0 a;
 

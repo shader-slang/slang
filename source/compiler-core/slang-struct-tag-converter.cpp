@@ -101,18 +101,35 @@ void StructTagConverterBase::copy(const StructTagType* structType, const void* s
 {
     const slang::TaggedStructBase* srcBase = reinterpret_cast<const slang::TaggedStructBase*>(src);
 
-    const slang::StructSize size = std::min(structType->m_sizeInBytes, srcBase->structSize);
-
-    // Copy
-    ::memcpy(dst, src, size);
-
-    // TODO(JS): Alternatively if we have the default set on the structType, we could initialize
-    // other fields with the default values. For the moment we zero
-
-    // Zero any extra
-    if (size < structType->m_sizeInBytes)
+    if (structType->m_sizeInBytes == srcBase->structSize)
     {
-        ::memset((char*)dst + size, 0, structType->m_sizeInBytes - size);
+        // Copy the whole thing
+        ::memcpy(dst, src, structType->m_sizeInBytes);
+    }
+    else if (structType->m_sizeInBytes > srcBase->structSize)
+    {
+        // Copy the start
+        ::memcpy(dst, src, srcBase->structSize);
+
+        uint8_t* dstRemain = (uint8_t*)dst + srcBase->structSize;
+        const size_t remainSize = structType->m_sizeInBytes - srcBase->structSize;
+
+        if (structType->m_defaultInstance)
+        {
+            // Copy the remaining part from the default instance
+            const uint8_t* srcRemain = (const uint8_t*)structType->m_defaultInstance + srcBase->structSize;
+            ::memcpy(dstRemain, srcRemain, remainSize);
+        }
+        else
+        {
+            // We don't have instance data so just zero
+            ::memset(dstRemain, 0, remainSize);
+        }
+    }
+    else
+    {
+        // Copy the start
+        ::memcpy(dst, src, structType->m_sizeInBytes);
     }
 
     // Set the type and the size

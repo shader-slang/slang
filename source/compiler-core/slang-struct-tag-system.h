@@ -111,7 +111,8 @@ public:
     StructTagType(slang::StructTag tag, const String& name, size_t sizeInBytes):
         m_tag(tag),
         m_name(name),
-        m_sizeInBytes(slang::StructSize(sizeInBytes))
+        m_sizeInBytes(slang::StructSize(sizeInBytes)),
+        m_defaultInstance(nullptr)
     {
     }
 
@@ -120,6 +121,8 @@ public:
     slang::StructSize m_sizeInBytes;        ///< The size of this version in bytes
 
     List<Field> m_fields;                   ///< Fields that need to be followed
+
+    void* m_defaultInstance;                ///< Holds a default instance
 };
 
 namespace StructTagTypeTraits
@@ -227,16 +230,51 @@ public:
 
         /// Add a category
     StructTagCategoryInfo* addCategoryInfo(slang::StructTagCategory category, const String& name);
-    StructTagCategoryInfo* getCategoryInfo(slang::StructTagCategory category);
+    StructTagCategoryInfo* getCategoryInfo(slang::StructTagCategory category) const;
 
         /// Get struct type 
-    StructTagType* getType(slang::StructTag tag);
+    StructTagType* getType(slang::StructTag tag) const;
+
+        /// Set the default instance
+    void setDefaultInstance(StructTagType* structType, const void* in);
+
+    template <typename T>
+    void setDefaultInstance(StructTagType* structType)
+    {
+        // Create a to copy from
+        T t;
+        setDefaultInstance(structType, &t);
+    }
+
+    template <typename T>
+    StructTagType* addTypeWithDefaultInstance(const String& name)
+    {
+        T t;
+        StructTagType* type = addType(T::kStructTag, name, sizeof(T));
+        setDefaultInstance(type, &t);
+        return type;
+    }
+
+    template <typename T>
+    StructTagType* addType(const String& name)
+    {
+        return addType(T::kStructTag, name, sizeof(T));
+    }
 
         /// Add the struct type
     StructTagType* addType(slang::StructTag tag, const String& name, size_t sizeInBytes);
 
     void appendName(slang::StructTag tag, StringBuilder& out);
     String getName(slang::StructTag tag) { StringBuilder buf; appendName(tag, buf); return buf.ProduceString(); }
+
+        /// True if can cast to the current type specified as tag. 
+    bool canCast(slang::StructTag tag, const void* in) const;
+
+    template <typename T>
+    const T* getAs(const void* in) { return canCast(T::kStructTag, in) ? reinterpret_cast<const T*>(in) : nullptr; }
+    template <typename T>
+    T* getAs(void* in) { return canCast(T::kStructTag, in) ? reinterpret_cast<T*>(in) : nullptr; }
+
 
     StructTagSystem():
         m_arena(1024)
