@@ -501,6 +501,11 @@ IBufferResource::Desc* DebugBufferResource::getDesc()
     return baseObject->getDesc();
 }
 
+DeviceAddress DebugBufferResource::getDeviceAddress()
+{
+    return baseObject->getDeviceAddress();
+}
+
 IResource::Type DebugTextureResource::getType()
 {
     SLANG_GFX_API_FUNC;

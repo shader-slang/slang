@@ -179,6 +179,17 @@ public:
         RefPtr<VKDevice> m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            if (!m_buffer.m_api->vkGetBufferDeviceAddress)
+                return 0;
+            VkBufferDeviceAddressInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            info.buffer = m_buffer.m_buffer;
+            return (DeviceAddress)m_buffer.m_api->vkGetBufferDeviceAddress(
+                m_buffer.m_api->m_device, &info);
+        }
     };
 
     class TextureResourceImpl : public TextureResource
