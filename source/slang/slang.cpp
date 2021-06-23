@@ -23,6 +23,7 @@
 #include "../core/slang-writer.h"
 
 #include "../compiler-core/slang-source-loc.h"
+#include "../compiler-core/slang-struct-tag-converter.h"
 
 #include "slang-ast-dump.h"
 
@@ -114,6 +115,32 @@ const char* getBuildTagString()
     return SLANG_TAG_VERSION;
 }
 
+static RefPtr<StructTagSystem> _createStructTagSystem()
+{
+    RefPtr<StructTagSystem> system = new StructTagSystem;
+
+    {
+#define SLANG_STRUCT_TAG_ADD_CATEGORY(x) system->addCategoryInfo(slang::StructTagCategory::x, #x);
+        SLANG_STRUCT_TAG_CATEGORIES(SLANG_STRUCT_TAG_ADD_CATEGORY)
+    }
+
+    {
+#define SLANG_STRUCT_TAG_ADD_TYPE(X) system->addType(slang::X::kStructTag, "slang::" #X, sizeof(slang::X));
+SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ADD_TYPE)
+
+        // Add field that references more tagged structs
+        {
+            slang::SessionDesc desc;
+            auto field = StructTagTypeTraits::getFieldWithCount(&desc, &desc.targets, &desc.targetCount);
+
+            auto type = system->getType(slang::SessionDesc::kStructTag);
+            type->m_fields.add(field);
+        }
+    }
+
+    return system;
+}
+
 void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
@@ -130,6 +157,8 @@ void Session::init()
     // Set up shared AST builder
     m_sharedASTBuilder = new SharedASTBuilder;
     m_sharedASTBuilder->init(this);
+
+    m_structTagSystem = _createStructTagSystem();
 
     //  Use to create a ASTBuilder
     RefPtr<ASTBuilder> builtinAstBuilder(new ASTBuilder(m_sharedASTBuilder, "m_builtInLinkage::m_astBuilder"));
@@ -438,42 +467,45 @@ ISlangUnknown* Session::getInterface(const Guid& guid)
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
-    slang::SessionDesc const&  desc,
+    slang::SessionDesc const&  inDesc,
     slang::ISession**          outSession)
 {
+    MemoryArena arena(1024);
+    
+    LazyStructTagConverter converter(getStructTagSystem(), &arena, nullptr);
+
+    const slang::SessionDesc* desc = nullptr;
+    SLANG_RETURN_ON_FAIL(converter.convertToCurrent(&inDesc, &desc));
+
     RefPtr<ASTBuilder> astBuilder(new ASTBuilder(m_sharedASTBuilder, "Session::astBuilder"));
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    Int targetCount = desc.targetCount;
-    const uint8_t* targetDescPtr = reinterpret_cast<const uint8_t*>(desc.targets);
-    for(Int ii = 0; ii < targetCount; ++ii)
     {
-        slang::TargetDesc targetDesc;
-        // Copy the size field first.
-        memcpy(&targetDesc.structureSize, targetDescPtr, sizeof(size_t));
-        // Copy the entire desc structure.
-        memcpy(&targetDesc, targetDescPtr, targetDesc.structureSize);
-        linkage->addTarget(targetDesc);
-        targetDescPtr += targetDesc.structureSize;
+        const Index targetCount = Index(desc->targetCount);
+        for(Index ii = 0; ii < targetCount; ++ii)
+        {
+            const auto& targetDesc = desc->targets[ii];
+            linkage->addTarget(targetDesc);
+        }
     }
 
-    if(desc.flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
+    if(desc->flags & slang::kSessionFlag_FalcorCustomSharedKeywordSemantics)
     {
         linkage->m_useFalcorCustomSharedKeywordSemantics = true;
     }
 
-    linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
+    linkage->setMatrixLayoutMode(desc->defaultMatrixLayoutMode);
 
-    Int searchPathCount = desc.searchPathCount;
+    Int searchPathCount = desc->searchPathCount;
     for(Int ii = 0; ii < searchPathCount; ++ii)
     {
-        linkage->addSearchPath(desc.searchPaths[ii]);
+        linkage->addSearchPath(desc->searchPaths[ii]);
     }
 
-    Int macroCount = desc.preprocessorMacroCount;
+    Int macroCount = desc->preprocessorMacroCount;
     for(Int ii = 0; ii < macroCount; ++ii)
     {
-        auto& macro = desc.preprocessorMacros[ii];
+        auto& macro = desc->preprocessorMacros[ii];
         linkage->addPreprocessorDefine(macro.name, macro.value);
     }
 
@@ -939,6 +971,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             {
                 ConstantBufferType* cbType = getASTBuilder()->create<ConstantBufferType>();
                 cbType->elementType = type;
+                cbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "ConstantBuffer", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = cbType;
             }
             break;
@@ -946,6 +980,8 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
             {
                 ParameterBlockType* pbType = getASTBuilder()->create<ParameterBlockType>();
                 pbType->elementType = type;
+                pbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "ParameterBlock", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = pbType;
             }
             break;
@@ -954,14 +990,14 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::getContainerType(
                 HLSLStructuredBufferType* sbType =
                     getASTBuilder()->create<HLSLStructuredBufferType>();
                 sbType->elementType = type;
+                sbType->declRef = getASTBuilder()->getBuiltinDeclRef(
+                    "HLSLStructuredBufferType", makeConstArrayView<Val*>(static_cast<Val*>(type)));
                 containerTypeReflection = sbType;
             }
             break;
         case slang::ContainerType::UnsizedArray:
             {
-                ArrayExpressionType* arrType = getASTBuilder()->create<ArrayExpressionType>();
-                arrType->baseType = type;
-                arrType->arrayLength = nullptr;
+                ArrayExpressionType* arrType = getASTBuilder()->getArrayType(type, nullptr);
                 containerTypeReflection = arrType;
             }
             break;

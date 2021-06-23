@@ -30,6 +30,11 @@ DIAGNOSTIC(100002, Error, unbalancedDownstreamArguments, "unbalanced downstream 
 DIAGNOSTIC(100003, Error, closeOfUnopenDownstreamArgs, "close of an unopen downstream argument scope")
 DIAGNOSTIC(100004, Error, downstreamToolNameNotDefined, "downstream tool name not defined")
 
+DIAGNOSTIC(110001, Error, structTagConversionFailureNoArena, "StructTag conversion failed - no arena")
+DIAGNOSTIC(110002, Error, unknownStructTag, "unknown StructTag $0")
+DIAGNOSTIC(110003, Error, cannotConvertStructTag, "cannot convert StructTag $0 to $1")
+DIAGNOSTIC(110004, Error, cannotConvertDifferentStructTag, "cannot convert different StructTag types $0 to $1")
+
 DIAGNOSTIC(99999, Note, noteLocationOfInternalError, "an internal error threw an exception while working on code near this location")
 
 #undef DIAGNOSTIC

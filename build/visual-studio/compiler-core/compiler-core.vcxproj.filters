@@ -72,6 +72,12 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-struct-tag-converter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\compiler-core\slang-struct-tag-system.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\compiler-core\slang-token-defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -138,6 +144,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-struct-tag-converter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\compiler-core\slang-struct-tag-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\compiler-core\slang-token.cpp">

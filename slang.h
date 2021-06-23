@@ -450,6 +450,178 @@ convention for interface methods.
 #include <stddef.h>
 #endif // ! SLANG_NO_STDDEF
 
+namespace slang
+{
+
+/* Slang provides a mechanism for value types (such as structures) to be able to provide forward and backward
+ABI compatibility through. 
+
+The type is made up of several parts.
+0) The kind primary or extension
+1) The category the type is in
+2) An id for the type in the category
+3) The major semantic version
+4) The minor semantic version
+
+Within the 'semantic versioning' a structure that has only a larger minor semantic version can be used (with some
+caveats) as is when being passed to a previous version of Slang. It may contain more fields.
+*/
+
+enum class StructTagKind : uint8_t
+{
+    Primary,                ///< A primary struct (contains optional extensions)
+    Extension,              ///< An extension struct
+};
+
+#define SLANG_STRUCT_TAG_ENUM(x) x,
+
+#define SLANG_STRUCT_TAG_CATEGORIES(x) \
+    x(Core) \
+    x(Slang) \
+    x(Gfx)
+
+
+enum class StructTagCategory : uint8_t
+{
+    SLANG_STRUCT_TAG_CATEGORIES(SLANG_STRUCT_TAG_ENUM)
+    CountOf,
+};
+
+/* AbiStructType is laid out as follows
+
+     |Primary | Category     | Type      | Major version | Minor Version
+-----|--------|--------------|-----------|---------------|----------------
+Bits | 31     | 30-24        | 23-16     |     15-8      |     0-7
+Type |        | AbiCategory  | Cat Spec  |               |
+
+Type will be specified as something specific for the category. A typical implementation will have an enum that lists
+types for that category. 
+
+TODO(JS): This layout may need to be altered - too may bits are perhaps used by major/minor version for example. This should
+be fine for the immediate future though.
+*/
+
+typedef uint32_t StructTagInt;
+typedef uint32_t StructSize;
+
+enum class StructTag : StructTagInt;
+
+enum : uint32_t
+{
+    kStructTagPrimaryMask = 0x80000000,
+
+    kStructTagCategoryMask = 0x7f000000,
+    kStructTagCategoryShift = 24,
+
+    // Combination of category and TypeIndex
+    kStructTagCategoryTypeIndexMask = 0x7fff0000,
+    kStructTagCategoryTypeIndexShift = 16,
+
+    kStructTagCategoryTypeMajorMask = 0xffffff00,
+
+    kStructTagTypeIndexMask = 0x00ff0000,
+    kStructTagTypeIndexShift = 16,
+
+    kStructTagVersionMask = 0x0000ffff,
+    kStructTagVersionShift = 0,
+
+    kStructTagMajorMask = 0x0000ff00,
+    kStructTagMajorShift = 8,
+
+    kStructTagMinorMask = 0x000000ff,
+    kStructTagMinorShift = 0,
+};
+
+// Types purely for use in template type identification
+// Any Primary or Extension TaggedStruct must have a typedef of one of these as Tag.
+enum class PrimaryTag;
+enum class ExtensionTag;
+
+#define SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) slang::StructTag(slang::StructTagInt(slang::kStructTagPrimaryMask) | (slang::StructTagInt(CATEGORY) << 24) | (slang::StructTagInt(TYPE_ID) << 16) | (slang::StructTagInt(MAJOR) << 8) | slang::StructTagInt(MINOR))
+#define SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR) slang::StructTag((slang::StructTagInt(CATEGORY) << 24) | (slang::StructTagInt(TYPE_ID) << 16) | (slang::StructTagInt(MAJOR) << 8) | slang::StructTagInt(MINOR))
+
+/* 
+`PrimaryStruct`s are structs that are passed directly into API calls. They always contain a 'structType' that identifies the exact version
+and type of that is being passed in. `PrimaryStruct`s can also specify optional `ExtensionStruct` types that modify and/or add to the values
+in the `PrimaryStruct`.
+
+`ExtensionStruct` cannot contain optional other extensions as PrimaryStructs do - all required extensions have to be specified via the list set on the
+`PrimaryStruct`.
+
+`ExtensionStruct` is typically used when it is necessary to provide some special additional information that is not appropriate to place within
+the `PrimaryStruct`. This also provides a mechanism such that a `PrimaryStruct` derived type does not need to include all the fields that will
+every be needed. Cross cutting aspects can have their own uniquely identified structs.
+
+As a mechanism to provide extensibility without having to modify a struct or to allow optional and/or additional information through
+ExtensionStruct set via the `exts` and `extsCount` members.
+
+A type that is ABI compatible with this mechanism must start with exactly the same fields as specified.
+When using extensions, the exts and extsCount should be set. `exts` points to the extension ids (which must be at the start of the types)
+to provide some kind of type safely without requiring inheritance.
+*/
+
+#define SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
+    typedef TYPE_NAME ThisType; \
+    typedef slang::ExtensionTag Tag; \
+    static const slang::StructTag kStructTag = SLANG_MAKE_EXTENSION_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    slang::StructTag structTag = kStructTag; \
+    slang::StructSize structSize = slang::StructSize(sizeof(ThisType));
+
+#define SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, CATEGORY, TYPE_ID, MAJOR, MINOR) \
+    typedef TYPE_NAME ThisType; \
+    typedef ::slang::PrimaryTag Tag; \
+    static const ::slang::StructTag kStructTag = SLANG_MAKE_PRIMARY_STRUCT_TAG(CATEGORY, TYPE_ID, MAJOR, MINOR); \
+    slang::StructTag structTag = kStructTag; \
+    slang::StructSize structSize = slang::StructSize(sizeof(ThisType)); \
+    const slang::StructTag** exts = nullptr; \
+    int32_t extsCount = 0; 
+
+#define SLANG_API_TYPE_ENUM(x) x,
+
+struct TaggedStructBase
+{
+    StructTag structTag;            ///< Identity for the type
+    StructSize structSize;             ///< Size of the type in bytes
+};
+
+/* Layout for a PrimaryTaggedStruct */
+struct PrimaryTaggedStruct
+{
+    StructTag structTag;                ///< Identity for the type
+    StructSize structSize;              ///< Size of the type in bytes
+    const StructTag** exts;             ///< Extensions - StructTag type should be the first member of Extension structs
+    int32_t extsCount = 0;              ///< The number of extensions
+};
+
+/* Layout for a Extension TaggedStruct */
+struct ExtensionTaggedStruct 
+{
+    StructTag structTag;                ///< Identity for the type
+    StructSize structSize;              ///< Size of the type in bytes
+};
+
+// Enumerate all of the types that want ABI handling as part of Slang API.
+//
+// NOTE! That care is needed using the enumeration, because we want IDs to remain stable.
+// New types should be added to the end. Removed types should become Depreciated_Name (say).
+//
+// NOTE! The names must match the type name for an active type exactly for the SLANG_PRIMARY_TAGGED_STRUCT and SLANG_EXTENSION_TAGGED_STRUCT
+// macros to work.
+#define SLANG_TAGGED_STRUCTS(x) \
+    x(TargetDesc) \
+    x(SessionDesc)
+
+// Define Slangs types in the enum
+enum class SlangTaggedStruct
+{
+    SLANG_TAGGED_STRUCTS(SLANG_STRUCT_TAG_ENUM)
+};
+
+#define SLANG_PRIMARY_TAGGED_STRUCT(TYPE_NAME, MAJOR, MINOR)  SLANG_PRIMARY_TAGGED_STRUCT_IMPL(TYPE_NAME, StructTagCategory::Slang, SlangTaggedStruct::TYPE_NAME, MAJOR, MINOR)
+#define SLANG_EXTENSION_TAGGED_STRUCT(TYPE_NAME, MAJOR, MINOR)  SLANG_EXTENSION_TAGGED_STRUCT_IMPL(TYPE_NAME, StructTagCategory::Slang, SlangTaggedStruct::TYPE_NAME, MAJOR, MINOR)
+
+} // namespace slang
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -478,7 +650,7 @@ extern "C"
 
     typedef bool SlangBool;
 
-
+    
     /*!
     @brief Severity of a diagnostic generated by the compiler.
     Values come from the enum below, with higher values representing more severe
@@ -830,6 +1002,9 @@ extern "C"
 #define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
     //! Could not complete because some underlying feature (hardware or software) was not available 
 #define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
+
+    //! A type specified is StructTag incompatible with this version of slang
+#define SLANG_E_STRUCT_TAG_INCOMPATIBLE     SLANG_MAKE_CORE_ERROR(8)
 
     /** A "Universally Unique Identifier" (UUID)
 
@@ -3804,9 +3979,7 @@ namespace slang
         */
     struct TargetDesc
     {
-            /** The size of this structure, in bytes.
-            */
-        size_t structureSize = sizeof(TargetDesc);
+        SLANG_PRIMARY_TAGGED_STRUCT(TargetDesc, 0, 0)
 
             /** The target format to generate code for (e.g., SPIR-V, DXIL, etc.)
             */
@@ -3856,9 +4029,7 @@ namespace slang
 
     struct SessionDesc
     {
-            /** The size of this structure, in bytes.
-             */
-        size_t structureSize = sizeof(SessionDesc);
+        SLANG_PRIMARY_TAGGED_STRUCT(SessionDesc, 0, 0)
 
             /** Code generation targets to include in the session.
             */
