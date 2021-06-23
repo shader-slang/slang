@@ -124,6 +124,7 @@ public:
     IBufferResource* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>

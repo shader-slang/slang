@@ -37,7 +37,8 @@ public:
     SlangResult init()
     {
         m_data = malloc(m_desc.sizeInBytes);
-        if(!m_data) return SLANG_E_OUT_OF_MEMORY;
+        if (!m_data)
+            return SLANG_E_OUT_OF_MEMORY;
         return SLANG_OK;
     }
 
@@ -48,6 +49,11 @@ public:
     }
 
     void* m_data = nullptr;
+
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+    {
+        return (DeviceAddress)m_data;
+    }
 };
 
 struct CPUTextureBaseShapeInfo

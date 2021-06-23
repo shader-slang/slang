@@ -36,6 +36,7 @@ typedef SlangResult Result;
 // Had to move here, because Options needs types defined here
 typedef SlangInt Int;
 typedef SlangUInt UInt;
+typedef uint64_t DeviceAddress;
 
 // Declare opaque type
 class IInputLayout: public ISlangUnknown
@@ -295,6 +296,7 @@ public:
         Format format = Format::Unknown;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
