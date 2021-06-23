@@ -242,6 +242,11 @@ public:
 		GLuint m_handle;
         GLenum m_target;
         UInt m_size;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            return 0;
+        }
 	};
 
     class TextureResourceImpl: public TextureResource

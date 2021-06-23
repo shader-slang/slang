@@ -87,6 +87,11 @@ Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
         return SLANG_FAIL;
     }
 
+    if (!vkGetBufferDeviceAddressKHR && vkGetBufferDeviceAddressEXT)
+        vkGetBufferDeviceAddressKHR = vkGetBufferDeviceAddressEXT;
+    if (!vkGetBufferDeviceAddress && vkGetBufferDeviceAddressKHR)
+        vkGetBufferDeviceAddress = vkGetBufferDeviceAddressKHR;
+
     m_device = device;
     return SLANG_OK;
 }
