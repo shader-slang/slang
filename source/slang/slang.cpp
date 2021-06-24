@@ -1532,7 +1532,7 @@ static void _calcViewInitiatingHierarchy(SourceManager* sourceManager, ViewIniti
     // This assumes they increase in SourceLoc implies an later within a source file - this is true currently.
     for (auto& pair : outHierarchy)
     {
-        pair.Value.sort([](SourceView* a, SourceView* b) { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
+        pair.Value.sort([](SourceView* a, SourceView* b) -> bool { return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw(); });
     }
 }
 
