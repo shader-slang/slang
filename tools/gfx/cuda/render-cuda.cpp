@@ -188,6 +188,11 @@ public:
     void* m_cudaMemory = nullptr;
 
     RefPtr<CUDAContext> m_cudaContext;
+
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+    {
+        return (DeviceAddress)m_cudaMemory;
+    }
 };
 
 class TextureCUDAResource : public TextureResource

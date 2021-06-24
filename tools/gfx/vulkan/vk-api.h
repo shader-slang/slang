@@ -143,6 +143,7 @@ namespace gfx {
     x(vkGetPhysicalDeviceSurfacePresentModesKHR) \
     x(vkGetPhysicalDeviceSurfaceCapabilitiesKHR) \
     x(vkDestroySurfaceKHR) \
+
     /* */
 
 #define VK_API_DEVICE_KHR_PROCS(x) \
@@ -155,6 +156,10 @@ namespace gfx {
 
 #define VK_API_DEVICE_OPT_PROCS(x) \
     x(vkCmdSetPrimitiveTopologyEXT) \
+    x(vkGetBufferDeviceAddress) \
+    x(vkGetBufferDeviceAddressKHR) \
+    x(vkGetBufferDeviceAddressEXT) \
+
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

@@ -210,6 +210,11 @@ protected:
         ComPtr<ID3D11Buffer> m_buffer;
         ComPtr<ID3D11Buffer> m_staging;
         List<uint8_t> m_uploadStagingBuffer;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            return 0;
+        }
     };
     class TextureResourceImpl : public TextureResource
     {

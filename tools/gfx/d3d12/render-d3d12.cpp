@@ -198,6 +198,11 @@ public:
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
         D3D12_RESOURCE_STATES m_defaultState;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            return (DeviceAddress)m_resource.getResource()->GetGPUVirtualAddress();
+        }
     };
 
     class TextureResourceImpl: public TextureResource
