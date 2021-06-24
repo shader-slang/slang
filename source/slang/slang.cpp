@@ -2201,7 +2201,23 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
 // Act as expected of the API-based compiler
 SlangResult EndToEndCompileRequest::executeActions()
 {
-    SlangResult res = executeActionsInner();
+    SlangResult res = SLANG_FAIL;
+    try
+    {
+        res = executeActionsInner();
+    }
+    catch (const InternalError&)
+    {
+        String reproFileName;
+        SlangResult saveRes = SLANG_FAIL;
+
+        RefPtr<Stream> stream;
+        if (SLANG_SUCCEEDED(ReproUtil::findUniqueReproDumpStream(this, reproFileName, stream)))
+        {
+            saveRes = ReproUtil::saveState(this, stream);
+        }
+    }
+
     m_diagnosticOutput = getSink()->outputBuffer.ProduceString();
     return res;
 }
@@ -4183,6 +4199,17 @@ SlangResult EndToEndCompileRequest::setTypeNameForEntryPointExistentialTypeParam
 SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 {
     SlangResult res = SLANG_FAIL;
+
+    // If we don't have a caching file system (needed for repro), then make one.
+    if (true || m_linkage->m_requireCacheFileSystem)
+    {
+        if (!m_linkage->m_cacheFileSystem)
+        {
+            ComPtr<ISlangFileSystem> scopeFileSystem(m_linkage->m_fileSystem);
+         
+            m_linkage->setFileSystem(scopeFileSystem);
+        }
+    }
 
 #if !defined(SLANG_DEBUG_INTERNAL_ERROR)
     // By default we'd like to catch as many internal errors as possible,

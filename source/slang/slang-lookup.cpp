@@ -755,6 +755,13 @@ static void _lookUpInScopes(
     auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
 
     auto scope      = request.scope;
+
+    if (scope && scope->parent && scope->parent->debugGetReferenceCount() > 64)
+    {
+        // Throw an exception
+        throw InternalError("Invalid refCount on scope");
+    }
+
     auto endScope   = request.endScope;
     for (;scope != endScope; scope = scope->parent)
     {
