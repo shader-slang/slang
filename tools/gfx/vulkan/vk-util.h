@@ -1,6 +1,7 @@
 // vk-util.h
 #pragma once
 
+#include "core/slang-basic.h"
 #include "vk-api.h"
 #include "slang-gfx.h"
 
@@ -45,5 +46,23 @@ struct VulkanUtil
 
     static VkImageLayout getImageLayoutFromState(ResourceState state);
 };
+
+struct AccelerationStructureBuildGeometryInfoBuilder
+{
+public:
+    VkAccelerationStructureBuildGeometryInfoKHR buildInfo = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
+    Slang::List<uint32_t> primitiveCounts;
+
+    Slang::Result build(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IDebugCallback* debugCallback);
+
+private:
+    Slang::List<VkAccelerationStructureGeometryKHR> m_geometryInfos;
+    VkAccelerationStructureGeometryKHR m_vkInstanceInfo = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+};
+
 
 } // renderer_test

@@ -921,22 +921,6 @@ public:
             : public IComputeCommandEncoder
         {
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IComputeCommandEncoder)
-                {
-                    *outObject = static_cast<IComputeCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
-        public:
             CommandWriter* m_writer;
             CommandBufferImpl* m_commandBuffer;
             RefPtr<ShaderObjectBase> m_rootObject;
@@ -982,22 +966,6 @@ public:
             : public IResourceCommandEncoder
         {
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IResourceCommandEncoder)
-                {
-                    *outObject = static_cast<IResourceCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
-        public:
             CommandWriter* m_writer;
 
             void init(CommandBufferImpl* cmdBuffer)
@@ -1035,6 +1003,12 @@ public:
         {
             m_resourceCommandEncoder.init(this);
             *outEncoder = &m_resourceCommandEncoder;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            *outEncoder = nullptr;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}

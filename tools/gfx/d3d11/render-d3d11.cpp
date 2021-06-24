@@ -1536,7 +1536,7 @@ protected:
             bufferDesc.defaultState = ResourceState::ConstantBuffer;
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
             SLANG_RETURN_ON_FAIL(
                 device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
@@ -2506,10 +2506,10 @@ static int _calcResourceAccessFlags(int accessFlags)
     switch (accessFlags)
     {
         case 0:         return 0;
-        case IResource::AccessFlag::Read:            return D3D11_CPU_ACCESS_READ;
-        case IResource::AccessFlag::Write:           return D3D11_CPU_ACCESS_WRITE;
-        case IResource::AccessFlag::Read |
-             IResource::AccessFlag::Write:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+        case AccessFlag::Read:            return D3D11_CPU_ACCESS_READ;
+        case AccessFlag::Write:           return D3D11_CPU_ACCESS_WRITE;
+        case AccessFlag::Read |
+             AccessFlag::Write:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         default: assert(!"Invalid flags"); return 0;
     }
 }
@@ -2663,11 +2663,11 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.BindFlags = d3dBindFlags;
     // For read we'll need to do some staging
     bufferDesc.CPUAccessFlags =
-        _calcResourceAccessFlags(descIn.cpuAccessFlags & IResource::AccessFlag::Write);
+        _calcResourceAccessFlags(descIn.cpuAccessFlags & AccessFlag::Write);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
     // If written by CPU, make it dynamic
-    if ((descIn.cpuAccessFlags & IResource::AccessFlag::Write) &&
+    if ((descIn.cpuAccessFlags & AccessFlag::Write) &&
         !descIn.allowedStates.contains(ResourceState::UnorderedAccess))
     {
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -2698,7 +2698,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
         }
     }
 
-    if (srcDesc.cpuAccessFlags & IResource::AccessFlag::Write)
+    if (srcDesc.cpuAccessFlags & AccessFlag::Write)
     {
         bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
     }
@@ -2711,8 +2711,8 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
     buffer->m_d3dUsage = bufferDesc.Usage;
 
-    if ((srcDesc.cpuAccessFlags & IResource::AccessFlag::Read) ||
-        ((srcDesc.cpuAccessFlags & IResource::AccessFlag::Write) && bufferDesc.Usage != D3D11_USAGE_DYNAMIC))
+    if ((srcDesc.cpuAccessFlags & AccessFlag::Read) ||
+        ((srcDesc.cpuAccessFlags & AccessFlag::Write) && bufferDesc.Usage != D3D11_USAGE_DYNAMIC))
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;

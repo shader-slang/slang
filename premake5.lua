@@ -652,6 +652,8 @@ example "hello-world"
 -- Let's go ahead and set up the projects for our other example now.
 example "triangle"
 
+example "ray-tracing"
+
 example "gpu-printing"
     kind "ConsoleApp"
 
