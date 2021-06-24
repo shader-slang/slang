@@ -4201,7 +4201,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
     SlangResult res = SLANG_FAIL;
 
     // If we don't have a caching file system (needed for repro), then make one.
-    if (true || m_linkage->m_requireCacheFileSystem)
+    //if (true || m_linkage->m_requireCacheFileSystem)
     {
         if (!m_linkage->m_cacheFileSystem)
         {
