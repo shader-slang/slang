@@ -756,7 +756,7 @@ static void _lookUpInScopes(
 
     auto scope      = request.scope;
 
-    if (scope && scope->parent && scope->parent->debugGetReferenceCount() > 64)
+    if (scope && scope->parent && scope->parent->debugGetReferenceCount() > 65536)
     {
         SLANG_BREAKPOINT(0);
         // Throw an exception
