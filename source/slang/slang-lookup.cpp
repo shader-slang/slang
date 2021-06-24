@@ -758,6 +758,7 @@ static void _lookUpInScopes(
 
     if (scope && scope->parent && scope->parent->debugGetReferenceCount() > 64)
     {
+        SLANG_BREAKPOINT(0);
         // Throw an exception
         throw InternalError("Invalid refCount on scope");
     }
