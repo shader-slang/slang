@@ -465,7 +465,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::createSession(
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
-    Int searchPathCount = desc->searchPathCount;
+    Int searchPathCount = desc.searchPathCount;
     for(Int ii = 0; ii < searchPathCount; ++ii)
     {
         linkage->addSearchPath(desc.searchPaths[ii]);
