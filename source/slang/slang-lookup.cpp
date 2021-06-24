@@ -756,12 +756,14 @@ static void _lookUpInScopes(
 
     auto scope      = request.scope;
 
+#if 0
     if (scope && scope->parent && scope->parent->debugGetReferenceCount() > 65536)
     {
         SLANG_BREAKPOINT(0);
         // Throw an exception
         throw InternalError("Invalid refCount on scope");
     }
+#endif
 
     auto endScope   = request.endScope;
     for (;scope != endScope; scope = scope->parent)

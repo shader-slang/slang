@@ -4269,7 +4269,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
                 return saveRes;
             }
         }
-        else if (m_dumpReproOnError && SLANG_FAILED(res))
+        else /* if (m_dumpReproOnError && SLANG_FAILED(res)) */
         {
             String reproFileName;
             SlangResult saveRes = SLANG_FAIL;
