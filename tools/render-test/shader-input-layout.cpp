@@ -683,7 +683,7 @@ namespace renderer_test
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
-            else if (parser.AdvanceIf("TextureSamplerSampler1D"))
+            else if (parser.AdvanceIf("TextureSampler1D"))
             {
                 RefPtr<ShaderInputLayout::CombinedTextureSamplerVal> val = new ShaderInputLayout::CombinedTextureSamplerVal;
                 val->textureVal = new ShaderInputLayout::TextureVal;

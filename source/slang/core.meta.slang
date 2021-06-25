@@ -596,78 +596,6 @@ static const struct {
 };
 static const int kBaseTextureAccessLevelCount = sizeof(kBaseTextureAccessLevels) / sizeof(kBaseTextureAccessLevels[0]);
 
-#if 0
-// Declare the GLSL types here for compatibility...
-//
-// TODO: The stdlib should include a module that declares the GLSL types, to keep
-// them separate...
-for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
-{
-    char const* name = kBaseTextureTypes[tt].name;
-    TextureFlavor::Shape baseShape = kBaseTextureTypes[tt].baseShape;
-
-    for (int isArray = 0; isArray < 2; ++isArray)
-    {
-        // Arrays of 3D textures aren't allowed
-        if (isArray && baseShape == TextureFlavor::Shape::Shape3D) continue;
-
-        for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
-        {       
-            for (int accessLevel = 0; accessLevel < kBaseTextureAccessLevelCount; ++accessLevel)
-            {
-                auto access = kBaseTextureAccessLevels[accessLevel].access;
-
-                 // No such thing as RWTextureCube
-                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE && baseShape == TextureFlavor::Shape::ShapeCube)
-                {
-                    continue;
-                }
-
-                // TODO: any constraints to enforce on what gets to be multisampled?
-
-                unsigned flavor = baseShape;
-                if (isArray)		flavor |= TextureFlavor::ArrayFlag;
-                if (isMultisample)	flavor |= TextureFlavor::MultisampleFlag;
-    //                        if (isShadow)		flavor |= TextureFlavor::ShadowFlag;
-
-                flavor |= (access << 8);
-
-                // emit a generic signature
-                // TODO: allow for multisample count to come in as well...
-                sb << "__generic<T = float4> ";
-
-                sb << "__magic_type(TextureSampler," << int(flavor) << ")\n";
-                sb << "__intrinsic_type(" << (kIROp_TextureSamplerType + (int(flavor) << kIROpMeta_OtherShift)) << ")\n";
-                sb << "struct Sampler";
-                sb << kBaseTextureAccessLevels[accessLevel].name;
-                sb << name;
-                if (isMultisample) sb << "MS";
-                if (isArray) sb << "Array";
-    //                        if (isShadow) sb << "Shadow";
-                sb << "\n{\n";
-                sb << "__specialized_for_target(glsl)\n";
-                sb << "__init(";
-                sb << kBaseTextureAccessLevels[accessLevel].name;
-                sb << name;
-                if (isMultisample) sb << "MS";
-                if (isArray) sb << "Array";
-                sb << "<T> t, ";
-                sb << "SamplerState s);\n";
-
-                sb << "__target_intrinsic(glsl, texture)\n";
-                sb << "T Sample(float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
-
-                sb << "__target_intrinsic(glsl, texture)\n";
-                sb << "T Sample(float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
-
-                sb << "};\n";
-
-            }
-        }
-    }
-}
-#endif
-
 static const struct TextureTypePrefixInfo
 {
     char const* name;
@@ -735,7 +663,6 @@ for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
                 sb << "\n{";
 
                 char const* samplerStateParam = prefixInfo.combined ? "" : "SamplerState s, ";
-//                int samplerStateParamCount =  prefixInfo.combined ? 0 : 1;
 
                 if( !isMultisample )
                 {

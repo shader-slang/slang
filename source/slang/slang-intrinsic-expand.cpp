@@ -519,6 +519,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             else
             {
                 // What other cases are possible?
+                SLANG_UNEXPECTED("bad format in intrinsic definition");
             }
         }
         break;
