@@ -457,7 +457,25 @@ struct OptionsParser
                 stdOut->write(buf.getBuffer(), buf.getLength());
             }
 
-            SLANG_RETURN_ON_FAIL(requestImpl->compile());
+            StringBuilder bufs[Index(WriterChannel::CountOf)];
+            ComPtr<ISlangWriter> writers[Index(WriterChannel::CountOf)];
+            for (Index i = 0; i < Index(WriterChannel::CountOf); ++i)
+            {
+                writers[i] = new StringWriter(&bufs[0], 0);
+                requestImpl->setWriter(WriterChannel(i), writers[i]);
+            }
+
+            if (SLANG_FAILED(requestImpl->compile()))
+            {
+                const char failed[] = "FAILED!\n";
+                stdOut->write(failed, SLANG_COUNT_OF(failed) - 1);
+
+                const auto& diagnostics = bufs[Index(WriterChannel::Diagnostic)];
+
+                stdOut->write(diagnostics.getBuffer(), diagnostics.getLength());
+
+                return SLANG_FAIL;
+            }
         }
 
         if (stdOut)
