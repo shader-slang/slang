@@ -716,8 +716,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 SLANG_RETURN_ON_FAIL(
                     m_transientHeap->createCommandBuffer(commandBuffer.writeRef()));
 
-                ComPtr<IResourceCommandEncoder> encoder;
-                commandBuffer->encodeResourceCommands(encoder.writeRef());
+                IResourceCommandEncoder* encoder = nullptr;
+                commandBuffer->encodeResourceCommands(&encoder);
                 encoder->copyBuffer(stagingBuffer, 0, bufferResource, 0, bufferSize);
                 encoder->endEncoding();
 
