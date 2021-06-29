@@ -1,12 +1,9 @@
-Slang "Hello World" Example
+Slang "Ray Tracing" Example
 ===========================
 
-The goal of this example is to demonstrate an almost minimal application that uses Slang for shading.
+The goal of this example is to demonstrate how to use hardware ray-tracing in Slang.
 
-The `shaders.slang` file contains simple vertex and fragment shader entry points. The shader code should compile as either Slang or HLSL code (that is, this example does not show off any new Slang language features).
+The `shaders.slang` file contains a compute shader that traces primary rays from camera and shade intersections with basic lighting + ray-traced shadows. The file also defines a vertex and a fragment shader entry point for displaying the ray-traced image produced by the compute shader.
 
-The `main.cpp` file contains the C++ application code, showing how to use the Slang API to load and compile the shader code to DirectX shader bytecode (DXBC).
-The application perform rendering using the D3D11 API, through a platform and graphics API abstraction layer that is implemented in `tools/gfx`.
+The `main.cpp` file contains the C++ application code, showing how to use the Slang API to load and compile the shader code, and how to use a graphics API abstraction layer implemented in `tools/gfx` to initiate hardware ray-tracing.
 Note that this abstraction layer is *not* required in order to work with Slang, and it is just there to help us write example and test applications more conveniently.
-
-This example is not necessarily representative of best practices for integrating Slang into a production engine; the goal is merely to use the minimum amount of code possible to demonstrate a complete applicaiton that uses Slang.
