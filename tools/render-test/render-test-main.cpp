@@ -435,9 +435,7 @@ Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* e
     {
     case PipelineType::Compute:
         {
-            ComPtr<IComputeCommandEncoder> computeEncoder;
-            encoder->queryInterface(
-                SLANG_UUID_IComputeCommandEncoder, (void**)computeEncoder.writeRef());
+            IComputeCommandEncoder* computeEncoder = static_cast<IComputeCommandEncoder*>(encoder);
             auto rootObject = computeEncoder->bindPipeline(m_pipelineState);
             SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
                 m_device, rootObject, m_compilationOutput.layout, m_outputPlan, slangReflection));
@@ -445,9 +443,7 @@ Result RenderTestApp::applyBinding(PipelineType pipelineType, ICommandEncoder* e
         break;
     case PipelineType::Graphics:
         {
-            ComPtr<IRenderCommandEncoder> renderEncoder;
-            encoder->queryInterface(
-                SLANG_UUID_IRenderCommandEncoder, (void**)renderEncoder.writeRef());
+            IRenderCommandEncoder* renderEncoder = static_cast<IRenderCommandEncoder*>(encoder);
             auto rootObject = renderEncoder->bindPipeline(m_pipelineState);
             SLANG_RETURN_ON_FAIL(_assignVarsFromLayout(
                 m_device, rootObject, m_compilationOutput.layout, m_outputPlan, slangReflection));
@@ -523,7 +519,7 @@ SlangResult RenderTestApp::initialize(
                 IBufferResource::Desc vertexBufferDesc;
                 vertexBufferDesc.type = IResource::Type::Buffer;
                 vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-                vertexBufferDesc.cpuAccessFlags = IResource::AccessFlag::Write;
+                vertexBufferDesc.cpuAccessFlags = AccessFlag::Write;
                 vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
                 vertexBufferDesc.allowedStates = ResourceStateSet(ResourceState::VertexBuffer);
 
@@ -697,7 +693,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
             const size_t bufferSize = bufferDesc.sizeInBytes;
 
             ComPtr<ISlangBlob> blob;
-            if(bufferDesc.cpuAccessFlags & IResource::AccessFlag::Read)
+            if(bufferDesc.cpuAccessFlags & AccessFlag::Read)
             {
                 // The buffer is already allocated for CPU access, so we can read it back directly.
                 //
@@ -708,7 +704,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 // The buffer is not CPU-readable, so we will copy it using a staging buffer.
 
                 auto stagingBufferDesc = bufferDesc;
-                stagingBufferDesc.cpuAccessFlags = IResource::AccessFlag::Read;
+                stagingBufferDesc.cpuAccessFlags = AccessFlag::Read;
                 stagingBufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
                 stagingBufferDesc.defaultState = ResourceState::CopyDestination;
@@ -720,8 +716,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 SLANG_RETURN_ON_FAIL(
                     m_transientHeap->createCommandBuffer(commandBuffer.writeRef()));
 
-                ComPtr<IResourceCommandEncoder> encoder;
-                commandBuffer->encodeResourceCommands(encoder.writeRef());
+                IResourceCommandEncoder* encoder = nullptr;
+                commandBuffer->encodeResourceCommands(&encoder);
                 encoder->copyBuffer(stagingBuffer, 0, bufferResource, 0, bufferSize);
                 encoder->endEncoding();
 

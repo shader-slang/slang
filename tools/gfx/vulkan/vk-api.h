@@ -159,7 +159,14 @@ namespace gfx {
     x(vkGetBufferDeviceAddress) \
     x(vkGetBufferDeviceAddressKHR) \
     x(vkGetBufferDeviceAddressEXT) \
-
+    x(vkCmdBuildAccelerationStructuresKHR) \
+    x(vkCmdCopyAccelerationStructureKHR) \
+    x(vkCmdCopyAccelerationStructureToMemoryKHR) \
+    x(vkCmdCopyMemoryToAccelerationStructureKHR) \
+    x(vkCmdWriteAccelerationStructuresPropertiesKHR) \
+    x(vkCreateAccelerationStructureKHR) \
+    x(vkDestroyAccelerationStructureKHR) \
+    x(vkGetAccelerationStructureBuildSizesKHR) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \
