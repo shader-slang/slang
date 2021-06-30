@@ -146,6 +146,16 @@ namespace renderer_test
             return SLANG_OK;
         }
 
+
+        SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::CombinedTextureSamplerVal* val)
+        {
+            auto result = parseOption(parser, word, val->textureVal);
+            if(SLANG_SUCCEEDED(result)) return result;
+
+            result = parseOption(parser, word, val->samplerVal);
+            return result;
+        }
+
         SlangResult parseOption(Misc::TokenReader& parser, String const& word, ShaderInputLayout::DataValBase* val)
         {
             if (word == "data")
@@ -673,10 +683,43 @@ namespace renderer_test
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
-            // TODO: We can include combined texture/sampler cases
-            // here, but we don't really have tests for them and
-            // it might be better to save it for a point where
-            // we support hierarchical binding values more directly.
+            else if (parser.AdvanceIf("TextureSampler1D"))
+            {
+                RefPtr<ShaderInputLayout::CombinedTextureSamplerVal> val = new ShaderInputLayout::CombinedTextureSamplerVal;
+                val->textureVal = new ShaderInputLayout::TextureVal;
+                val->samplerVal = new ShaderInputLayout::SamplerVal;
+                val->textureVal->textureDesc.dimension = 1;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
+            else if (parser.AdvanceIf("TextureSampler2D"))
+            {
+                RefPtr<ShaderInputLayout::CombinedTextureSamplerVal> val = new ShaderInputLayout::CombinedTextureSamplerVal;
+                val->textureVal = new ShaderInputLayout::TextureVal;
+                val->samplerVal = new ShaderInputLayout::SamplerVal;
+                val->textureVal->textureDesc.dimension = 2;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
+            else if (parser.AdvanceIf("TextureSampler3D"))
+            {
+                RefPtr<ShaderInputLayout::CombinedTextureSamplerVal> val = new ShaderInputLayout::CombinedTextureSamplerVal;
+                val->textureVal = new ShaderInputLayout::TextureVal;
+                val->samplerVal = new ShaderInputLayout::SamplerVal;
+                val->textureVal->textureDesc.dimension = 3;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
+            else if (parser.AdvanceIf("TextureSamplerCube"))
+            {
+                RefPtr<ShaderInputLayout::CombinedTextureSamplerVal> val = new ShaderInputLayout::CombinedTextureSamplerVal;
+                val->textureVal = new ShaderInputLayout::TextureVal;
+                val->samplerVal = new ShaderInputLayout::SamplerVal;
+                val->textureVal->textureDesc.dimension = 2;
+                val->textureVal->textureDesc.isCube = true;
+                maybeParseOptions(parser, val.Ptr());
+                return val;
+            }
             else
             {
                 throw ShaderInputLayoutFormatException(String("Unknown shader input type '") + word + String("' at line") + String(parser.NextToken().Position.Line));
