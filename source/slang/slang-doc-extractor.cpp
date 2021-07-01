@@ -750,7 +750,7 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
     }
 
     // Sort them into loc order
-    entries.sort([](Entry& a, Entry& b) { return a.locOrOffset < b.locOrOffset; });
+    entries.sort([](const Entry& a, const Entry& b) -> bool { return a.locOrOffset < b.locOrOffset; });
 
     {
         SourceView* sourceView = nullptr;
@@ -789,7 +789,7 @@ SlangResult DocMarkupExtractor::extract(const SearchItemInput* inputs, Index inp
         }
 
         // Sort into view/file and then offset order
-        entries.sort([](Entry& a, Entry& b) { return (a.viewIndex < b.viewIndex) || ((a.viewIndex == b.viewIndex) && a.locOrOffset < b.locOrOffset); });
+        entries.sort([](const Entry& a, const Entry& b) -> bool { return (a.viewIndex < b.viewIndex) || ((a.viewIndex == b.viewIndex) && a.locOrOffset < b.locOrOffset); });
     }
 
     {

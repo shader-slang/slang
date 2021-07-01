@@ -222,7 +222,7 @@ namespace Slang
         /// after the `switch`.
         ///
         /// The default case must also be present in `cases`.
-        Case* defaultCase;
+        Case* defaultCase = nullptr;
     };
 
     /// Container for all of the regions in a function.
