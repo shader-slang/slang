@@ -26,7 +26,11 @@ protected:
     Slang::ComPtr<gfx::IRenderPassLayout> gRenderPass;
     Slang::ComPtr<gfx::ICommandQueue> gQueue;
 
-    Slang::Result initializeBase(const char* titile, int width, int height);
+    Slang::Result initializeBase(
+        const char* titile,
+        int width,
+        int height,
+        gfx::DeviceType deviceType = gfx::DeviceType::Default);
     void createSwapchainFramebuffers();
     void mainLoop();
 

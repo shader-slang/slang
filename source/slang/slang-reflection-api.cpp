@@ -1231,7 +1231,11 @@ namespace Slang
     SlangBindingType _calcResourceBindingType(
         Type* type)
     {
-        if( auto resourceType = as<ResourceType>(type) )
+        if(auto combinedTextureSamplerType = as<TextureSamplerType>(type))
+        {
+            return SLANG_BINDING_TYPE_COMBINED_TEXTURE_SAMPLER;
+        }
+        else if( auto resourceType = as<ResourceType>(type) )
         {
             auto shape = resourceType->getBaseShape();
 
@@ -1246,7 +1250,6 @@ namespace Slang
             case SLANG_TEXTURE_BUFFER:
                 return SLANG_BINDING_TYPE_TYPED_BUFFER | mutableFlag;
             }
-
         }
         else if( auto structuredBufferType = as<HLSLStructuredBufferTypeBase>(type) )
         {

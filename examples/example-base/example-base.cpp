@@ -9,7 +9,11 @@
 using namespace Slang;
 using namespace gfx;
 
-Slang::Result WindowedAppBase::initializeBase(const char* title, int width, int height)
+Slang::Result WindowedAppBase::initializeBase(
+    const char* title,
+    int width,
+    int height,
+    DeviceType deviceType)
 {
     // Create a window for our application to render into.
     //
@@ -30,7 +34,7 @@ Slang::Result WindowedAppBase::initializeBase(const char* title, int width, int 
     gfxEnableDebugLayer();
 #endif
     IDevice::Desc deviceDesc = {};
-    // deviceDesc.slang.targetFlags = SLANG_TARGET_FLAG_DUMP_IR;
+    deviceDesc.deviceType = deviceType;
     gfx::Result res = gfxCreateDevice(&deviceDesc, gDevice.writeRef());
     if (SLANG_FAILED(res))
         return res;
