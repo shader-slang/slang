@@ -180,6 +180,78 @@ SLANG_GFX_DEBUG_GET_OBJ_IMPL(AccelerationStructure)
 
 #undef SLANG_GFX_DEBUG_GET_OBJ_IMPL
 
+void validateAccelerationStructureBuildInputs(
+    const IAccelerationStructure::BuildInputs& buildInputs)
+{
+    switch (buildInputs.kind)
+    {
+    case IAccelerationStructure::Kind::TopLevel:
+        if (!buildInputs.instanceDescs)
+        {
+            GFX_DIAGNOSE_ERROR("IAccelerationStructure::BuildInputs::instanceDescs cannot be null "
+                               "when creating a top-level acceleration structure.");
+        }
+        break;
+    case IAccelerationStructure::Kind::BottomLevel:
+        if (!buildInputs.geometryDescs)
+        {
+            GFX_DIAGNOSE_ERROR("IAccelerationStructure::BuildInputs::geometryDescs cannot be null "
+                               "when creating a bottom-level acceleration structure.");
+        }
+        for (int i = 0; i < buildInputs.descCount; i++)
+        {
+            switch (buildInputs.geometryDescs[i].type)
+            {
+            case IAccelerationStructure::GeometryType::Triangles:
+                switch (buildInputs.geometryDescs[i].content.triangles.vertexFormat)
+                {
+                case Format::RGB_Float32:
+                case Format::RG_Float32:
+                case Format::RGBA_Float16:
+                case Format::RG_Float16:
+                case Format::RGBA_Snorm_UInt16:
+                case Format::RG_Snorm_UInt16:
+                    break;
+                default:
+                    GFX_DIAGNOSE_ERROR(
+                        "Unsupported IAccelerationStructure::TriangleDesc::vertexFormat. Valid "
+                        "values are RGB_Float32, RG_Float32, RGBA_Float16, RG_Float16, "
+                        "RGBA_Snorm_UInt16 or RG_Snorm_UInt16.");
+                }
+                if (buildInputs.geometryDescs[i].content.triangles.indexCount)
+                {
+                    switch (buildInputs.geometryDescs[i].content.triangles.indexFormat)
+                    {
+                    case Format::R_UInt32:
+                    case Format::R_UInt16:
+                        break;
+                    default:
+                        GFX_DIAGNOSE_ERROR(
+                            "Unsupported IAccelerationStructure::TriangleDesc::indexFormat. Valid "
+                            "values are R_UInt32 or R_UInt16.");
+                    }
+                    if (!buildInputs.geometryDescs[i].content.triangles.indexData)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData cannot be null if "
+                            "IAccelerationStructure::TriangleDesc::indexCount is not 0");
+                    }
+                }
+                if (!buildInputs.geometryDescs[i].content.triangles.vertexData)
+                {
+                    GFX_DIAGNOSE_ERROR(
+                        "IAccelerationStructure::TriangleDesc::vertexData cannot be null.");
+                }
+                break;
+            }
+        }
+        break;
+    default:
+        GFX_DIAGNOSE_ERROR("Invalid value of IAccelerationStructure::Kind.");
+        break;
+    }
+}
+
 Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
 {
     SLANG_GFX_API_FUNC;
@@ -306,7 +378,7 @@ Result DebugDevice::getAccelerationStructurePrebuildInfo(
     IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
 {
     SLANG_GFX_API_FUNC;
-
+    validateAccelerationStructureBuildInputs(buildInputs);
     return baseObject->getAccelerationStructurePrebuildInfo(buildInputs, outPrebuildInfo);
 }
 
@@ -892,6 +964,7 @@ void DebugRayTracingCommandEncoder::buildAccelerationStructure(
     {
         innerQueryDesc.queryPool = getInnerObj(innerQueryDesc.queryPool);
     }
+    validateAccelerationStructureBuildInputs(desc.inputs);
     baseObject->buildAccelerationStructure(
         innerDesc, propertyQueryCount, innerQueryDescs.getBuffer());
 }
@@ -1226,6 +1299,20 @@ DeviceAddress DebugAccelerationStructure::getDeviceAddress()
     SLANG_GFX_API_FUNC;
 
     return baseObject->getDeviceAddress();
+}
+
+IResourceView::Desc* DebugResourceView::getViewDesc()
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getViewDesc();
+}
+
+IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getViewDesc();
 }
 
 } // namespace gfx

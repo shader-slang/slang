@@ -379,12 +379,12 @@ public:
 protected:
     CPUResourceView(Kind kind, Desc const& desc)
         : m_kind(kind)
-        , m_desc(desc)
-    {}
+    {
+        m_desc = desc;
+    }
 
 private:
     Kind m_kind;
-    Desc m_desc;
 };
 
 class CPUBufferView : public CPUResourceView
