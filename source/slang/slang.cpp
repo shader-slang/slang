@@ -4202,6 +4202,7 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
 
     // If we don't have a caching file system (needed for repro), then make one.
     //if (true || m_linkage->m_requireCacheFileSystem)
+    if (m_linkage->m_requireCacheFileSystem)
     {
         if (!m_linkage->m_cacheFileSystem)
         {
@@ -4269,7 +4270,8 @@ SlangResult EndToEndCompileRequest::EndToEndCompileRequest::compile()
                 return saveRes;
             }
         }
-        else /* if (m_dumpReproOnError && SLANG_FAILED(res)) */
+        //else /* if (m_dumpReproOnError && SLANG_FAILED(res)) */
+        else if (m_dumpReproOnError && SLANG_FAILED(res)) 
         {
             String reproFileName;
             SlangResult saveRes = SLANG_FAIL;
