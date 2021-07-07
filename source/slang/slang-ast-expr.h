@@ -14,13 +14,13 @@ class DeclRefExpr: public Expr
     SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
 
     // The scope in which to perform lookup
-    RefPtr<Scope> scope;
+    Scope* scope = nullptr;
 
     // The declaration of the symbol being referenced
     DeclRef<Decl> declRef;
 
     // The name of the symbol being referenced
-    Name* name;
+    Name* name = nullptr;
 };
 
 class VarExpr : public DeclRefExpr
@@ -287,7 +287,7 @@ class ParenExpr: public Expr
 class ThisExpr: public Expr
 {
     SLANG_AST_CLASS(ThisExpr)
-    RefPtr<Scope> scope;
+    Scope* scope = nullptr;
 };
 
 // An expression that binds a temporary variable in a local expression context
@@ -322,7 +322,7 @@ class TaggedUnionTypeExpr: public Expr
 class ThisTypeExpr: public Expr
 {
     SLANG_AST_CLASS(ThisTypeExpr)
-    RefPtr<Scope> scope;
+    Scope* scope = nullptr;
 };
 
     /// A type expression of the form `Left & Right`.

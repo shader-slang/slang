@@ -158,20 +158,20 @@ void Session::init()
     // TODO: load these on-demand to avoid parsing
     // stdlib code for languages the user won't use.
 
-    baseLanguageScope = new Scope();
+    baseLanguageScope = builtinAstBuilder->create<Scope>();
 
     // Will stay in scope as long as ASTBuilder
     baseModuleDecl = populateBaseLanguageModule(
         m_builtinLinkage->getASTBuilder(),
         baseLanguageScope);
 
-    coreLanguageScope = new Scope();
+    coreLanguageScope = builtinAstBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
-    hlslLanguageScope = new Scope();
+    hlslLanguageScope = builtinAstBuilder->create<Scope>();
     hlslLanguageScope->nextSibling = coreLanguageScope;
 
-    slangLanguageScope = new Scope();
+    slangLanguageScope = builtinAstBuilder->create<Scope>();
     slangLanguageScope->nextSibling = hlslLanguageScope;
 
     {
@@ -416,7 +416,7 @@ SlangResult Session::_readBuiltinModule(ISlangFileSystem* fileSystem, Scope* sco
         else
         {
             // We need to create a new scope to link into the whole thing
-            auto subScope = new Scope();
+            auto subScope = linkage->getASTBuilder()->create<Scope>();
             subScope->containerDecl = moduleDecl;
             subScope->nextSibling = scope->nextSibling;
             scope->nextSibling = subScope;
@@ -1286,7 +1286,7 @@ SlangResult Linkage::loadFile(String const& path, PathInfo& outPathInfo, ISlangB
     return SLANG_OK;
 }
 
-Expr* Linkage::parseTermString(String typeStr, RefPtr<Scope> scope)
+Expr* Linkage::parseTermString(String typeStr, Scope* scope)
 {
     // Create a SourceManager on the stack, so any allocations for 'SourceFile'/'SourceView' etc will be cleaned up
     SourceManager localSourceManager;
@@ -1349,11 +1349,15 @@ Type* ComponentType::getTypeFromString(
     if(m_types.TryGetValue(typeStr, type))
         return type;
 
+
+    // TODO(JS): For now just used the linkages ASTBuilder to keep on scope
+    auto astBuilder = getLinkage()->getASTBuilder();
+
     // Otherwise, we need to start looking in
     // the modules that were directly or
     // indirectly referenced.
     //
-    RefPtr<Scope> scope = _createScopeForLegacyLookup();
+    Scope* scope = _createScopeForLegacyLookup(astBuilder);
 
     auto linkage = getLinkage();
     Expr* typeExpr = linkage->parseTermString(
@@ -1670,7 +1674,7 @@ void FrontEndCompileRequest::parseTranslationUnit(
     // would be checked too (after those on the FrontEndCompileRequest). 
     IncludeSystem includeSystem(&linkage->searchDirectories, linkage->getFileSystemExt(), linkage->getSourceManager());
 
-    RefPtr<Scope> languageScope;
+    Scope* languageScope = nullptr;
     switch (translationUnit->sourceLanguage)
     {
     case SourceLanguage::HLSL:
@@ -3773,7 +3777,7 @@ RefPtr<Module> findOrImportModule(
 }
 
 void Session::addBuiltinSource(
-    RefPtr<Scope> const&    scope,
+    Scope*                  scope,
     String const&           path,
     String const&           source)
 {
@@ -3795,7 +3799,6 @@ void Session::addBuiltinSource(
     Name* moduleName = getNamePool()->getName(path);
     auto translationUnitIndex = compileRequest->addTranslationUnit(SourceLanguage::Slang, moduleName);
 
-    
     compileRequest->addTranslationUnitSourceString(
         translationUnitIndex,
         path,
@@ -3830,7 +3833,7 @@ void Session::addBuiltinSource(
     else
     {
         // We need to create a new scope to link into the whole thing
-        auto subScope = new Scope();
+        auto subScope = module->getASTBuilder()->create<Scope>();
         subScope->containerDecl = moduleDecl;
         subScope->nextSibling = scope->nextSibling;
         scope->nextSibling = subScope;

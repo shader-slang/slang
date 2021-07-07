@@ -381,10 +381,10 @@ class UsingDecl : public Decl
     SLANG_AST_CLASS(UsingDecl)
 
         /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
-    Expr* arg;
+    Expr* arg = nullptr;
 
         /// The scope that the entity named by `arg` will be brought into
-    RefPtr<Scope> scope;
+    Scope* scope = nullptr;
 };
 
 class ImportDecl : public Decl
@@ -395,7 +395,7 @@ class ImportDecl : public Decl
     NameLoc moduleNameAndLoc;
 
     // The scope that we want to import into
-    RefPtr<Scope> scope;
+    Scope* scope = nullptr;
 
     // The module that actually got imported
     ModuleDecl* importedModuleDecl = nullptr;

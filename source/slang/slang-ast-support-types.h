@@ -1097,24 +1097,6 @@ namespace Slang
         static const TypeExp empty;
     };
 
-
-
-    struct Scope : public RefObject
-    {
-        // The parent of this scope (where lookup should go if nothing is found locally)
-        RefPtr<Scope>           parent;
-
-        // The next sibling of this scope (a peer for lookup)
-        RefPtr<Scope>           nextSibling;
-
-        // The container to use for lookup
-        //
-        // Note(tfoley): This is kept as an unowned pointer
-        // so that a scope can't keep parts of the AST alive,
-        // but the opposite it allowed.
-        ContainerDecl*          containerDecl = nullptr;
-    };
-
     // Masks to be applied when lookup up declarations
     enum class LookupMask : uint8_t
     {
@@ -1365,8 +1347,8 @@ namespace Slang
     struct LookupRequest
     {
         SemanticsVisitor*   semantics   = nullptr;
-        RefPtr<Scope>       scope       = nullptr;
-        RefPtr<Scope>       endScope    = nullptr;
+        Scope*              scope       = nullptr;
+        Scope*              endScope    = nullptr;
 
         LookupMask          mask        = LookupMask::Default;
         LookupOptions       options     = LookupOptions::None;
