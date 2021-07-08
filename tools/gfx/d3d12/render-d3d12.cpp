@@ -147,6 +147,15 @@ public:
 
     ~D3D12Device();
 
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IAccelerationStructure::PrebuildInfo* outPrebuildInfo) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
+        const IAccelerationStructure::CreateDesc& desc,
+        IAccelerationStructure** outView) override;
+#endif
+
 public:
     
     static const Int kMaxNumRenderFrames = 4;
@@ -170,6 +179,7 @@ public:
         bool m_isWarp;
         ComPtr<IDXGIFactory> m_dxgiFactory;
         ComPtr<ID3D12Device> m_device;
+        ComPtr<ID3D12Device5> m_device5;
         ComPtr<IDXGIAdapter> m_adapter;
         DXGI_ADAPTER_DESC m_desc;
         DXGI_ADAPTER_DESC1 m_desc1;
@@ -240,16 +250,20 @@ public:
         }
     };
 
-    class ResourceViewImpl : public ResourceViewBase
+    class ResourceViewInternalImpl
+    {
+    public:
+        D3D12Descriptor m_descriptor;
+        RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
+        ~ResourceViewInternalImpl() { m_allocator->free(m_descriptor); }
+    };
+
+    class ResourceViewImpl
+        : public ResourceViewBase
+        , public ResourceViewInternalImpl
     {
     public:
         RefPtr<Resource> m_resource;
-        D3D12Descriptor m_descriptor;
-        RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
-        ~ResourceViewImpl()
-        {
-            m_allocator->free(m_descriptor);
-        }
     };
 
     class FramebufferLayoutImpl : public FramebufferLayoutBase
@@ -372,6 +386,48 @@ public:
         ComPtr<ID3D12CommandQueue> m_commandQueue;
         HANDLE m_waitEvent;
         UINT64 m_eventValue = 0;
+    };
+
+    /// Implements the IQueryPool interface with a plain buffer.
+    /// Used for query types that does not correspond to a D3D query,
+    /// such as ray-tracing acceleration structure post-build info.
+    class PlainBufferProxyQueryPoolImpl
+        : public IQueryPool
+        , public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+
+    public:
+        uint32_t m_stride = 0;
+        Result init(const IQueryPool::Desc& desc, D3D12Device* device, uint32_t stride);
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(m_device->readBufferResource(
+                m_bufferResource, m_stride * queryIndex, m_stride * count,
+                blob.writeRef()));
+            for (Int i = 0; i < count; i++)
+            {
+                memcpy(
+                    data + i,
+                    (uint8_t*)blob->getBufferPointer() + m_stride * i,
+                    sizeof(uint64_t));
+            }
+            return SLANG_OK;
+        }
+    public:
+        QueryType m_queryType;
+        RefPtr<BufferResourceImpl> m_bufferResource;
+        RefPtr<D3D12Device> m_device;
     };
 
     struct BoundVertexBuffer
@@ -1315,6 +1371,7 @@ public:
                 case slang::BindingType::RawBuffer:
                 case slang::BindingType::Texture:
                 case slang::BindingType::TypedBuffer:
+                case slang::BindingType::RayTracingAccelerationStructure:
                     *outType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     return SLANG_OK;
                 case slang::BindingType::MutableRawBuffer:
@@ -1691,219 +1748,6 @@ public:
 //                addPendingResourceBindingRanges(typeLayout, physicalDescriptorSetIndex, pendingOffset);
             }
 
-#if 0
-                /// Add child parameter blocks defined in `typeLayout` to the root signature.
-            void addParameterBlocks(
-                slang::TypeLayoutReflection*        typeLayout,
-                Index                               physicalDescriptorSetIndex,
-                BindingRegisterOffsetPair const&    offset)
-            {
-                Index subObjectCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectCount;
-                     subObjectRangeIndex++)
-                {
-                    // There are a few different concerns being tackled at once here, which depend
-                    // on the type of each sub-object range.
-                    //
-                    auto bindingRangeIndex =
-                        typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ConstantBuffer:
-                        {
-                            // We also need to recurse into the element type of the constant buffer to add
-                            // any binding ranges defined in the element type.
-                            auto subObjectType =
-                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto spaceOffset = (uint32_t)typeLayout->getSubObjectRangeSpaceOffset(subObjectRangeIndex);
-
-                            BindingRegisterOffsetPair subOffset;
-                            subOffset.primary.spaceOffset = offset.primary.spaceOffset + spaceOffset;
-                            subOffset.pending.spaceOffset = offset.pending.spaceOffset + spaceOffset;
-                            addParameterBlocks(
-                                _unwrapParameterGroups(subObjectType),
-                                physicalDescriptorSetIndex,
-                                subOffset);
-                        }
-                        break;
-
-                    case slang::BindingType::ParameterBlock:
-                        {
-                            // A parameter block (`ParameterBlock<ConcreteType>`) will always map to
-                            // a distinct descriptor set, and its contained view/sampler binding
-                            // ranges will be bound through that set.
-                            //
-                            auto blockPhysicalDescriptorSetIndex = addDescriptorSet();
-
-                            // We will need to recursively add the binding ranges implied by the
-                            // type of the parameter block.
-                            //
-                            auto blockTypeLayout =
-                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            
-                            // One important detail is that the `blockTypeLayout` does not know the
-                            // base register space that the contents of the block should use. All
-                            // descriptor ranges stored in that layout will by default use a space
-                            // offset of zero.
-                            //
-                            // We need to compute the space offset to apply when recursing into that
-                            // block type based on the binding range we are processing here.
-                            //
-                            auto spaceOffset =
-                                typeLayout->getSubObjectRangeSpaceOffset(subObjectRangeIndex);
-                            // The space offset for this binding range should be added to any
-                            // additional space offset that was being passed down from above this
-                            // layer.
-                            //
-                            // Any other offset information (register offsets) should be ignored at
-                            // this point, because `register` offsets from outside of the block
-                            // don't affect layout within the block.
-                            //
-                            BindingRegisterOffsetPair blockOffset;
-                            blockOffset.primary.spaceOffset = offset.primary.spaceOffset + (uint32_t)spaceOffset;
-                            blockOffset.pending.spaceOffset = offset.pending.spaceOffset + (uint32_t)spaceOffset;
-
-                            // Note: there is an important subtlety going on here. We are passing in
-                            // the type `blockTypeLayout` which corresponds to
-                            // `ParameterBlock<ConcreteType>` and *not* to `ConcreteType` alone.
-                            // We call `_unwrapParameterGroups` on `blockTypeLayout` get the layout
-                            // for the element type.
-                            auto elementLayout = _unwrapParameterGroups(blockTypeLayout);
-
-                            // If the element type requires constant buffer storage, add an
-                            // implicit constant buffer descriptor in descriptor set.
-                            if (elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
-                            {
-                                addDescriptorRange(
-                                    blockPhysicalDescriptorSetIndex,
-                                    D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-                                    0,
-                                    blockOffset.primary.spaceOffset,
-                                    1);
-                                blockOffset.primary.offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] = 1;
-                            }
-
-                            // Once we have all the details worked out, we can write the binding
-                            // ranges for the block's type into the newly-allocated descriptor set.
-                            //
-                            addAsConstantBuffer(
-                                elementLayout, blockPhysicalDescriptorSetIndex, blockOffset);
-                        }
-                        break;
-
-                    case slang::BindingType::ExistentialValue:
-                        // TODO: Need to handle this case here.
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-
-//                addPendingParameterBlocks(typeLayout, physicalDescriptorSetIndex, offset);
-            }
-#endif
-
-#if 0
-            void addPendingResourceBindingRanges(
-                slang::TypeLayoutReflection* typeLayout,
-                Index physicalDescriptorSetIndex,
-                BindingRegisterOffsetPair const& offset)
-            {
-                Index subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; subObjectRangeIndex++)
-                {
-                    auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ExistentialValue:
-                        {
-                            // Any nested binding ranges in the sub-object will "leak" into the
-                            // binding ranges for the surrounding context.
-                            //
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto specializedTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                            if(specializedTypeLayout)
-                            {
-                                // TODO: We need to compute the offsets that should be applied to
-                                // any resources bound via the sub-object.
-                                BindingRegisterOffsetPair subOffset = offset;
-                                subOffset.primary += BindingRegisterOffset(typeLayout->getSubObjectRangePendingDataOffset(subObjectRangeIndex));
-
-                                addResourceBindingRanges(specializedTypeLayout, physicalDescriptorSetIndex, subOffset);
-                            }
-                        }
-                        break;
-
-                    case slang::BindingType::ConstantBuffer:
-                        {
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto elementTypeLayout = subObjectTypeLayout->getElementTypeLayout();
-                            SLANG_ASSERT(elementTypeLayout);
-
-                            BindingRegisterOffsetPair subOffset = offset;
-                            subOffset.primary += BindingRegisterOffset(typeLayout->getSubObjectRangePendingDataOffset(subObjectRangeIndex));
-
-                            addPendingResourceBindingRanges(elementTypeLayout, physicalDescriptorSetIndex, subOffset);
-                        }
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-            }
-#endif
-
-#if 0
-            void addPendingParameterBlocks(
-                slang::TypeLayoutReflection* typeLayout,
-                Index physicalDescriptorSetIndex,
-                BindingRegisterOffset const& offset)
-            {
-                Index subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; subObjectRangeIndex++)
-                {
-                    auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ExistentialValue:
-                        {
-                            // Any nested binding ranges in the sub-object will "leak" into the
-                            // binding ranges for the surrounding context.
-                            //
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto pendingTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                            if(pendingTypeLayout)
-                            {
-                                // TODO: We need to compute the offsets that should be applied to
-                                // any resources bound via the sub-object.
-                                BindingRegisterOffset subOffset = offset;
-
-                                addParameterBlocks(pendingTypeLayout, physicalDescriptorSetIndex, subOffset);
-                            }
-                        }
-                        break;
-
-                    case slang::BindingType::ConstantBuffer:
-                    case slang::BindingType::ParameterBlock:
-                        {
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            BindingRegisterOffset subOffset = offset;
-                            addPendingParameterBlocks(subObjectTypeLayout, physicalDescriptorSetIndex, subOffset);
-                        }
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-            }
-#endif
-
             D3D12_ROOT_SIGNATURE_DESC& build()
             {
                 for (Index i = 0; i < m_descriptorSets.getCount(); i++)
@@ -2168,30 +2012,7 @@ public:
         }
 
         SLANG_NO_THROW Result SLANG_MCALL
-            setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE
-        {
-            if (offset.bindingRangeIndex < 0)
-                return SLANG_E_INVALID_ARG;
-            auto layout = getLayout();
-            if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
-                return SLANG_E_INVALID_ARG;
-
-            auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
-
-            auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
-            auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-            // Hold a reference to the resource to prevent its destruction.
-            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] =
-                resourceViewImpl->m_resource;
-            ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
-            d3dDevice->CopyDescriptorsSimple(
-                1,
-                m_descriptorSet.resourceTable.getCpuHandle(
-                    bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
-                resourceViewImpl->m_descriptor.cpuHandle,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            return SLANG_OK;
-        }
+            setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE;
 
         SLANG_NO_THROW Result SLANG_MCALL
             setSampler(ShaderOffset const& offset, ISamplerState* sampler) SLANG_OVERRIDE
@@ -3070,6 +2891,8 @@ public:
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
+        ComPtr<ID3D12GraphicsCommandList4> m_cmdList4;
+
         BreakableReference<TransientResourceHeapImpl> m_transientHeap;
         // Weak reference is fine here since `m_transientHeap` already holds strong reference to
         // device.
@@ -3091,6 +2914,10 @@ public:
             };
             m_cmdList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
             m_rootShaderObject.init(renderer);
+
+#if SLANG_GFX_HAS_DXR_SUPPORT
+            m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
+#endif
         }
 
         class RenderCommandEncoderImpl
@@ -3568,11 +3395,61 @@ public:
             *outEncoder = &m_resourceCommandEncoder;
         }
 
+#if SLANG_GFX_HAS_DXR_SUPPORT
+        class RayTracingCommandEncoderImpl : public IRayTracingCommandEncoder
+        {
+        public:
+            CommandBufferImpl* m_commandBuffer;
+            void init(D3D12Device* renderer, CommandBufferImpl* commandBuffer)
+            {
+                m_commandBuffer = commandBuffer;
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
+                const IAccelerationStructure::BuildDesc& desc,
+                int propertyQueryCount,
+                AccelerationStructureQueryDesc* queryDescs) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
+                IAccelerationStructure* dest,
+                IAccelerationStructure* src,
+                AccelerationStructureCopyMode mode) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
+                int accelerationStructureCount,
+                IAccelerationStructure* const* accelerationStructures,
+                int queryCount,
+                AccelerationStructureQueryDesc* queryDescs) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL serializeAccelerationStructure(
+                DeviceAddress dest,
+                IAccelerationStructure* source) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL deserializeAccelerationStructure(
+                IAccelerationStructure* dest,
+                DeviceAddress source) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
+                int count,
+                IAccelerationStructure* const* structures,
+                AccessFlag::Enum sourceAccess,
+                AccessFlag::Enum destAccess) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                writeTimestamp(IQueryPool* pool, SlangInt index) override
+            {
+                static_cast<QueryPoolImpl*>(pool)->writeTimestamp(
+                    m_commandBuffer->m_cmdList, index);
+            }
+        };
+        RayTracingCommandEncoderImpl m_rayTracingCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            m_rayTracingCommandEncoder.init(m_renderer, this);
+            *outEncoder = &m_rayTracingCommandEncoder;
+        }
+#else
         virtual SLANG_NO_THROW void SLANG_MCALL
             encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
         {
             *outEncoder = nullptr;
         }
+#endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
     };
@@ -3810,6 +3687,7 @@ public:
 
     DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
+    ID3D12Device5* m_device5 = nullptr;
 
     VirtualObjectPool m_queueIndexAllocator;
 
@@ -4284,11 +4162,6 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 
 Result D3D12Device::initialize(const Desc& desc)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(
-        desc.slang,
-        SLANG_DXBC,
-        "sm_5_1",
-        makeArray(slang::PreprocessorMacroDesc{ "__D3D12__", "1" }).getView()));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -4443,6 +4316,22 @@ Result D3D12Device::initialize(const Desc& desc)
                 auto minPrecisionSupport = options.MinPrecisionSupport;
             }
         }
+        // Check ray tracing support
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                    D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))))
+            {
+                if (options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+                {
+                    m_features.add("ray-tracing");
+                }
+                if (options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1)
+                {
+                    m_features.add("ray-query");
+                }
+            }
+        }
     }
 
     m_desc = desc;
@@ -4482,6 +4371,17 @@ Result D3D12Device::initialize(const Desc& desc)
         m_adapterName = String::fromWString(adapterDesc.Description);
         m_info.adapterName = m_adapterName.begin();
     }
+
+    // Initialize DXR interface.
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    m_device->QueryInterface<ID3D12Device5>(m_deviceInfo.m_device5.writeRef());
+    m_device5 = m_deviceInfo.m_device5.get();
+#endif
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(
+        desc.slang,
+        m_device5 ? SLANG_DXIL : SLANG_DXBC,
+        m_device5 ? "sm_6_5" : "sm_5_1",
+        makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
     m_isInitialized = true;
     return SLANG_OK;
@@ -4540,6 +4440,7 @@ static D3D12_RESOURCE_FLAGS _calcResourceFlag(ResourceState state)
     case ResourceState::DepthWrite:
         return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     case ResourceState::UnorderedAccess:
+    case ResourceState::AccelerationStructure:
         return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     default:
         return D3D12_RESOURCE_FLAG_NONE;
@@ -4944,7 +4845,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
-
+    viewImpl->m_desc = desc;
     switch (desc.type)
     {
     default:
@@ -5045,6 +4946,7 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
+    viewImpl->m_desc = desc;
 
     switch (desc.type)
     {
@@ -5620,11 +5522,308 @@ Result D3D12Device::QueryPoolImpl::init(const IQueryPool::Desc& desc, D3D12Devic
     return SLANG_OK;
 }
 
+Result D3D12Device::PlainBufferProxyQueryPoolImpl::init(
+    const IQueryPool::Desc& desc,
+    D3D12Device* device,
+    uint32_t stride)
+{
+    ComPtr<IBufferResource> bufferResource;
+    IBufferResource::Desc bufferDesc = {};
+    bufferDesc.defaultState = ResourceState::UnorderedAccess;
+    bufferDesc.elementSize = 0;
+    bufferDesc.type = IResource::Type::Buffer;
+    bufferDesc.sizeInBytes = desc.count * sizeof(uint64_t);
+    bufferDesc.format = Format::Unknown;
+    SLANG_RETURN_ON_FAIL(
+        device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef()));
+    m_bufferResource = static_cast<D3D12Device::BufferResourceImpl*>(bufferResource.get());
+    m_queryType = desc.type;
+    m_device = device;
+    m_stride = stride;
+    return SLANG_OK;
+}
+
 Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outState)
 {
-    RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
-    SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
-    returnComPtr(outState, queryPoolImpl);
+    switch (desc.type)
+    {
+    case QueryType::AccelerationStructureCompactedSize:
+    case QueryType::AccelerationStructureSerializedSize:
+        {
+            RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
+                new PlainBufferProxyQueryPoolImpl();
+            uint32_t stride = 8;
+            if (desc.type == QueryType::AccelerationStructureSerializedSize)
+                stride = 16;
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this, stride));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
+    default:
+        {
+            RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
+    }   
+}
+
+#if SLANG_GFX_HAS_DXR_SUPPORT
+
+class D3D12AccelerationStructureImpl
+    : public AccelerationStructureBase
+    , public D3D12Device::ResourceViewInternalImpl
+{
+public:
+    RefPtr<D3D12Device::BufferResourceImpl> m_buffer;
+    uint64_t m_offset;
+    uint64_t m_size;
+    ComPtr<ID3D12Device5> m_device5;
+
+public:
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+    {
+        return m_buffer->getDeviceAddress() + m_offset;
+    }
+};
+
+Result D3D12Device::getAccelerationStructurePrebuildInfo(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+{
+    if (!m_device5)
+        return SLANG_E_NOT_AVAILABLE;
+    
+    D3DAccelerationStructureInputsBuilder inputsBuilder;
+    SLANG_RETURN_ON_FAIL(inputsBuilder.build(buildInputs, getDebugCallback()));
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo;
+    m_device5->GetRaytracingAccelerationStructurePrebuildInfo(&inputsBuilder.desc, &prebuildInfo);
+
+    outPrebuildInfo->resultDataMaxSize = prebuildInfo.ResultDataMaxSizeInBytes;
+    outPrebuildInfo->scratchDataSize = prebuildInfo.ScratchDataSizeInBytes;
+    outPrebuildInfo->updateScratchDataSize = prebuildInfo.UpdateScratchDataSizeInBytes;
+    return SLANG_OK;
+}
+
+Result D3D12Device::createAccelerationStructure(
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outAS)
+{
+    RefPtr<D3D12AccelerationStructureImpl> result = new D3D12AccelerationStructureImpl();
+    result->m_device5 = m_device5;
+    result->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);
+    result->m_size = desc.size;
+    result->m_offset = desc.offset;
+    result->m_allocator = m_cpuViewHeap;
+    result->m_desc.type = IResourceView::Type::AccelerationStructure;
+    SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&result->m_descriptor));
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.RaytracingAccelerationStructure.Location =
+        result->m_buffer->getDeviceAddress()+ desc.offset;
+    m_device->CreateShaderResourceView(nullptr, &srvDesc, result->m_descriptor.cpuHandle);
+    returnComPtr(outAS, result);
+    return SLANG_OK;
+}
+
+void translatePostBuildInfoDescs(
+    int propertyQueryCount,
+    AccelerationStructureQueryDesc* queryDescs,
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC>& postBuildInfoDescs)
+{
+    postBuildInfoDescs.setCount(propertyQueryCount);
+    for (int i = 0; i < propertyQueryCount; i++)
+    {
+        switch (queryDescs[i].queryType)
+        {
+        case QueryType::AccelerationStructureCompactedSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        case QueryType::AccelerationStructureSerializedSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        }
+    }
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::buildAccelerationStructure(
+    const IAccelerationStructure::BuildDesc& desc,
+    int propertyQueryCount,
+    AccelerationStructureQueryDesc* queryDescs)
+{
+    if (!m_commandBuffer->m_cmdList4)
+    {
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "Ray-tracing is not supported on current system.");
+        return;
+    }
+    D3D12AccelerationStructureImpl* destASImpl = nullptr;
+    if (desc.dest)
+        destASImpl = static_cast<D3D12AccelerationStructureImpl*>(desc.dest);
+    D3D12AccelerationStructureImpl* srcASImpl = nullptr;
+    if (desc.source)
+        srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(desc.source);
+    
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+    buildDesc.DestAccelerationStructureData = destASImpl->getDeviceAddress();
+    buildDesc.SourceAccelerationStructureData = srcASImpl?srcASImpl->getDeviceAddress() : 0;
+    buildDesc.ScratchAccelerationStructureData = desc.scratchData;
+    D3DAccelerationStructureInputsBuilder builder;
+    builder.build(desc.inputs, getDebugCallback());
+    buildDesc.Inputs = builder.desc;
+
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC> postBuildInfoDescs;
+    translatePostBuildInfoDescs(propertyQueryCount, queryDescs, postBuildInfoDescs);
+    m_commandBuffer->m_cmdList4->BuildRaytracingAccelerationStructure(
+        &buildDesc, (UINT)propertyQueryCount, postBuildInfoDescs.getBuffer());
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::copyAccelerationStructure(
+    IAccelerationStructure* dest,
+    IAccelerationStructure* src,
+    AccelerationStructureCopyMode mode)
+{
+    auto destASImpl = static_cast<D3D12AccelerationStructureImpl*>(dest);
+    auto srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(src);
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE copyMode;
+    switch (mode)
+    {
+    case AccelerationStructureCopyMode::Clone:
+        copyMode = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_CLONE;
+        break;
+    case AccelerationStructureCopyMode::Compact:
+        copyMode = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT;
+        break;
+    default:
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "Unsupported AccelerationStructureCopyMode.");
+        return;
+    }
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        destASImpl->getDeviceAddress(), srcASImpl->getDeviceAddress(), copyMode);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::
+    queryAccelerationStructureProperties(
+        int accelerationStructureCount,
+        IAccelerationStructure* const* accelerationStructures,
+        int queryCount,
+        AccelerationStructureQueryDesc* queryDescs)
+{
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC> postBuildInfoDescs;
+    List<DeviceAddress> asAddresses;
+    asAddresses.setCount(accelerationStructureCount);
+    for (int i = 0; i < accelerationStructureCount; i++)
+        asAddresses[i] = accelerationStructures[i]->getDeviceAddress();
+    translatePostBuildInfoDescs(queryCount, queryDescs, postBuildInfoDescs);
+    m_commandBuffer->m_cmdList4->EmitRaytracingAccelerationStructurePostbuildInfo(
+        postBuildInfoDescs.getBuffer(),
+        (UINT)accelerationStructureCount,
+        asAddresses.getBuffer());
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::serializeAccelerationStructure(
+    DeviceAddress dest,
+    IAccelerationStructure* src)
+{
+    auto srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(src);
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        dest,
+        srcASImpl->getDeviceAddress(),
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_SERIALIZE);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::deserializeAccelerationStructure(
+    IAccelerationStructure* dest,
+    DeviceAddress source)
+{
+    auto destASImpl = static_cast<D3D12AccelerationStructureImpl*>(dest);
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        dest->getDeviceAddress(),
+        source,
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::memoryBarrier(
+    int count,
+    IAccelerationStructure* const* structures,
+    AccessFlag::Enum sourceAccess,
+    AccessFlag::Enum destAccess)
+{
+    ShortList<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.setCount(count);
+    for (int i = 0; i < count; i++)
+    {
+        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barriers[i].UAV.pResource = static_cast<D3D12AccelerationStructureImpl*>(structures[i])
+                                        ->m_buffer->m_resource.getResource();
+    }
+    m_commandBuffer->m_cmdList4->ResourceBarrier((UINT)count, barriers.getArrayView().getBuffer());
+}
+
+#endif // SLANG_GFX_HAS_DXR_SUPPORT
+Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
+{
+    if (offset.bindingRangeIndex < 0)
+        return SLANG_E_INVALID_ARG;
+    auto layout = getLayout();
+    if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
+        return SLANG_E_INVALID_ARG;
+
+    auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+
+    ResourceViewInternalImpl* internalResourceView = nullptr;
+    switch (resourceView->getViewDesc()->type)
+    {
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    case IResourceView::Type::AccelerationStructure:
+        {
+            auto asImpl = static_cast<D3D12AccelerationStructureImpl*>(resourceView);
+            // Hold a reference to the resource to prevent its destruction.
+            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] = asImpl->m_buffer;
+            internalResourceView = asImpl;
+        }
+        break;
+#endif
+    default:
+        {
+            auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
+            // Hold a reference to the resource to prevent its destruction.
+            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                resourceViewImpl->m_resource;
+            internalResourceView = resourceViewImpl;
+        }
+        break;
+    }
+
+    auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
+    ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
+    d3dDevice->CopyDescriptorsSimple(
+        1,
+        m_descriptorSet.resourceTable.getCpuHandle(
+            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
+        internalResourceView->m_descriptor.cpuHandle,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     return SLANG_OK;
 }
 

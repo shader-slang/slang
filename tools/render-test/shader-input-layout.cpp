@@ -720,6 +720,12 @@ namespace renderer_test
                 maybeParseOptions(parser, val.Ptr());
                 return val;
             }
+            else if (parser.AdvanceIf("AccelerationStructure"))
+            {
+                RefPtr<ShaderInputLayout::AccelerationStructureVal> val =
+                    new ShaderInputLayout::AccelerationStructureVal();
+                return val;
+            }
             else
             {
                 throw ShaderInputLayoutFormatException(String("Unknown shader input type '") + word + String("' at line") + String(parser.NextToken().Position.Line));

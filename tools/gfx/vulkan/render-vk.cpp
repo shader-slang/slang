@@ -2352,9 +2352,16 @@ public:
             if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
                 return SLANG_E_INVALID_ARG;
             auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
-
-            m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
-                static_cast<ResourceViewImpl*>(resourceView);
+            if (resourceView->getViewDesc()->type == IResourceView::Type::AccelerationStructure)
+            {
+                m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                    static_cast<AccelerationStructureImpl*>(resourceView);
+            }
+            else
+            {
+                m_resourceViews[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                    static_cast<ResourceViewImpl*>(resourceView);
+            }
             return SLANG_OK;
         }
 
@@ -2640,7 +2647,7 @@ public:
             RootBindingContext& context,
             BindingOffset const& offset,
             VkDescriptorType descriptorType,
-            ArrayView<RefPtr<ResourceViewImpl>> resourceViews)
+            ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews)
         {
             auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
@@ -2675,7 +2682,7 @@ public:
             RootBindingContext& context,
             BindingOffset const& offset,
             VkDescriptorType descriptorType,
-            ArrayView<RefPtr<ResourceViewImpl>> resourceViews)
+            ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews)
         {
             auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
@@ -2735,15 +2742,15 @@ public:
             RootBindingContext& context,
             BindingOffset const& offset,
             VkDescriptorType descriptorType,
-            ArrayView<RefPtr<ResourceViewImpl>> resourceViews)
+            ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews)
         {
             auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
             Index count = resourceViews.getCount();
             for (Index i = 0; i < count; ++i)
             {
-                auto accelerationStructure = static_cast<AccelerationStructureImpl*>(
-                    static_cast<IResourceView*>(resourceViews[i].Ptr()));
+                auto accelerationStructure =
+                    static_cast<AccelerationStructureImpl*>(resourceViews[i].Ptr());
                 
                 VkWriteDescriptorSetAccelerationStructureKHR writeAS = {};
                 writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
@@ -2765,7 +2772,7 @@ public:
             RootBindingContext& context,
             BindingOffset const& offset,
             VkDescriptorType descriptorType,
-            ArrayView<RefPtr<ResourceViewImpl>> resourceViews)
+            ArrayView<RefPtr<ResourceViewInternalBase>> resourceViews)
         {
             auto descriptorSet = context.descriptorSets[offset.bindingSet];
 
@@ -3218,7 +3225,7 @@ public:
             return SLANG_OK;
         }
 
-        List<RefPtr<ResourceViewImpl>> m_resourceViews;
+        List<RefPtr<ResourceViewInternalBase>> m_resourceViews;
 
         List<RefPtr<SamplerStateImpl>> m_samplers;
 
@@ -4274,7 +4281,7 @@ public:
                     m_commandBuffer->m_commandBuffer, &copyInfo);
             }
 
-            virtual SLANG_NO_THROW void memoryBarrier(
+            virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
                 AccessFlag::Enum srcAccess,
@@ -5545,6 +5552,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             deviceCreateInfo.pNext = &rayQueryFeatures;
             deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
             m_features.add("ray-query");
+            m_features.add("ray-tracing");
         }
 
         if (bufferDeviceAddressFeatures.bufferDeviceAddress)
@@ -5837,6 +5845,7 @@ Result VKDevice::createAccelerationStructure(
     resultAS->m_size = desc.size;
     resultAS->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);
     resultAS->m_device = this;
+    resultAS->m_desc.type = IResourceView::Type::AccelerationStructure;
     VkAccelerationStructureCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
     createInfo.buffer = resultAS->m_buffer->m_buffer.m_buffer;
     createInfo.offset = desc.offset;
@@ -6620,6 +6629,7 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
         SLANG_UNIMPLEMENTED_X("Unknown TextureViewDesc type.");
         break;
     }
+    view->m_desc = desc;
     m_api.vkCreateImageView(m_device, &createInfo, nullptr, &view->m_view);
     returnComPtr(outView, view);
     return SLANG_OK;
@@ -6670,6 +6680,8 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
             viewImpl->m_buffer = resourceImpl;
             viewImpl->offset = 0;
             viewImpl->size = size;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
@@ -6692,6 +6704,8 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
             RefPtr<TexelBufferResourceViewImpl> viewImpl = new TexelBufferResourceViewImpl(this);
             viewImpl->m_buffer = resourceImpl;
             viewImpl->m_view = view;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
