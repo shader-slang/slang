@@ -160,6 +160,7 @@ public:
 
 public:
     IResourceView* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
 };
 
 class DebugAccelerationStructure : public DebugObject<IAccelerationStructure>
@@ -170,6 +171,7 @@ public:
 public:
     IAccelerationStructure* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
 };
 
 class DebugSamplerState : public DebugObject<ISamplerState>
@@ -341,7 +343,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL deserializeAccelerationStructure(
         IAccelerationStructure* dest,
         DeviceAddress source) override;
-    virtual SLANG_NO_THROW void memoryBarrier(
+    virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
         AccessFlag::Enum sourceAccess,

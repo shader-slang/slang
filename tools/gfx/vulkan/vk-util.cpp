@@ -22,6 +22,8 @@ namespace gfx {
 
         case Format::RGBA_Unorm_UInt8:  return VK_FORMAT_R8G8B8A8_UNORM;
         case Format::BGRA_Unorm_UInt8:  return VK_FORMAT_B8G8R8A8_UNORM;
+        case Format::RGBA_Snorm_UInt16: return VK_FORMAT_R16G16B16A16_SNORM;
+        case Format::RG_Snorm_UInt16:   return VK_FORMAT_R16G16_SNORM;
         case Format::R_UInt32:          return VK_FORMAT_R32_UINT;
 
         case Format::D_Float32:         return VK_FORMAT_D32_SFLOAT;

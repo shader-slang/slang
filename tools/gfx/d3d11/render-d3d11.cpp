@@ -2863,6 +2863,8 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             RefPtr<RenderTargetViewImpl> viewImpl = new RenderTargetViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::RTV;
             viewImpl->m_rtv = rtv;
+            viewImpl->m_desc = desc;
+
             memcpy(
                 viewImpl->m_clearValue,
                 &resourceImpl->getDesc()->optimalClearValue.color,
@@ -2881,6 +2883,8 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             viewImpl->m_type = ResourceViewImpl::Type::DSV;
             viewImpl->m_dsv = dsv;
             viewImpl->m_clearValue = resourceImpl->getDesc()->optimalClearValue.depthStencil;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
@@ -2894,6 +2898,8 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::UAV;
             viewImpl->m_uav = uav;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
@@ -2907,6 +2913,8 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
             RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::SRV;
             viewImpl->m_srv = srv;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
@@ -2952,6 +2960,8 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             RefPtr<UnorderedAccessViewImpl> viewImpl = new UnorderedAccessViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::UAV;
             viewImpl->m_uav = uav;
+            viewImpl->m_desc = desc;
+
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
@@ -2997,6 +3007,7 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::SRV;
             viewImpl->m_srv = srv;
+            viewImpl->m_desc = desc;
             returnComPtr(outView, viewImpl);
             return SLANG_OK;
         }
