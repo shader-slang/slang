@@ -5552,6 +5552,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             deviceCreateInfo.pNext = &rayQueryFeatures;
             deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
             m_features.add("ray-query");
+            m_features.add("ray-tracing");
         }
 
         if (bufferDeviceAddressFeatures.bufferDeviceAddress)
