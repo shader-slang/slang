@@ -405,7 +405,6 @@ public:
         }
 
     public:
-        uint32_t m_stride = 0;
         Result init(const IQueryPool::Desc& desc, D3D12Device* device, uint32_t stride);
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -428,6 +427,7 @@ public:
         QueryType m_queryType;
         RefPtr<BufferResourceImpl> m_bufferResource;
         RefPtr<D3D12Device> m_device;
+        uint32_t m_stride = 0;
     };
 
     struct BoundVertexBuffer
