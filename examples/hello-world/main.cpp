@@ -115,8 +115,9 @@ int HelloWorldExample::createComputePipelineFromShader()
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = slangGlobalSession->findProfile("glsl440");
-    sessionDesc.targetCount = 1;
+    
     sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
 
     ComPtr<slang::ISession> session;
     RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));

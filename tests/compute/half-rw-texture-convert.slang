@@ -1,5 +1,3 @@
-
-
 // Native half not supported on CPU currently
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 // Doesn't work on DX11 currently - locks up on binding
@@ -7,19 +5,11 @@
 // Produces a different result on DX12 with DXBC than expected(!). So disabled for now
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type -shaderobj
-// TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
-//DIABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
 
 // Note that this test is a little silly. The output does not confirm that the write actually worked.
-// This is because it's not trivial on CUDA to do so. If there is a write conversion, the RWTexture
-// is backed by a surface. There is a texture converting write (in sust.p) but not in reading.
-// 
-// In practice if if you wanted a texture read, you'd either only be able to read *without* format 
-// conversion, or via a separate binding of the same surface as a Texture.
-// There's no simple way to describe either, so this test just confirms it outputs PTX that can 
-// be executed, and unfortunately doesn't test if the write conversion actually *worked*
-
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
+// half-rw-texture-convert2.slang tests this
 
 //TEST_INPUT: RWTexture2D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt2D
 [format("r16f")]

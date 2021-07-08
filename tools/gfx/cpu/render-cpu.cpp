@@ -1,6 +1,8 @@
 // render-cpu.cpp
 #include "render-cpu.h"
 
+#include <chrono>
+
 #include "slang.h"
 #include "slang-com-ptr.h"
 #include "slang-com-helper.h"
@@ -35,7 +37,8 @@ public:
     SlangResult init()
     {
         m_data = malloc(m_desc.sizeInBytes);
-        if(!m_data) return SLANG_E_OUT_OF_MEMORY;
+        if (!m_data)
+            return SLANG_E_OUT_OF_MEMORY;
         return SLANG_OK;
     }
 
@@ -46,6 +49,11 @@ public:
     }
 
     void* m_data = nullptr;
+
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+    {
+        return (DeviceAddress)m_data;
+    }
 };
 
 struct CPUTextureBaseShapeInfo
@@ -999,6 +1007,34 @@ public:
     }
 };
 
+class CPUQueryPool : public IQueryPool, public ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    IQueryPool* getInterface(const Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+            return static_cast<IQueryPool*>(this);
+        return nullptr;
+    }
+public:
+    List<uint64_t> m_queries;
+    Result init(const IQueryPool::Desc& desc)
+    {
+        m_queries.setCount(desc.count);
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(
+        SlangInt queryIndex, SlangInt count, uint64_t* data) override
+    {
+        for (SlangInt i = 0; i < count; i++)
+        {
+            data[i] = m_queries[queryIndex + i];
+        }
+        return SLANG_OK;
+    }
+};
+
 class CPUDevice : public ImmediateComputeDeviceBase
 {
 private:
@@ -1102,6 +1138,7 @@ public:
             static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
             ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
             m_info.adapterName = "CPU";
+            m_info.timestampFrequency = 1000000000;
         }
 
         return SLANG_OK;
@@ -1223,6 +1260,21 @@ public:
         state->init(desc);
         returnComPtr(outState, state);
         return Result();
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** outPool) override
+    {
+        RefPtr<CPUQueryPool> pool = new CPUQueryPool();
+        pool->init(desc);
+        returnComPtr(outPool, pool);
+        return SLANG_OK;
+    }
+
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    {
+        static_cast<CPUQueryPool*>(pool)->m_queries[index] =
+            std::chrono::high_resolution_clock::now().time_since_epoch().count();
     }
 
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override

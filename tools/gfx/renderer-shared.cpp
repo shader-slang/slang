@@ -25,12 +25,12 @@ const Slang::Guid GfxGUID::IID_IDevice = SLANG_UUID_IDevice;
 const Slang::Guid GfxGUID::IID_IShaderObject = SLANG_UUID_IShaderObject;
 
 const Slang::Guid GfxGUID::IID_IRenderPassLayout = SLANG_UUID_IRenderPassLayout;
-const Slang::Guid GfxGUID::IID_ICommandEncoder = SLANG_UUID_ICommandEncoder;
-const Slang::Guid GfxGUID::IID_IRenderCommandEncoder = SLANG_UUID_IRenderCommandEncoder;
-const Slang::Guid GfxGUID::IID_IComputeCommandEncoder = SLANG_UUID_IComputeCommandEncoder;
-const Slang::Guid GfxGUID::IID_IResourceCommandEncoder = SLANG_UUID_IResourceCommandEncoder;
+const Slang::Guid GfxGUID::IID_IRayTracingCommandEncoder = SLANG_UUID_IRayTracingCommandEncoder;
 const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
 const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
+const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
+const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAccelerationStructure;
+
 
 StageType translateStage(SlangStage slangStage)
 {
@@ -114,6 +114,14 @@ IResourceView* ResourceViewBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView)
         return static_cast<IResourceView*>(this);
+    return nullptr;
+}
+
+IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView ||
+        guid == GfxGUID::IID_IAccelerationStructure)
+        return static_cast<IAccelerationStructure*>(this);
     return nullptr;
 }
 
@@ -275,6 +283,24 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
     SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
+}
+
+Result RendererBase::getAccelerationStructurePrebuildInfo(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+{
+    SLANG_UNUSED(buildInputs);
+    SLANG_UNUSED(outPrebuildInfo);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::createAccelerationStructure(
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outView)
+{
+    SLANG_UNUSED(desc);
+    SLANG_UNUSED(outView);
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 Result RendererBase::getShaderObjectLayout(

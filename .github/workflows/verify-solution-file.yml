@@ -16,7 +16,7 @@ jobs:
         fetch-depth: '1'
     - name: verify
       run: |
-        & .\premake.bat vs2015
+        & .\premake.bat vs2017
         $diff = & git diff
         if ($diff.length -ne 0)
         {

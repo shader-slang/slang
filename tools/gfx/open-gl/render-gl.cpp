@@ -170,6 +170,18 @@ public:
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
+    virtual void writeTimestamp(IQueryPool* pool, SlangInt index) override
+    {
+        SLANG_UNUSED(pool);
+        SLANG_UNUSED(index);
+    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc, IQueryPool** pool) override
+    {
+        SLANG_UNUSED(desc);
+        *pool = nullptr;
+        return SLANG_E_NOT_IMPLEMENTED;
+    }
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -230,6 +242,11 @@ public:
 		GLuint m_handle;
         GLenum m_target;
         UInt m_size;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            return 0;
+        }
 	};
 
     class TextureResourceImpl: public TextureResource
@@ -1240,7 +1257,7 @@ public:
             bufferDesc.defaultState = ResourceState::ConstantBuffer;
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
             SLANG_RETURN_ON_FAIL(
                 device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());

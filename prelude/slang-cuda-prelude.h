@@ -15,6 +15,15 @@
 #include <optix.h>
 #endif
 
+// Define slang offsetof implementation 
+#ifndef SLANG_OFFSET_OF
+#   define SLANG_OFFSET_OF(type, member) (size_t)((char*)&(((type *)0)->member) - (char*)0)
+#endif
+
+#ifndef SLANG_ALIGN_OF
+#   define SLANG_ALIGN_OF(type) __alignof__(type)
+#endif
+
 // Must be large enough to cause overflow and therefore infinity
 #ifndef SLANG_INFINITY
 #   define SLANG_INFINITY   ((float)(1e+300 * 1e+300))

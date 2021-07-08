@@ -228,7 +228,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         case '5': case '6': case '7': case '8': case '9':
         {
             // Simple case: emit one of the direct arguments to the call
-            Index argIndex = d - '0';
+            Index argIndex = d - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT((0 <= argIndex) && (argIndex < m_argCount));
             m_writer->emit("(");
             m_emitter->emitOperand(m_args[argIndex].get(), getInfo(EmitOp::General));
@@ -236,11 +236,40 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
         }
         break;
 
+        case 'G':
+        {
+            // Get the type/value at the index of the specialization of this generic
+
+            SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
+            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
+            
+            IRSpecialize* specialize = as<IRSpecialize>(m_callInst->getCallee());
+            SLANG_ASSERT(specialize);
+
+            {
+                auto argCount = Index(specialize->getArgCount());
+                SLANG_UNUSED(argCount);
+                SLANG_ASSERT(argIndex < argCount);
+
+                auto arg = specialize->getArg(argIndex);
+
+                if (auto type = as<IRType>(arg))
+                {
+                    m_emitter->emitType(type);
+                }
+                else
+                {
+                    m_emitter->emitVal(arg, getInfo(EmitOp::General));
+                }
+            }
+        }
+        break;
+
         case 'T':
             // Get the the 'element' type for the type of the param at the index
         {
             SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0';
+            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             IRType* type = m_args[argIndex].get()->getDataType();
@@ -256,7 +285,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // Get the scalar type of a generic at specified index
         {
             SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0';
+            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             IRType* type = m_args[argIndex].get()->getDataType();
@@ -289,15 +318,37 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // If we are calling a D3D texturing operation in the form t.Foo(s, ...),
             // then this form will pair up the t and s arguments as needed for a GLSL
             // texturing operation.
-            SLANG_RELEASE_ASSERT(m_argCount >= 2);
+            SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
-            auto samplerArg = m_args[1].get();
 
-            if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
+            if (auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
             {
-                m_emitter->emitTextureOrTextureSamplerType(baseTextureType, "sampler");
+                // If the base object (first argument) has a combined texture-sampler type,
+                // then we can simply use that argument as-is.
+                //
+                m_emitter->emitOperand(textureArg, getInfo(EmitOp::General));
 
+                // HACK: Because the target intrinsic strings are using indices based on the
+                // parameter list with the `SamplerState` parameter in place, seeing this opcode
+                // and this type tells us that we are about to have an off-by-one sort of
+                // situation. We quietly patch it up by offseting the index-based access for
+                // all the other operands.
+                //
+                m_argIndexOffset -= 1;
+            }
+            else if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
+            {
+                // If the base object (first argument) has a texture type, then we expect
+                // the next argument to be a sampler to pair with it.
+                //
+                SLANG_RELEASE_ASSERT(m_argCount >= 2);
+                auto samplerArg = m_args[1].get();
+
+                // We will emit GLSL code to construct the corresponding combined texture/sampler
+                // type from the separate pieces.
+                //
+                m_emitter->emitTextureOrTextureSamplerType(baseTextureType, "sampler");
                 if (auto samplerType = as<IRSamplerStateTypeBase>(samplerArg->getDataType()))
                 {
                     if (as<IRSamplerComparisonStateType>(samplerType))
@@ -433,32 +484,41 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             SLANG_RELEASE_ASSERT(m_argCount >= 1);
 
             auto textureArg = m_args[0].get();
+            IRType* elementType  = nullptr;
+
             if (auto baseTextureType = as<IRTextureType>(textureArg->getDataType()))
             {
-                auto elementType = baseTextureType->getElementType();
-                if (auto basicType = as<IRBasicType>(elementType))
-                {
-                    // A scalar result is expected
-                    m_writer->emit(".x");
-                }
-                else if (auto vectorType = as<IRVectorType>(elementType))
-                {
-                    // A vector result is expected
-                    auto elementCount = getIntVal(vectorType->getElementCount());
+                elementType = baseTextureType->getElementType();
+            }
+            else if(auto baseTextureSamplerType = as<IRTextureSamplerType>(textureArg->getDataType()))
+            {
+                elementType = baseTextureSamplerType->getElementType();
+            }
+            else
+            {
+                SLANG_UNEXPECTED("bad format in intrinsic definition");
+            }
 
-                    if (elementCount < 4)
-                    {
-                        char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
-                        m_writer->emit(swiz[elementCount]);
-                    }
-                }
-                else
+            SLANG_ASSERT(elementType);
+            if (auto basicType = as<IRBasicType>(elementType))
+            {
+                // A scalar result is expected
+                m_writer->emit(".x");
+            }
+            else if (auto vectorType = as<IRVectorType>(elementType))
+            {
+                // A vector result is expected
+                auto elementCount = getIntVal(vectorType->getElementCount());
+
+                if (elementCount < 4)
                 {
-                    // What other cases are possible?
+                    char const* swiz[] = { "", ".x", ".xy", ".xyz", "" };
+                    m_writer->emit(swiz[elementCount]);
                 }
             }
             else
             {
+                // What other cases are possible?
                 SLANG_UNEXPECTED("bad format in intrinsic definition");
             }
         }
@@ -470,7 +530,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // we can use it in the constructed expression.
 
             SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0';
+            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto vectorArg = m_args[argIndex].get();
@@ -493,7 +553,7 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             // (this is the inverse of `$z`).
             //
             SLANG_RELEASE_ASSERT(*cursor >= '0' && *cursor <= '9');
-            Index argIndex = (*cursor++) - '0';
+            Index argIndex = (*cursor++) - '0' + m_argIndexOffset;
             SLANG_RELEASE_ASSERT(m_argCount > argIndex);
 
             auto arg = m_args[argIndex].get();

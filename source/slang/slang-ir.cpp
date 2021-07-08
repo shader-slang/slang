@@ -6019,3 +6019,15 @@ namespace Slang
     }
 } // namespace Slang
 
+#if SLANG_VC
+#ifdef _DEBUG
+// Natvis sometimes cannot find enum values.
+// Export symbols for them to make sure natvis works correctly when debugging external projects.
+SLANG_API const int SlangDebug__IROpNameHint = Slang::kIROp_NameHintDecoration;
+SLANG_API const int SlangDebug__IROpExport = Slang::kIROp_ExportDecoration;
+SLANG_API const int SlangDebug__IROpImport = Slang::kIROp_ImportDecoration;
+SLANG_API const int SlangDebug__IROpStringLit = Slang::kIROp_StringLit;
+SLANG_API const int SlangDebug__IROpIntLit = Slang::kIROp_IntLit;
+#endif
+#endif
+

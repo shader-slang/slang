@@ -91,6 +91,10 @@ namespace gfx {
     x(vkCmdCopyBufferToImage)\
     x(vkCmdPushConstants) \
     x(vkCmdSetStencilReference) \
+    x(vkCmdWriteTimestamp) \
+    x(vkCmdBeginQuery) \
+    x(vkCmdEndQuery) \
+    x(vkCmdResetQueryPool) \
     \
     x(vkCreateFence) \
     x(vkDestroyFence) \
@@ -116,6 +120,10 @@ namespace gfx {
     \
     x(vkBindImageMemory) \
     x(vkBindBufferMemory) \
+    \
+    x(vkCreateQueryPool) \
+    x(vkGetQueryPoolResults) \
+    x(vkDestroyQueryPool) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
@@ -135,6 +143,7 @@ namespace gfx {
     x(vkGetPhysicalDeviceSurfacePresentModesKHR) \
     x(vkGetPhysicalDeviceSurfaceCapabilitiesKHR) \
     x(vkDestroySurfaceKHR) \
+
     /* */
 
 #define VK_API_DEVICE_KHR_PROCS(x) \
@@ -147,6 +156,17 @@ namespace gfx {
 
 #define VK_API_DEVICE_OPT_PROCS(x) \
     x(vkCmdSetPrimitiveTopologyEXT) \
+    x(vkGetBufferDeviceAddress) \
+    x(vkGetBufferDeviceAddressKHR) \
+    x(vkGetBufferDeviceAddressEXT) \
+    x(vkCmdBuildAccelerationStructuresKHR) \
+    x(vkCmdCopyAccelerationStructureKHR) \
+    x(vkCmdCopyAccelerationStructureToMemoryKHR) \
+    x(vkCmdCopyMemoryToAccelerationStructureKHR) \
+    x(vkCmdWriteAccelerationStructuresPropertiesKHR) \
+    x(vkCreateAccelerationStructureKHR) \
+    x(vkDestroyAccelerationStructureKHR) \
+    x(vkGetAccelerationStructureBuildSizesKHR) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

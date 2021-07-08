@@ -104,6 +104,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
+        const IQueryPool::Desc& desc,
+        IQueryPool** outPool) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* texture,
@@ -117,6 +120,15 @@ public:
         size_t offset,
         size_t size,
         ISlangBlob** outBlob) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IAccelerationStructure::PrebuildInfo* outPrebuildInfo) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
+        const IAccelerationStructure::CreateDesc& desc,
+        IAccelerationStructure** outView) override;
+
     void waitForGpu();
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
@@ -124,6 +136,40 @@ public:
     }
         /// Dtor
     ~VKDevice();
+
+public:
+    // Float16 features
+    VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR};
+    // 16 bit storage features
+    VkPhysicalDevice16BitStorageFeatures storage16BitFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR};
+    // AtomicInt64 features
+    VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR};
+    // Atomic Float features
+    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT};
+    // Timeline Semaphore features
+    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES};
+    // Extended dynamic state features
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT};
+    // Subgroup extended type features
+    VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures shaderSubgroupExtendedTypeFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES};
+    // Acceleration structure features
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+    // Ray query (inline ray-tracing) features
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+    // Buffer device address features
+    VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddressFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
+
+public:
 
     class Buffer
     {
@@ -176,6 +222,17 @@ public:
         RefPtr<VKDevice> m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
+
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            if (!m_buffer.m_api->vkGetBufferDeviceAddress)
+                return 0;
+            VkBufferDeviceAddressInfo info = {};
+            info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+            info.buffer = m_buffer.m_buffer;
+            return (DeviceAddress)m_buffer.m_api->vkGetBufferDeviceAddress(
+                m_buffer.m_api->m_device, &info);
+        }
     };
 
     class TextureResourceImpl : public TextureResource
@@ -287,6 +344,28 @@ public:
         RefPtr<BufferResourceImpl>  m_buffer;
         VkDeviceSize                offset;
         VkDeviceSize                size;
+    };
+
+    class AccelerationStructureImpl : public AccelerationStructureBase
+    {
+    public:
+        VkAccelerationStructureKHR m_vkHandle = VK_NULL_HANDLE;
+        RefPtr<BufferResourceImpl> m_buffer;
+        VkDeviceSize m_offset;
+        VkDeviceSize m_size;
+        RefPtr<VKDevice> m_device;
+    public:
+        virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+        {
+            return m_buffer->getDeviceAddress() + m_offset;
+        }
+        ~AccelerationStructureImpl()
+        {
+            if (m_device)
+            {
+                m_device->m_api.vkDestroyAccelerationStructureKHR(m_device->m_api.m_device, m_vkHandle, nullptr);
+            }
+        }
     };
 
     class FramebufferLayoutImpl : public FramebufferLayoutBase
@@ -2087,7 +2166,6 @@ public:
     class PipelineCommandEncoder : public RefObject
     {
     public:
-        bool m_isOpen = false;
         CommandBufferImpl* m_commandBuffer;
         VkCommandBuffer m_vkCommandBuffer;
         VkCommandBuffer m_vkPreCommandBuffer = VK_NULL_HANDLE;
@@ -2116,7 +2194,6 @@ public:
 
         void endEncodingImpl()
         {
-            m_isOpen = false;
             for (auto& pipeline : m_boundPipelines)
                 pipeline = VK_NULL_HANDLE;
         }
@@ -2654,6 +2731,36 @@ public:
             }
         }
 
+        static void writeAccelerationStructureDescriptor(
+            RootBindingContext& context,
+            BindingOffset const& offset,
+            VkDescriptorType descriptorType,
+            ArrayView<RefPtr<ResourceViewImpl>> resourceViews)
+        {
+            auto descriptorSet = context.descriptorSets[offset.bindingSet];
+
+            Index count = resourceViews.getCount();
+            for (Index i = 0; i < count; ++i)
+            {
+                auto accelerationStructure = static_cast<AccelerationStructureImpl*>(
+                    static_cast<IResourceView*>(resourceViews[i].Ptr()));
+                
+                VkWriteDescriptorSetAccelerationStructureKHR writeAS = {};
+                writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                writeAS.accelerationStructureCount = 1;
+                writeAS.pAccelerationStructures = &accelerationStructure->m_vkHandle;
+                VkWriteDescriptorSet write = {};
+                write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write.descriptorCount = 1;
+                write.descriptorType = descriptorType;
+                write.dstArrayElement = uint32_t(i);
+                write.dstBinding = offset.binding;
+                write.dstSet = descriptorSet;
+                write.pNext = &writeAS;
+                writeDescriptor(context, write);
+            }
+        }
+
         static void writeTextureDescriptor(
             RootBindingContext& context,
             BindingOffset const& offset,
@@ -2867,7 +2974,15 @@ public:
                         VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
                         m_resourceViews.getArrayView(baseIndex, count));
                     break;
-
+                case slang::BindingType::RayTracingAccelerationStructure:
+                    rangeOffset.bindingSet += bindingRangeInfo.setOffset;
+                    rangeOffset.binding += bindingRangeInfo.bindingOffset;
+                    writeAccelerationStructureDescriptor(
+                        context,
+                        rangeOffset,
+                        VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR,
+                        m_resourceViews.getArrayView(baseIndex, count));
+                    break;
                 case slang::BindingType::VaryingInput:
                 case slang::BindingType::VaryingOutput:
                     break;
@@ -3459,7 +3574,6 @@ public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
         VkCommandPool m_pool;
-        VkFence m_fence;
         VKDevice* m_renderer;
         BreakableReference<TransientResourceHeapImpl> m_transientHeap;
         bool m_isPreCommandBufferEmpty = true;
@@ -3471,13 +3585,11 @@ public:
         Result init(
             VKDevice* renderer,
             VkCommandPool pool,
-            VkFence fence,
             TransientResourceHeapImpl* transientHeap)
         {
             m_renderer = renderer;
             m_transientHeap = transientHeap;
             m_pool = pool;
-            m_fence = fence;
 
             auto& api = renderer->m_api;
             VkCommandBufferAllocateInfo allocInfo = {};
@@ -3498,7 +3610,7 @@ public:
             VkCommandBufferBeginInfo beginInfo = {
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 nullptr,
-                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
             api.vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
             if (m_preCommandBuffer)
             {
@@ -3520,7 +3632,7 @@ public:
             VkCommandBufferBeginInfo beginInfo = {
                 VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
                 nullptr,
-                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
+                VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT };
             api.vkBeginCommandBuffer(m_preCommandBuffer, &beginInfo);
             return SLANG_OK;
         }
@@ -3532,6 +3644,20 @@ public:
                 return m_preCommandBuffer;
             createPreCommandBuffer();
             return m_preCommandBuffer;
+        }
+
+        static void _writeTimestamp(
+            VulkanApi* api,
+            VkCommandBuffer vkCmdBuffer,
+            IQueryPool* queryPool,
+            SlangInt index)
+        {
+            auto queryPoolImpl = static_cast<QueryPoolImpl*>(queryPool);
+            api->vkCmdResetQueryPool(vkCmdBuffer, queryPoolImpl->m_pool, (uint32_t)index, 1);
+            api->vkCmdWriteTimestamp(vkCmdBuffer,
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                queryPoolImpl->m_pool,
+                (uint32_t)index);
         }
 
     public:
@@ -3548,21 +3674,6 @@ public:
             VkIndexType m_boundIndexFormat;
 
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IRenderCommandEncoder)
-                {
-                    *outObject = static_cast<IRenderCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
             {
                 FramebufferImpl* framebufferImpl = static_cast<FramebufferImpl*>(framebuffer);
@@ -3582,7 +3693,6 @@ public:
                 beginInfo.pClearValues = framebufferImpl->m_clearValues;
                 auto& api = *m_api;
                 api.vkCmdBeginRenderPass(m_vkCommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-                m_isOpen = true;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
@@ -3590,6 +3700,11 @@ public:
                 auto& api = *m_api;
                 api.vkCmdEndRenderPass(m_vkCommandBuffer);
                 endEncodingImpl();
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(m_api, m_vkCommandBuffer, queryPool, index);
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -3792,7 +3907,6 @@ public:
                 m_renderCommandEncoder = new RenderCommandEncoder();
                 m_renderCommandEncoder->init(this);
             }
-            assert(!m_renderCommandEncoder->m_isOpen);
             m_renderCommandEncoder->beginPass(renderPass, framebuffer);
             *outEncoder = m_renderCommandEncoder.Ptr();
         }
@@ -3801,21 +3915,6 @@ public:
             : public IComputeCommandEncoder
             , public PipelineCommandEncoder
         {
-        public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IComputeCommandEncoder)
-                {
-                    *outObject = static_cast<IComputeCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -3843,6 +3942,11 @@ public:
                 flushBindingState(VK_PIPELINE_BIND_POINT_COMPUTE);
                 m_api->vkCmdDispatch(m_vkCommandBuffer, x, y, z);
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(m_api, m_vkCommandBuffer, queryPool, index);
+            }
         };
 
         RefPtr<ComputeCommandEncoder> m_computeCommandEncoder;
@@ -3855,7 +3959,6 @@ public:
                 m_computeCommandEncoder = new ComputeCommandEncoder();
                 m_computeCommandEncoder->init(this);
             }
-            assert(!m_computeCommandEncoder->m_isOpen);
             *outEncoder = m_computeCommandEncoder.Ptr();
         }
 
@@ -3865,21 +3968,6 @@ public:
         {
         public:
             CommandBufferImpl* m_commandBuffer;
-        public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IResourceCommandEncoder)
-                {
-                    *outObject = static_cast<IResourceCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
                 IBufferResource* dst,
@@ -3940,6 +4028,15 @@ public:
                     nullptr);
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(
+                    &m_commandBuffer->m_renderer->m_api,
+                    m_commandBuffer->m_commandBuffer,
+                    queryPool,
+                    index);
+            }
+
             void init(CommandBufferImpl* commandBuffer)
             {
                 m_commandBuffer = commandBuffer;
@@ -3957,6 +4054,264 @@ public:
                 m_resourceCommandEncoder->init(this);
             }
             *outEncoder = m_resourceCommandEncoder.Ptr();
+        }
+
+        class RayTracingCommandEncoder
+            : public IRayTracingCommandEncoder
+            , public RefObject
+        {
+        public:
+            CommandBufferImpl* m_commandBuffer;
+
+        public:
+            void init(CommandBufferImpl* commandBuffer) { m_commandBuffer = commandBuffer; }
+
+            inline VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag::Enum access)
+            {
+                VkAccessFlags result = 0;
+                if (access & AccessFlag::Read)
+                    result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
+                              VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+                if (access & AccessFlag::Write)
+                    result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+                return result;
+            }
+
+            inline void _memoryBarrier(
+                int count,
+                IAccelerationStructure* const* structures,
+                AccessFlag::Enum srcAccess,
+                AccessFlag::Enum destAccess)
+            {
+                ShortList<VkBufferMemoryBarrier> memBarriers;
+                memBarriers.setCount(count);
+                for (int i = 0; i < count; i++)
+                {
+                    memBarriers[i].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                    memBarriers[i].pNext = nullptr;
+                    memBarriers[i].dstAccessMask =
+                        translateAccelerationStructureAccessFlag(destAccess);
+                    memBarriers[i].srcAccessMask =
+                        translateAccelerationStructureAccessFlag(srcAccess);
+                    memBarriers[i].srcQueueFamilyIndex =
+                        m_commandBuffer->m_renderer->m_queueFamilyIndex;
+                    memBarriers[i].dstQueueFamilyIndex =
+                        m_commandBuffer->m_renderer->m_queueFamilyIndex;
+
+                    auto asImpl = static_cast<AccelerationStructureImpl*>(structures[i]);
+                    memBarriers[i].buffer = asImpl->m_buffer->m_buffer.m_buffer;
+                    memBarriers[i].offset = asImpl->m_offset;
+                    memBarriers[i].size = asImpl->m_size;
+                }
+                m_commandBuffer->m_renderer->m_api.vkCmdPipelineBarrier(
+                    m_commandBuffer->m_commandBuffer,
+                    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR |
+                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                    VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR |
+                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0,
+                    0,
+                    nullptr,
+                    (uint32_t)memBarriers.getCount(),
+                    memBarriers.getArrayView().getBuffer(),
+                    0,
+                    nullptr);
+            }
+
+            inline void _queryAccelerationStructureProperties(
+                int accelerationStructureCount,
+                IAccelerationStructure* const* accelerationStructures,
+                int queryCount,
+                AccelerationStructureQueryDesc* queryDescs)
+            {
+                ShortList<VkAccelerationStructureKHR> vkHandles;
+                vkHandles.setCount(accelerationStructureCount);
+                for (int i = 0; i < accelerationStructureCount; i++)
+                {
+                    vkHandles[i] =
+                        static_cast<AccelerationStructureImpl*>(accelerationStructures[i])
+                            ->m_vkHandle;
+                }
+                auto vkHandlesView = vkHandles.getArrayView();
+                for (int i = 0; i < queryCount; i++)
+                {
+                    VkQueryType queryType;
+                    switch (queryDescs[i].queryType)
+                    {
+                    case QueryType::AccelerationStructureCompactedSize:
+                        queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+                        break;
+                    case QueryType::AccelerationStructureSerializedSize:
+                        queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR;
+                        break;
+                    default:
+                        getDebugCallback()->handleMessage(DebugMessageType::Error, DebugMessageSource::Layer,
+                            "Invalid query type for use in queryAccelerationStructureProperties.");
+                        return;
+                    }
+                    auto queryPool = static_cast<QueryPoolImpl*>(queryDescs[i].queryPool)->m_pool;
+                    m_commandBuffer->m_renderer->m_api.vkCmdResetQueryPool(
+                        m_commandBuffer->m_commandBuffer,
+                        queryPool,
+                        (uint32_t)queryDescs[i].firstQueryIndex,
+                        1);
+                    m_commandBuffer->m_renderer->m_api
+                        .vkCmdWriteAccelerationStructuresPropertiesKHR(
+                            m_commandBuffer->m_commandBuffer,
+                            accelerationStructureCount,
+                            vkHandlesView.getBuffer(),
+                            queryType,
+                            queryPool,
+                            queryDescs[i].firstQueryIndex);
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
+                const IAccelerationStructure::BuildDesc& desc,
+                int propertyQueryCount,
+                AccelerationStructureQueryDesc* queryDescs) override
+            {
+                AccelerationStructureBuildGeometryInfoBuilder geomInfoBuilder;
+                if (geomInfoBuilder.build(desc.inputs, getDebugCallback()) != SLANG_OK)
+                    return;
+
+                if (desc.dest)
+                {
+                    geomInfoBuilder.buildInfo.dstAccelerationStructure =
+                        static_cast<AccelerationStructureImpl*>(desc.dest)->m_vkHandle;
+                }
+                if (desc.source)
+                {
+                    geomInfoBuilder.buildInfo.srcAccelerationStructure =
+                        static_cast<AccelerationStructureImpl*>(desc.source)->m_vkHandle;
+                }
+                geomInfoBuilder.buildInfo.scratchData.deviceAddress = desc.scratchData;
+
+                List<VkAccelerationStructureBuildRangeInfoKHR> rangeInfos;
+                rangeInfos.setCount(geomInfoBuilder.primitiveCounts.getCount());
+                for (Index i = 0; i < geomInfoBuilder.primitiveCounts.getCount(); i++)
+                {
+                    auto& rangeInfo = rangeInfos[i];
+                    rangeInfo.primitiveCount = geomInfoBuilder.primitiveCounts[i];
+                    rangeInfo.firstVertex = 0;
+                    rangeInfo.primitiveOffset = 0;
+                    rangeInfo.transformOffset = 0;
+                }
+
+                auto rangeInfoPtr = rangeInfos.getBuffer();
+                m_commandBuffer->m_renderer->m_api.vkCmdBuildAccelerationStructuresKHR(
+                    m_commandBuffer->m_commandBuffer, 1, &geomInfoBuilder.buildInfo, &rangeInfoPtr);
+
+                if (propertyQueryCount)
+                {
+                    _memoryBarrier(1, &desc.dest, AccessFlag::Write, AccessFlag::Read);
+                    _queryAccelerationStructureProperties(
+                        1, &desc.dest, propertyQueryCount, queryDescs);
+                }
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
+                IAccelerationStructure* dest,
+                IAccelerationStructure* src,
+                AccelerationStructureCopyMode mode) override
+            {
+                VkCopyAccelerationStructureInfoKHR copyInfo = {
+                    VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR};
+                copyInfo.src = static_cast<AccelerationStructureImpl*>(src)->m_vkHandle;
+                copyInfo.dst = static_cast<AccelerationStructureImpl*>(dest)->m_vkHandle;
+                switch (mode)
+                {
+                case AccelerationStructureCopyMode::Clone:
+                    copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_CLONE_KHR;
+                    break;
+                case AccelerationStructureCopyMode::Compact:
+                    copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+                    break;
+                default:
+                    getDebugCallback()->handleMessage(
+                        DebugMessageType::Error,
+                        DebugMessageSource::Layer,
+                        "Unsupported AccelerationStructureCopyMode.");
+                    return;
+                }
+                m_commandBuffer->m_renderer->m_api.vkCmdCopyAccelerationStructureKHR(
+                    m_commandBuffer->m_commandBuffer, &copyInfo);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
+                int accelerationStructureCount,
+                IAccelerationStructure* const* accelerationStructures,
+                int queryCount,
+                AccelerationStructureQueryDesc* queryDescs) override
+            {
+                _queryAccelerationStructureProperties(
+                    accelerationStructureCount, accelerationStructures, queryCount, queryDescs);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL serializeAccelerationStructure(
+                DeviceAddress dest,
+                IAccelerationStructure* source) override
+            {
+                VkCopyAccelerationStructureToMemoryInfoKHR copyInfo = {
+                    VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_TO_MEMORY_INFO_KHR};
+                copyInfo.src = static_cast<AccelerationStructureImpl*>(source)->m_vkHandle;
+                copyInfo.dst.deviceAddress = dest;
+                copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_SERIALIZE_KHR;
+                m_commandBuffer->m_renderer->m_api.vkCmdCopyAccelerationStructureToMemoryKHR(
+                    m_commandBuffer->m_commandBuffer, &copyInfo);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL deserializeAccelerationStructure(
+                IAccelerationStructure* dest,
+                DeviceAddress source) override
+            {
+                VkCopyMemoryToAccelerationStructureInfoKHR copyInfo = {
+                    VK_STRUCTURE_TYPE_COPY_MEMORY_TO_ACCELERATION_STRUCTURE_INFO_KHR};
+                copyInfo.src.deviceAddress = source;
+                copyInfo.dst = static_cast<AccelerationStructureImpl*>(dest)->m_vkHandle;
+                copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_DESERIALIZE_KHR;
+                m_commandBuffer->m_renderer->m_api.vkCmdCopyMemoryToAccelerationStructureKHR(
+                    m_commandBuffer->m_commandBuffer, &copyInfo);
+            }
+
+            virtual SLANG_NO_THROW void memoryBarrier(
+                int count,
+                IAccelerationStructure* const* structures,
+                AccessFlag::Enum srcAccess,
+                AccessFlag::Enum destAccess) override
+            {
+                _memoryBarrier(count, structures, srcAccess, destAccess);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
+            {
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                writeTimestamp(IQueryPool* queryPool, SlangInt index) override
+            {
+                _writeTimestamp(
+                    &m_commandBuffer->m_renderer->m_api,
+                    m_commandBuffer->m_commandBuffer,
+                    queryPool,
+                    index);
+            }
+        };
+
+        RefPtr<RayTracingCommandEncoder> m_rayTracingCommandEncoder;
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            if (!m_rayTracingCommandEncoder)
+            {
+                if (m_renderer->m_api.vkCmdBuildAccelerationStructuresKHR)
+                {
+                    m_rayTracingCommandEncoder = new RayTracingCommandEncoder();
+                    m_rayTracingCommandEncoder->init(this);
+                }
+            }
+            *outEncoder = m_rayTracingCommandEncoder.Ptr();
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override
@@ -4005,9 +4360,9 @@ public:
         RefPtr<VKDevice> m_renderer;
         VkQueue m_queue;
         uint32_t m_queueFamilyIndex;
-        VkSemaphore m_pendingWaitSemaphore = VK_NULL_HANDLE;
+        VkSemaphore m_pendingWaitSemaphores[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         List<VkCommandBuffer> m_submitCommandBuffers;
-        static const int kSemaphoreCount = 2;
+        static const int kSemaphoreCount = 32;
         uint32_t m_currentSemaphoreIndex;
         VkSemaphore m_semaphores[kSemaphoreCount];
         ~CommandQueueImpl()
@@ -4067,26 +4422,37 @@ public:
                 auto vkCmdBuf = cmdBufImpl->m_commandBuffer;
                 m_submitCommandBuffers.add(vkCmdBuf);
             }
-            VkSemaphore waitSemaphore = m_pendingWaitSemaphore;
             VkSemaphore signalSemaphore = m_semaphores[m_currentSemaphoreIndex];
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            VkPipelineStageFlags stageFlag = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-            submitInfo.pWaitDstStageMask = &stageFlag;
+            VkPipelineStageFlags stageFlag[] = {
+                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT};
+            submitInfo.pWaitDstStageMask = stageFlag;
             submitInfo.commandBufferCount = (uint32_t)m_submitCommandBuffers.getCount();
             submitInfo.pCommandBuffers = m_submitCommandBuffers.getBuffer();
-            if (m_pendingWaitSemaphore != VK_NULL_HANDLE)
+            Array<VkSemaphore, 2> waitSemaphores;
+            for (auto s : m_pendingWaitSemaphores)
             {
-                submitInfo.waitSemaphoreCount = 1;
-                submitInfo.pWaitSemaphores = &waitSemaphore;
+                if (s != VK_NULL_HANDLE)
+                {
+                    waitSemaphores.add(s);
+                }
+            }
+            submitInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.getCount();
+            if (submitInfo.waitSemaphoreCount)
+            {
+                submitInfo.pWaitSemaphores = waitSemaphores.getBuffer();
             }
             submitInfo.signalSemaphoreCount = 1;
             submitInfo.pSignalSemaphores = &signalSemaphore;
 
-            auto fence = static_cast<CommandBufferImpl*>(commandBuffers[0])->m_fence;
+            auto commandBufferImpl = static_cast<CommandBufferImpl*>(commandBuffers[0]);
+            auto fence = commandBufferImpl->m_transientHeap->getCurrentFence();
             vkAPI.vkResetFences(vkAPI.m_device, 1, &fence);
             vkAPI.vkQueueSubmit(m_queue, 1, &submitInfo, fence);
-            m_pendingWaitSemaphore = signalSemaphore;
+            m_pendingWaitSemaphores[0] = signalSemaphore;
+            m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
+            commandBufferImpl->m_transientHeap->advanceFence();
 
             m_currentSemaphoreIndex++;
             m_currentSemaphoreIndex = m_currentSemaphoreIndex % kSemaphoreCount;
@@ -4102,22 +4468,102 @@ public:
     public:
         VkCommandPool m_commandPool;
         DescriptorSetAllocator m_descSetAllocator;
-        VkFence m_fence;
+        List<VkFence> m_fences;
+        Index m_fenceIndex = -1;
         List<RefPtr<CommandBufferImpl>> m_commandBufferPool;
         uint32_t m_commandBufferAllocId = 0;
+        VkFence getCurrentFence()
+        {
+            return m_fences[m_fenceIndex];
+        }
+        void advanceFence()
+        {
+            m_fenceIndex++;
+            if (m_fenceIndex >= m_fences.getCount())
+            {
+                m_fences.setCount(m_fenceIndex + 1);
+                VkFenceCreateInfo fenceCreateInfo = {};
+                fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+                m_device->m_api.vkCreateFence(
+                    m_device->m_api.m_device, &fenceCreateInfo, nullptr, &m_fences[m_fenceIndex]);
+            }
+        }
 
         Result init(const ITransientResourceHeap::Desc& desc, VKDevice* device);
         ~TransientResourceHeapImpl()
         {
             m_commandBufferPool = decltype(m_commandBufferPool)();
             m_device->m_api.vkDestroyCommandPool(m_device->m_api.m_device, m_commandPool, nullptr);
-            m_device->m_api.vkDestroyFence(m_device->m_api.m_device, m_fence, nullptr);
+            for (auto fence : m_fences)
+            {
+                m_device->m_api.vkDestroyFence(m_device->m_api.m_device, fence, nullptr);
+            }
             m_descSetAllocator.close();
         }
     public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             createCommandBuffer(ICommandBuffer** outCommandBuffer) override;
         virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
+    };
+
+    class QueryPoolImpl
+        : public IQueryPool
+        , public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+    public:
+        Result init(const IQueryPool::Desc& desc, VKDevice* device)
+        {
+            m_device = device;
+            VkQueryPoolCreateInfo createInfo = {};
+            createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+            createInfo.queryCount = (uint32_t)desc.count;
+            switch (desc.type)
+            {
+            case QueryType::Timestamp:
+                createInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+                break;
+            case QueryType::AccelerationStructureCompactedSize:
+                createInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+                break;
+            case QueryType::AccelerationStructureSerializedSize:
+                createInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR;
+                break;
+            default:
+                return SLANG_E_INVALID_ARG;
+            }
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateQueryPool(
+                m_device->m_api.m_device, &createInfo, nullptr, &m_pool));
+            return SLANG_OK;
+        }
+        ~QueryPoolImpl()
+        {
+            m_device->m_api.vkDestroyQueryPool(m_device->m_api.m_device, m_pool, nullptr);
+        }
+    public:
+        virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt index, SlangInt count, uint64_t* data) override
+        {
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetQueryPoolResults(
+                m_device->m_api.m_device,
+                m_pool,
+                (uint32_t)index,
+                (uint32_t)count,
+                sizeof(uint64_t) * count,
+                data,
+                sizeof(uint64_t), 0));
+            return SLANG_OK;
+        }
+    public:
+        VkQueryPool m_pool;
+        RefPtr<VKDevice> m_device;
     };
 
     class SwapchainImpl
@@ -4454,13 +4900,22 @@ public:
             presentInfo.swapchainCount = 1;
             presentInfo.pSwapchains = &m_swapChain;
             presentInfo.pImageIndices = swapChainIndices;
-            if (m_queue->m_pendingWaitSemaphore != VK_NULL_HANDLE)
+            Array<VkSemaphore, 2> waitSemaphores;
+            for (auto s : m_queue->m_pendingWaitSemaphores)
             {
-                presentInfo.waitSemaphoreCount = 1;
-                presentInfo.pWaitSemaphores = &m_queue->m_pendingWaitSemaphore;
+                if (s != VK_NULL_HANDLE)
+                {
+                    waitSemaphores.add(s);
+                }
+            }
+            presentInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.getCount();
+            if (presentInfo.waitSemaphoreCount)
+            {
+                presentInfo.pWaitSemaphores = waitSemaphores.getBuffer();
             }
             m_api->vkQueuePresentKHR(m_queue->m_queue, &presentInfo);
-            m_queue->m_pendingWaitSemaphore = VK_NULL_HANDLE;
+            m_queue->m_pendingWaitSemaphores[0] = VK_NULL_HANDLE;
+            m_queue->m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
             return SLANG_OK;
         }
         virtual SLANG_NO_THROW int SLANG_MCALL acquireNextImage() override
@@ -4484,7 +4939,7 @@ public:
                 return m_currentImageIndex;
             }
             // Make the queue's next submit wait on `m_nextImageSemaphore`.
-            m_queue->m_pendingWaitSemaphore = m_nextImageSemaphore;
+            m_queue->m_pendingWaitSemaphores[1] = m_nextImageSemaphore;
             return m_currentImageIndex;
         }
     };
@@ -4630,7 +5085,6 @@ Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferU
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
-
     SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
@@ -4644,7 +5098,14 @@ Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferU
     VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
-
+    VkMemoryAllocateFlagsInfo flagInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+    if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
+    {
+        flagInfo.deviceMask = 1;
+        flagInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        allocateInfo.pNext = &flagInfo;
+    }
+ 
     SLANG_VK_CHECK(api.vkAllocateMemory(api.m_device, &allocateInfo, nullptr, &m_memory));
     SLANG_VK_CHECK(api.vkBindBufferMemory(api.m_device, m_buffer, m_memory, 0));
 
@@ -4935,27 +5396,12 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     VkPhysicalDeviceProperties basicProps = {};
     m_api.vkGetPhysicalDeviceProperties(m_api.m_physicalDevice, &basicProps);
 
+    // Compute timestamp frequency.
+    m_info.timestampFrequency = uint64_t(1e9 / basicProps.limits.timestampPeriod);
+
     // Get the API version
     const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
     const uint32_t minorVersion = VK_VERSION_MINOR(basicProps.apiVersion);
-
-    // Need in this scope because it will be linked into the device creation (if it is available)
-
-    // Float16 features
-    VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR };
-    // 16 bit storage features
-    VkPhysicalDevice16BitStorageFeatures storage16BitFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR };
-    // AtomicInt64 features
-    VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR };
-    // Atomic Float features
-    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT };
-    // Timeline Semaphore features
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES };
-    // Extended dynamic state features
-    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT };
-    // Subgroup extended type features
-    VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures shaderSubgroupExtendedTypeFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES};
 
     // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
     if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
@@ -4965,6 +5411,18 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
         // Get device features
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+        // Buffer device address features
+        bufferDeviceAddressFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &bufferDeviceAddressFeatures;
+
+        // Ray query features
+        rayQueryFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &rayQueryFeatures;
+
+        // Acceleration structure features
+        accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &accelerationStructureFeatures;
 
         // Subgroup features
         shaderSubgroupExtendedTypeFeatures.pNext = deviceFeatures2.pNext;
@@ -5071,6 +5529,31 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
+
+        if (accelerationStructureFeatures.accelerationStructure)
+        {
+            accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &accelerationStructureFeatures;
+            deviceExtensions.add(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+            deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+            m_features.add("acceleration-structure");
+        }
+
+        if (rayQueryFeatures.rayQuery)
+        {
+            rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &rayQueryFeatures;
+            deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+            m_features.add("ray-query");
+        }
+
+        if (bufferDeviceAddressFeatures.bufferDeviceAddress)
+        {
+            bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &bufferDeviceAddressFeatures;
+            deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+            m_features.add("buffer-device-address");
+        }
     }
 
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
@@ -5152,11 +5635,7 @@ Result VKDevice::TransientResourceHeapImpl::init(
     device->m_api.vkCreateCommandPool(
         device->m_api.m_device, &poolCreateInfo, nullptr, &m_commandPool);
 
-    VkFenceCreateInfo fenceCreateInfo = {};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    device->m_api.vkCreateFence(device->m_api.m_device, &fenceCreateInfo, nullptr, &m_fence);
-
+    advanceFence();
     return SLANG_OK;
 }
 
@@ -5173,7 +5652,7 @@ Result VKDevice::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer**
 
     RefPtr<CommandBufferImpl> commandBuffer = new CommandBufferImpl();
     SLANG_RETURN_ON_FAIL(commandBuffer->init(
-        m_device, m_commandPool, m_fence, this));
+        m_device, m_commandPool, this));
     m_commandBufferPool.add(commandBuffer);
     m_commandBufferAllocId++;
     returnComPtr(outCmdBuffer, commandBuffer);
@@ -5184,12 +5663,15 @@ Result VKDevice::TransientResourceHeapImpl::synchronizeAndReset()
 {
     m_commandBufferAllocId = 0;
     auto& api = m_device->m_api;
-    if (api.vkWaitForFences(api.m_device, 1, &m_fence, 1, UINT64_MAX) != VK_SUCCESS)
+    if (api.vkWaitForFences(
+            api.m_device, (uint32_t)m_fences.getCount(), m_fences.getBuffer(), 1, UINT64_MAX) !=
+        VK_SUCCESS)
     {
         return SLANG_FAIL;
     }
     api.vkResetCommandPool(api.m_device, m_commandPool, 0);
     m_descSetAllocator.reset();
+    m_fenceIndex = 0;
     Super::reset();
     return SLANG_OK;
 }
@@ -5318,6 +5800,69 @@ SlangResult VKDevice::readBufferResource(
     return SLANG_OK;
 }
 
+Result VKDevice::getAccelerationStructurePrebuildInfo(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+{
+    if (!m_api.vkGetAccelerationStructureBuildSizesKHR)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    VkAccelerationStructureBuildSizesInfoKHR sizeInfo = {
+        VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
+    AccelerationStructureBuildGeometryInfoBuilder geomInfoBuilder;
+    SLANG_RETURN_ON_FAIL(geomInfoBuilder.build(buildInputs, getDebugCallback()));
+    m_api.vkGetAccelerationStructureBuildSizesKHR(
+        m_api.m_device,
+        VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+        &geomInfoBuilder.buildInfo,
+        geomInfoBuilder.primitiveCounts.getBuffer(),
+        &sizeInfo);
+    outPrebuildInfo->resultDataMaxSize = sizeInfo.accelerationStructureSize;
+    outPrebuildInfo->scratchDataSize = sizeInfo.buildScratchSize;
+    outPrebuildInfo->updateScratchDataSize = sizeInfo.updateScratchSize;
+    return SLANG_OK;
+}
+
+Result VKDevice::createAccelerationStructure(
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outAS)
+{
+    if (!m_api.vkCreateAccelerationStructureKHR)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    RefPtr<AccelerationStructureImpl> resultAS = new AccelerationStructureImpl();
+    resultAS->m_offset = desc.offset;
+    resultAS->m_size = desc.size;
+    resultAS->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);
+    resultAS->m_device = this;
+    VkAccelerationStructureCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
+    createInfo.buffer = resultAS->m_buffer->m_buffer.m_buffer;
+    createInfo.offset = desc.offset;
+    createInfo.size = desc.size;
+    switch (desc.kind)
+    {
+    case IAccelerationStructure::Kind::BottomLevel:
+        createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+        break;
+    case IAccelerationStructure::Kind::TopLevel:
+        createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+        break;
+    default:
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "invalid value of IAccelerationStructure::Kind encountered in desc.kind");
+        return SLANG_E_INVALID_ARG;
+    }
+
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateAccelerationStructureKHR(
+        m_api.m_device, &createInfo, nullptr, &resultAS->m_vkHandle));
+    returnComPtr(outAS, resultAS);
+    return SLANG_OK;
+}
+
 static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
 {
     switch (state)
@@ -5345,6 +5890,8 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
         return VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::AccelerationStructure:
+        return VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
     default:
         return VkBufferUsageFlagBits(0);
     }
@@ -5407,7 +5954,7 @@ static VkImageUsageFlags _calcImageUsageFlags(
 {
     VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
-    if ((cpuAccessFlags & IResource::AccessFlag::Write) || initData)
+    if ((cpuAccessFlags & AccessFlag::Write) || initData)
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
@@ -5521,6 +6068,15 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
         sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            newLayout == VK_IMAGE_LAYOUT_GENERAL)
+    {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     }
     else
@@ -5799,6 +6355,10 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
     VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates);
+    if (bufferDeviceAddressFeatures.bufferDeviceAddress)
+    {
+        usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    }
 
     if (initData)
     {
@@ -5813,7 +6373,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
     SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
 
-    if ((desc.cpuAccessFlags & IResource::AccessFlag::Write) || initData)
+    if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
@@ -6470,6 +7030,16 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     pipelineStateImpl->establishStrongDeviceReference();
     returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+Result VKDevice::createQueryPool(
+    const IQueryPool::Desc& desc,
+    IQueryPool** outPool)
+{
+    RefPtr<QueryPoolImpl> result = new QueryPoolImpl();
+    SLANG_RETURN_ON_FAIL(result->init(desc, this));
+    returnComPtr(outPool, result);
     return SLANG_OK;
 }
 

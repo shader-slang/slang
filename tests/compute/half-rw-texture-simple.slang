@@ -6,9 +6,12 @@
 // Produces a different result on DX12 with DXBC than expected(!). So disabled for now
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -use-dxil -output-using-type -shaderobj
-// TODO(JS): Doesn't work on vk currently, because createTextureView not implemented on vk renderer
-//DIABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+// TODO(JS): Doesn't currently work on Vulkan - 3rd value in output appears incorrect
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
+
+//TEST_INPUT: RWTexture1D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt1D
+RWTexture1D<half> rwt1D;
 
 //TEST_INPUT: RWTexture2D(format=R_Float16, size=4, content = one, mipMaps = 1):name rwt2D
 RWTexture2D<half> rwt2D;
@@ -26,7 +29,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     float val = 0.0f;
  
-    //val += rwt1D[idx];
+    val += rwt1D[idx];
     
     half h0 = rwt2D[uint2(idx, idx)];
 
@@ -37,8 +40,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
    
     val += f1.x + f1.y + f1.z + f1.w;
     
-    // NOTE! This is disabled because on CUDA, whilst this has an effect it is not what is expected.
-    // The value read back has changed but seems to always be 1.
     // rwt1D[idx] = idx;
     rwt2D[uint2(idx, idx)] = half(idx);    
     

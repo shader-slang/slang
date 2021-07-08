@@ -1433,7 +1433,7 @@ namespace Slang
             Type* const*    args,
             DiagnosticSink* sink);
 
-            /// Add a mew target amd return its index.
+            /// Add a mew target and return its index.
         UInt addTarget(
             CodeGenTarget   target);
 

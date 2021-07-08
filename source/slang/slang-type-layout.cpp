@@ -8,31 +8,51 @@
 
 namespace Slang {
 
-size_t RoundToAlignment(size_t offset, size_t alignment)
+static bool _isPow2(size_t v)
 {
-    size_t remainder = offset % alignment;
-    if (remainder == 0)
-        return offset;
-    else
-        return offset + (alignment - remainder);
+    return v > 0 && ((v - 1) & v) == 0;
 }
 
-LayoutSize RoundToAlignment(LayoutSize offset, size_t alignment)
+static size_t _roundToAlignment(size_t offset, size_t alignment)
+{
+    // Must also be a power of 2
+    SLANG_ASSERT(_isPow2(alignment));
+
+    const size_t mask = alignment - 1;
+    return (offset + mask) & ~mask;
+}
+
+static LayoutSize _roundToAlignment(LayoutSize offset, size_t alignment)
 {
     // An infinite size is assumed to be maximally aligned.
     if(offset.isInfinite())
         return LayoutSize::infinite();
 
-    return RoundToAlignment(offset.getFiniteValue(), alignment);
+    return _roundToAlignment(offset.getFiniteValue(), alignment);
 }
 
-static size_t RoundUpToPowerOfTwo( size_t value )
+static size_t _roundUpToPowerOfTwo( size_t value )
 {
     // TODO(tfoley): I know this isn't a fast approach
     size_t result = 1;
     while (result < value)
         result *= 2;
     return result;
+}
+
+static bool _isAligned(size_t size, size_t alignment)
+{
+    SLANG_ASSERT(_isPow2(alignment));
+    return ((alignment - 1) & size) == 0;
+}
+
+// This is a workaround to keep functions from causing warnings in release builds, and therefore causing compilation to fail.
+void _typeLayout_keepFunctions()
+{
+    auto a = _isAligned;
+    auto b = _isPow2;
+    SLANG_UNUSED(a);
+    SLANG_UNUSED(b);
 }
 
 //
@@ -81,7 +101,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
         auto elementSize = elementInfo.size.getFiniteValue();
         auto elementAlignment = elementInfo.alignment;
-        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
+        auto elementStride = _roundToAlignment(elementSize, elementAlignment);
 
         // An array with no elements will have zero size.
         //
@@ -155,7 +175,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         auto fieldBaseOffset = ioStructInfo->size;
 
         // We need to ensure that the offset for the field will respect its alignment
-        auto fieldOffset = RoundToAlignment(fieldBaseOffset, fieldInfo.alignment);
+        auto fieldOffset = _roundToAlignment(fieldBaseOffset, fieldInfo.alignment);
 
         // The size of the struct must be adjusted to cover the bytes consumed
         // by this field.
@@ -222,7 +242,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         SimpleLayoutInfo vectorInfo(
             LayoutResourceKind::Uniform,
             size,
-            RoundUpToPowerOfTwo(size));
+            _roundUpToPowerOfTwo(size));
         return vectorInfo;
     }
 
@@ -231,7 +251,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of an array must be rounded up to be a multiple of its alignment.
         //
         auto info = Super::GetArrayLayout(elementInfo, elementCount);
-        info.size = RoundToAlignment(info.size, info.alignment);
+        info.size = _roundToAlignment(info.size, info.alignment);
         return info;
     }
 
@@ -239,7 +259,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // The size of a `struct` must be rounded up to be a multiple of its alignment.
         //
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
@@ -329,7 +349,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
             return ioStructInfo->size;
 
         ioStructInfo->alignment = std::max(ioStructInfo->alignment, fieldInfo.alignment);
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, fieldInfo.alignment);
 
         LayoutSize fieldOffset = ioStructInfo->size;
         LayoutSize fieldSize = fieldInfo.size;
@@ -340,7 +360,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         auto endRegister = (fieldOffset + fieldSize - 1) / registerSize;
         if (startRegister != endRegister)
         {
-            ioStructInfo->size = RoundToAlignment(ioStructInfo->size, size_t(registerSize));
+            ioStructInfo->size = _roundToAlignment(ioStructInfo->size, size_t(registerSize));
             fieldOffset = ioStructInfo->size;
         }
 
@@ -349,6 +369,8 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+/* CPU layout requires that all sizes are a multiple of alignment.
+*/
 struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
@@ -365,6 +387,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
                 return SimpleLayoutInfo( LayoutResourceKind::Uniform, 1, 1 );
             }
 
+            // This always returns a layout where the size is the same as the alignment.
             default: return Super::GetScalarLayout(baseType);
         }
     }
@@ -396,9 +419,37 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to C/C++ size is adjusted to the largest alignment
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
+
+// The CUDA compiler NVRTC only works on 64 bit operating systems.
+// So instead of using native host type sizes we use these types instead
+//
+// NOTE! This implies that our CUDA reflection (even if produced on 32 bit host environment) is always 64 bit.
+// This is unlikely to be a problem in practice.
+
+// NOTE! For the moment the CUDA prelude we use size_t - but that's ok as we currently use these types for
+// sizes
+
+// Memory sizes, and memory offsets (signed)
+typedef int64_t CUDASize;
+typedef int64_t CUDAOffset;
+
+// TODO(JS): This could be better as CudaUSize if we accepted LowerCamel Acronyms...
+typedef uint64_t CUDAUSize;
+
+// A type that is the size of a pointer
+typedef CUDASize CUDAPtr;
+// For CUtexObject and CUsurfObject
+typedef CUDAPtr CUDAHandle;
+
+// This is not strictly speaking needed - but exists to be consistent with cuda-prelude.h and the current CUDA emit.
+typedef CUDAPtr CUDASamplerState;
+
+// TODO(JS): Perhaps there is an argument these should be 32 bit?
+typedef CUDASize CUDACount;
+typedef CUDASize CUDAIndex;
 
 struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 {
@@ -421,48 +472,23 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) override
     {
         SLANG_RELEASE_ASSERT(elementInfo.size.isFinite());
-        auto elementSize = elementInfo.size.getFiniteValue();
-        auto elementAlignment = elementInfo.alignment;
-        auto elementStride = RoundToAlignment(elementSize, elementAlignment);
-
+        
         if (elementCount.isInfinite())
         {
             // This is an unsized array, get information for element
             auto info = Super::GetArrayLayout(elementInfo, LayoutSize(1));
 
             // So it is actually a Array<T> on CUDA which is a pointer and a size
-            info.size = sizeof(void*) * 2;
-            info.alignment = SLANG_ALIGN_OF(void*);
+            info.size = _roundToAlignment((CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+            info.alignment = sizeof(CUDAPtr);
             return info;
         }
+        
+        // It's fine to use the Default impl, as long as any elements size is alignment rounded (as happen in EndStructLayout).
+        // If that weren't the case the array may be smaller than elementSize * elementCount which would be wrong for CUDA.
+        SLANG_ASSERT(_isAligned(elementInfo.size.getFiniteValue(), elementInfo.alignment));
 
-        // An array with no elements will have zero size.
-        //
-        LayoutSize arraySize = 0;
-        //
-        // Any array with a non-zero number of elements will need
-        // to have space for N elements of size `elementSize`, with
-        // the constraints that there must be `elementStride` bytes
-        // between consecutive elements.
-        //
-        if (elementCount > 0)
-        {
-            // We can think of this as either allocating (N-1)
-            // chunks of size `elementStride` (for most of the elements)
-            // and then one final chunk of size `elementSize`  for
-            // the last element, or equivalently as allocating
-            // N chunks of size `elementStride` and then "giving back"
-            // the final `elementStride - elementSize` bytes.
-            //
-            arraySize = (elementStride * (elementCount - 1)) + elementSize;
-        }
-
-        SimpleArrayLayoutInfo arrayInfo;
-        arrayInfo.kind = elementInfo.kind;
-        arrayInfo.size = arraySize;
-        arrayInfo.alignment = elementAlignment;
-        arrayInfo.elementStride = elementStride;
-        return arrayInfo;
+        return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
     SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) override
@@ -472,29 +498,46 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         {
             SimpleLayoutInfo fixInfo(elementInfo);
             fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
+            fixInfo.alignment = sizeof(int32_t);
             return GetVectorLayout(BaseType::Int, fixInfo, elementCount);
         }
+        
+        const auto elementSize = elementInfo.size.getFiniteValue();
+
+        // These rules can largely be determines by looking at
+        // 'vector_types.h' in the CUDA SDK
+
+        // Size in bytes of vector
+        size_t size = elementSize * elementCount;
+        // Special case 3, as uses alignment of the elementSize
+        size_t alignment = (elementCount == 3) ? elementSize : size;
+
+        // special case half
+        if (elementType == BaseType::Half && elementCount >= 3)
+        {
+            alignment = elementSize * 2;
+            size = _roundToAlignment(size, alignment);
+        }
+
+        // Nothing is aligned more than 16
+        alignment = std::min(alignment, size_t(16));
+
+        // For CUDA the size must be a multiple of alignment, as this is the amount of bytes used 'exclusively' by the type.
+
+        // The size must be a multiple of the alignment
+        SLANG_ASSERT(_isAligned(size, alignment));
 
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
-        vectorInfo.size = elementInfo.size * elementCount;
-        vectorInfo.alignment = elementInfo.alignment;
-    
+        vectorInfo.size = size;
+        vectorInfo.alignment = alignment;
+     
         return vectorInfo;
     }
 
     SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) override
     {
-        // Special case bool
-        if (elementType == BaseType::Bool)
-        {
-            SimpleLayoutInfo fixInfo(elementInfo);
-            fixInfo.size = sizeof(int32_t);
-            fixInfo.alignment = SLANG_ALIGN_OF(int32_t);
-            return GetMatrixLayout(BaseType::Int, fixInfo, rowCount, columnCount);
-        }
-
+        // The default behavior is to calculate the size as an array of rowCount vectors, which is correct here
         return Super::GetMatrixLayout(elementType, elementInfo, rowCount, columnCount);
     }
 
@@ -506,7 +549,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
-        ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
 
@@ -869,9 +912,10 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         switch (kind)
         {
             case ShaderParameterKind::ConstantBuffer:
+            {
                 // It's a pointer to the actual uniform data
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
-
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDAPtr), sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::TextureSampler:
             case ShaderParameterKind::MutableTextureSampler:
                 // That there is no distinct Sampler on CUDA, so TextureSampler is the same as a Texture
@@ -879,29 +923,37 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
             case ShaderParameterKind::MutableTexture:
             case ShaderParameterKind::TextureUniformBuffer:
             case ShaderParameterKind::Texture:
-                // It's a pointer to a texture interface 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(ObjectHandle), SLANG_ALIGN_OF(ObjectHandle));
+            {
+                // It's a CUtexObject or CUsurfObject which is an opaque CUDAHandle sized
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDAHandle), sizeof(CUDAPtr));
+            }
 
             case ShaderParameterKind::StructuredBuffer:
             case ShaderParameterKind::MutableStructuredBuffer:
-                // It's a pointer and a size
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
-
+            {
+                // It's a ptr and a count of the amount of elements
+                const size_t size = _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::RawBuffer:
             case ShaderParameterKind::Buffer:
             case ShaderParameterKind::MutableRawBuffer:
             case ShaderParameterKind::MutableBuffer:
-                // It's a pointer and a size in bytes
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*) * 2, SLANG_ALIGN_OF(void*));
-
+            {
+                // It's a ptr and a count of the amount of elements
+                const size_t size = _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
             case ShaderParameterKind::SamplerState:
+            {
                 // In CUDA it seems that sampler states are combined into texture objects.
                 // So it's a binding issue to combine a sampler with a texture - and sampler are ignored
                 // For simplicity here though - we do create a variable and that variable takes up
                 // uniform binding space.
                 // TODO(JS): If we wanted to remove these variables we'd want to do it as a pass. The pass
                 // would presumably have to remove use of variables of this kind throughout IR. 
-                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), SLANG_ALIGN_OF(void*));
+                return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(CUDASamplerState), sizeof(CUDAPtr));
+            }
 
             case ShaderParameterKind::InputRenderTarget:
                 // TODO: how to handle these?
@@ -4002,7 +4054,7 @@ static TypeLayoutResult _createTypeLayout(
             // The tag is always a `uint` for now.
             //
             auto tagInfo = context.rules->GetScalarLayout(BaseType::UInt);
-            info.size = RoundToAlignment(info.size, tagInfo.alignment);
+            info.size = _roundToAlignment(info.size, tagInfo.alignment);
 
             taggedUnionLayout->tagOffset = info.size;
 
