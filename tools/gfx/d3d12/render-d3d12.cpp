@@ -4316,6 +4316,22 @@ Result D3D12Device::initialize(const Desc& desc)
                 auto minPrecisionSupport = options.MinPrecisionSupport;
             }
         }
+        // Check ray tracing support
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                    D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))))
+            {
+                if (options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+                {
+                    m_features.add("ray-tracing");
+                }
+                if (options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1)
+                {
+                    m_features.add("ray-query");
+                }
+            }
+        }
     }
 
     m_desc = desc;

@@ -228,13 +228,46 @@ void validateAccelerationStructureBuildInputs(
                     default:
                         GFX_DIAGNOSE_ERROR(
                             "Unsupported IAccelerationStructure::TriangleDesc::indexFormat. Valid "
-                            "values are R_UInt32 or R_UInt16.");
+                            "values are Unknown, R_UInt32 or R_UInt16.");
                     }
                     if (!buildInputs.geometryDescs[i].content.triangles.indexData)
                     {
                         GFX_DIAGNOSE_ERROR(
                             "IAccelerationStructure::TriangleDesc::indexData cannot be null if "
                             "IAccelerationStructure::TriangleDesc::indexCount is not 0");
+                    }
+                }
+                if (buildInputs.geometryDescs[i].content.triangles.indexFormat != Format::Unknown)
+                {
+                    if (buildInputs.geometryDescs[i].content.triangles.indexCount == 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexCount cannot be 0 if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is not Format::Unknown");
+                    }
+                    if (buildInputs.geometryDescs[i].content.triangles.indexData == 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData cannot be null if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is not "
+                            "Format::Unknown");
+                    }
+                }
+                else
+                {
+                    if (buildInputs.geometryDescs[i].content.triangles.indexCount != 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexCount must be 0 if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is "
+                            "Format::Unknown");
+                    }
+                    if (buildInputs.geometryDescs[i].content.triangles.indexData != 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData must be null if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is "
+                            "Format::Unknown");
                     }
                 }
                 if (!buildInputs.geometryDescs[i].content.triangles.vertexData)

@@ -262,6 +262,9 @@ Result AccelerationStructureBuildGeometryInfoBuilder::build(
                 case Format::R_UInt16:
                     vkGeomData.triangles.indexType = VK_INDEX_TYPE_UINT16;
                     break;
+                case Format::Unknown:
+                    vkGeomData.triangles.indexType = VK_INDEX_TYPE_NONE_KHR;
+                    break;
                 default:
                     debugCallback->handleMessage(
                         DebugMessageType::Error,
