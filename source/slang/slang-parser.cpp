@@ -114,6 +114,13 @@ namespace Slang
         }
         void PushScope(ContainerDecl* containerDecl)
         {
+            // TODO(JS):
+            // 
+            // Previously Scope was ref counted. This meant that if a scope was pushed, but not used when popped
+            // it's memory would be freed.
+            //
+            // Here the memory is consumed and will not be freed until the astBuilder goes out of scope.
+
             Scope* newScope = astBuilder->create<Scope>();
             newScope->containerDecl = containerDecl;
             newScope->parent = currentScope;

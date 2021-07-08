@@ -555,7 +555,8 @@ class AttributeBase : public Modifier
 class UncheckedAttribute : public AttributeBase 
 {
     SLANG_AST_CLASS(UncheckedAttribute)
- 
+
+    SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 

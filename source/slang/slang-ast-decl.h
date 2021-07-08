@@ -383,6 +383,7 @@ class UsingDecl : public Decl
         /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
     Expr* arg = nullptr;
 
+    SLANG_UNREFLECTED
         /// The scope that the entity named by `arg` will be brought into
     Scope* scope = nullptr;
 };
@@ -393,12 +394,13 @@ class ImportDecl : public Decl
 
     // The name of the module we are trying to import
     NameLoc moduleNameAndLoc;
-
-    // The scope that we want to import into
-    Scope* scope = nullptr;
-
+    
     // The module that actually got imported
     ModuleDecl* importedModuleDecl = nullptr;
+
+    SLANG_UNREFLECTED
+    // The scope that we want to import into
+    Scope* scope = nullptr;
 };
 
 // A generic declaration, parameterized on types/values

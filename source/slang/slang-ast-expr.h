@@ -13,14 +13,16 @@ class DeclRefExpr: public Expr
 {
     SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
 
-    // The scope in which to perform lookup
-    Scope* scope = nullptr;
-
+    
     // The declaration of the symbol being referenced
     DeclRef<Decl> declRef;
 
     // The name of the symbol being referenced
     Name* name = nullptr;
+
+    SLANG_UNREFLECTED
+    // The scope in which to perform lookup
+    Scope* scope = nullptr;
 };
 
 class VarExpr : public DeclRefExpr
@@ -287,6 +289,8 @@ class ParenExpr: public Expr
 class ThisExpr: public Expr
 {
     SLANG_AST_CLASS(ThisExpr)
+
+    SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 
@@ -322,6 +326,8 @@ class TaggedUnionTypeExpr: public Expr
 class ThisTypeExpr: public Expr
 {
     SLANG_AST_CLASS(ThisTypeExpr)
+
+    SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 

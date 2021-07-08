@@ -64,19 +64,20 @@ SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 struct Scope : public NodeBase
 {
     SLANG_AST_CLASS(Scope)
-
-    // The parent of this scope (where lookup should go if nothing is found locally)
-    Scope*                  parent = nullptr;
-
-    // The next sibling of this scope (a peer for lookup)
-    Scope*                  nextSibling = nullptr;
-
+    
     // The container to use for lookup
     //
     // Note(tfoley): This is kept as an unowned pointer
     // so that a scope can't keep parts of the AST alive,
     // but the opposite it allowed.
     ContainerDecl*          containerDecl = nullptr;
+
+    SLANG_UNREFLECTED
+    // The parent of this scope (where lookup should go if nothing is found locally)
+    Scope*                  parent = nullptr;
+
+    // The next sibling of this scope (a peer for lookup)
+    Scope*                  nextSibling = nullptr;
 };
 
 // Base class for all nodes representing actual syntax

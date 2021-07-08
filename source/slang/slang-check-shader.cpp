@@ -1308,6 +1308,7 @@ namespace Slang
         // definitions (that scope is necessary because
         // it defines keywords like `true` and `false`).
         //
+
         Scope* scope = astBuilder->create<Scope>();
         scope->parent = getLinkage()->getSessionImpl()->slangLanguageScope;
         //
@@ -1339,6 +1340,11 @@ namespace Slang
     {
         auto unspecialiedProgram = endToEndReq->getUnspecializedGlobalComponentType();
 
+        // TODO(JS):
+        //
+        // We create the scopes on the linkages ASTBuilder. We might want to create a temporary ASTBuilder,
+        // and let that memory get freed, but is like this because it's not clear if the scopes in ASTNode members
+        // will dangle if we do.
         Scope* scope = unspecialiedProgram->_createScopeForLegacyLookup(endToEndReq->getLinkage()->getASTBuilder());
 
         // We are going to do some semantic checking, so we need to
