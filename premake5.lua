@@ -274,7 +274,6 @@ workspace "slang"
     -- and set the preprocessor definition that VS would add by default.
     filter { "configurations:release" }
         optimize "On"
-        symbols "On"
         defines { "NDEBUG" }
             
     filter { "system:linux" }
