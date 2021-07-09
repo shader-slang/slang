@@ -239,7 +239,6 @@ public:
 class CUDAResourceView : public ResourceViewBase
 {
 public:
-    Desc desc;
     RefPtr<MemoryCUDAResource> memoryResource = nullptr;
     RefPtr<TextureCUDAResource> textureResource = nullptr;
     void* proxyBuffer = nullptr;
@@ -447,7 +446,7 @@ public:
                 viewDesc.type = IResourceView::Type::UnorderedAccess;
                 m_bufferView = new CUDAResourceView();
                 m_bufferView->proxyBuffer = m_cpuBuffer.getBuffer();
-                m_bufferView->desc = viewDesc;
+                m_bufferView->m_desc = viewDesc;
             }
             return SLANG_OK;
         }
@@ -466,7 +465,7 @@ public:
             viewDesc.type = IResourceView::Type::UnorderedAccess;
             m_bufferView = new CUDAResourceView();
             m_bufferView->memoryResource = m_bufferResource;
-            m_bufferView->desc = viewDesc;
+            m_bufferView->m_desc = viewDesc;
         }
         auto oldSize = m_bufferResource->getDesc()->sizeInBytes;
         if ((size_t)count != oldSize)
@@ -571,7 +570,7 @@ public:
 
         if (cudaView->textureResource)
         {
-            if (cudaView->desc.type == IResourceView::Type::UnorderedAccess)
+            if (cudaView->m_desc.type == IResourceView::Type::UnorderedAccess)
             {
                 auto handle = cudaView->textureResource->m_cudaSurfObj;
                 setData(offset, &handle, sizeof(uint64_t));
@@ -1727,7 +1726,7 @@ public:
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override
     {
         RefPtr<CUDAResourceView> view = new CUDAResourceView();
-        view->desc = desc;
+        view->m_desc = desc;
         view->textureResource = dynamic_cast<TextureCUDAResource*>(texture);
         returnComPtr(outView, view);
         return SLANG_OK;
@@ -1737,7 +1736,7 @@ public:
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override
     {
         RefPtr<CUDAResourceView> view = new CUDAResourceView();
-        view->desc = desc;
+        view->m_desc = desc;
         view->memoryResource = dynamic_cast<MemoryCUDAResource*>(buffer);
         returnComPtr(outView, view);
         return SLANG_OK;

@@ -287,7 +287,7 @@ void onMouseUp(platform::MouseEventArgs args) { isMouseDown = false; }
 
 Slang::Result initialize()
 {
-    initializeBase("Ray Tracing", 1024, 768, DeviceType::Vulkan);
+    initializeBase("Ray Tracing", 1024, 768);
     gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
     gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
     gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
@@ -297,14 +297,14 @@ Slang::Result initialize()
     IBufferResource::Desc vertexBufferDesc;
     vertexBufferDesc.type = IResource::Type::Buffer;
     vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-    vertexBufferDesc.defaultState = ResourceState::UnorderedAccess;
+    vertexBufferDesc.defaultState = ResourceState::ShaderResource;
     gVertexBuffer = gDevice->createBufferResource(vertexBufferDesc, &kVertexData[0]);
     if(!gVertexBuffer) return SLANG_FAIL;
 
     IBufferResource::Desc indexBufferDesc;
     indexBufferDesc.type = IResource::Type::Buffer;
     indexBufferDesc.sizeInBytes = kIndexCount * sizeof(int32_t);
-    indexBufferDesc.defaultState = ResourceState::UnorderedAccess;
+    indexBufferDesc.defaultState = ResourceState::ShaderResource;
     gIndexBuffer = gDevice->createBufferResource(indexBufferDesc, &kIndexData[0]);
     if (!gIndexBuffer)
         return SLANG_FAIL;
@@ -324,8 +324,8 @@ Slang::Result initialize()
 
     IBufferResource::Desc transformBufferDesc;
     transformBufferDesc.type = IResource::Type::Buffer;
-    transformBufferDesc.sizeInBytes = sizeof(float) * 16;
-    transformBufferDesc.defaultState = ResourceState::UnorderedAccess;
+    transformBufferDesc.sizeInBytes = sizeof(float) * 12;
+    transformBufferDesc.defaultState = ResourceState::ShaderResource;
     float transformData[12] = {
         1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
     gTransformBuffer = gDevice->createBufferResource(transformBufferDesc, &transformData);
@@ -439,7 +439,7 @@ Slang::Result initialize()
         instanceBufferDesc.type = IResource::Type::Buffer;
         instanceBufferDesc.sizeInBytes =
             instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
-        instanceBufferDesc.defaultState = ResourceState::UnorderedAccess;
+        instanceBufferDesc.defaultState = ResourceState::ShaderResource;
         gInstanceBuffer = gDevice->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
         if (!gInstanceBuffer)
             return SLANG_FAIL;

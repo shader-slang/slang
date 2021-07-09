@@ -139,6 +139,8 @@ public:
     \
     x(RGBA_Unorm_UInt8, sizeof(uint32_t)) \
     x(BGRA_Unorm_UInt8, sizeof(uint32_t)) \
+    x(RGBA_Snorm_UInt16, sizeof(uint32_t)*2) \
+    x(RG_Snorm_UInt16, sizeof(uint32_t)) \
     \
     x(R_UInt16, sizeof(uint16_t)) \
     x(R_UInt32, sizeof(uint32_t)) \
@@ -163,6 +165,9 @@ enum class Format
 
     RGBA_Unorm_UInt8,
     BGRA_Unorm_UInt8,
+
+    RGBA_Snorm_UInt16,
+    RG_Snorm_UInt16,
 
     R_UInt16,
     R_UInt32,
@@ -497,6 +502,7 @@ public:
         // Fields for `RenderTarget` and `DepthStencil` views.
         RenderTargetDesc renderTarget;
     };
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
 #define SLANG_UUID_IResourceView                                                      \
     {                                                                                 \
@@ -514,6 +520,8 @@ public:
 
     struct BuildFlags
     {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS.
         enum Enum
         {
             None,
@@ -533,6 +541,8 @@ public:
 
     struct GeometryFlags
     {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_GEOMETRY_FLAGS.
         enum Enum
         {
             None,
@@ -565,7 +575,7 @@ public:
 
     struct ProceduralAABBDesc
     {
-        // Number of AABBs.
+        /// Number of AABBs.
         uint64_t count;
 
         /// Pointer to an array of `ProceduralAABB` values in device memory.
@@ -588,6 +598,8 @@ public:
 
     struct GeometryInstanceFlags
     {
+        // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
+        // and VkGeometryInstanceFlagBitsKHR.
         enum Enum : uint32_t
         {
             None = 0,
@@ -598,6 +610,8 @@ public:
         };
     };
 
+    // The layout of this struct is intentionally consistent with D3D12_RAYTRACING_INSTANCE_DESC
+    // and VkAccelerationStructureInstanceKHR.
     struct InstanceDesc
     {
         float transform[3][4];
@@ -1153,7 +1167,7 @@ public:
         serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         deserializeAccelerationStructure(IAccelerationStructure* dest, DeviceAddress source) = 0;
-    virtual SLANG_NO_THROW void memoryBarrier(
+    virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
         AccessFlag::Enum sourceAccess,

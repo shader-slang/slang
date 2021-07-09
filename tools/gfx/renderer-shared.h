@@ -245,22 +245,30 @@ protected:
     Desc m_desc;
 };
 
+class ResourceViewInternalBase : public Slang::ComObject
+{};
+
 class ResourceViewBase
     : public IResourceView
-    , public Slang::ComObject
+    , public ResourceViewInternalBase
 {
 public:
+    Desc m_desc = {};
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IResourceView* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
 };
 
 class AccelerationStructureBase
     : public IAccelerationStructure
-    , public Slang::ComObject
+    , public ResourceViewInternalBase
 {
 public:
+    IResourceView::Desc m_desc = {};
+
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IAccelerationStructure* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
 };
 
 class RendererBase;
