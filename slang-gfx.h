@@ -520,6 +520,8 @@ public:
 
     struct BuildFlags
     {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS.
         enum Enum
         {
             None,
@@ -539,6 +541,8 @@ public:
 
     struct GeometryFlags
     {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_GEOMETRY_FLAGS.
         enum Enum
         {
             None,
@@ -571,7 +575,7 @@ public:
 
     struct ProceduralAABBDesc
     {
-        // Number of AABBs.
+        /// Number of AABBs.
         uint64_t count;
 
         /// Pointer to an array of `ProceduralAABB` values in device memory.
@@ -594,6 +598,8 @@ public:
 
     struct GeometryInstanceFlags
     {
+        // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
+        // and VkGeometryInstanceFlagBitsKHR.
         enum Enum : uint32_t
         {
             None = 0,
@@ -604,6 +610,8 @@ public:
         };
     };
 
+    // The layout of this struct is intentionally consistent with D3D12_RAYTRACING_INSTANCE_DESC
+    // and VkAccelerationStructureInstanceKHR.
     struct InstanceDesc
     {
         float transform[3][4];
