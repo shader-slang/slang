@@ -6,23 +6,29 @@ namespace gfx
 VkDescriptorPool DescriptorSetAllocator::newPool()
 {
     VkDescriptorPoolCreateInfo descriptorPoolInfo = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
-    VkDescriptorPoolSize poolSizes[] = {
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1024},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 256},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 4096},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4096},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 16},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT, 16},
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 256}};
+    Slang::Array<VkDescriptorPoolSize, 32> poolSizes;
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1024});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 256});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 256});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 4096});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 4096});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 4096});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 4096});
+    poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 16});
+    if (m_api->m_extendedFeatures.inlineUniformBlockFeatures.inlineUniformBlock)
+    {
+        poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT, 16});
+    }
+    if (m_api->m_extendedFeatures.accelerationStructureFeatures.accelerationStructure)
+    {
+        poolSizes.add(VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 256});
+    }
     descriptorPoolInfo.maxSets = 4096;
-    descriptorPoolInfo.poolSizeCount = sizeof(poolSizes) / sizeof(VkDescriptorPoolSize);
-    descriptorPoolInfo.pPoolSizes = poolSizes;
+    descriptorPoolInfo.poolSizeCount = (uint32_t)poolSizes.getCount();
+    descriptorPoolInfo.pPoolSizes = poolSizes.getBuffer();
     descriptorPoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 
     VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
