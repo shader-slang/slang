@@ -755,6 +755,7 @@ static void _lookUpInScopes(
     auto thisParameterMode = LookupResultItem::Breadcrumb::ThisParameterMode::Default;
 
     auto scope      = request.scope;
+
     auto endScope   = request.endScope;
     for (;scope != endScope; scope = scope->parent)
     {
@@ -918,7 +919,7 @@ LookupResult lookUp(
     ASTBuilder*         astBuilder, 
     SemanticsVisitor*   semantics,
     Name*               name,
-    RefPtr<Scope>       scope,
+    Scope*              scope,
     LookupMask          mask)
 {
     LookupRequest request;
