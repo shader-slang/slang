@@ -681,7 +681,7 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     IBufferResource::Desc transformBufferDesc;
     transformBufferDesc.type = IResource::Type::Buffer;
-    transformBufferDesc.sizeInBytes = sizeof(float) * 16;
+    transformBufferDesc.sizeInBytes = sizeof(float) * 12;
     transformBufferDesc.defaultState = ResourceState::ShaderResource;
     float transformData[12] = {
         1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
