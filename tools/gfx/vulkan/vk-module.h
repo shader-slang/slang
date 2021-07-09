@@ -25,6 +25,9 @@ struct VulkanModule
         /// Get a function by name
     PFN_vkVoidFunction getFunction(const char* name) const;
 
+        /// true if using a software Vulkan implementation.
+    bool isSoftware() const { return m_isSoftware; }
+
         /// Initialize
     Slang::Result init();
         /// Destroy
@@ -33,8 +36,9 @@ struct VulkanModule
         /// Dtor
     ~VulkanModule() { destroy(); }
 
-    protected:
-    void* m_module = nullptr;
+ protected:
+     void* m_module = nullptr;
+     bool m_isSoftware = false;
 };
 
 } // renderer_test

@@ -1,7 +1,7 @@
 // This test is to see what intrinsics are available on VK
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj -render-feature double
 
 // We don't want to run a cuda test here...
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj

@@ -138,38 +138,6 @@ public:
     ~VKDevice();
 
 public:
-    // Float16 features
-    VkPhysicalDeviceFloat16Int8FeaturesKHR float16Features = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES_KHR};
-    // 16 bit storage features
-    VkPhysicalDevice16BitStorageFeatures storage16BitFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES_KHR};
-    // AtomicInt64 features
-    VkPhysicalDeviceShaderAtomicInt64FeaturesKHR atomicInt64Features = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR};
-    // Atomic Float features
-    VkPhysicalDeviceShaderAtomicFloatFeaturesEXT atomicFloatFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_FLOAT_FEATURES_EXT};
-    // Timeline Semaphore features
-    VkPhysicalDeviceTimelineSemaphoreFeatures timelineFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES};
-    // Extended dynamic state features
-    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT extendedDynamicStateFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT};
-    // Subgroup extended type features
-    VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures shaderSubgroupExtendedTypeFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES};
-    // Acceleration structure features
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
-    // Ray query (inline ray-tracing) features
-    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
-    // Buffer device address features
-    VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddressFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
-
-public:
 
     class Buffer
     {
@@ -5234,99 +5202,104 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 {
     m_queueAllocCount = 0;
 
-    VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
-    applicationInfo.pApplicationName = "slang-render-test";
-    applicationInfo.pEngineName = "slang-render-test";
+    VkInstance instance = VK_NULL_HANDLE;
+    VkApplicationInfo applicationInfo = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
+    applicationInfo.pApplicationName = "slang-gfx";
+    applicationInfo.pEngineName = "slang-gfx";
     applicationInfo.apiVersion = VK_API_VERSION_1_1;
     applicationInfo.engineVersion = 1;
     applicationInfo.applicationVersion = 1;
-    const char* instanceExtensions[] =
+
+    for (int tryUseSurfaceExtensions = 1; tryUseSurfaceExtensions >= 0; tryUseSurfaceExtensions--)
     {
-        VK_KHR_SURFACE_EXTENSION_NAME,
+        Array<const char*, 4> instanceExtensions;
 
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-
+        instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        if (tryUseSurfaceExtensions)
+        {
+            instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
 #if SLANG_WINDOWS_FAMILY
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+            instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
-        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+            instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
-
 #if ENABLE_VALIDATION_LAYER
-        VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+            instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
-    };
-
-    VkInstance instance = VK_NULL_HANDLE;
-
-    VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
-    instanceCreateInfo.pApplicationInfo = &applicationInfo;
-    instanceCreateInfo.enabledExtensionCount = SLANG_COUNT_OF(instanceExtensions);
-    instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
-
-    if (useValidationLayer)
-    {
-        // Depending on driver version, validation layer may or may not exist.
-        // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
-        // drivers provide only the deprecated
-        // "VK_LAYER_LUNARG_standard_validation" layer.
-        // We will check what layers are available, and use the newer
-        // "VK_LAYER_KHRONOS_validation" layer when possible.
-        uint32_t layerCount;
-        m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-        List<VkLayerProperties> availableLayers;
-        availableLayers.setCount(layerCount);
-        m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
-
-        const char* layerNames[] = { nullptr };
-        for (auto& layer : availableLayers)
-        {
-            if (strncmp(
-                layer.layerName,
-                "VK_LAYER_KHRONOS_validation",
-                sizeof("VK_LAYER_KHRONOS_validation")) == 0)
-            {
-                layerNames[0] = "VK_LAYER_KHRONOS_validation";
-                break;
-            }
         }
-        // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
-        // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
-        if (!layerNames[0])
+
+        VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+        instanceCreateInfo.pApplicationInfo = &applicationInfo;
+        instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
+        instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
+
+        if (useValidationLayer)
         {
+            // Depending on driver version, validation layer may or may not exist.
+            // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
+            // drivers provide only the deprecated
+            // "VK_LAYER_LUNARG_standard_validation" layer.
+            // We will check what layers are available, and use the newer
+            // "VK_LAYER_KHRONOS_validation" layer when possible.
+            uint32_t layerCount;
+            m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+            List<VkLayerProperties> availableLayers;
+            availableLayers.setCount(layerCount);
+            m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
+
+            const char* layerNames[] = {nullptr};
             for (auto& layer : availableLayers)
             {
                 if (strncmp(
-                    layer.layerName,
-                    "VK_LAYER_LUNARG_standard_validation",
-                    sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                        layer.layerName,
+                        "VK_LAYER_KHRONOS_validation",
+                        sizeof("VK_LAYER_KHRONOS_validation")) == 0)
                 {
-                    layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                    layerNames[0] = "VK_LAYER_KHRONOS_validation";
                     break;
                 }
             }
+            // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
+            // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
+            if (!layerNames[0])
+            {
+                for (auto& layer : availableLayers)
+                {
+                    if (strncmp(
+                            layer.layerName,
+                            "VK_LAYER_LUNARG_standard_validation",
+                            sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                    {
+                        layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                        break;
+                    }
+                }
+            }
+            if (layerNames[0])
+            {
+                instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
+                instanceCreateInfo.ppEnabledLayerNames = layerNames;
+            }
         }
-        if (layerNames[0])
+        uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
+        for (auto apiVersion : apiVersionsToTry)
         {
-            instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
-            instanceCreateInfo.ppEnabledLayerNames = layerNames;
+            applicationInfo.apiVersion = apiVersion;
+            if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
+            {
+                break;
+            }
         }
-    }
-    uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
-    for (auto apiVersion : apiVersionsToTry)
-    {
-        applicationInfo.apiVersion = apiVersion;
-        if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
-        {
+        if (instance)
             break;
-        }
     }
     if (!instance)
         return SLANG_FAIL;
+
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
 
-    if (useValidationLayer)
+    if (useValidationLayer && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
 
@@ -5410,6 +5383,8 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     const uint32_t majorVersion = VK_VERSION_MAJOR(basicProps.apiVersion);
     const uint32_t minorVersion = VK_VERSION_MINOR(basicProps.apiVersion);
 
+    auto& extendedFeatures = m_api.m_extendedFeatures;
+
     // API version check, can't use vkGetPhysicalDeviceProperties2 yet since this device might not support it
     if (VK_MAKE_VERSION(majorVersion, minorVersion, 0) >= VK_API_VERSION_1_1 &&
         m_api.vkGetPhysicalDeviceProperties2 &&
@@ -5419,57 +5394,77 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
         VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
         deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
+        // Inline uniform block
+        extendedFeatures.inlineUniformBlockFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.inlineUniformBlockFeatures;
+
         // Buffer device address features
-        bufferDeviceAddressFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &bufferDeviceAddressFeatures;
+        extendedFeatures.bufferDeviceAddressFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
 
         // Ray query features
-        rayQueryFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &rayQueryFeatures;
+        extendedFeatures.rayQueryFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.rayQueryFeatures;
 
         // Acceleration structure features
-        accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &accelerationStructureFeatures;
+        extendedFeatures.accelerationStructureFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.accelerationStructureFeatures;
 
         // Subgroup features
-        shaderSubgroupExtendedTypeFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &shaderSubgroupExtendedTypeFeatures;
+        extendedFeatures.shaderSubgroupExtendedTypeFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.shaderSubgroupExtendedTypeFeatures;
 
         // Extended dynamic states
-        extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &extendedDynamicStateFeatures;
+        extendedFeatures.extendedDynamicStateFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.extendedDynamicStateFeatures;
 
         // Timeline Semaphore
-        timelineFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &timelineFeatures;
+        extendedFeatures.timelineFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.timelineFeatures;
 
         // Float16
-        float16Features.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &float16Features;
+        extendedFeatures.float16Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.float16Features;
 
         // 16-bit storage
-        storage16BitFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &storage16BitFeatures;
+        extendedFeatures.storage16BitFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.storage16BitFeatures;
 
         // Atomic64
-        atomicInt64Features.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &atomicInt64Features;
+        extendedFeatures.atomicInt64Features.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.atomicInt64Features;
 
         // Atomic Float
         // To detect atomic float we need
         // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
 
-        atomicFloatFeatures.pNext = deviceFeatures2.pNext;
-        deviceFeatures2.pNext = &atomicFloatFeatures;
+        extendedFeatures.atomicFloatFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
         m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
 
+        if (deviceFeatures2.features.shaderResourceMinLod)
+        {
+            m_features.add("shader-resource-min-lod");
+        }
+        if (deviceFeatures2.features.shaderFloat64)
+        {
+            m_features.add("double");
+        }
+        if (deviceFeatures2.features.shaderInt64)
+        {
+            m_features.add("int64");
+        }
+        if (deviceFeatures2.features.shaderInt16)
+        {
+            m_features.add("int16");
+        }
         // If we have float16 features then enable
-        if (float16Features.shaderFloat16)
+        if (extendedFeatures.float16Features.shaderFloat16)
         {
             // Link into the creation features
-            float16Features.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &float16Features;
+            extendedFeatures.float16Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.float16Features;
 
             // Add the Float16 extension
             deviceExtensions.add(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME);
@@ -5478,11 +5473,11 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             m_features.add("half");
         }
 
-        if (storage16BitFeatures.storageBuffer16BitAccess)
+        if (extendedFeatures.storage16BitFeatures.storageBuffer16BitAccess)
         {
             // Link into the creation features
-            storage16BitFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &storage16BitFeatures;
+            extendedFeatures.storage16BitFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.storage16BitFeatures;
 
             // Add the 16-bit storage extension
             deviceExtensions.add(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
@@ -5491,77 +5486,94 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             m_features.add("16-bit-storage");
         }
 
-        if (atomicInt64Features.shaderBufferInt64Atomics)
+        if (extendedFeatures.atomicInt64Features.shaderBufferInt64Atomics)
         {
             // Link into the creation features
-            atomicInt64Features.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &atomicInt64Features;
+            extendedFeatures.atomicInt64Features.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.atomicInt64Features;
 
             deviceExtensions.add(VK_KHR_SHADER_ATOMIC_INT64_EXTENSION_NAME);
             m_features.add("atomic-int64");
         }
 
-        if (atomicFloatFeatures.shaderBufferFloat32AtomicAdd)
+        if (extendedFeatures.atomicFloatFeatures.shaderBufferFloat32AtomicAdd)
         {
             // Link into the creation features
-            atomicFloatFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &atomicFloatFeatures;
+            extendedFeatures.atomicFloatFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.atomicFloatFeatures;
 
             deviceExtensions.add(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
             m_features.add("atomic-float");
         }
 
-        if (timelineFeatures.timelineSemaphore)
+        if (extendedFeatures.timelineFeatures.timelineSemaphore)
         {
             // Link into the creation features
-            timelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &timelineFeatures;
+            extendedFeatures.timelineFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.timelineFeatures;
             deviceExtensions.add(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
             m_features.add("timeline-semaphore");
         }
 
-        if (extendedDynamicStateFeatures.extendedDynamicState)
+        if (extendedFeatures.extendedDynamicStateFeatures.extendedDynamicState)
         {
             // Link into the creation features
-            extendedDynamicStateFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedDynamicStateFeatures;
+            extendedFeatures.extendedDynamicStateFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.extendedDynamicStateFeatures;
             deviceExtensions.add(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
             m_features.add("extended-dynamic-states");
         }
 
-        if (shaderSubgroupExtendedTypeFeatures.shaderSubgroupExtendedTypes)
+        if (extendedFeatures.shaderSubgroupExtendedTypeFeatures.shaderSubgroupExtendedTypes)
         {
-            shaderSubgroupExtendedTypeFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &shaderSubgroupExtendedTypeFeatures;
+            extendedFeatures.shaderSubgroupExtendedTypeFeatures.pNext =
+                (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.shaderSubgroupExtendedTypeFeatures;
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
 
-        if (accelerationStructureFeatures.accelerationStructure)
+        if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
         {
-            accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &accelerationStructureFeatures;
+            extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.accelerationStructureFeatures;
             deviceExtensions.add(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
             deviceExtensions.add(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
             m_features.add("acceleration-structure");
         }
 
-        if (rayQueryFeatures.rayQuery)
+        if (extendedFeatures.rayQueryFeatures.rayQuery)
         {
-            rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &rayQueryFeatures;
+            extendedFeatures.rayQueryFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.rayQueryFeatures;
             deviceExtensions.add(VK_KHR_RAY_QUERY_EXTENSION_NAME);
             m_features.add("ray-query");
             m_features.add("ray-tracing");
         }
 
-        if (bufferDeviceAddressFeatures.bufferDeviceAddress)
+        if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
         {
-            bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &bufferDeviceAddressFeatures;
+            extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
             deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
             m_features.add("buffer-device-address");
         }
+
+        if (extendedFeatures.inlineUniformBlockFeatures.inlineUniformBlock)
+        {
+            extendedFeatures.inlineUniformBlockFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.inlineUniformBlockFeatures;
+            deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+            m_features.add("inline-uniform-block");
+        }
+    }
+    if (m_api.m_module->isSoftware())
+    {
+        m_features.add("software-device");
+    }
+    else
+    {
+        m_features.add("hardware-device");
     }
 
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
@@ -5604,6 +5616,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(m_module.init());
     SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
     descriptorSetAllocator.m_api = &m_api;
+
     SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice(ENABLE_VALIDATION_LAYER != 0));
     {
         VkQueue queue;
@@ -6088,6 +6101,14 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+    {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    }
     else
     {
         assert(!"unsupported layout transition!");
@@ -6364,7 +6385,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
     VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates);
-    if (bufferDeviceAddressFeatures.bufferDeviceAddress)
+    if (m_api.m_extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
     {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
