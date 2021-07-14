@@ -5200,6 +5200,8 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 
 Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 {
+    m_features.clear();
+
     m_queueAllocCount = 0;
 
     VkInstance instance = VK_NULL_HANDLE;
@@ -5210,95 +5212,91 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     applicationInfo.engineVersion = 1;
     applicationInfo.applicationVersion = 1;
 
-    for (int tryUseSurfaceExtensions = 1; tryUseSurfaceExtensions >= 0; tryUseSurfaceExtensions--)
-    {
-        Array<const char*, 4> instanceExtensions;
+    Array<const char*, 4> instanceExtensions;
 
-        instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-        if (tryUseSurfaceExtensions)
-        {
-            instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
+    instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    // Software (swiftshader) implementation currently does not support surface extension,
+    // so only use it with a hardware implementation.
+    if (!m_api.m_module->isSoftware())
+    {
+        instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
 #if SLANG_WINDOWS_FAMILY
-            instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+        instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
-            instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+        instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
 #if ENABLE_VALIDATION_LAYER
-            instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+        instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
-        }
+    }
 
-        VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
-        instanceCreateInfo.pApplicationInfo = &applicationInfo;
-        instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
-        instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
+    VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
+    instanceCreateInfo.pApplicationInfo = &applicationInfo;
+    instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
+    instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
 
-        if (useValidationLayer)
+    if (useValidationLayer)
+    {
+        // Depending on driver version, validation layer may or may not exist.
+        // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
+        // drivers provide only the deprecated
+        // "VK_LAYER_LUNARG_standard_validation" layer.
+        // We will check what layers are available, and use the newer
+        // "VK_LAYER_KHRONOS_validation" layer when possible.
+        uint32_t layerCount;
+        m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        List<VkLayerProperties> availableLayers;
+        availableLayers.setCount(layerCount);
+        m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
+
+        const char* layerNames[] = {nullptr};
+        for (auto& layer : availableLayers)
         {
-            // Depending on driver version, validation layer may or may not exist.
-            // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
-            // drivers provide only the deprecated
-            // "VK_LAYER_LUNARG_standard_validation" layer.
-            // We will check what layers are available, and use the newer
-            // "VK_LAYER_KHRONOS_validation" layer when possible.
-            uint32_t layerCount;
-            m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-            List<VkLayerProperties> availableLayers;
-            availableLayers.setCount(layerCount);
-            m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
-
-            const char* layerNames[] = {nullptr};
+            if (strncmp(
+                    layer.layerName,
+                    "VK_LAYER_KHRONOS_validation",
+                    sizeof("VK_LAYER_KHRONOS_validation")) == 0)
+            {
+                layerNames[0] = "VK_LAYER_KHRONOS_validation";
+                break;
+            }
+        }
+        // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
+        // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
+        if (!layerNames[0])
+        {
             for (auto& layer : availableLayers)
             {
                 if (strncmp(
                         layer.layerName,
-                        "VK_LAYER_KHRONOS_validation",
-                        sizeof("VK_LAYER_KHRONOS_validation")) == 0)
+                        "VK_LAYER_LUNARG_standard_validation",
+                        sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
                 {
-                    layerNames[0] = "VK_LAYER_KHRONOS_validation";
+                    layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
                     break;
                 }
             }
-            // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
-            // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
-            if (!layerNames[0])
-            {
-                for (auto& layer : availableLayers)
-                {
-                    if (strncmp(
-                            layer.layerName,
-                            "VK_LAYER_LUNARG_standard_validation",
-                            sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
-                    {
-                        layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
-                        break;
-                    }
-                }
-            }
-            if (layerNames[0])
-            {
-                instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
-                instanceCreateInfo.ppEnabledLayerNames = layerNames;
-            }
         }
-        uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
-        for (auto apiVersion : apiVersionsToTry)
+        if (layerNames[0])
         {
-            applicationInfo.apiVersion = apiVersion;
-            if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
-            {
-                break;
-            }
+            instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
+            instanceCreateInfo.ppEnabledLayerNames = layerNames;
         }
-        if (instance)
+    }
+    uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
+    for (auto apiVersion : apiVersionsToTry)
+    {
+        applicationInfo.apiVersion = apiVersion;
+        if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
+        {
             break;
+        }
     }
     if (!instance)
         return SLANG_FAIL;
-
     SLANG_RETURN_ON_FAIL(m_api.initInstanceProcs(instance));
-
     if (useValidationLayer && m_api.vkCreateDebugReportCallbackEXT)
     {
         VkDebugReportFlagsEXT debugFlags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
@@ -5589,7 +5587,6 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
- 
     if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
@@ -5612,12 +5609,20 @@ SlangResult VKDevice::initialize(const Desc& desc)
     m_desc = desc;
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
+    SlangResult initDeviceResult = SLANG_OK;
+    for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
+    {
+        if (m_module.init(forceSoftware != 0) != SLANG_OK)
+            continue;
+        if (m_api.initGlobalProcs(m_module) != SLANG_OK)
+            continue;
+        descriptorSetAllocator.m_api = &m_api;
+        initDeviceResult = initVulkanInstanceAndDevice(ENABLE_VALIDATION_LAYER != 0);
+        if (initDeviceResult == SLANG_OK)
+            break;
+    }
+    SLANG_RETURN_ON_FAIL(initDeviceResult);
 
-    SLANG_RETURN_ON_FAIL(m_module.init());
-    SLANG_RETURN_ON_FAIL(m_api.initGlobalProcs(m_module));
-    descriptorSetAllocator.m_api = &m_api;
-
-    SLANG_RETURN_ON_FAIL(initVulkanInstanceAndDevice(ENABLE_VALIDATION_LAYER != 0));
     {
         VkQueue queue;
         m_api.vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &queue);
