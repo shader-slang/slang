@@ -1,4 +1,4 @@
-﻿// module.cpp
+// module.cpp
 #include "vk-module.h"
 
 #include <stdlib.h>
@@ -34,6 +34,18 @@ Slang::Result VulkanModule::init()
     dynamicLibraryName = "libvulkan.so.1";
     m_module = dlopen(dynamicLibraryName, RTLD_NOW);
 #endif
+
+    if (!m_module)
+    {
+        dynamicLibraryName = "vk_swiftshader";
+#if SLANG_WINDOWS_FAMILY
+        HMODULE swiftShaderModule = ::LoadLibraryA(dynamicLibraryName);
+        m_module = (void*)swiftShaderModule;
+#else
+        m_module = dlopen(dynamicLibraryName, RTLD_NOW);
+#endif
+        m_isSoftware = true;
+    }
 
     if (!m_module)
     {

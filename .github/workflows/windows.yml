@@ -47,4 +47,6 @@ jobs:
         }
         $slangTestBinDir = ".\bin\windows-$testPlatform\${{matrix.configuration}}\";
         $env:Path += ";$slangTestBinDir";
+        Invoke-WebRequest -uri "https://github.com/shader-slang/swiftshader/releases/download/v1.0/vk_swiftshader_windows_$testPlatform.zip" -Method "GET"  -Outfile "swiftshader.zip";
+        Expand-Archive "swiftshader.zip" -DestinationPath $slangTestBinDir;
         & "$slangTestBinDir\slang-test.exe" -api all-dx12 -appveyor -bindir "$slangTestBinDir\" -platform $testPlatform -configuration ${{matrix.configuration}} -category $testCategory;

@@ -555,8 +555,9 @@ class AttributeBase : public Modifier
 class UncheckedAttribute : public AttributeBase 
 {
     SLANG_AST_CLASS(UncheckedAttribute)
- 
-    RefPtr<Scope> scope;
+
+    SLANG_UNREFLECTED
+    Scope* scope = nullptr;
 };
 
 // A `[name(arg0, ...)]` style attribute that has been validated.

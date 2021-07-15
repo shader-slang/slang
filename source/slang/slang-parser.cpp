@@ -91,8 +91,8 @@ namespace Slang
 
         int anonymousCounter = 0;
 
-        RefPtr<Scope> outerScope;
-        RefPtr<Scope> currentScope;
+        Scope* outerScope = nullptr;
+        Scope* currentScope = nullptr;
 
         TokenReader tokenReader;
         DiagnosticSink* sink;
@@ -114,7 +114,14 @@ namespace Slang
         }
         void PushScope(ContainerDecl* containerDecl)
         {
-            RefPtr<Scope> newScope = new Scope();
+            // TODO(JS):
+            // 
+            // Previously Scope was ref counted. This meant that if a scope was pushed, but not used when popped
+            // it's memory would be freed.
+            //
+            // Here the memory is consumed and will not be freed until the astBuilder goes out of scope.
+
+            Scope* newScope = astBuilder->create<Scope>();
             newScope->containerDecl = containerDecl;
             newScope->parent = currentScope;
 
@@ -135,7 +142,7 @@ namespace Slang
             ASTBuilder* inAstBuilder,
             TokenSpan const& _tokens,
             DiagnosticSink * sink,
-            RefPtr<Scope> const& outerScope)
+            Scope*           outerScope)
             : tokenReader(_tokens)
             , astBuilder(inAstBuilder)
             , sink(sink)
@@ -1236,7 +1243,7 @@ namespace Slang
         }
     }
 
-    static void AddMember(RefPtr<Scope> scope, Decl* member)
+    static void AddMember(Scope* scope, Decl* member)
     {
         if (scope)
         {
@@ -1399,7 +1406,8 @@ namespace Slang
     class ReplaceScopeVisitor : public ExprVisitor<ReplaceScopeVisitor>
     {
     public:
-        RefPtr<Scope> scope;
+        Scope* scope = nullptr;
+
         void visitDeclRefExpr(DeclRefExpr* expr)
         {
             expr->scope = scope;
@@ -1830,7 +1838,7 @@ namespace Slang
         // TODO: do this better, e.g. by filling in the `declRef` field directly
 
         auto expr = parser->astBuilder->create<VarExpr>();
-        expr->scope = parser->currentScope.Ptr();
+        expr->scope = parser->currentScope;
         expr->loc = decl->getNameLoc();
         expr->name = decl->getName();
         return expr;
@@ -2071,7 +2079,7 @@ namespace Slang
         Token typeName = parser->ReadToken(TokenType::Identifier);
 
         auto basicType = parser->astBuilder->create<VarExpr>();
-        basicType->scope = parser->currentScope.Ptr();
+        basicType->scope = parser->currentScope;
         basicType->loc = typeName.loc;
         basicType->name = typeName.getNameOrNull();
 
@@ -2529,7 +2537,7 @@ namespace Slang
         auto bufferDataTypeExpr = parser->astBuilder->create<VarExpr>();
         bufferDataTypeExpr->loc = bufferDataTypeDecl->loc;
         bufferDataTypeExpr->name = bufferDataTypeDecl->nameAndLoc.name;
-        bufferDataTypeExpr->scope = parser->currentScope.Ptr();
+        bufferDataTypeExpr->scope = parser->currentScope;
 
         // Construct a type expression to reference the type constructor
         auto bufferWrapperTypeExpr = parser->astBuilder->create<VarExpr>();
@@ -5388,7 +5396,7 @@ namespace Slang
                     MemberExpr* memberExpr = parser->astBuilder->create<MemberExpr>();
 
                     // TODO(tfoley): why would a member expression need this?
-                    memberExpr->scope = parser->currentScope.Ptr();
+                    memberExpr->scope = parser->currentScope;
 
                     parser->FillPosition(memberExpr);
                     memberExpr->baseExpression = expr;
@@ -5504,7 +5512,7 @@ namespace Slang
         ASTBuilder*                     astBuilder,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        RefPtr<Scope> const&            outerScope,
+        Scope*                          outerScope,
         NamePool*                       namePool,
         SourceLanguage                  sourceLanguage)
     {
@@ -5521,7 +5529,7 @@ namespace Slang
         TranslationUnitRequest*         translationUnit,
         TokenSpan const&                tokens,
         DiagnosticSink*                 sink,
-        RefPtr<Scope> const&            outerScope)
+        Scope*                          outerScope)
     {
         Parser parser(astBuilder, tokens, sink, outerScope);
         parser.namePool = translationUnit->getNamePool();
@@ -6077,7 +6085,7 @@ namespace Slang
 
     ModuleDecl* populateBaseLanguageModule(
         ASTBuilder*     astBuilder,
-        RefPtr<Scope>   scope)
+        Scope*          scope)
     {
         Session* session = astBuilder->getGlobalSession();
 
