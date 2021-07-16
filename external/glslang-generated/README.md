@@ -32,8 +32,6 @@ First we need to create the `build_info.h` file in glslang. We can do this from 
 % python build_info.py . -i build_info.h.tmpl -o ../glslang-generated/glslang/build_info.h
 ```
 
-Next we need to create glslang/Include/revision.h. In notes it seems like this may not be needed much longer, but was needed for this build. We run the l/unix shell script `make-revision`. On windows it worked fine within cygwin (and did the previous python step). We then copy the file to `external/glslang-generated/glslang/Include/revision.h`.
-
 The glslang project is dependent on 'spirv-tools', so the next step is to set them up. How to do this is described in the README.md file in the `external/spirv-tools-generated` folder. 
 
 ## Creating and building the Slang glslang project
