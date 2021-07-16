@@ -708,7 +708,7 @@ struct OptionsParser
 
                     hasLoadedRepro = true;
                 }
-                else if (argValue == "-repro-directory")
+                else if (argValue == "-load-repro-directory")
                 {
                     CommandLineArg reproDirectory;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproDirectory));

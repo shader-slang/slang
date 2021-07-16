@@ -13,7 +13,8 @@ There are a few command line options
 * `-extract-repro [filename]` extracts the contents of the repro file. The contained files are placed in a directory with a name, the same as the repro file minus the extension. Also contains a 'manifest'.
 * `-load-repro [filename]` loads the repro and compiles using it's options. Note this must be the last arg on the command line.
 * `-dump-repro-on-error` if a compilation fails will attempt to save a repro (using a filename generated from first source filename)
-* `-repro-file-system` [filename] makes the repros file contents appear as the file system during a compilation. Does not set any compilation options.
+* `-repro-file-system [filename]` makes the repros file contents appear as the file system during a compilation. Does not set any compilation options.
+* `-load-repro-directory [directory]` compiles all of the .slang-repro files found in `directory`
 
 The `manifest` made available via `-extract-repro` provides some very useful information
 
