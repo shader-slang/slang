@@ -918,6 +918,15 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                     && TestToolUtil::getReturnCodeFromInt(exeRes.resultCode) == ToolReturnCode::Success)
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    StdWriters::getOut().print(
+                        "Check %s: Supported\n", RenderApiUtil::getApiName(apiType).begin());
+                }
+                else
+                {
+                    StdWriters::getOut().print(
+                        "Check %s: Not Supported\n", RenderApiUtil::getApiName(apiType).begin());
+                    StdWriters::getOut().print(
+                        "%s\n%s\n", exeRes.standardError.getBuffer(), exeRes.standardOutput.getBuffer());
                 }
             }
         }
@@ -3440,22 +3449,28 @@ SlangResult innerMain(int argc, char** argv)
             }
         }
 
+        StdWriters::getOut().print("Supported backends:");
         if (context.availableBackendFlags & PassThroughFlag::Fxc)
         {
+            StdWriters::getOut().print(" fxc");
             fxcCategory = categorySet.add("fxc", fullTestCategory);
         }
         if (context.availableBackendFlags & PassThroughFlag::Glslang)
         {
+            StdWriters::getOut().print(" glslang");
             glslangCategory = categorySet.add("glslang", fullTestCategory);
         }
         if (context.availableBackendFlags & PassThroughFlag::Dxc)
         {
+            StdWriters::getOut().print(" dxc");
             dxcCategory = categorySet.add("dxc", fullTestCategory);
         }
         if (context.availableBackendFlags & PassThroughFlag::NVRTC)
         {
+            StdWriters::getOut().print(" nvrtc");
             nvrtcCategory = categorySet.add("nvrtc", fullTestCategory);
         }
+        StdWriters::getOut().print("\n");
     }
 
     // Working out what renderApis is worked on on demand through

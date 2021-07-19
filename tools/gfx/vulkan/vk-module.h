@@ -29,7 +29,7 @@ struct VulkanModule
     bool isSoftware() const { return m_isSoftware; }
 
         /// Initialize
-    Slang::Result init();
+    Slang::Result init(bool useSoftwareImpl);
         /// Destroy
     void destroy();
 

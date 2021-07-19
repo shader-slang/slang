@@ -22,7 +22,6 @@
 #include "window.h"
 
 #include "../../source/core/slang-test-tool-util.h"
-
 #define ENABLE_RENDERDOC_INTEGRATION 0
 
 #if ENABLE_RENDERDOC_INTEGRATION
@@ -1120,6 +1119,23 @@ static void renderDocBeginFrame(){}
 static void renderDocEndFrame(){}
 #endif
 
+class StdWritersDebugCallback : public gfx::IDebugCallback
+{
+public:
+    Slang::StdWriters* writers;
+    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
+        gfx::DebugMessageType type,
+        gfx::DebugMessageSource source,
+        const char* message) override
+    {
+        SLANG_UNUSED(source);
+        if (type == gfx::DebugMessageType::Error)
+        {
+            writers->getOut().print("%s\n", message);
+        }
+    }
+};
+
 static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* session, int argcIn, const char*const* argvIn)
 {
     using namespace renderer_test;
@@ -1245,6 +1261,9 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 #ifdef _DEBUG
     gfxEnableDebugLayer();
 #endif
+    StdWritersDebugCallback debugCallback;
+    debugCallback.writers = stdWriters;
+    gfxSetDebugCallback(&debugCallback);
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;
