@@ -209,9 +209,11 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     dst.Append(name);
     dst.Append(".dylib");
 #elif SLANG_LINUX_FAMILY
-    dst.Append("lib");
+    if (!name.startsWith("lib"))
+        dst.Append("lib");
     dst.Append(name);
-    dst.Append(".so");
+    if (name.indexOf(UnownedStringSlice(".so.")) == -1)
+        dst.Append(".so");
 #else
     // Just guess we can do with the name on it's own
     dst.Append(name);
