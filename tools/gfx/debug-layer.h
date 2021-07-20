@@ -102,6 +102,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* resource,
         ResourceState state,

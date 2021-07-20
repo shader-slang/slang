@@ -909,6 +909,25 @@ struct ComputePipelineStateDesc
     IShaderProgram*  program;
 };
 
+struct RayTracingPipelineFlags
+{
+    enum Enum : uint32_t
+    {
+        None = 0,
+        SkipTriangles = 1,
+        SkipProcedurals = 2,
+    };
+};
+
+struct RayTracingPipelineStateDesc
+{
+    IShaderProgram* program = nullptr;
+
+    int maxRecursion;
+    int maxRayPayloadSize;
+    RayTracingPipelineFlags::Enum flags;
+};
+
 class IPipelineState : public ISlangUnknown
 {
 };
@@ -1596,6 +1615,9 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createComputePipelineState(desc, state.writeRef()));
         return state;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc, IPipelineState** outState) = 0;
 
         /// Read back texture resource and stores the result in `outBlob`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
