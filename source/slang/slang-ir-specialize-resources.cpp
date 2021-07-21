@@ -18,8 +18,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
 
     TargetRequest* targetRequest = nullptr;
 
-    bool doesParamNeedSpecialization(IRParam* param)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
     {
+        SLANG_UNUSED(arg);
+
         // Whether or not a parameter needs specialization is really
         // a function of its type:
         //

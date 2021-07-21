@@ -2014,6 +2014,40 @@ LoweredValInfo createVar(
     return LoweredValInfo::ptr(irAlloc);
 }
 
+// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
+// we can either do it "aggressively" or not (what we'll call the "default" behavior,
+// although it isn't strictly more common).
+//
+// The case that this is mostly there to address is when somebody writes an operation
+// like:
+//
+//      foo[a] = b;
+//
+// In that case, we might as well just use the `set` accessor if there is one, rather
+// than complicate things. However, in more complex cases like:
+//
+//      foo[a].x = b;
+//
+// there is no way to satisfy the semantics of the code the user wrote (in terms of
+// only writing one vector component, and not a full vector) by using the `set`
+// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
+// an address.
+//
+// TODO: realistically IR lowering is too early to be binding to this choice,
+// because different accessors might be supported on different targets.
+//
+enum class TryGetAddressMode
+{
+    Default,
+    Aggressive,
+};
+
+/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
+LoweredValInfo tryGetAddress(
+    IRGenContext* context,
+    LoweredValInfo const& inVal,
+    TryGetAddressMode       mode);
+
     /// Add a single `in` argument value to a list of arguments
 void addInArg(
     IRGenContext*   context,
@@ -2092,59 +2126,49 @@ void addArg(
             // According to our "calling convention" we need to
             // pass a pointer into the callee.
             //
-            // A naive approach would be to just take the address
-            // of `loweredArg` above and pass it in, but that
-            // has two issues:
+            // Ideally we would like to just pass the address of
+            // `loweredArg`, and when that it possible we will do so.
+            // It may happen, though, that `loweredArg` is not an
+            // addressable l-value (e.g., it is `foo.xyz`, so that
+            // the bytes of the l-value are not contiguous).
             //
-            // 1. The l-value might not be something that has a single
-            //    well-defined "address" (e.g., `foo.xzy`).
-            //
-            // 2. The l-value argument might actually alias some other
-            //    storage that the callee will access (e.g., we are
-            //    passing in a global variable, or two `out` parameters
-            //    are being passed the same location in an array).
-            //
-            // In each of these cases, the safe option is to create
-            // a temporary variable to use for argument-passing,
-            // and then do copy-in/copy-out around the call.
-            //
-            // TODO: We should consider ruling out case (2) as undefined
-            // behavior, and specify that whether `inout` and `out` are
-            // handled via copy-in-copy-out or by-reference parameter
-            // passing is an implementation detail. That would allow
-            // us to avoid introducing a copy except where it is required
-            // for the semantics of (1).
-            //
-            // TODO: We should confirm whether such a change will make
-            // it harder to create SSA values for variables that get
-            // used with `out` or `inout` parameters.
-
-            LoweredValInfo tempVar = createVar(context, paramType);
-
-            // If the parameter is `in out` or `inout`, then we need
-            // to ensure that we pass in the original value stored
-            // in the argument, which we accomplish by assigning
-            // from the l-value to our temp.
-            if(paramDirection == kParameterDirection_InOut)
+            LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
+            if(argPtr.flavor == LoweredValInfo::Flavor::Ptr)
             {
-                assign(context, tempVar, argVal);
+                addInArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
             }
+            else
+            {
+                // If the value is not one that could yield a simple l-value
+                // then we need to convert it into a temporary
+                //
+                LoweredValInfo tempVar = createVar(context, paramType);
 
-            // Now we can pass the address of the temporary variable
-            // to the callee as the actual argument for the `in out`
-            SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
-            IRInst* tempPtr = getAddress(context, tempVar, loc);
-            addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
+                // If the parameter is `in out` or `inout`, then we need
+                // to ensure that we pass in the original value stored
+                // in the argument, which we accomplish by assigning
+                // from the l-value to our temp.
+                //
+                if (paramDirection == kParameterDirection_InOut)
+                {
+                    assign(context, tempVar, argVal);
+                }
 
-            // Finally, after the call we will need
-            // to copy in the other direction: from our
-            // temp back to the original l-value.
-            OutArgumentFixup fixup;
-            fixup.src = tempVar;
-            fixup.dst = argVal;
+                // Now we can pass the address of the temporary variable
+                // to the callee as the actual argument for the `in out`
+                SLANG_ASSERT(tempVar.flavor == LoweredValInfo::Flavor::Ptr);
+                IRInst* tempPtr = getAddress(context, tempVar, loc);
+                addInArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
 
-            (*ioFixups).add(fixup);
+                // Finally, after the call we will need
+                // to copy in the other direction: from our
+                // temp back to the original l-value.
+                OutArgumentFixup fixup;
+                fixup.src = tempVar;
+                fixup.dst = argVal;
 
+                (*ioFixups).add(fixup);
+            }
         }
         break;
 
@@ -2195,40 +2219,6 @@ void addCallArgsForParam(
 
 
 //
-
-// When we try to turn a `LoweredValInfo` into an address of some temporary storage,
-// we can either do it "aggressively" or not (what we'll call the "default" behavior,
-// although it isn't strictly more common).
-//
-// The case that this is mostly there to address is when somebody writes an operation
-// like:
-//
-//      foo[a] = b;
-//
-// In that case, we might as well just use the `set` accessor if there is one, rather
-// than complicate things. However, in more complex cases like:
-//
-//      foo[a].x = b;
-//
-// there is no way to satisfy the semantics of the code the user wrote (in terms of
-// only writing one vector component, and not a full vector) by using the `set`
-// accessor, and we need to be "aggressive" in turning the lvalue `foo[a]` into
-// an address.
-//
-// TODO: realistically IR lowering is too early to be binding to this choice,
-// because different accessors might be supported on different targets.
-//
-enum class TryGetAddressMode
-{
-    Default,
-    Aggressive,
-};
-
-/// Try to coerce `inVal` into a `LoweredValInfo::ptr()` with a simple address.
-LoweredValInfo tryGetAddress(
-    IRGenContext*           context,
-    LoweredValInfo const&   inVal,
-    TryGetAddressMode       mode);
 
     /// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
