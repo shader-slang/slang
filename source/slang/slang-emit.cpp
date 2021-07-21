@@ -452,7 +452,7 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
-    specializeFuncsForBuferLoadArgs(compileRequest, targetRequest, irModule);
+    specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
     // For GLSL targets, we also want to specialize calls to functions that

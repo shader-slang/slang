@@ -37,7 +37,7 @@ struct IRModule;
     /// Note how in the transformed code, there is no longer any attempt to load the rest
     /// of the contents of `gParams`.
     ///
-void specializeFuncsForBuferLoadArgs(
+void specializeFuncsForBufferLoadArgs(
     BackEndCompileRequest* compileRequest,
     TargetRequest* targetRequest,
     IRModule* module);
