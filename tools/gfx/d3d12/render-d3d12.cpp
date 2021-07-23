@@ -194,6 +194,7 @@ public:
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
         virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
         virtual void setRootConstants(Index rootParamIndex, Index dstOffsetIn32BitValues, Index countOf32BitValues, void const* srcData) = 0;
+        virtual void setPipelineState(PipelineStateBase* pipelineState) = 0;
     };
 
     class BufferResourceImpl: public gfx::BufferResource
@@ -485,6 +486,11 @@ public:
         {
             m_commandList->SetGraphicsRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
         }
+        virtual void setPipelineState(PipelineStateBase* pipeline) override
+        {
+            auto pipelineImpl = static_cast<PipelineStateImpl*>(pipeline);
+            m_commandList->SetPipelineState(pipelineImpl->m_pipelineState.get());
+        }
 
         GraphicsSubmitter(ID3D12GraphicsCommandList* commandList):
             m_commandList(commandList)
@@ -516,7 +522,11 @@ public:
         {
             m_commandList->SetComputeRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
         }
-
+        virtual void setPipelineState(PipelineStateBase* pipeline) override
+        {
+            auto pipelineImpl = static_cast<PipelineStateImpl*>(pipeline);
+            m_commandList->SetPipelineState(pipelineImpl->m_pipelineState.get());
+        }
         ComputeSubmitter(ID3D12GraphicsCommandList* commandList) :
             m_commandList(commandList)
         {
@@ -690,7 +700,7 @@ public:
         ID3D12GraphicsCommandList* m_d3dCmdList;
         ID3D12GraphicsCommandList* m_preCmdList = nullptr;
 
-        RefPtr<PipelineStateImpl> m_currentPipeline;
+        RefPtr<PipelineStateBase> m_currentPipeline;
 
         static int getBindPointIndex(PipelineType type)
         {
@@ -720,7 +730,7 @@ public:
 
         Result bindPipelineImpl(IPipelineState* pipelineState, IShaderObject** outRootObject)
         {
-            m_currentPipeline = static_cast<PipelineStateImpl*>(pipelineState);
+            m_currentPipeline = static_cast<PipelineStateBase*>(pipelineState);
             auto rootObject = &m_commandBuffer->m_rootShaderObject;
             SLANG_RETURN_ON_FAIL(rootObject->reset(
                 m_renderer,
@@ -731,7 +741,7 @@ public:
             return SLANG_OK;
         }
 
-        Result _bindRenderState(Submitter* submitter);
+        Result _bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline);
     };
 
     struct DescriptorTable
@@ -3198,7 +3208,8 @@ public:
                 // Submit - setting for graphics
                 {
                     GraphicsSubmitter submitter(m_d3dCmdList);
-                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    RefPtr<PipelineStateBase> newPipeline;
+                    if(SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
                     {
                         assert(!"Failed to bind render state");
                     }
@@ -3354,7 +3365,8 @@ public:
                 // Submit binding for compute
                 {
                     ComputeSubmitter submitter(m_d3dCmdList);
-                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    RefPtr<PipelineStateBase> newPipeline;
+                    if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
                     {
                         assert(!"Failed to bind render state");
                     }
@@ -3426,7 +3438,9 @@ public:
         }
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
-        class RayTracingCommandEncoderImpl : public IRayTracingCommandEncoder
+        class RayTracingCommandEncoderImpl
+            : public IRayTracingCommandEncoder
+            , public PipelineCommandEncoder
         {
         public:
             CommandBufferImpl* m_commandBuffer;
@@ -3458,8 +3472,9 @@ public:
                 IAccelerationStructure* const* structures,
                 AccessFlag::Enum sourceAccess,
                 AccessFlag::Enum destAccess) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-                IPipelineState* raytracingPipeline,
                 const char* rayGenShaderName,
                 int32_t width,
                 int32_t height,
@@ -3793,16 +3808,15 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
     return SLANG_OK;
 }
 
-Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter)
+Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline)
 {
-    RefPtr<PipelineStateBase> newPipeline;
     RootShaderObjectImpl* rootObjectImpl = &m_commandBuffer->m_rootShaderObject;
     m_renderer->maybeSpecializePipeline(m_currentPipeline, rootObjectImpl, newPipeline);
-    PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
+    PipelineStateBase* newPipelineImpl = static_cast<PipelineStateBase*>(newPipeline.Ptr());
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
     auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
-    commandList->SetPipelineState(newPipelineImpl->m_pipelineState);
+    submitter->setPipelineState(newPipelineImpl);
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
     SLANG_RETURN_ON_FAIL(rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef()));
@@ -5826,15 +5840,43 @@ void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::memoryBarrier
     m_commandBuffer->m_cmdList4->ResourceBarrier((UINT)count, barriers.getArrayView().getBuffer());
 }
 
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipeline(
+    IPipelineState* state, IShaderObject** outRootObject)
+{
+    bindPipelineImpl(state, outRootObject);
+}
+
 void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::dispatchRays(
-    IPipelineState* raytracingPipeline,
     const char* rayGenShaderName,
     int32_t width,
     int32_t height,
     int32_t depth)
 {
-    auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(raytracingPipeline);
-    m_commandBuffer->m_cmdList4->SetPipelineState1(pipelineImpl->m_stateObject);
+    RefPtr<PipelineStateBase> newPipeline;
+    PipelineStateBase* pipeline = m_currentPipeline.Ptr();
+    {
+        struct RayTracingSubmitter : public ComputeSubmitter
+        {
+            ID3D12GraphicsCommandList4* m_cmdList4;
+            RayTracingSubmitter(ID3D12GraphicsCommandList4* cmdList4)
+                : ComputeSubmitter(cmdList4), m_cmdList4(cmdList4)
+            {
+            }
+            virtual void setPipelineState(PipelineStateBase* pipeline) override
+            {
+                auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
+                m_cmdList4->SetPipelineState1(pipelineImpl->m_stateObject.get());
+            }
+        };
+        RayTracingSubmitter submitter(m_commandBuffer->m_cmdList4);
+        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
+        {
+            assert(!"Failed to bind render state");
+        }
+        if (newPipeline)
+            pipeline = newPipeline.Ptr();
+    }
+    auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
     auto dispatchDesc = pipelineImpl->m_dispatchDesc;
     int32_t rayGenShaderOffset = 0;
     if (rayGenShaderName)

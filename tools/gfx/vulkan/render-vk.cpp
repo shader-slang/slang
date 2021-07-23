@@ -4258,13 +4258,23 @@ public:
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL
+            bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override
+            {
+                SLANG_UNUSED(pipeline);
+                SLANG_UNUSED(outRootObject);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-                IPipelineState* raytracingPipeline,
                 const char* rayGenShaderName,
                 int32_t width,
                 int32_t height,
                 int32_t depth) override
             {
+                SLANG_UNUSED(rayGenShaderName);
+                SLANG_UNUSED(width);
+                SLANG_UNUSED(height);
+                SLANG_UNUSED(depth);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override

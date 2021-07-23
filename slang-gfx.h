@@ -1202,11 +1202,12 @@ public:
         AccessFlag::Enum sourceAccess,
         AccessFlag::Enum destAccess) = 0;
 
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
     /// Issues a dispatch command to start ray tracing worload with a ray tracing pipeline.
     /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for
     /// the first ray generation shader defined in `raytracingPipeline`.
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-        IPipelineState* raytracingPipeline,
         const char* rayGenShaderName,
         int32_t width,
         int32_t height,
