@@ -351,6 +351,12 @@ public:
         IAccelerationStructure* const* structures,
         AccessFlag::Enum sourceAccess,
         AccessFlag::Enum destAccess) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+        IPipelineState* raytracingPipeline,
+        const char* rayGenShaderName,
+        int32_t width,
+        int32_t height,
+        int32_t depth) override;
 
 public:
     DebugCommandBuffer* commandBuffer;

@@ -1084,6 +1084,18 @@ void DebugRayTracingCommandEncoder::memoryBarrier(
     baseObject->memoryBarrier(count, innerAS.getBuffer(), sourceAccess, destAccess);
 }
 
+void DebugRayTracingCommandEncoder::dispatchRays(
+    IPipelineState* raytracingPipeline,
+    const char* rayGenShaderName,
+    int32_t width,
+    int32_t height,
+    int32_t depth)
+{
+    SLANG_GFX_API_FUNC;
+    auto innerPipeline = getInnerObj(raytracingPipeline);
+    baseObject->dispatchRays(innerPipeline, rayGenShaderName, width, height, depth);
+}
+
 const ICommandQueue::Desc& DebugCommandQueue::getDesc()
 {
     SLANG_GFX_API_FUNC;
