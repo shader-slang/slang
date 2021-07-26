@@ -1092,6 +1092,11 @@ public:
         const IAccelerationStructure::CreateDesc& desc,
         IAccelerationStructure** outView) override;
 
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
+    // without ray tracing support.
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc, IPipelineState** outState) override;
+
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,

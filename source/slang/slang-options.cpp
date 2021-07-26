@@ -399,6 +399,94 @@ struct OptionsParser
         }
     }
 
+    class ReproPathVisitor : public Slang::Path::Visitor
+    {
+    public:
+        virtual void accept(Slang::Path::Type type, const Slang::UnownedStringSlice& filename) SLANG_OVERRIDE
+        {
+            if (type == Path::Type::File && Path::getPathExt(filename) == "slang-repro")
+            {
+                m_filenames.add(filename);
+            }
+        }
+
+        Slang::List<String> m_filenames;
+    };
+
+    static SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir)
+    {
+        auto stdOut = originalRequest->getWriter(WriterChannel::StdOutput);
+
+        ReproPathVisitor visitor;
+        Path::find(dir, nullptr, &visitor);
+
+        for (auto filename : visitor.m_filenames)
+        {
+            auto path = Path::combine(dir, filename);
+
+            ComPtr<slang::ICompileRequest> request;
+            SLANG_RETURN_ON_FAIL(session->createCompileRequest(request.writeRef()));
+
+            auto requestImpl = asInternal(request);
+
+            List<uint8_t> buffer;
+            SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, buffer));
+
+            auto requestState = ReproUtil::getRequest(buffer);
+            MemoryOffsetBase base;
+            base.set(buffer.getBuffer(), buffer.getCount());
+
+            // If we can find a directory, that exists, we will set up a file system to load from that directory
+            ComPtr<ISlangFileSystem> fileSystem;
+            String dirPath;
+            if (SLANG_SUCCEEDED(ReproUtil::calcDirectoryPathFromFilename(path, dirPath)))
+            {
+                SlangPathType pathType;
+                if (SLANG_SUCCEEDED(Path::getPathType(dirPath, &pathType)) && pathType == SLANG_PATH_TYPE_DIRECTORY)
+                {
+                    fileSystem = new RelativeFileSystem(OSFileSystem::getExtSingleton(), dirPath);
+                }
+            }
+
+            SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, requestImpl));
+
+            if (stdOut)
+            {
+                StringBuilder buf;
+                buf << filename << "\n";
+                stdOut->write(buf.getBuffer(), buf.getLength());
+            }
+
+            StringBuilder bufs[Index(WriterChannel::CountOf)];
+            ComPtr<ISlangWriter> writers[Index(WriterChannel::CountOf)];
+            for (Index i = 0; i < Index(WriterChannel::CountOf); ++i)
+            {
+                writers[i] = new StringWriter(&bufs[0], 0);
+                requestImpl->setWriter(WriterChannel(i), writers[i]);
+            }
+
+            if (SLANG_FAILED(requestImpl->compile()))
+            {
+                const char failed[] = "FAILED!\n";
+                stdOut->write(failed, SLANG_COUNT_OF(failed) - 1);
+
+                const auto& diagnostics = bufs[Index(WriterChannel::Diagnostic)];
+
+                stdOut->write(diagnostics.getBuffer(), diagnostics.getLength());
+
+                return SLANG_FAIL;
+            }
+        }
+
+        if (stdOut)
+        {
+            const char end[] = "(END)\n";
+            stdOut->write(end, SLANG_COUNT_OF(end) - 1);
+        }
+
+        return SLANG_OK;
+    }
+
     SlangResult parse(
         int             argc,
         char const* const*  argv)
@@ -619,6 +707,13 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(ReproUtil::load(base, requestState, fileSystem, requestImpl));
 
                     hasLoadedRepro = true;
+                }
+                else if (argValue == "-load-repro-directory")
+                {
+                    CommandLineArg reproDirectory;
+                    SLANG_RETURN_ON_FAIL(reader.expectArg(reproDirectory));
+
+                    SLANG_RETURN_ON_FAIL(_compileReproDirectory(session, requestImpl, reproDirectory.value));
                 }
                 else if (argValue == "-repro-file-system")
                 {

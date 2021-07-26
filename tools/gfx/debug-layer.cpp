@@ -612,6 +612,24 @@ Result DebugDevice::createComputePipelineState(
     return result;
 }
 
+Result DebugDevice::createRayTracingPipelineState(
+    const RayTracingPipelineStateDesc& desc,
+    IPipelineState** outState)
+{
+    SLANG_GFX_API_FUNC;
+
+    RayTracingPipelineStateDesc innerDesc = desc;
+    innerDesc.program = static_cast<DebugShaderProgram*>(desc.program)->baseObject;
+
+    RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
+    auto result =
+        baseObject->createRayTracingPipelineState(innerDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outState, outObject);
+    return result;
+}
+
 SlangResult DebugDevice::readTextureResource(
     ITextureResource* resource,
     ResourceState state,

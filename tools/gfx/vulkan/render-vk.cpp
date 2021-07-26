@@ -5612,9 +5612,11 @@ SlangResult VKDevice::initialize(const Desc& desc)
     SlangResult initDeviceResult = SLANG_OK;
     for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
     {
-        if (m_module.init(forceSoftware != 0) != SLANG_OK)
+        initDeviceResult = m_module.init(forceSoftware != 0);
+        if (initDeviceResult != SLANG_OK)
             continue;
-        if (m_api.initGlobalProcs(m_module) != SLANG_OK)
+        initDeviceResult = m_api.initGlobalProcs(m_module);
+        if (initDeviceResult != SLANG_OK)
             continue;
         descriptorSetAllocator.m_api = &m_api;
         initDeviceResult = initVulkanInstanceAndDevice(ENABLE_VALIDATION_LAYER != 0);

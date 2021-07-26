@@ -1310,6 +1310,8 @@ struct IRLoad : IRInst
 {
     IRUse ptr;
     IR_LEAF_ISA(Load)
+
+    IRInst* getPtr() { return ptr.get(); }
 };
 
 struct IRStore : IRInst
@@ -1317,6 +1319,9 @@ struct IRStore : IRInst
     IRUse ptr;
     IRUse val;
     IR_LEAF_ISA(Store)
+
+    IRInst* getPtr() { return ptr.get(); }
+    IRInst* getVal() { return val.get(); }
 };
 
 struct IRFieldExtract : IRInst

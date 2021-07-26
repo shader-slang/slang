@@ -25,6 +25,7 @@
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-specialize-arrays.h"
+#include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-resources.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-strip-witness-tables.h"
@@ -451,6 +452,7 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
+    specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
     // For GLSL targets, we also want to specialize calls to functions that
