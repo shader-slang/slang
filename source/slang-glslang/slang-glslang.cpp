@@ -188,6 +188,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 
     case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         // Use the same passes when specifying the "-O" flag in spirv-opt
+        // Roughly equivalent to `RegisterPerformancePasses`
 
         // To compile some large shaders the default is not enough.
         // That although this limit is exceeded, the final optimized output is typically well
@@ -204,6 +205,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
         optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
         optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+        optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
         optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
@@ -222,12 +224,22 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 
         // Note that CreateLocalMultiStoreElimPass really just does a SSARewritePass
         optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
+        
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreateCCPPass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
+        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
         optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
         optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
         optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+        optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
+        optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+        optimizer.RegisterPass(spvtools::CreateSSARewritePass());
+        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
         optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
         optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
