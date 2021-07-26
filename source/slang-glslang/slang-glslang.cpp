@@ -159,6 +159,8 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
     }
 
+    spvtools::OptimizerOptions spvOptOptions;
+
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
@@ -177,8 +179,27 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         break;
     case SLANG_OPTIMIZATION_LEVEL_HIGH:
+
+        // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
+        // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
+        // needed.
+        //
+        // Currently we just have high have the same meaning as 'maximal'. 
+
     case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         // Use the same passes when specifying the "-O" flag in spirv-opt
+
+        // To compile some large shaders the default is not enough.
+        // That although this limit is exceeded, the final optimized output is typically well
+        // within the range.
+        //
+        // See kDefaultMaxIdBound for description of this limit.
+        //
+        // If a compilation produces a warning like
+        // `0:0: ID overflow. Try running compact-ids.`
+        // it might be fixable by raising the multiplier to a larger value.
+        spvOptOptions.set_max_id_bound(kDefaultMaxIdBound * 4);
+
         optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
         optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
         optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
@@ -193,6 +214,13 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
         optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+        // We run CompactIdsPass here, because CreateLocalMultiStoreElimPass can explode
+        // id usage (by a factor of 10), and compacting ids here has been shown to half
+        // id usage with a complex shader.
+        optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+
+        // Note that CreateLocalMultiStoreElimPass really just does a SSARewritePass
         optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
         optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         optimizer.RegisterPass(spvtools::CreateCCPPass());
@@ -213,6 +241,11 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
         optimizer.RegisterPass(spvtools::CreateBlockMergePass());
         optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+        // We again run compaction to try and ensure the final output uses ids that are in range.
+        // On a complex shader, this reduced the amount ids by 5.
+        optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+
         break;
     }
 
@@ -221,7 +254,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
 
-    spvtools::OptimizerOptions spvOptOptions;
+    
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
     optimizer.Run(spirv.data(), spirv.size(), &spirv, spvOptOptions);
 }
