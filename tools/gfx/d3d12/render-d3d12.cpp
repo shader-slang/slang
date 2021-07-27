@@ -349,8 +349,10 @@ public:
         ComPtr<ID3D12StateObject> m_stateObject;
         D3D12_DISPATCH_RAYS_DESC m_dispatchDesc = {};
         Dictionary<String, int32_t> m_mapRayGenShaderNameToShaderTableIndex;
-        // Shader identifiers stored in GPU memory. Arranged as (RayGen, Miss, HitGroup*).
-        RefPtr<BufferResourceImpl> m_shaderTable;
+        // Shader Tables for each ray-tracing stage stored in GPU memory.
+        RefPtr<BufferResourceImpl> m_rayGenShaderTable;
+        RefPtr<BufferResourceImpl> m_hitgroupShaderTable;
+        RefPtr<BufferResourceImpl> m_missShaderTable;
         void init(const RayTracingPipelineStateDesc& inDesc)
         {
             PipelineStateDesc pipelineDesc;
@@ -602,6 +604,7 @@ public:
         {
             uint64_t waitValue;
             HANDLE fenceEvent;
+            ID3D12Fence* fence = nullptr;
         };
         ShortList<QueueWaitInfo, 4> m_waitInfos;
 
@@ -619,7 +622,7 @@ public:
                 m_waitInfos[i].fenceEvent = CreateEventEx(
                     nullptr,
                     false,
-                    CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+                    0,
                     EVENT_ALL_ACCESS);
             }
             return m_waitInfos[queueIndex];
@@ -724,6 +727,7 @@ public:
             m_d3dCmdList = m_commandBuffer->m_cmdList;
             m_renderer = commandBuffer->m_renderer;
             m_transientHeap = commandBuffer->m_transientHeap;
+            m_device = commandBuffer->m_renderer->m_device;
         }
 
         void endEncodingImpl() { m_isOpen = false; }
@@ -2990,7 +2994,6 @@ public:
             {
                 PipelineCommandEncoder::init(cmdBuffer);
                 m_preCmdList = nullptr;
-                m_device = renderer->m_device;
                 m_renderPass = renderPass;
                 m_framebuffer = framebuffer;
                 m_transientHeap = transientHeap;
@@ -3349,7 +3352,6 @@ public:
             {
                 PipelineCommandEncoder::init(cmdBuffer);
                 m_preCmdList = nullptr;
-                m_device = renderer->m_device;
                 m_transientHeap = transientHeap;
                 m_currentPipeline = nullptr;
             }
@@ -3446,6 +3448,7 @@ public:
             CommandBufferImpl* m_commandBuffer;
             void init(D3D12Device* renderer, CommandBufferImpl* commandBuffer)
             {
+                PipelineCommandEncoder::init(commandBuffer);
                 m_commandBuffer = commandBuffer;
             }
             virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
@@ -3578,8 +3581,7 @@ public:
                 auto transientHeap = cmdImpl->m_transientHeap;
                 auto& waitInfo = transientHeap->getQueueWaitInfo(m_queueIndex);
                 waitInfo.waitValue = m_fenceValue;
-                ResetEvent(waitInfo.fenceEvent);
-                m_fence->SetEventOnCompletion(m_fenceValue, waitInfo.fenceEvent);
+                waitInfo.fence = m_fence;
             }
             m_d3dQueue->Signal(m_fence, m_fenceValue);
             ResetEvent(globalWaitHandle);
@@ -3767,8 +3769,13 @@ SLANG_NO_THROW Result SLANG_MCALL D3D12Device::TransientResourceHeapImpl::synchr
     Array<HANDLE, 16> waitHandles;
     for (auto& waitInfo : m_waitInfos)
     {
-        if (waitInfo.waitValue != 0)
+        if (waitInfo.waitValue == 0)
+            continue;
+        if (waitInfo.fence)
+        {
+            waitInfo.fence->SetEventOnCompletion(waitInfo.waitValue, waitInfo.fenceEvent);
             waitHandles.add(waitInfo.fenceEvent);
+        }
     }
     WaitForMultipleObjects((DWORD)waitHandles.getCount(), waitHandles.getBuffer(), TRUE, INFINITE);
     m_viewHeap.deallocateAll();
@@ -5923,7 +5930,7 @@ Result D3D12Device::createRayTracingPipelineState(const RayTracingPipelineStateD
         ComPtr<ISlangBlob> codeBlob;
         auto compileResult =
             slangProgram->getEntryPointCode(i, 0, codeBlob.writeRef(), diagnostics.writeRef());
-        if (diagnostics->getBufferSize())
+        if (diagnostics.get())
         {
             getDebugCallback()->handleMessage(
                 compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
@@ -6074,47 +6081,50 @@ Result D3D12Device::RayTracingPipelineStateImpl::createShaderTables(
         hitgroupIdentifiers.add(hitgroupIdentifier);
     }
 
-    // Combine shader identifiers into a single flat buffer.
-    List<ShaderIdentifier> shaderIdentifiers;
-    shaderIdentifiers.addRange(rayGenIdentifiers);
-    shaderIdentifiers.addRange(missIdentifiers);
-    shaderIdentifiers.addRange(hitgroupIdentifiers);
+    auto createShaderTableResource = [&](ArrayView<ShaderIdentifier> content,
+                                         RefPtr<BufferResourceImpl>& outResource) -> Result
+    {
+        IBufferResource::Desc bufferDesc = {};
+        bufferDesc.type = IResource::Type::Buffer;
+        bufferDesc.defaultState = ResourceState::ShaderResource;
+        bufferDesc.allowedStates = ResourceStateSet(
+            ResourceState::CopySource,
+            ResourceState::UnorderedAccess,
+            ResourceState::ShaderResource);
+        bufferDesc.elementSize = 0;
+        bufferDesc.sizeInBytes = content.getCount() * sizeof(ShaderIdentifier);
+        bufferDesc.format = Format::Unknown;
+        ComPtr<IBufferResource> shaderTableResource;
+        SLANG_RETURN_ON_FAIL(device->createBufferResource(
+            bufferDesc, content.getBuffer(), shaderTableResource.writeRef()));
+        outResource = static_cast<BufferResourceImpl*>(shaderTableResource.get());
+        return SLANG_OK;
+    };
 
-    // Create a device buffer to hold the shader table.
-    IBufferResource::Desc bufferDesc = {};
-    bufferDesc.type = IResource::Type::Buffer;
-    bufferDesc.defaultState = ResourceState::ShaderResource;
-    bufferDesc.allowedStates = ResourceStateSet(
-        ResourceState::CopySource, ResourceState::UnorderedAccess, ResourceState::ShaderResource);
-    bufferDesc.elementSize = 0;
-    bufferDesc.sizeInBytes = shaderIdentifiers.getCount() * sizeof(ShaderIdentifier);
-    bufferDesc.format = Format::Unknown;
-    ComPtr<IBufferResource> shaderTableResource;
-    SLANG_RETURN_ON_FAIL(device->createBufferResource(
-        bufferDesc, shaderIdentifiers.getBuffer(), shaderTableResource.writeRef()));
-    m_shaderTable = static_cast<BufferResourceImpl*>(shaderTableResource.get());
-    auto bufferAddress = shaderTableResource->getDeviceAddress();
     if (desc.shaderTableHitGroupCount)
     {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(hitgroupIdentifiers.getArrayView(), m_hitgroupShaderTable));
         m_dispatchDesc.HitGroupTable.SizeInBytes =
             (uint64_t)(sizeof(ShaderIdentifier)) * desc.shaderTableHitGroupCount;
         m_dispatchDesc.HitGroupTable.StrideInBytes = sizeof(ShaderIdentifier);
-        m_dispatchDesc.HitGroupTable.StartAddress =
-            bufferAddress + (uint64_t)(sizeof(ShaderIdentifier)) *
-                                (rayGenIdentifiers.getCount() + missIdentifiers.getCount());
-    }
-    if (missIdentifiers.getCount())
-    {
-        m_dispatchDesc.MissShaderTable.SizeInBytes =
-            (uint64_t)(sizeof(ShaderIdentifier)) * missIdentifiers.getCount();
-        m_dispatchDesc.MissShaderTable.StrideInBytes = sizeof(ShaderIdentifier);
-        m_dispatchDesc.MissShaderTable.StartAddress =
-            bufferAddress + (uint64_t)(sizeof(ShaderIdentifier)) * (rayGenIdentifiers.getCount());
+        m_dispatchDesc.HitGroupTable.StartAddress = m_hitgroupShaderTable->getDeviceAddress();
     }
     if (rayGenIdentifiers.getCount())
     {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(rayGenIdentifiers.getArrayView(), m_rayGenShaderTable));
         m_dispatchDesc.RayGenerationShaderRecord.SizeInBytes = sizeof(ShaderIdentifier);
-        m_dispatchDesc.MissShaderTable.StartAddress = bufferAddress;
+        m_dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->getDeviceAddress();
+    }
+    if (missIdentifiers.getCount())
+    {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(missIdentifiers.getArrayView(), m_missShaderTable));
+        m_dispatchDesc.MissShaderTable.SizeInBytes =
+            (uint64_t)(sizeof(ShaderIdentifier)) * missIdentifiers.getCount();
+        m_dispatchDesc.MissShaderTable.StrideInBytes = sizeof(ShaderIdentifier);
+        m_dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->getDeviceAddress();
     }
     return SLANG_OK;
 }

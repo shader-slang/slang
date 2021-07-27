@@ -705,6 +705,7 @@ DebugCommandBuffer::DebugCommandBuffer()
     m_renderCommandEncoder.commandBuffer = this;
     m_computeCommandEncoder.commandBuffer = this;
     m_resourceCommandEncoder.commandBuffer = this;
+    m_rayTracingCommandEncoder.commandBuffer = this;
 }
 
 void DebugCommandBuffer::encodeRenderCommands(
