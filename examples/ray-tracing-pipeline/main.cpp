@@ -527,8 +527,9 @@ Slang::Result initialize()
     RayTracingPipelineStateDesc rtpDesc = {};
     rtpDesc.program = rayTracingProgram;
     rtpDesc.hitGroupCount = 2;
-    HitGroupDesc hitGroups[2] = {
-        {"closestHitShader", nullptr, nullptr}, {"shadowRayHitShader", nullptr, nullptr}};
+    HitGroupDesc hitGroups[2];
+    hitGroups[0].closestHitEntryPoint = "closestHitShader";
+    hitGroups[1].closestHitEntryPoint = "shadowRayHitShader";
     rtpDesc.hitGroups = hitGroups;
     rtpDesc.maxRayPayloadSize = 64;
     rtpDesc.maxRecursion = 2;

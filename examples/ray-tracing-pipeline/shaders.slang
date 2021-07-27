@@ -19,79 +19,15 @@ struct Primitive
     float3 getColor() { return color.xyz; }
 };
 
-bool traceRayFirstHit(
-    RaytracingAccelerationStructure sceneBVH,
-    float3 rayOrigin,
-    float3 rayDir,
-    out float t,
-    out int primitiveIndex)
+struct RayPayload
 {
-    RayDesc ray;
-    ray.Origin = rayOrigin;
-    ray.TMin = 0.01f;
-    ray.Direction = rayDir;
-    ray.TMax = 1e4f;
-    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
-             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> q;
-    let rayFlags = RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
-             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
-
-    q.TraceRayInline(
-        sceneBVH,
-        rayFlags,
-        0xff,
-        ray);
-    q.Proceed();
-
-    if(q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
-    {
-        t = q.CommittedRayT();
-        primitiveIndex = q.CommittedPrimitiveIndex();
-        return true;
-    }
-    return false;
-}
-
-bool traceRayNearestHit(
-    RaytracingAccelerationStructure sceneBVH,
-    float3 rayOrigin,
-    float3 rayDir,
-    out float t,
-    out int primitiveIndex)
-{
-    RayDesc ray;
-    ray.Origin = rayOrigin;
-    ray.TMin = 0.01f;
-    ray.Direction = rayDir;
-    ray.TMax = 1e4f;
-    RayQuery<RAY_FLAG_NONE> q;
-    let rayFlags = RAY_FLAG_NONE;
-
-    q.TraceRayInline(
-        sceneBVH,
-        rayFlags,
-        0xff,
-        ray);
-
-    q.Proceed();
-    if(q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
-    {
-        t = q.CommittedRayT();
-        primitiveIndex = q.CommittedPrimitiveIndex();
-        return true;
-    }
-    return false;
-}
+    float4 color;
+};
 
 uniform RWTexture2D resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
 uniform StructuredBuffer<Primitive> primitiveBuffer;
 uniform Uniforms uniforms;
-
-struct RayPayload
-{
-    float4 color;
-};
 
 [shader("raygeneration")]
 void rayGenShader()
