@@ -919,10 +919,20 @@ struct RayTracingPipelineFlags
     };
 };
 
+struct HitGroupDesc
+{
+    const char* closestHitEntryPoint = nullptr;
+    const char* anyHitEntryPoint = nullptr;
+    const char* intersectionEntryPoint = nullptr;
+};
+
 struct RayTracingPipelineStateDesc
 {
     IShaderProgram* program = nullptr;
-
+    int32_t hitGroupCount;
+    const HitGroupDesc* hitGroups;
+    int32_t shaderTableHitGroupCount;
+    int32_t* shaderTableHitGroupIndices;
     int maxRecursion;
     int maxRayPayloadSize;
     RayTracingPipelineFlags::Enum flags;
@@ -1191,6 +1201,17 @@ public:
         IAccelerationStructure* const* structures,
         AccessFlag::Enum sourceAccess,
         AccessFlag::Enum destAccess) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
+    /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
+    /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for
+    /// the first ray generation shader defined in `raytracingPipeline`.
+    virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+        const char* rayGenShaderName,
+        int32_t width,
+        int32_t height,
+        int32_t depth) = 0;
 };
 #define SLANG_UUID_IRayTracingCommandEncoder                                           \
     {                                                                                  \

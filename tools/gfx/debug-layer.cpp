@@ -705,6 +705,7 @@ DebugCommandBuffer::DebugCommandBuffer()
     m_renderCommandEncoder.commandBuffer = this;
     m_computeCommandEncoder.commandBuffer = this;
     m_resourceCommandEncoder.commandBuffer = this;
+    m_rayTracingCommandEncoder.commandBuffer = this;
 }
 
 void DebugCommandBuffer::encodeRenderCommands(
@@ -1082,6 +1083,25 @@ void DebugRayTracingCommandEncoder::memoryBarrier(
         innerAS.add(getInnerObj(structures[i]));
     }
     baseObject->memoryBarrier(count, innerAS.getBuffer(), sourceAccess, destAccess);
+}
+
+void DebugRayTracingCommandEncoder::bindPipeline(
+    IPipelineState* state, IShaderObject** outRootObject)
+{
+    SLANG_GFX_API_FUNC;
+    auto innerPipeline = getInnerObj(state);
+    baseObject->bindPipeline(innerPipeline, commandBuffer->rootObject.baseObject.writeRef());
+    *outRootObject = &commandBuffer->rootObject;
+}
+
+void DebugRayTracingCommandEncoder::dispatchRays(
+    const char* rayGenShaderName,
+    int32_t width,
+    int32_t height,
+    int32_t depth)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->dispatchRays(rayGenShaderName, width, height, depth);
 }
 
 const ICommandQueue::Desc& DebugCommandQueue::getDesc()

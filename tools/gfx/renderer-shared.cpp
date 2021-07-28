@@ -605,6 +605,14 @@ Result RendererBase::maybeSpecializePipeline(
                     pipelineDesc, specializedPipelineComPtr.writeRef()));
                 break;
             }
+            case PipelineType::RayTracing:
+            {
+                auto pipelineDesc = currentPipeline->desc.rayTracing;
+                pipelineDesc.program = specializedProgram;
+                SLANG_RETURN_ON_FAIL(createRayTracingPipelineState(
+                    pipelineDesc, specializedPipelineComPtr.writeRef()));
+                break;
+            }
             default:
                 break;
             }
