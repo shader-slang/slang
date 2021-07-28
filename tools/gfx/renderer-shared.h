@@ -1115,6 +1115,8 @@ public:
 public:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
+    // The newly specialized pipeline is held alive by the pipeline cache so users of `outNewPipeline` do not
+    // need to maintain its lifespan.
     Result maybeSpecializePipeline(
         PipelineStateBase* currentPipeline,
         ShaderObjectBase* rootObject,

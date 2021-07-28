@@ -745,6 +745,10 @@ public:
             return SLANG_OK;
         }
 
+        /// Specializes the pipeline according to current root-object argument values,
+        /// applys the root object bindings and binds the pipeline state.
+        /// The newly specialized pipeline is held alive by the pipeline cache so users of
+        /// `newPipeline` do not need to maintain its lifespan.
         Result _bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline);
     };
 
