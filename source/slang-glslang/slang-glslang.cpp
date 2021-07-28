@@ -185,11 +185,12 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 #endif
         // The following selection of passes was created by
         // 1) Taking the list of passes from optimizer.RegisterSizePasses
-        // 2) Disable/enable passes to try to produce some good combination of low SPIR-V output size, and compilation speed
-        // For a particularly difficult glsl shader this produced 1/3 SPIR-V code, in around 13th the time for -Os/-O3 options
-        // Over a wide range of compiles SPIR-V is around 6% larger than -O3
+        // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V output size and compilation speed
+        // 
+        // For a particularly difficult glsl shader this produced 1/3 SPIR-V code (against previous -O1), in around 13th the time (against -O3 option)
+        // Over a wide range of compiles the SPIR-V is around 6% larger than -O3
         {
-            // The following commentds describe the path to finding this combination. The original compilation produces 18Mb SPIR-V binaries
+            // The following comments describe the path to finding this combination. The original compilation produces 18Mb SPIR-V binaries
             // in around 3 1/2 mins. The integer number increases with the ordering of the test.
             //
             // With 5 47s
