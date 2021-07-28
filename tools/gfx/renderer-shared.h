@@ -766,7 +766,7 @@ public:
 
         auto bindingRangeIndex = offset.bindingRangeIndex;
         auto bindingRange = layout->getBindingRange(bindingRangeIndex);
-        auto objectIndex = bindingRange.subObjectIndex + offset.bindingArrayIndex;
+        Slang::Index objectIndex = bindingRange.subObjectIndex + offset.bindingArrayIndex;
         if (objectIndex >= m_userProvidedSpecializationArgs.getCount())
             m_userProvidedSpecializationArgs.setCount(objectIndex + 1);
         if (!m_userProvidedSpecializationArgs[objectIndex])
@@ -816,7 +816,7 @@ public:
                  subObjectIndexInRange++)
             {
                 ExtendedShaderObjectTypeList typeArgs;
-                auto objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+                Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
                 auto subObject = m_objects[objectIndex];
 
                 if (!subObject)
@@ -932,9 +932,19 @@ public:
         PipelineType type;
         GraphicsPipelineStateDesc graphics;
         ComputePipelineStateDesc compute;
+        RayTracingPipelineStateDesc rayTracing;
         ShaderProgramBase* getProgram()
         {
-            return static_cast<ShaderProgramBase*>(type == PipelineType::Compute ? compute.program : graphics.program);
+            switch (type)
+            {
+            case PipelineType::Compute:
+                return static_cast<ShaderProgramBase*>(compute.program);
+            case PipelineType::Graphics:
+                return static_cast<ShaderProgramBase*>(graphics.program);
+            case PipelineType::RayTracing:
+                return static_cast<ShaderProgramBase*>(rayTracing.program);
+            }
+            return nullptr;
         }
     } desc;
 
@@ -1105,6 +1115,8 @@ public:
 public:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
+    // The newly specialized pipeline is held alive by the pipeline cache so users of `outNewPipeline` do not
+    // need to maintain its lifespan.
     Result maybeSpecializePipeline(
         PipelineStateBase* currentPipeline,
         ShaderObjectBase* rootObject,
