@@ -1266,7 +1266,7 @@ public:
                     vkPushConstantRange.size = ordinaryDataSize;
                     vkPushConstantRange.stageFlags = VK_SHADER_STAGE_ALL; // TODO: be more clever
 
-                    while(m_ownPushConstantRanges.getCount() <= pushConstantRangeIndex)
+                    while((uint32_t)m_ownPushConstantRanges.getCount() <= pushConstantRangeIndex)
                     {
                         VkPushConstantRange emptyRange = { 0 };
                         m_ownPushConstantRanges.add(emptyRange);
@@ -2995,7 +2995,7 @@ public:
                 case slang::BindingType::ConstantBuffer:
                     {
                         BindingOffset objOffset = rangeOffset;
-                        for (uint32_t i = 0; i < count; ++i)
+                        for (Index i = 0; i < count; ++i)
                         {
                             // Binding a constant buffer sub-object is simple enough:
                             // we just call `bindAsConstantBuffer` on it to bind
@@ -3016,7 +3016,7 @@ public:
                 case slang::BindingType::ParameterBlock:
                     {
                         BindingOffset objOffset = rangeOffset;
-                        for (uint32_t i = 0; i < count; ++i)
+                        for (Index i = 0; i < count; ++i)
                         {
                             // The case for `ParameterBlock<X>` is not that different
                             // from `ConstantBuffer<X>`, except that we call `bindAsParameterBlock`
@@ -3047,7 +3047,7 @@ public:
                         //
                         SimpleBindingOffset objOffset = rangeOffset.pending;
                         SimpleBindingOffset objStride = rangeStride.pending;
-                        for (uint32_t i = 0; i < count; ++i)
+                        for (Index i = 0; i < count; ++i)
                         {
                             // An existential-type sub-object is always bound just as a value,
                             // which handles its nested bindings and descriptor sets, but
@@ -4256,6 +4256,25 @@ public:
                 AccessFlag::Enum destAccess) override
             {
                 _memoryBarrier(count, structures, srcAccess, destAccess);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+            bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override
+            {
+                SLANG_UNUSED(pipeline);
+                SLANG_UNUSED(outRootObject);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+                const char* rayGenShaderName,
+                int32_t width,
+                int32_t height,
+                int32_t depth) override
+            {
+                SLANG_UNUSED(rayGenShaderName);
+                SLANG_UNUSED(width);
+                SLANG_UNUSED(height);
+                SLANG_UNUSED(depth);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
