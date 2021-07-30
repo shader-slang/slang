@@ -207,6 +207,9 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -573,6 +576,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp">

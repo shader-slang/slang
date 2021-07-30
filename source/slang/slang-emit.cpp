@@ -21,6 +21,7 @@
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -248,12 +249,18 @@ Result linkAndOptimizeIR(
     // the global scope instead.
     //
     // TODO: We should skip this step for CUDA targets.
+    // (NM): we actually do need to do this step for OptiX based CUDA targets
     //
     {
         CollectEntryPointUniformParamsOptions passOptions;
         switch( target )
         {
         case CodeGenTarget::CUDASource:
+            collectOptiXEntryPointUniformParams(irModule);
+            #if 0
+            dumpIRIfEnabled(compileRequest, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
+            #endif
+            validateIRModuleIfEnabled(compileRequest, irModule);
             break;
 
         case CodeGenTarget::CPPSource:
@@ -278,7 +285,6 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(compileRequest, irModule);
         break;
 
-    case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         break;
     }
