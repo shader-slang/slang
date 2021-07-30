@@ -8,6 +8,61 @@
 namespace Slang
 {
 
+bool FunctionCallSpecializeCondition::isParamSuitableForSpecialization(IRParam* param, IRInst* inArg)
+{
+    SLANG_UNUSED(param);
+
+    // Determining if an argument is suitable for
+    // specializing a callee function requires
+    // looking at its (recurisve) structure.
+    //
+    // Rather than write a recursively procedure
+    // here, we will be tail-recursive by using
+    // a simple loop.
+    //
+    IRInst* arg = inArg;
+    for (;;)
+    {
+        // The leaf case we care about is when the
+        // argument at the call site is a global
+        // shader parameter, because then we can
+        // specialize a callee to refer to the same
+        // global parameter directly.
+        //
+        if (as<IRGlobalParam>(arg)) return true;
+
+        // As we will see later, we can also
+        // specialize a call when the argument
+        // is the result of indexing into an
+        // array (`base[index]`) *if* the `base`
+        // of the indexing operation is also
+        // suitable for specialization.
+        //
+        if (arg->getOp() == kIROp_getElement || arg->getOp() == kIROp_Load)
+        {
+            auto base = arg->getOperand(0);
+
+            // We will "recurse" on the base of
+            // the indexing operation by continuing
+            // our loop with the `base` as our new
+            // argument.
+            //
+            arg = base;
+            continue;
+        }
+
+        // By default, we will *not* consider an argument
+        // suitable for specialization.
+        //
+        // TODO: There may be other cases that are worth
+        // handling here. The current code is based on
+        // observation of what simple shaders do in
+        // practice.
+        //
+        return false;
+    }
+}
+
 struct FunctionParameterSpecializationContext
 {
     // This type implements a pass to specialize functions
@@ -121,14 +176,15 @@ struct FunctionParameterSpecializationContext
         // two conditions we care about:
         //
         // 1. Should we specialize? This amounts to whether
-        // `func` has any parameters that need specialization.
-        // We will call those "specializable" parameters for
-        // lack of a better name.
+        // `func` has any parameters that "want" specialization,
+        // or wheter `call` has any arguments that "want" specialization.
+        // If either the parameter or argument at a given position
+        // want specialization, we will call the coresponding parameter
+        // a "specializable" parameter for lack of a better name.
         //
         // 2. Can we specialize? This amounts to whether the
-        // arguments in `call` that correspond to those
-        // specializable parameters are "suitable" for use
-        // in specialization.
+        // parameter of `func` and the corresponding argument to
+        // `call` are both "suitable" for specialization.
         //
         // We are going to answer both of these queries in
         // a single loop that walks over the parameters of
@@ -147,23 +203,23 @@ struct FunctionParameterSpecializationContext
             SLANG_ASSERT(argIndex < call->getArgCount());
             auto arg = call->getArg(argIndex);
 
-            // If the given parameter doesn't need specialization,
+            // If neither the parameter nor the argument wants specialization,
             // then we need to keep looking.
             //
-            if(!doesParamNeedSpecialization(param))
+            if(!doesParamWantSpecialization(param, arg))
                 continue;
 
-            // If we have run into a `param` that needs specialization,
+            // If we have run into a `param` or `arg` that wants specialization,
             // then our first condition is met.
             //
             anySpecializableParam = true;
 
-            // Now we need to check whether `arg` is actually suitable
+            // Now we need to check whether `param` and `arg` are actually suitable
             // for specialization (our second condition). If not, we
             // can bail out immediately because our second condition
             // cannot be met.
             //
-            if(!isArgSuitableForSpecialization(arg))
+            if(!isParamSuitableForSpecialization(param, arg))
                 return false;
         }
 
@@ -178,62 +234,14 @@ struct FunctionParameterSpecializationContext
     // Of course, now we need to back-fill the predicates that
     // the above function used to evaluate prameters and arguments.
 
-    bool doesParamNeedSpecialization(IRParam* param)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
     {
-        return condition->doesParamNeedSpecialization(param);
+        return condition->doesParamWantSpecialization(param, arg);
     }
 
-    bool isArgSuitableForSpecialization(IRInst* inArg)
+    bool isParamSuitableForSpecialization(IRParam* param, IRInst* arg)
     {
-        // Determining if an argument is suitable for
-        // specializing a callee function requires
-        // looking at its (recurisve) structure.
-        //
-        // Rather than write a recursively procedure
-        // here, we will be tail-recursive by using
-        // a simple loop.
-        //
-        IRInst* arg = inArg;
-        for(;;)
-        {
-            // The leaf case we care about is when the
-            // argument at the call site is a global
-            // shader parameter, because then we can
-            // specialize a callee to refer to the same
-            // global parameter directly.
-            //
-            if(as<IRGlobalParam>(arg)) return true;
-
-            // As we will see later, we can also
-            // specialize a call when the argument
-            // is the result of indexing into an
-            // array (`base[index]`) *if* the `base`
-            // of the indexing operation is also
-            // suitable for specialization.
-            //
-            if( arg->getOp() == kIROp_getElement || arg->getOp() == kIROp_Load )
-            {
-                auto base = arg->getOperand(0);
-
-                // We will "recurse" on the base of
-                // the indexing operation by continuing
-                // our loop with the `base` as our new
-                // argument.
-                //
-                arg = base;
-                continue;
-            }
-
-            // By default, we will *not* consider an argument
-            // suitable for specialization.
-            //
-            // TODO: There may be other cases that are worth
-            // handling here. The current code is based on
-            // observation of what simple shaders do in
-            // practice.
-            //
-            return false;
-        }
+        return condition->isParamSuitableForSpecialization(param, arg);
     }
 
     // Once we'e determined that a given call site can/should
@@ -451,10 +459,10 @@ struct FunctionParameterSpecializationContext
         IRParam*                oldParam,
         IRInst*                 oldArg)
     {
-        // We know that the case where a parameter
-        // doesn't need specialization is easy.
+        // We know that the case where the parameter
+        // and argument don't want specialization is easy.
         //
-        if( !doesParamNeedSpecialization(oldParam) )
+        if( !doesParamWantSpecialization(oldParam, oldArg) )
         {
             // The new call site will use the same argument
             // value as the old one, and we don't need
@@ -470,6 +478,12 @@ struct FunctionParameterSpecializationContext
             // is handled with a different function
             // because it needs to recurse in some cases.
             //
+            // We will add the parameter that we are specializing to
+            // the key for caching of specializations, because functions
+            // specialized at different parameter positions should not
+            // be shared.
+            //
+            ioInfo.key.vals.add(oldParam);
             getCallInfoForArg(ioInfo, oldArg);
         }
     }
@@ -572,7 +586,7 @@ struct FunctionParameterSpecializationContext
         // As always, the easy case is when the parameter of
         // the original function doesn't need specialization.
         //
-        if( !doesParamNeedSpecialization(oldParam) )
+        if( !doesParamWantSpecialization(oldParam, oldArg) )
         {
             // The specialized callee will need a new parameter
             // that fills the same role as the old one, so we
@@ -677,9 +691,19 @@ struct FunctionParameterSpecializationContext
 
             return newVal;
         }
-        else if (oldArg->getOp() == kIROp_Load)
+        else if (auto oldArgLoad = as<IRLoad>(oldArg))
         {
-            return getSpecializedValueForArg(ioInfo, oldArg->getOperand(0));
+            auto oldPtr = oldArgLoad->getPtr();
+            auto newPtr = getSpecializedValueForArg(ioInfo, oldPtr);
+
+            auto builder = getBuilder();
+            builder->setInsertInto(nullptr);
+            auto newVal = builder->emitLoad(
+                oldArg->getFullType(),
+                newPtr);
+            ioInfo.newBodyInsts.add(newVal);
+
+            return newVal;
         }
         else
         {

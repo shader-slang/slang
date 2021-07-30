@@ -33,9 +33,11 @@ struct GfxGUID
     static const Slang::Guid IID_IRenderCommandEncoder;
     static const Slang::Guid IID_IComputeCommandEncoder;
     static const Slang::Guid IID_IResourceCommandEncoder;
+    static const Slang::Guid IID_IRayTracingCommandEncoder;
     static const Slang::Guid IID_ICommandBuffer;
     static const Slang::Guid IID_ICommandQueue;
     static const Slang::Guid IID_IQueryPool;
+    static const Slang::Guid IID_IAccelerationStructure;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -243,13 +245,30 @@ protected:
     Desc m_desc;
 };
 
+class ResourceViewInternalBase : public Slang::ComObject
+{};
+
 class ResourceViewBase
     : public IResourceView
-    , public Slang::ComObject
+    , public ResourceViewInternalBase
 {
 public:
+    Desc m_desc = {};
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IResourceView* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
+};
+
+class AccelerationStructureBase
+    : public IAccelerationStructure
+    , public ResourceViewInternalBase
+{
+public:
+    IResourceView::Desc m_desc = {};
+
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IAccelerationStructure* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
 };
 
 class RendererBase;
@@ -747,7 +766,7 @@ public:
 
         auto bindingRangeIndex = offset.bindingRangeIndex;
         auto bindingRange = layout->getBindingRange(bindingRangeIndex);
-        auto objectIndex = bindingRange.subObjectIndex + offset.bindingArrayIndex;
+        Slang::Index objectIndex = bindingRange.subObjectIndex + offset.bindingArrayIndex;
         if (objectIndex >= m_userProvidedSpecializationArgs.getCount())
             m_userProvidedSpecializationArgs.setCount(objectIndex + 1);
         if (!m_userProvidedSpecializationArgs[objectIndex])
@@ -797,7 +816,7 @@ public:
                  subObjectIndexInRange++)
             {
                 ExtendedShaderObjectTypeList typeArgs;
-                auto objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
+                Slang::Index objectIndex = bindingRange.subObjectIndex + subObjectIndexInRange;
                 auto subObject = m_objects[objectIndex];
 
                 if (!subObject)
@@ -913,9 +932,19 @@ public:
         PipelineType type;
         GraphicsPipelineStateDesc graphics;
         ComputePipelineStateDesc compute;
+        RayTracingPipelineStateDesc rayTracing;
         ShaderProgramBase* getProgram()
         {
-            return static_cast<ShaderProgramBase*>(type == PipelineType::Compute ? compute.program : graphics.program);
+            switch (type)
+            {
+            case PipelineType::Compute:
+                return static_cast<ShaderProgramBase*>(compute.program);
+            case PipelineType::Graphics:
+                return static_cast<ShaderProgramBase*>(graphics.program);
+            case PipelineType::RayTracing:
+                return static_cast<ShaderProgramBase*>(rayTracing.program);
+            }
+            return nullptr;
         }
     } desc;
 
@@ -1061,6 +1090,23 @@ public:
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
 
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
+    // without ray tracing support.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IAccelerationStructure::PrebuildInfo* outPrebuildInfo) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
+    // without ray tracing support.
+    virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
+        const IAccelerationStructure::CreateDesc& desc,
+        IAccelerationStructure** outView) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
+    // without ray tracing support.
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc, IPipelineState** outState) override;
+
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,
         ShaderObjectContainerType   container,
@@ -1069,6 +1115,8 @@ public:
 public:
     ExtendedShaderObjectTypeList specializationArgs;
     // Given current pipeline and root shader object binding, generate and bind a specialized pipeline if necessary.
+    // The newly specialized pipeline is held alive by the pipeline cache so users of `outNewPipeline` do not
+    // need to maintain its lifespan.
     Result maybeSpecializePipeline(
         PipelineStateBase* currentPipeline,
         ShaderObjectBase* rootObject,

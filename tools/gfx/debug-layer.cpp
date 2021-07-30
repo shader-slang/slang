@@ -126,9 +126,6 @@ SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(BufferResource, Resource)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(TextureResource, Resource)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(CommandBuffer)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(CommandQueue)
-SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(ComputeCommandEncoder, CommandEncoder)
-SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(RenderCommandEncoder, CommandEncoder)
-SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(ResourceCommandEncoder, CommandEncoder)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Framebuffer)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(FramebufferLayout)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(InputLayout)
@@ -141,10 +138,152 @@ SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderProgram)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Swapchain)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(TransientResourceHeap)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(QueryPool)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(AccelerationStructure, ResourceView)
 
 
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT
+
+// Utility conversion functions to get Debug* object or the inner object from a user provided
+// pointer.
+#define SLANG_GFX_DEBUG_GET_OBJ_IMPL(type)                                                   \
+    static Debug##type* getDebugObj(I##type* ptr) { return static_cast<Debug##type*>(ptr); } \
+    static I##type* getInnerObj(I##type* ptr)                                                \
+    {                                                                                        \
+        if (!ptr) return nullptr;                                                            \
+        auto debugObj = getDebugObj(ptr);                                                    \
+        return debugObj->baseObject;                                                         \
+    }
+
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(Device)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(BufferResource)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(TextureResource)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(CommandBuffer)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(CommandQueue)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ComputeCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(RenderCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ResourceCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(RayTracingCommandEncoder)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(Framebuffer)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(FramebufferLayout)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(InputLayout)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(RenderPassLayout)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(PipelineState)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ResourceView)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(SamplerState)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ShaderObject)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ShaderProgram)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(Swapchain)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(TransientResourceHeap)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(QueryPool)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(AccelerationStructure)
+
+#undef SLANG_GFX_DEBUG_GET_OBJ_IMPL
+
+void validateAccelerationStructureBuildInputs(
+    const IAccelerationStructure::BuildInputs& buildInputs)
+{
+    switch (buildInputs.kind)
+    {
+    case IAccelerationStructure::Kind::TopLevel:
+        if (!buildInputs.instanceDescs)
+        {
+            GFX_DIAGNOSE_ERROR("IAccelerationStructure::BuildInputs::instanceDescs cannot be null "
+                               "when creating a top-level acceleration structure.");
+        }
+        break;
+    case IAccelerationStructure::Kind::BottomLevel:
+        if (!buildInputs.geometryDescs)
+        {
+            GFX_DIAGNOSE_ERROR("IAccelerationStructure::BuildInputs::geometryDescs cannot be null "
+                               "when creating a bottom-level acceleration structure.");
+        }
+        for (int i = 0; i < buildInputs.descCount; i++)
+        {
+            switch (buildInputs.geometryDescs[i].type)
+            {
+            case IAccelerationStructure::GeometryType::Triangles:
+                switch (buildInputs.geometryDescs[i].content.triangles.vertexFormat)
+                {
+                case Format::RGB_Float32:
+                case Format::RG_Float32:
+                case Format::RGBA_Float16:
+                case Format::RG_Float16:
+                case Format::RGBA_Snorm_UInt16:
+                case Format::RG_Snorm_UInt16:
+                    break;
+                default:
+                    GFX_DIAGNOSE_ERROR(
+                        "Unsupported IAccelerationStructure::TriangleDesc::vertexFormat. Valid "
+                        "values are RGB_Float32, RG_Float32, RGBA_Float16, RG_Float16, "
+                        "RGBA_Snorm_UInt16 or RG_Snorm_UInt16.");
+                }
+                if (buildInputs.geometryDescs[i].content.triangles.indexCount)
+                {
+                    switch (buildInputs.geometryDescs[i].content.triangles.indexFormat)
+                    {
+                    case Format::R_UInt32:
+                    case Format::R_UInt16:
+                        break;
+                    default:
+                        GFX_DIAGNOSE_ERROR(
+                            "Unsupported IAccelerationStructure::TriangleDesc::indexFormat. Valid "
+                            "values are Unknown, R_UInt32 or R_UInt16.");
+                    }
+                    if (!buildInputs.geometryDescs[i].content.triangles.indexData)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData cannot be null if "
+                            "IAccelerationStructure::TriangleDesc::indexCount is not 0");
+                    }
+                }
+                if (buildInputs.geometryDescs[i].content.triangles.indexFormat != Format::Unknown)
+                {
+                    if (buildInputs.geometryDescs[i].content.triangles.indexCount == 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexCount cannot be 0 if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is not Format::Unknown");
+                    }
+                    if (buildInputs.geometryDescs[i].content.triangles.indexData == 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData cannot be null if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is not "
+                            "Format::Unknown");
+                    }
+                }
+                else
+                {
+                    if (buildInputs.geometryDescs[i].content.triangles.indexCount != 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexCount must be 0 if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is "
+                            "Format::Unknown");
+                    }
+                    if (buildInputs.geometryDescs[i].content.triangles.indexData != 0)
+                    {
+                        GFX_DIAGNOSE_ERROR(
+                            "IAccelerationStructure::TriangleDesc::indexData must be null if "
+                            "IAccelerationStructure::TriangleDesc::indexFormat is "
+                            "Format::Unknown");
+                    }
+                }
+                if (!buildInputs.geometryDescs[i].content.triangles.vertexData)
+                {
+                    GFX_DIAGNOSE_ERROR(
+                        "IAccelerationStructure::TriangleDesc::vertexData cannot be null.");
+                }
+                break;
+            }
+        }
+        break;
+    default:
+        GFX_DIAGNOSE_ERROR("Invalid value of IAccelerationStructure::Kind.");
+        break;
+    }
+}
 
 Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
 {
@@ -265,6 +404,30 @@ Result DebugDevice::createBufferView(
         return result;
     returnComPtr(outView, outObject);
     return result;
+}
+
+Result DebugDevice::getAccelerationStructurePrebuildInfo(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+{
+    SLANG_GFX_API_FUNC;
+    validateAccelerationStructureBuildInputs(buildInputs);
+    return baseObject->getAccelerationStructurePrebuildInfo(buildInputs, outPrebuildInfo);
+}
+
+Result DebugDevice::createAccelerationStructure(
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outAS)
+{
+    SLANG_GFX_API_FUNC;
+    auto innerDesc = desc;
+    innerDesc.buffer = getInnerObj(innerDesc.buffer);
+    RefPtr<DebugAccelerationStructure> outObject = new DebugAccelerationStructure();
+    auto result = baseObject->createAccelerationStructure(innerDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outAS, outObject);
+    return SLANG_OK;
 }
 
 Result DebugDevice::createFramebufferLayout(
@@ -449,6 +612,24 @@ Result DebugDevice::createComputePipelineState(
     return result;
 }
 
+Result DebugDevice::createRayTracingPipelineState(
+    const RayTracingPipelineStateDesc& desc,
+    IPipelineState** outState)
+{
+    SLANG_GFX_API_FUNC;
+
+    RayTracingPipelineStateDesc innerDesc = desc;
+    innerDesc.program = static_cast<DebugShaderProgram*>(desc.program)->baseObject;
+
+    RefPtr<DebugPipelineState> outObject = new DebugPipelineState();
+    auto result =
+        baseObject->createRayTracingPipelineState(innerDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outState, outObject);
+    return result;
+}
+
 SlangResult DebugDevice::readTextureResource(
     ITextureResource* resource,
     ResourceState state,
@@ -524,6 +705,7 @@ DebugCommandBuffer::DebugCommandBuffer()
     m_renderCommandEncoder.commandBuffer = this;
     m_computeCommandEncoder.commandBuffer = this;
     m_resourceCommandEncoder.commandBuffer = this;
+    m_rayTracingCommandEncoder.commandBuffer = this;
 }
 
 void DebugCommandBuffer::encodeRenderCommands(
@@ -540,7 +722,7 @@ void DebugCommandBuffer::encodeRenderCommands(
         framebuffer ? static_cast<DebugFramebuffer*>(framebuffer)->baseObject : nullptr;
     m_renderCommandEncoder.isOpen = true;
     baseObject->encodeRenderCommands(
-        innerRenderPass, innerFramebuffer, m_renderCommandEncoder.baseObject.writeRef());
+        innerRenderPass, innerFramebuffer, &m_renderCommandEncoder.baseObject);
     if (m_renderCommandEncoder.baseObject)
         *outEncoder = &m_renderCommandEncoder;
     else
@@ -553,8 +735,15 @@ void DebugCommandBuffer::encodeComputeCommands(IComputeCommandEncoder** outEncod
     checkCommandBufferOpenWhenCreatingEncoder();
     checkEncodersClosedBeforeNewEncoder();
     m_computeCommandEncoder.isOpen = true;
-    baseObject->encodeComputeCommands(m_computeCommandEncoder.baseObject.writeRef());
-    *outEncoder = &m_computeCommandEncoder;
+    baseObject->encodeComputeCommands(&m_computeCommandEncoder.baseObject);
+    if (m_computeCommandEncoder.baseObject)
+    {
+        *outEncoder = &m_computeCommandEncoder;
+    }
+    else
+    {
+        *outEncoder = nullptr;
+    }
 }
 
 void DebugCommandBuffer::encodeResourceCommands(IResourceCommandEncoder** outEncoder)
@@ -563,8 +752,32 @@ void DebugCommandBuffer::encodeResourceCommands(IResourceCommandEncoder** outEnc
     checkCommandBufferOpenWhenCreatingEncoder();
     checkEncodersClosedBeforeNewEncoder();
     m_resourceCommandEncoder.isOpen = true;
-    baseObject->encodeResourceCommands(m_resourceCommandEncoder.baseObject.writeRef());
-    *outEncoder = &m_resourceCommandEncoder;
+    baseObject->encodeResourceCommands(&m_resourceCommandEncoder.baseObject);
+    if (m_resourceCommandEncoder.baseObject)
+    {
+        *outEncoder = &m_resourceCommandEncoder;
+    }
+    else
+    {
+        *outEncoder = nullptr;
+    }
+}
+
+void DebugCommandBuffer::encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder)
+{
+    SLANG_GFX_API_FUNC;
+    checkCommandBufferOpenWhenCreatingEncoder();
+    checkEncodersClosedBeforeNewEncoder();
+    m_rayTracingCommandEncoder.isOpen = true;
+    baseObject->encodeRayTracingCommands(&m_rayTracingCommandEncoder.baseObject);
+    if (m_rayTracingCommandEncoder.baseObject)
+    {
+        *outEncoder = &m_rayTracingCommandEncoder;
+    }
+    else
+    {
+        *outEncoder = nullptr;
+    }
 }
 
 void DebugCommandBuffer::close()
@@ -619,6 +832,7 @@ void DebugCommandBuffer::checkCommandBufferOpenWhenCreatingEncoder()
 void DebugComputeCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
+    isOpen = false;
     baseObject->endEncoding();
 }
 
@@ -650,6 +864,7 @@ void DebugComputeCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index
 void DebugRenderCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
+    isOpen = false;
     baseObject->endEncoding();
 }
 
@@ -738,6 +953,7 @@ void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
+    isOpen = false;
     baseObject->endEncoding();
 }
 
@@ -771,6 +987,123 @@ void DebugResourceCommandEncoder::uploadBufferData(
     baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
+void DebugRayTracingCommandEncoder::endEncoding()
+{
+    SLANG_GFX_API_FUNC;
+    isOpen = false;
+    baseObject->endEncoding();
+}
+
+SLANG_NO_THROW void SLANG_MCALL
+    DebugRayTracingCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
+}
+
+void DebugRayTracingCommandEncoder::buildAccelerationStructure(
+    const IAccelerationStructure::BuildDesc& desc,
+    int propertyQueryCount,
+    AccelerationStructureQueryDesc* queryDescs)
+{
+    SLANG_GFX_API_FUNC;
+    IAccelerationStructure::BuildDesc innerDesc = desc;
+    innerDesc.dest = getInnerObj(innerDesc.dest);
+    innerDesc.source = getInnerObj(innerDesc.source);
+    List<AccelerationStructureQueryDesc> innerQueryDescs;
+    innerQueryDescs.addRange(queryDescs, propertyQueryCount);
+    for (auto& innerQueryDesc : innerQueryDescs)
+    {
+        innerQueryDesc.queryPool = getInnerObj(innerQueryDesc.queryPool);
+    }
+    validateAccelerationStructureBuildInputs(desc.inputs);
+    baseObject->buildAccelerationStructure(
+        innerDesc, propertyQueryCount, innerQueryDescs.getBuffer());
+}
+
+void DebugRayTracingCommandEncoder::copyAccelerationStructure(
+    IAccelerationStructure* dest,
+    IAccelerationStructure* src,
+    AccelerationStructureCopyMode mode)
+{
+    SLANG_GFX_API_FUNC;
+    auto innerDest = getInnerObj(dest);
+    auto innerSrc = getInnerObj(src);
+    baseObject->copyAccelerationStructure(innerDest, innerSrc, mode);
+}
+
+void DebugRayTracingCommandEncoder::queryAccelerationStructureProperties(
+    int accelerationStructureCount,
+    IAccelerationStructure* const* accelerationStructures,
+    int queryCount,
+    AccelerationStructureQueryDesc* queryDescs)
+{
+    SLANG_GFX_API_FUNC;
+    List<IAccelerationStructure*> innerAS;
+    for (int i = 0; i < accelerationStructureCount; i++)
+    {
+        innerAS.add(getInnerObj(accelerationStructures[i]));
+    }
+    List<AccelerationStructureQueryDesc> innerQueryDescs;
+    innerQueryDescs.addRange(queryDescs, queryCount);
+    for (auto& innerQueryDesc : innerQueryDescs)
+    {
+        innerQueryDesc.queryPool = getInnerObj(innerQueryDesc.queryPool);
+    }
+    baseObject->queryAccelerationStructureProperties(
+        accelerationStructureCount, innerAS.getBuffer(), queryCount, innerQueryDescs.getBuffer());
+}
+
+void DebugRayTracingCommandEncoder::serializeAccelerationStructure(
+    DeviceAddress dest,
+    IAccelerationStructure* source)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->serializeAccelerationStructure(dest, getInnerObj(source));
+}
+
+void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
+    IAccelerationStructure* dest,
+    DeviceAddress source)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->deserializeAccelerationStructure(getInnerObj(dest), source);
+}
+
+void DebugRayTracingCommandEncoder::memoryBarrier(
+    int count,
+    IAccelerationStructure* const* structures,
+    AccessFlag::Enum sourceAccess,
+    AccessFlag::Enum destAccess)
+{
+    SLANG_GFX_API_FUNC;
+    List<IAccelerationStructure*> innerAS;
+    for (int i = 0; i < count; i++)
+    {
+        innerAS.add(getInnerObj(structures[i]));
+    }
+    baseObject->memoryBarrier(count, innerAS.getBuffer(), sourceAccess, destAccess);
+}
+
+void DebugRayTracingCommandEncoder::bindPipeline(
+    IPipelineState* state, IShaderObject** outRootObject)
+{
+    SLANG_GFX_API_FUNC;
+    auto innerPipeline = getInnerObj(state);
+    baseObject->bindPipeline(innerPipeline, commandBuffer->rootObject.baseObject.writeRef());
+    *outRootObject = &commandBuffer->rootObject;
+}
+
+void DebugRayTracingCommandEncoder::dispatchRays(
+    const char* rayGenShaderName,
+    int32_t width,
+    int32_t height,
+    int32_t depth)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->dispatchRays(rayGenShaderName, width, height, depth);
+}
+
 const ICommandQueue::Desc& DebugCommandQueue::getDesc()
 {
     SLANG_GFX_API_FUNC;
@@ -794,6 +1127,14 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
                 "before submitting to a command queue.",
                 cmdBufferImpl->uid);
         }
+        if (i > 0)
+        {
+            if (cmdBufferImpl->m_transientHeap != getDebugObj(commandBuffers[0])->m_transientHeap)
+            {
+                GFX_DIAGNOSE_ERROR("Command buffers passed to a single executeCommandBuffers "
+                                   "call must be allocated from the same transient heap.");
+            }
+        }
     }
     baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer());
 }
@@ -810,6 +1151,7 @@ Result DebugTransientResourceHeap::createCommandBuffer(ICommandBuffer** outComma
 {
     SLANG_GFX_API_FUNC;
     RefPtr<DebugCommandBuffer> outObject = new DebugCommandBuffer();
+    outObject->m_transientHeap = this;
     auto result = baseObject->createCommandBuffer(outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
@@ -1009,14 +1351,39 @@ Result DebugRootShaderObject::setSpecializationArgs(
     const slang::SpecializationArg* args,
     uint32_t count)
 {
+    SLANG_GFX_API_FUNC;
+
     return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 Result DebugQueryPool::getResult(SlangInt index, SlangInt count, uint64_t* data)
 {
-    if (index < 0 || index + count >= desc.count)
+    SLANG_GFX_API_FUNC;
+
+    if (index < 0 || index + count > desc.count)
         GFX_DIAGNOSE_ERROR("index is out of bounds.");
     return baseObject->getResult(index, count, data);
+}
+
+DeviceAddress DebugAccelerationStructure::getDeviceAddress()
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getDeviceAddress();
+}
+
+IResourceView::Desc* DebugResourceView::getViewDesc()
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getViewDesc();
+}
+
+IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getViewDesc();
 }
 
 } // namespace gfx

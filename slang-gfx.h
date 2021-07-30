@@ -139,6 +139,8 @@ public:
     \
     x(RGBA_Unorm_UInt8, sizeof(uint32_t)) \
     x(BGRA_Unorm_UInt8, sizeof(uint32_t)) \
+    x(RGBA_Snorm_UInt16, sizeof(uint32_t)*2) \
+    x(RG_Snorm_UInt16, sizeof(uint32_t)) \
     \
     x(R_UInt16, sizeof(uint16_t)) \
     x(R_UInt32, sizeof(uint32_t)) \
@@ -163,6 +165,9 @@ enum class Format
 
     RGBA_Unorm_UInt8,
     BGRA_Unorm_UInt8,
+
+    RGBA_Snorm_UInt16,
+    RG_Snorm_UInt16,
 
     R_UInt16,
     R_UInt32,
@@ -214,6 +219,7 @@ enum class ResourceState
     CopyDestination,
     ResolveSource,
     ResolveDestination,
+    AccelerationStructure,
     _Count
 };
 
@@ -242,6 +248,17 @@ private:
     void add() {}
 };
 
+
+/// Combinations describe how a resource can be accessed (typically by the host/cpu)
+struct AccessFlag
+{
+    enum Enum
+    {
+        Read = 0x1,
+        Write = 0x2
+    };
+};
+
 class IResource: public ISlangUnknown
 {
 public:
@@ -256,16 +273,6 @@ public:
         Texture3D,          ///< A 3d texture
         TextureCube,        ///< A cubemap consists of 6 Texture2D like faces
         CountOf,
-    };
-
-        /// Combinations describe how a resource can be accessed (typically by the host/cpu)
-    struct AccessFlag
-    {
-        enum Enum
-        {
-            Read = 0x1,
-            Write = 0x2
-        };
     };
 
         /// Base class for Descs
@@ -474,6 +481,7 @@ public:
         DepthStencil,
         ShaderResource,
         UnorderedAccess,
+        AccelerationStructure,
     };
 
     struct RenderTargetDesc
@@ -494,10 +502,171 @@ public:
         // Fields for `RenderTarget` and `DepthStencil` views.
         RenderTargetDesc renderTarget;
     };
+    virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
-#define SLANG_UUID_IResourceView                                                       \
+#define SLANG_UUID_IResourceView                                                      \
     {                                                                                 \
         0x7b6c4926, 0x884, 0x408c, { 0xad, 0x8a, 0x50, 0x3a, 0x8e, 0x23, 0x98, 0xa4 } \
+    }
+
+class IAccelerationStructure : public IResourceView
+{
+public:
+    enum class Kind
+    {
+        TopLevel,
+        BottomLevel
+    };
+
+    struct BuildFlags
+    {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS.
+        enum Enum
+        {
+            None,
+            AllowUpdate = 1,
+            AllowCompaction = 2,
+            PreferFastTrace = 4,
+            PreferFastBuild = 8,
+            MinimizeMemory = 16,
+            PerformUpdate = 32
+        };
+    };
+
+    enum class GeometryType
+    {
+        Triangles, ProcedurePrimitives
+    };
+
+    struct GeometryFlags
+    {
+        // The enum values are intentionally consistent with
+        // D3D12_RAYTRACING_GEOMETRY_FLAGS.
+        enum Enum
+        {
+            None,
+            Opaque = 1,
+            NoDuplicateAnyHitInvocation = 2
+        };
+    };
+
+    struct TriangleDesc
+    {
+        DeviceAddress transform3x4;
+        Format indexFormat;
+        Format vertexFormat;
+        uint32_t indexCount;
+        uint32_t vertexCount;
+        DeviceAddress indexData;
+        DeviceAddress vertexData;
+        uint64_t vertexStride;
+    };
+
+    struct ProceduralAABB
+    {
+        float minX;
+        float minY;
+        float minZ;
+        float maxX;
+        float maxY;
+        float maxZ;
+    };
+
+    struct ProceduralAABBDesc
+    {
+        /// Number of AABBs.
+        uint64_t count;
+
+        /// Pointer to an array of `ProceduralAABB` values in device memory.
+        DeviceAddress data;
+
+        /// Stride in bytes of the AABB values array.
+        uint64_t stride;
+    };
+
+    struct GeometryDesc
+    {
+        GeometryType type;
+        GeometryFlags::Enum flags;
+        union
+        {
+            TriangleDesc triangles;
+            ProceduralAABBDesc proceduralAABBs;
+        } content;
+    };
+
+    struct GeometryInstanceFlags
+    {
+        // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
+        // and VkGeometryInstanceFlagBitsKHR.
+        enum Enum : uint32_t
+        {
+            None = 0,
+            TriangleFacingCullDisable = 0x00000001,
+            TriangleFrontCounterClockwise = 0x00000002,
+            ForceOpaque = 0x00000004,
+            NoOpaque = 0x00000008
+        };
+    };
+
+    // The layout of this struct is intentionally consistent with D3D12_RAYTRACING_INSTANCE_DESC
+    // and VkAccelerationStructureInstanceKHR.
+    struct InstanceDesc
+    {
+        float transform[3][4];
+        uint32_t instanceID : 24;
+        uint32_t instanceMask : 8;
+        uint32_t instanceContributionToHitGroupIndex : 24;
+        GeometryInstanceFlags::Enum flags : 8;
+        DeviceAddress accelerationStructure;
+    };
+
+    struct PrebuildInfo
+    {
+        uint64_t resultDataMaxSize;
+        uint64_t scratchDataSize;
+        uint64_t updateScratchDataSize;
+    };
+
+    struct BuildInputs
+    {
+        Kind kind;
+
+        BuildFlags::Enum flags;
+
+        int32_t descCount;
+
+        /// Array of `InstanceDesc` values in device memory.
+        /// Used when `kind` is `TopLevel`.
+        DeviceAddress instanceDescs;
+
+        /// Array of `GeometryDesc` values.
+        /// Used when `kind` is `BottomLevel`.
+        const GeometryDesc* geometryDescs;
+    };
+
+    struct CreateDesc
+    {
+        Kind kind;
+        IBufferResource* buffer;
+        uint64_t offset;
+        uint64_t size;
+    };
+
+    struct BuildDesc
+    {
+        BuildInputs inputs;
+        IAccelerationStructure* source;
+        IAccelerationStructure* dest;
+        DeviceAddress scratchData;
+    };
+
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
+};
+#define SLANG_UUID_IAccelerationStructure                                             \
+    {                                                                                 \
+        0xa5cdda3c, 0x1d4e, 0x4df7, { 0x8e, 0xf2, 0xb7, 0x3f, 0xce, 0x4, 0xde, 0x3b } \
     }
 
 struct ShaderOffset
@@ -740,6 +909,35 @@ struct ComputePipelineStateDesc
     IShaderProgram*  program;
 };
 
+struct RayTracingPipelineFlags
+{
+    enum Enum : uint32_t
+    {
+        None = 0,
+        SkipTriangles = 1,
+        SkipProcedurals = 2,
+    };
+};
+
+struct HitGroupDesc
+{
+    const char* closestHitEntryPoint = nullptr;
+    const char* anyHitEntryPoint = nullptr;
+    const char* intersectionEntryPoint = nullptr;
+};
+
+struct RayTracingPipelineStateDesc
+{
+    IShaderProgram* program = nullptr;
+    int32_t hitGroupCount;
+    const HitGroupDesc* hitGroups;
+    int32_t shaderTableHitGroupCount;
+    int32_t* shaderTableHitGroupIndices;
+    int maxRecursion;
+    int maxRayPayloadSize;
+    RayTracingPipelineFlags::Enum flags;
+};
+
 class IPipelineState : public ISlangUnknown
 {
 };
@@ -854,6 +1052,8 @@ public:
 enum class QueryType
 {
     Timestamp,
+    AccelerationStructureCompactedSize,
+    AccelerationStructureSerializedSize,
 };
 
 class IQueryPool : public ISlangUnknown
@@ -871,16 +1071,12 @@ public:
     { 0xc2cc3784, 0x12da, 0x480a, { 0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 } }
 
 
-class ICommandEncoder : public ISlangUnknown
+class ICommandEncoder
 {
 public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* queryPool, SlangInt queryIndex) = 0;
 };
-#define SLANG_UUID_ICommandEncoder                                                     \
-    {                                                                                  \
-        0xbd0717f8, 0xc4a7, 0x4603, { 0x94, 0xd4, 0x6f, 0x8f, 0x95, 0x16, 0x91, 0x47 } \
-    }
 
 class IRenderCommandEncoder : public ICommandEncoder
 {
@@ -933,10 +1129,6 @@ public:
         drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
 };
-#define SLANG_UUID_IRenderCommandEncoder                                               \
-    {                                                                                  \
-        0x39417cf7, 0x8d97, 0x43a9, { 0xbb, 0x9f, 0x2f, 0x35, 0xe9, 0x11, 0xd0, 0x42 } \
-    }
 
 class IComputeCommandEncoder : public ICommandEncoder
 {
@@ -956,10 +1148,6 @@ public:
     }
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
 };
-#define SLANG_UUID_IComputeCommandEncoder                                              \
-    {                                                                                  \
-        0x65400452, 0xc877, 0x478f, { 0x91, 0x7d, 0x48, 0xd5, 0x41, 0x6f, 0x39, 0xab } \
-    }
 
 class IResourceCommandEncoder : public ICommandEncoder
 {
@@ -973,9 +1161,61 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
 };
-#define SLANG_UUID_IResourceCommandEncoder                                             \
+
+enum class AccelerationStructureCopyMode
+{
+    Clone, Compact
+};
+
+struct AccelerationStructureQueryDesc
+{
+    QueryType queryType;
+
+    IQueryPool* queryPool;
+
+    int32_t firstQueryIndex;
+};
+
+class IRayTracingCommandEncoder : public ICommandEncoder
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
+        const IAccelerationStructure::BuildDesc& desc,
+        int propertyQueryCount,
+        AccelerationStructureQueryDesc* queryDescs) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
+        IAccelerationStructure* dest,
+        IAccelerationStructure* src,
+        AccelerationStructureCopyMode mode) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
+        int accelerationStructureCount,
+        IAccelerationStructure* const* accelerationStructures,
+        int queryCount,
+        AccelerationStructureQueryDesc* queryDescs) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        serializeAccelerationStructure(DeviceAddress dest, IAccelerationStructure* source) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        deserializeAccelerationStructure(IAccelerationStructure* dest, DeviceAddress source) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
+        int count,
+        IAccelerationStructure* const* structures,
+        AccessFlag::Enum sourceAccess,
+        AccessFlag::Enum destAccess) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
+    /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
+    /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for
+    /// the first ray generation shader defined in `raytracingPipeline`.
+    virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+        const char* rayGenShaderName,
+        int32_t width,
+        int32_t height,
+        int32_t depth) = 0;
+};
+#define SLANG_UUID_IRayTracingCommandEncoder                                           \
     {                                                                                  \
-        0x5fe87643, 0x7ad7, 0x4177, { 0x8b, 0xd1, 0xd7, 0x84, 0xad, 0xcf, 0x3d, 0xce } \
+        0x9a672b87, 0x5035, 0x45e3, { 0x96, 0x7c, 0x1f, 0x85, 0xcd, 0xb3, 0x63, 0x4f } \
     }
 
 class ICommandBuffer : public ISlangUnknown
@@ -990,29 +1230,38 @@ public:
         IRenderPassLayout* renderPass,
         IFramebuffer* framebuffer,
         IRenderCommandEncoder** outEncoder) = 0;
-    ComPtr<IRenderCommandEncoder>
+    IRenderCommandEncoder*
         encodeRenderCommands(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
     {
-        ComPtr<IRenderCommandEncoder> result;
-        encodeRenderCommands(renderPass, framebuffer, result.writeRef());
+        IRenderCommandEncoder* result;
+        encodeRenderCommands(renderPass, framebuffer, &result);
         return result;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         encodeComputeCommands(IComputeCommandEncoder** outEncoder) = 0;
-    ComPtr<IComputeCommandEncoder> encodeComputeCommands()
+    IComputeCommandEncoder* encodeComputeCommands()
     {
-        ComPtr<IComputeCommandEncoder> result;
-        encodeComputeCommands(result.writeRef());
+        IComputeCommandEncoder* result;
+        encodeComputeCommands(&result);
         return result;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         encodeResourceCommands(IResourceCommandEncoder** outEncoder) = 0;
-    ComPtr<IResourceCommandEncoder> encodeResourceCommands()
+    IResourceCommandEncoder* encodeResourceCommands()
     {
-        ComPtr<IResourceCommandEncoder> result;
-        encodeResourceCommands(result.writeRef());
+        IResourceCommandEncoder* result;
+        encodeResourceCommands(&result);
+        return result;
+    }
+
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) = 0;
+    IRayTracingCommandEncoder* encodeRayTracingCommands()
+    {
+        IRayTracingCommandEncoder* result;
+        encodeRayTracingCommands(&result);
         return result;
     }
 
@@ -1388,6 +1637,9 @@ public:
         return state;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc, IPipelineState** outState) = 0;
+
         /// Read back texture resource and stores the result in `outBlob`.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* resource,
@@ -1407,6 +1659,15 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc, IQueryPool** outPool) = 0;
+
+    
+    virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IAccelerationStructure::PrebuildInfo* outPrebuildInfo) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
+        const IAccelerationStructure::CreateDesc& desc,
+        IAccelerationStructure** outView) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                             \

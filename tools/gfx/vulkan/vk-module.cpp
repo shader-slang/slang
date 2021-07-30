@@ -1,4 +1,4 @@
-﻿// module.cpp
+// module.cpp
 #include "vk-module.h"
 
 #include <stdlib.h>
@@ -11,33 +11,38 @@
 #   include <dlfcn.h>
 #endif
 
+#include "../renderer-shared.h"
+
 namespace gfx {
 using namespace Slang;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VulkanModule !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Slang::Result VulkanModule::init()
+Slang::Result VulkanModule::init(bool useSoftwareImpl)
 {
     if (isInitialized())
     {
         destroy();
-        return SLANG_OK;
     }
 
     const char* dynamicLibraryName = "Unknown";
+    m_isSoftware = useSoftwareImpl;
 
 #if SLANG_WINDOWS_FAMILY
-    dynamicLibraryName = "vulkan-1.dll";
+    dynamicLibraryName = useSoftwareImpl ? "vk_swiftshader.dll" : "vulkan-1.dll";
     HMODULE module = ::LoadLibraryA(dynamicLibraryName);
     m_module = (void*)module;
 #else
-    dynamicLibraryName = "libvulkan.so.1";
+    dynamicLibraryName = useSoftwareImpl ? "libvk_swiftshader.so" : "libvulkan.so.1";
+    if (useSoftwareImpl)
+    {
+        dlopen("libpthread.so.0", RTLD_NOW | RTLD_GLOBAL);
+    }
     m_module = dlopen(dynamicLibraryName, RTLD_NOW);
 #endif
 
     if (!m_module)
     {
-        fprintf(stderr, "error: failed load '%s'\n", dynamicLibraryName);
         return SLANG_FAIL;
     }
 

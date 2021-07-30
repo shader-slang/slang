@@ -239,7 +239,6 @@ public:
 class CUDAResourceView : public ResourceViewBase
 {
 public:
-    Desc desc;
     RefPtr<MemoryCUDAResource> memoryResource = nullptr;
     RefPtr<TextureCUDAResource> textureResource = nullptr;
     void* proxyBuffer = nullptr;
@@ -447,7 +446,7 @@ public:
                 viewDesc.type = IResourceView::Type::UnorderedAccess;
                 m_bufferView = new CUDAResourceView();
                 m_bufferView->proxyBuffer = m_cpuBuffer.getBuffer();
-                m_bufferView->desc = viewDesc;
+                m_bufferView->m_desc = viewDesc;
             }
             return SLANG_OK;
         }
@@ -466,7 +465,7 @@ public:
             viewDesc.type = IResourceView::Type::UnorderedAccess;
             m_bufferView = new CUDAResourceView();
             m_bufferView->memoryResource = m_bufferResource;
-            m_bufferView->desc = viewDesc;
+            m_bufferView->m_desc = viewDesc;
         }
         auto oldSize = m_bufferResource->getDesc()->sizeInBytes;
         if ((size_t)count != oldSize)
@@ -571,7 +570,7 @@ public:
 
         if (cudaView->textureResource)
         {
-            if (cudaView->desc.type == IResourceView::Type::UnorderedAccess)
+            if (cudaView->m_desc.type == IResourceView::Type::UnorderedAccess)
             {
                 auto handle = cudaView->textureResource->m_cudaSurfObj;
                 setData(offset, &handle, sizeof(uint64_t));
@@ -921,22 +920,6 @@ public:
             : public IComputeCommandEncoder
         {
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IComputeCommandEncoder)
-                {
-                    *outObject = static_cast<IComputeCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
-        public:
             CommandWriter* m_writer;
             CommandBufferImpl* m_commandBuffer;
             RefPtr<ShaderObjectBase> m_rootObject;
@@ -982,22 +965,6 @@ public:
             : public IResourceCommandEncoder
         {
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IResourceCommandEncoder)
-                {
-                    *outObject = static_cast<IResourceCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
-        public:
             CommandWriter* m_writer;
 
             void init(CommandBufferImpl* cmdBuffer)
@@ -1035,6 +1002,12 @@ public:
         {
             m_resourceCommandEncoder.init(this);
             *outEncoder = &m_resourceCommandEncoder;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            *outEncoder = nullptr;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
@@ -1753,7 +1726,7 @@ public:
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override
     {
         RefPtr<CUDAResourceView> view = new CUDAResourceView();
-        view->desc = desc;
+        view->m_desc = desc;
         view->textureResource = dynamic_cast<TextureCUDAResource*>(texture);
         returnComPtr(outView, view);
         return SLANG_OK;
@@ -1763,7 +1736,7 @@ public:
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override
     {
         RefPtr<CUDAResourceView> view = new CUDAResourceView();
-        view->desc = desc;
+        view->m_desc = desc;
         view->memoryResource = dynamic_cast<MemoryCUDAResource*>(buffer);
         returnComPtr(outView, view);
         return SLANG_OK;

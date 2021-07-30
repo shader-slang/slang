@@ -652,6 +652,9 @@ example "hello-world"
 -- Let's go ahead and set up the projects for our other example now.
 example "triangle"
 
+example "ray-tracing"
+example "ray-tracing-pipeline"
+
 example "gpu-printing"
     kind "ConsoleApp"
 
@@ -793,7 +796,7 @@ toolSharedLibrary "render-test"
     if isTargetWindows then    
         addSourceDir "tools/render-test/windows"
         
-        systemversion "10.0.14393.0"
+        systemversion "latest"
      
         -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
@@ -834,7 +837,7 @@ tool "gfx"
     -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
     -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
     if isTargetWindows then
-        systemversion "10.0.14393.0"
+        systemversion "latest"
 
         -- For Windows targets, we want to copy 
         -- dxcompiler.dll, and dxil.dll from the Windows SDK redistributable
@@ -913,7 +916,7 @@ tool "platform"
     addSourceDir "tools/platform/placeholder"
     -- Include windowing support on Windows.
     if isTargetWindows then
-        systemversion "10.0.14393.0"
+        systemversion "latest"
     else
         if enableXlib then
             defines { "SLANG_ENABLE_XLIB" }

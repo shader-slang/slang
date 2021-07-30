@@ -4999,11 +4999,9 @@ namespace Slang
         importedModulesList.add(moduleDecl);
         importedModulesSet.Add(moduleDecl);
 
-
-
         // Create a new sub-scope to wire the module
         // into our lookup chain.
-        auto subScope = new Scope();
+        auto subScope = getASTBuilder()->create<Scope>();
         subScope->containerDecl = moduleDecl;
 
         subScope->nextSibling = scope->nextSibling;
@@ -5049,7 +5047,7 @@ namespace Slang
         // Add the declarations from the imported module into the scope
         // that the `import` declaration is set to extend.
         //
-        importModuleIntoScope(scope.Ptr(), importedModuleDecl);
+        importModuleIntoScope(scope, importedModuleDecl);
 
         // Record the `import`ed module (and everything it depends on)
         // as a dependency of the module we are compiling.
@@ -5105,7 +5103,7 @@ namespace Slang
         // of entities than just namespaces.
         //
         auto scope = decl->scope;
-        auto subScope = new Scope();
+        auto subScope = getASTBuilder()->create<Scope>();
         subScope->containerDecl = namespaceDecl;
         subScope->nextSibling = scope->nextSibling;
         scope->nextSibling = subScope;

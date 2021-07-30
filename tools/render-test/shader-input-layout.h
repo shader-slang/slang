@@ -23,6 +23,7 @@ enum class ShaderInputType
     Object,
     Aggregate,
     Specialize,
+    AccelerationStructure,
 };
 
 enum class InputTextureContent
@@ -209,6 +210,14 @@ public:
 
         Slang::RefPtr<TextureVal> textureVal;
         Slang::RefPtr<SamplerVal> samplerVal;
+    };
+
+    class AccelerationStructureVal : public Val
+    {
+    public:
+        AccelerationStructureVal()
+            : Val(ShaderInputType::AccelerationStructure)
+        {}
     };
 
     struct Field

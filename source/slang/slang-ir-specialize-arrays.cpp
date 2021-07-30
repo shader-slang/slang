@@ -35,8 +35,9 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
         return false;
     }
 
-    bool doesParamNeedSpecialization(IRParam* param)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
     {
+        SLANG_UNUSED(arg);
         return isStructTypeWithArray(param->getDataType());
     }
 };

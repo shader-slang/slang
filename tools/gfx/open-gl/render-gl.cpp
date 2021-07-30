@@ -1257,7 +1257,7 @@ public:
             bufferDesc.defaultState = ResourceState::ConstantBuffer;
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
             SLANG_RETURN_ON_FAIL(
                 device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
@@ -2502,6 +2502,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureView(
     viewImpl->m_textureID = resourceImpl->m_handle;
     viewImpl->type = ResourceViewImpl::Type::Texture;
     viewImpl->m_target = resourceImpl->m_target;
+    viewImpl->m_desc = desc;
+
     if (desc.type == IResourceView::Type::ShaderResource)
     {
         viewImpl->access = GL_READ_ONLY;
@@ -2532,6 +2534,8 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
     viewImpl->type = ResourceViewImpl::Type::Buffer;
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_bufferID = resourceImpl->m_handle;
+    viewImpl->m_desc = desc;
+
     returnComPtr(outView, viewImpl);
     return SLANG_OK;
 }

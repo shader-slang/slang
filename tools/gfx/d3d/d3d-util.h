@@ -17,6 +17,15 @@
 #include <dxgi.h>
 #include <d3d12.h>
 
+#if defined(__ID3D12Device5_FWD_DEFINED__) && defined(__ID3D12GraphicsCommandList4_FWD_DEFINED__)
+#    define SLANG_GFX_HAS_DXR_SUPPORT 1
+#else
+#    define SLANG_GFX_HAS_DXR_SUPPORT 0
+typedef ISlangUnknown ID3D12Device5;
+typedef ISlangUnknown ID3D12GraphicsCommandList4;
+
+#endif
+
 namespace gfx {
 
 class D3DUtil
@@ -87,4 +96,22 @@ class D3DUtil
 
 };
 
+#if SLANG_GFX_HAS_DXR_SUPPORT
+struct D3DAccelerationStructureInputsBuilder
+{
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS desc = {};
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = {};
+    Slang::List<D3D12_RAYTRACING_GEOMETRY_DESC> geomDescs;
+    Slang::Result build(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IDebugCallback* callback);
+
+private:
+    D3D12_RAYTRACING_GEOMETRY_FLAGS translateGeometryFlags(
+        IAccelerationStructure::GeometryFlags::Enum flags)
+    {
+        return (D3D12_RAYTRACING_GEOMETRY_FLAGS)flags;
+    }
+};
+#endif
 } // renderer_test

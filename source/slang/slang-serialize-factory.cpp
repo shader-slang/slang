@@ -49,8 +49,8 @@ void* DefaultSerialObjectFactory::create(SerialTypeKind typeKind, SerialSubType 
 
 SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const RefObject* inPtr)
 {
-    // We don't serialize Module or Scope
-    if (as<Module>(inPtr) || as<Scope>(inPtr))
+    // We don't serialize Module
+    if (as<Module>(inPtr))
     {
         writer->setPointerIndex(inPtr, SerialIndex(0));
         return SerialIndex(0);
@@ -64,6 +64,13 @@ SerialIndex ModuleSerialFilter::writePointer(SerialWriter* writer, const NodeBas
 {
     NodeBase* ptr = const_cast<NodeBase*>(inPtr);
     SLANG_ASSERT(ptr);
+
+    // We don't serialize Scope
+    if (as<Scope>(ptr))
+    {
+        writer->setPointerIndex(inPtr, SerialIndex(0));
+        return SerialIndex(0);
+    }
 
     if (Decl* decl = as<Decl>(ptr))
     {

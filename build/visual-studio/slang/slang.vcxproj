@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -29,25 +29,25 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -257,6 +257,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-arrays.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dispatch.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-function-call.h" />
@@ -382,6 +383,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-arrays.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-buffer-load-arg.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dispatch.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-dynamic-associatedtype-lookup.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-function-call.cpp" />

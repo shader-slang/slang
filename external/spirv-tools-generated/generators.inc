@@ -26,3 +26,6 @@
 {25, "Netease Games", "Messiah Shader Compiler", "Netease Games Messiah Shader Compiler"},
 {26, "Xenia", "Xenia Emulator Microcode Translator", "Xenia Xenia Emulator Microcode Translator"},
 {27, "Embark Studios", "Rust GPU Compiler Backend", "Embark Studios Rust GPU Compiler Backend"},
+{28, "gfx-rs community", "Naga", "gfx-rs community Naga"},
+{29, "Mikkosoft Productions", "MSP Shader Compiler", "Mikkosoft Productions MSP Shader Compiler"},
+{30, "SpvGenTwo community", "SpvGenTwo SPIR-V IR Tools", "SpvGenTwo community SpvGenTwo SPIR-V IR Tools"},

@@ -34,7 +34,7 @@ Result loadShaderProgram(
     ComPtr<gfx::IShaderProgram>& outShaderProgram,
     slang::ProgramLayout*& slangReflection)
 {
-    // We need to obatin a compilation session (`slang::ISession`) that will provide
+    // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
     //
     // Our example application uses the `gfx` graphics API abstraction layer, which already
@@ -171,7 +171,7 @@ int main()
         ResourceState::CopyDestination,
         ResourceState::CopySource);
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
-    bufferDesc.cpuAccessFlags = IResource::AccessFlag::Write | IResource::AccessFlag::Read;
+    bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
 
     ComPtr<gfx::IBufferResource> numbersBuffer;
     SLANG_RETURN_ON_FAIL(device->createBufferResource(

@@ -260,6 +260,11 @@ SlangResult GlslangDownstreamCompiler::disassemble(SlangCompileTarget sourceBlob
     // isn't going to be distributed with the shader compiler. 
     ComPtr<ISlangSharedLibrary> pthreadLibrary;
     DefaultSharedLibraryLoader::load(loader, path, "pthread", pthreadLibrary.writeRef());
+    if (!pthreadLibrary.get())
+    {
+        DefaultSharedLibraryLoader::load(loader, path, "libpthread.so.0", pthreadLibrary.writeRef());
+    }
+
 #endif
 
     SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "slang-glslang", library));

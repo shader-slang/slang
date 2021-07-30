@@ -10,6 +10,7 @@
 #include "../d3d/d3d-swapchain.h"
 #include "core/slang-blob.h"
 #include "core/slang-basic.h"
+#include "core/slang-chunked-list.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -147,6 +148,17 @@ public:
 
     ~D3D12Device();
 
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(
+        const IAccelerationStructure::BuildInputs& buildInputs,
+        IAccelerationStructure::PrebuildInfo* outPrebuildInfo) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
+        const IAccelerationStructure::CreateDesc& desc,
+        IAccelerationStructure** outView) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc, IPipelineState** outState) override;
+#endif
+
 public:
     
     static const Int kMaxNumRenderFrames = 4;
@@ -170,6 +182,7 @@ public:
         bool m_isWarp;
         ComPtr<IDXGIFactory> m_dxgiFactory;
         ComPtr<ID3D12Device> m_device;
+        ComPtr<ID3D12Device5> m_device5;
         ComPtr<IDXGIAdapter> m_adapter;
         DXGI_ADAPTER_DESC m_desc;
         DXGI_ADAPTER_DESC1 m_desc1;
@@ -181,6 +194,7 @@ public:
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
         virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
         virtual void setRootConstants(Index rootParamIndex, Index dstOffsetIn32BitValues, Index countOf32BitValues, void const* srcData) = 0;
+        virtual void setPipelineState(PipelineStateBase* pipelineState) = 0;
     };
 
     class BufferResourceImpl: public gfx::BufferResource
@@ -240,16 +254,20 @@ public:
         }
     };
 
-    class ResourceViewImpl : public ResourceViewBase
+    class ResourceViewInternalImpl
+    {
+    public:
+        D3D12Descriptor m_descriptor;
+        RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
+        ~ResourceViewInternalImpl() { m_allocator->free(m_descriptor); }
+    };
+
+    class ResourceViewImpl
+        : public ResourceViewBase
+        , public ResourceViewInternalImpl
     {
     public:
         RefPtr<Resource> m_resource;
-        D3D12Descriptor m_descriptor;
-        RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
-        ~ResourceViewImpl()
-        {
-            m_allocator->free(m_descriptor);
-        }
     };
 
     class FramebufferLayoutImpl : public FramebufferLayoutBase
@@ -324,6 +342,31 @@ public:
         }
     };
 
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    class RayTracingPipelineStateImpl : public PipelineStateBase
+    {
+    public:
+        ComPtr<ID3D12StateObject> m_stateObject;
+        D3D12_DISPATCH_RAYS_DESC m_dispatchDesc = {};
+        Dictionary<String, int32_t> m_mapRayGenShaderNameToShaderTableIndex;
+        // Shader Tables for each ray-tracing stage stored in GPU memory.
+        RefPtr<BufferResourceImpl> m_rayGenShaderTable;
+        RefPtr<BufferResourceImpl> m_hitgroupShaderTable;
+        RefPtr<BufferResourceImpl> m_missShaderTable;
+        void init(const RayTracingPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::RayTracing;
+            pipelineDesc.rayTracing = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        Result createShaderTables(
+            D3D12Device* device,
+            slang::IComponentType* slangProgram,
+            const RayTracingPipelineStateDesc& desc);
+    };
+#endif
+
     class QueryPoolImpl : public IQueryPool, public ComObject
     {
     public:
@@ -374,6 +417,48 @@ public:
         UINT64 m_eventValue = 0;
     };
 
+    /// Implements the IQueryPool interface with a plain buffer.
+    /// Used for query types that does not correspond to a D3D query,
+    /// such as ray-tracing acceleration structure post-build info.
+    class PlainBufferProxyQueryPoolImpl
+        : public IQueryPool
+        , public ComObject
+    {
+    public:
+        SLANG_COM_OBJECT_IUNKNOWN_ALL
+        IQueryPool* getInterface(const Guid& guid)
+        {
+            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+                return static_cast<IQueryPool*>(this);
+            return nullptr;
+        }
+
+    public:
+        Result init(const IQueryPool::Desc& desc, D3D12Device* device, uint32_t stride);
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) override
+        {
+            ComPtr<ISlangBlob> blob;
+            SLANG_RETURN_ON_FAIL(m_device->readBufferResource(
+                m_bufferResource, m_stride * queryIndex, m_stride * count,
+                blob.writeRef()));
+            for (Int i = 0; i < count; i++)
+            {
+                memcpy(
+                    data + i,
+                    (uint8_t*)blob->getBufferPointer() + m_stride * i,
+                    sizeof(uint64_t));
+            }
+            return SLANG_OK;
+        }
+    public:
+        QueryType m_queryType;
+        RefPtr<BufferResourceImpl> m_bufferResource;
+        RefPtr<D3D12Device> m_device;
+        uint32_t m_stride = 0;
+    };
+
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
@@ -402,6 +487,11 @@ public:
             void const* srcData) override
         {
             m_commandList->SetGraphicsRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
+        }
+        virtual void setPipelineState(PipelineStateBase* pipeline) override
+        {
+            auto pipelineImpl = static_cast<PipelineStateImpl*>(pipeline);
+            m_commandList->SetPipelineState(pipelineImpl->m_pipelineState.get());
         }
 
         GraphicsSubmitter(ID3D12GraphicsCommandList* commandList):
@@ -434,7 +524,11 @@ public:
         {
             m_commandList->SetComputeRoot32BitConstants(UINT(rootParamIndex), UINT(countOf32BitValues), srcData, UINT(dstOffsetIn32BitValues));
         }
-
+        virtual void setPipelineState(PipelineStateBase* pipeline) override
+        {
+            auto pipelineImpl = static_cast<PipelineStateImpl*>(pipeline);
+            m_commandList->SetPipelineState(pipelineImpl->m_pipelineState.get());
+        }
         ComputeSubmitter(ID3D12GraphicsCommandList* commandList) :
             m_commandList(commandList)
         {
@@ -510,6 +604,7 @@ public:
         {
             uint64_t waitValue;
             HANDLE fenceEvent;
+            ID3D12Fence* fence = nullptr;
         };
         ShortList<QueueWaitInfo, 4> m_waitInfos;
 
@@ -527,7 +622,7 @@ public:
                 m_waitInfos[i].fenceEvent = CreateEventEx(
                     nullptr,
                     false,
-                    CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
+                    0,
                     EVENT_ALL_ACCESS);
             }
             return m_waitInfos[queueIndex];
@@ -578,7 +673,7 @@ public:
                 bufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
                 bufferDesc.sizeInBytes = desc.constantBufferSize;
-                bufferDesc.cpuAccessFlags |= IResource::AccessFlag::Write;
+                bufferDesc.cpuAccessFlags |= AccessFlag::Write;
                 SLANG_RETURN_ON_FAIL(device->createBufferResource(
                     bufferDesc,
                     nullptr,
@@ -608,7 +703,7 @@ public:
         ID3D12GraphicsCommandList* m_d3dCmdList;
         ID3D12GraphicsCommandList* m_preCmdList = nullptr;
 
-        RefPtr<PipelineStateImpl> m_currentPipeline;
+        RefPtr<PipelineStateBase> m_currentPipeline;
 
         static int getBindPointIndex(PipelineType type)
         {
@@ -632,13 +727,14 @@ public:
             m_d3dCmdList = m_commandBuffer->m_cmdList;
             m_renderer = commandBuffer->m_renderer;
             m_transientHeap = commandBuffer->m_transientHeap;
+            m_device = commandBuffer->m_renderer->m_device;
         }
 
         void endEncodingImpl() { m_isOpen = false; }
 
         Result bindPipelineImpl(IPipelineState* pipelineState, IShaderObject** outRootObject)
         {
-            m_currentPipeline = static_cast<PipelineStateImpl*>(pipelineState);
+            m_currentPipeline = static_cast<PipelineStateBase*>(pipelineState);
             auto rootObject = &m_commandBuffer->m_rootShaderObject;
             SLANG_RETURN_ON_FAIL(rootObject->reset(
                 m_renderer,
@@ -649,7 +745,11 @@ public:
             return SLANG_OK;
         }
 
-        Result _bindRenderState(Submitter* submitter);
+        /// Specializes the pipeline according to current root-object argument values,
+        /// applys the root object bindings and binds the pipeline state.
+        /// The newly specialized pipeline is held alive by the pipeline cache so users of
+        /// `newPipeline` do not need to maintain its lifespan.
+        Result _bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline);
     };
 
     struct DescriptorTable
@@ -1315,6 +1415,7 @@ public:
                 case slang::BindingType::RawBuffer:
                 case slang::BindingType::Texture:
                 case slang::BindingType::TypedBuffer:
+                case slang::BindingType::RayTracingAccelerationStructure:
                     *outType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                     return SLANG_OK;
                 case slang::BindingType::MutableRawBuffer:
@@ -1691,219 +1792,6 @@ public:
 //                addPendingResourceBindingRanges(typeLayout, physicalDescriptorSetIndex, pendingOffset);
             }
 
-#if 0
-                /// Add child parameter blocks defined in `typeLayout` to the root signature.
-            void addParameterBlocks(
-                slang::TypeLayoutReflection*        typeLayout,
-                Index                               physicalDescriptorSetIndex,
-                BindingRegisterOffsetPair const&    offset)
-            {
-                Index subObjectCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectCount;
-                     subObjectRangeIndex++)
-                {
-                    // There are a few different concerns being tackled at once here, which depend
-                    // on the type of each sub-object range.
-                    //
-                    auto bindingRangeIndex =
-                        typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ConstantBuffer:
-                        {
-                            // We also need to recurse into the element type of the constant buffer to add
-                            // any binding ranges defined in the element type.
-                            auto subObjectType =
-                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto spaceOffset = (uint32_t)typeLayout->getSubObjectRangeSpaceOffset(subObjectRangeIndex);
-
-                            BindingRegisterOffsetPair subOffset;
-                            subOffset.primary.spaceOffset = offset.primary.spaceOffset + spaceOffset;
-                            subOffset.pending.spaceOffset = offset.pending.spaceOffset + spaceOffset;
-                            addParameterBlocks(
-                                _unwrapParameterGroups(subObjectType),
-                                physicalDescriptorSetIndex,
-                                subOffset);
-                        }
-                        break;
-
-                    case slang::BindingType::ParameterBlock:
-                        {
-                            // A parameter block (`ParameterBlock<ConcreteType>`) will always map to
-                            // a distinct descriptor set, and its contained view/sampler binding
-                            // ranges will be bound through that set.
-                            //
-                            auto blockPhysicalDescriptorSetIndex = addDescriptorSet();
-
-                            // We will need to recursively add the binding ranges implied by the
-                            // type of the parameter block.
-                            //
-                            auto blockTypeLayout =
-                                typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            
-                            // One important detail is that the `blockTypeLayout` does not know the
-                            // base register space that the contents of the block should use. All
-                            // descriptor ranges stored in that layout will by default use a space
-                            // offset of zero.
-                            //
-                            // We need to compute the space offset to apply when recursing into that
-                            // block type based on the binding range we are processing here.
-                            //
-                            auto spaceOffset =
-                                typeLayout->getSubObjectRangeSpaceOffset(subObjectRangeIndex);
-                            // The space offset for this binding range should be added to any
-                            // additional space offset that was being passed down from above this
-                            // layer.
-                            //
-                            // Any other offset information (register offsets) should be ignored at
-                            // this point, because `register` offsets from outside of the block
-                            // don't affect layout within the block.
-                            //
-                            BindingRegisterOffsetPair blockOffset;
-                            blockOffset.primary.spaceOffset = offset.primary.spaceOffset + (uint32_t)spaceOffset;
-                            blockOffset.pending.spaceOffset = offset.pending.spaceOffset + (uint32_t)spaceOffset;
-
-                            // Note: there is an important subtlety going on here. We are passing in
-                            // the type `blockTypeLayout` which corresponds to
-                            // `ParameterBlock<ConcreteType>` and *not* to `ConcreteType` alone.
-                            // We call `_unwrapParameterGroups` on `blockTypeLayout` get the layout
-                            // for the element type.
-                            auto elementLayout = _unwrapParameterGroups(blockTypeLayout);
-
-                            // If the element type requires constant buffer storage, add an
-                            // implicit constant buffer descriptor in descriptor set.
-                            if (elementLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM) != 0)
-                            {
-                                addDescriptorRange(
-                                    blockPhysicalDescriptorSetIndex,
-                                    D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
-                                    0,
-                                    blockOffset.primary.spaceOffset,
-                                    1);
-                                blockOffset.primary.offsetForRangeType[D3D12_DESCRIPTOR_RANGE_TYPE_CBV] = 1;
-                            }
-
-                            // Once we have all the details worked out, we can write the binding
-                            // ranges for the block's type into the newly-allocated descriptor set.
-                            //
-                            addAsConstantBuffer(
-                                elementLayout, blockPhysicalDescriptorSetIndex, blockOffset);
-                        }
-                        break;
-
-                    case slang::BindingType::ExistentialValue:
-                        // TODO: Need to handle this case here.
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-
-//                addPendingParameterBlocks(typeLayout, physicalDescriptorSetIndex, offset);
-            }
-#endif
-
-#if 0
-            void addPendingResourceBindingRanges(
-                slang::TypeLayoutReflection* typeLayout,
-                Index physicalDescriptorSetIndex,
-                BindingRegisterOffsetPair const& offset)
-            {
-                Index subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; subObjectRangeIndex++)
-                {
-                    auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ExistentialValue:
-                        {
-                            // Any nested binding ranges in the sub-object will "leak" into the
-                            // binding ranges for the surrounding context.
-                            //
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto specializedTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                            if(specializedTypeLayout)
-                            {
-                                // TODO: We need to compute the offsets that should be applied to
-                                // any resources bound via the sub-object.
-                                BindingRegisterOffsetPair subOffset = offset;
-                                subOffset.primary += BindingRegisterOffset(typeLayout->getSubObjectRangePendingDataOffset(subObjectRangeIndex));
-
-                                addResourceBindingRanges(specializedTypeLayout, physicalDescriptorSetIndex, subOffset);
-                            }
-                        }
-                        break;
-
-                    case slang::BindingType::ConstantBuffer:
-                        {
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto elementTypeLayout = subObjectTypeLayout->getElementTypeLayout();
-                            SLANG_ASSERT(elementTypeLayout);
-
-                            BindingRegisterOffsetPair subOffset = offset;
-                            subOffset.primary += BindingRegisterOffset(typeLayout->getSubObjectRangePendingDataOffset(subObjectRangeIndex));
-
-                            addPendingResourceBindingRanges(elementTypeLayout, physicalDescriptorSetIndex, subOffset);
-                        }
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-            }
-#endif
-
-#if 0
-            void addPendingParameterBlocks(
-                slang::TypeLayoutReflection* typeLayout,
-                Index physicalDescriptorSetIndex,
-                BindingRegisterOffset const& offset)
-            {
-                Index subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-                for (Index subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; subObjectRangeIndex++)
-                {
-                    auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
-                    auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-                    switch (bindingType)
-                    {
-                    case slang::BindingType::ExistentialValue:
-                        {
-                            // Any nested binding ranges in the sub-object will "leak" into the
-                            // binding ranges for the surrounding context.
-                            //
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            auto pendingTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                            if(pendingTypeLayout)
-                            {
-                                // TODO: We need to compute the offsets that should be applied to
-                                // any resources bound via the sub-object.
-                                BindingRegisterOffset subOffset = offset;
-
-                                addParameterBlocks(pendingTypeLayout, physicalDescriptorSetIndex, subOffset);
-                            }
-                        }
-                        break;
-
-                    case slang::BindingType::ConstantBuffer:
-                    case slang::BindingType::ParameterBlock:
-                        {
-                            auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-                            BindingRegisterOffset subOffset = offset;
-                            addPendingParameterBlocks(subObjectTypeLayout, physicalDescriptorSetIndex, subOffset);
-                        }
-                        break;
-
-                    default:
-                        break;
-                    }
-                }
-            }
-#endif
-
             D3D12_ROOT_SIGNATURE_DESC& build()
             {
                 for (Index i = 0; i < m_descriptorSets.getCount(); i++)
@@ -2094,13 +1982,17 @@ public:
 //        List<DescriptorSetInfo> m_gpuDescriptorSetInfos;
     };
 
+    struct ShaderBinary
+    {
+        SlangStage stage;
+        List<uint8_t> code;
+    };
+
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
         PipelineType m_pipelineType;
-        List<uint8_t> m_vertexShader;
-        List<uint8_t> m_pixelShader;
-        List<uint8_t> m_computeShader;
+        List<ShaderBinary> m_shaders;
         RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     };
 
@@ -2168,30 +2060,7 @@ public:
         }
 
         SLANG_NO_THROW Result SLANG_MCALL
-            setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE
-        {
-            if (offset.bindingRangeIndex < 0)
-                return SLANG_E_INVALID_ARG;
-            auto layout = getLayout();
-            if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
-                return SLANG_E_INVALID_ARG;
-
-            auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
-
-            auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
-            auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-            // Hold a reference to the resource to prevent its destruction.
-            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] =
-                resourceViewImpl->m_resource;
-            ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
-            d3dDevice->CopyDescriptorsSimple(
-                1,
-                m_descriptorSet.resourceTable.getCpuHandle(
-                    bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
-                resourceViewImpl->m_descriptor.cpuHandle,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-            return SLANG_OK;
-        }
+            setResource(ShaderOffset const& offset, IResourceView* resourceView) SLANG_OVERRIDE;
 
         SLANG_NO_THROW Result SLANG_MCALL
             setSampler(ShaderOffset const& offset, ISamplerState* sampler) SLANG_OVERRIDE
@@ -3070,6 +2939,8 @@ public:
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
+        ComPtr<ID3D12GraphicsCommandList4> m_cmdList4;
+
         BreakableReference<TransientResourceHeapImpl> m_transientHeap;
         // Weak reference is fine here since `m_transientHeap` already holds strong reference to
         // device.
@@ -3091,27 +2962,16 @@ public:
             };
             m_cmdList->SetDescriptorHeaps(SLANG_COUNT_OF(heaps), heaps);
             m_rootShaderObject.init(renderer);
+
+#if SLANG_GFX_HAS_DXR_SUPPORT
+            m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
+#endif
         }
 
         class RenderCommandEncoderImpl
             : public IRenderCommandEncoder
             , public PipelineCommandEncoder
         {
-        public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IRenderCommandEncoder)
-                {
-                    *outObject = static_cast<IRenderCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
         public:
             RefPtr<RenderPassLayoutImpl> m_renderPass;
             RefPtr<FramebufferImpl> m_framebuffer;
@@ -3138,7 +2998,6 @@ public:
             {
                 PipelineCommandEncoder::init(cmdBuffer);
                 m_preCmdList = nullptr;
-                m_device = renderer->m_device;
                 m_renderPass = renderPass;
                 m_framebuffer = framebuffer;
                 m_transientHeap = transientHeap;
@@ -3356,7 +3215,8 @@ public:
                 // Submit - setting for graphics
                 {
                     GraphicsSubmitter submitter(m_d3dCmdList);
-                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    RefPtr<PipelineStateBase> newPipeline;
+                    if(SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
                     {
                         assert(!"Failed to bind render state");
                     }
@@ -3481,22 +3341,6 @@ public:
             , public PipelineCommandEncoder
         {
         public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IComputeCommandEncoder)
-                {
-                    *outObject = static_cast<IComputeCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
-
-        public:
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
                 PipelineCommandEncoder::endEncodingImpl();
@@ -3512,7 +3356,6 @@ public:
             {
                 PipelineCommandEncoder::init(cmdBuffer);
                 m_preCmdList = nullptr;
-                m_device = renderer->m_device;
                 m_transientHeap = transientHeap;
                 m_currentPipeline = nullptr;
             }
@@ -3528,7 +3371,8 @@ public:
                 // Submit binding for compute
                 {
                     ComputeSubmitter submitter(m_d3dCmdList);
-                    if(SLANG_FAILED(_bindRenderState(&submitter)))
+                    RefPtr<PipelineStateBase> newPipeline;
+                    if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
                     {
                         assert(!"Failed to bind render state");
                     }
@@ -3547,22 +3391,6 @@ public:
 
         class ResourceCommandEncoderImpl : public IResourceCommandEncoder
         {
-        public:
-            virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-                queryInterface(SlangUUID const& uuid, void** outObject) override
-            {
-                if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ICommandEncoder ||
-                    uuid == GfxGUID::IID_IResourceCommandEncoder)
-                {
-                    *outObject = static_cast<IResourceCommandEncoder*>(this);
-                    return SLANG_OK;
-                }
-                *outObject = nullptr;
-                return SLANG_E_NO_INTERFACE;
-            }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() { return 1; }
-            virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() { return 1; }
-
         public:
             CommandBufferImpl* m_commandBuffer;
             void init(D3D12Device* renderer, CommandBufferImpl* commandBuffer)
@@ -3614,6 +3442,72 @@ public:
             m_resourceCommandEncoder.init(m_renderer, this);
             *outEncoder = &m_resourceCommandEncoder;
         }
+
+#if SLANG_GFX_HAS_DXR_SUPPORT
+        class RayTracingCommandEncoderImpl
+            : public IRayTracingCommandEncoder
+            , public PipelineCommandEncoder
+        {
+        public:
+            CommandBufferImpl* m_commandBuffer;
+            void init(D3D12Device* renderer, CommandBufferImpl* commandBuffer)
+            {
+                PipelineCommandEncoder::init(commandBuffer);
+                m_commandBuffer = commandBuffer;
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL buildAccelerationStructure(
+                const IAccelerationStructure::BuildDesc& desc,
+                int propertyQueryCount,
+                AccelerationStructureQueryDesc* queryDescs) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL copyAccelerationStructure(
+                IAccelerationStructure* dest,
+                IAccelerationStructure* src,
+                AccelerationStructureCopyMode mode) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL queryAccelerationStructureProperties(
+                int accelerationStructureCount,
+                IAccelerationStructure* const* accelerationStructures,
+                int queryCount,
+                AccelerationStructureQueryDesc* queryDescs) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL serializeAccelerationStructure(
+                DeviceAddress dest,
+                IAccelerationStructure* source) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL deserializeAccelerationStructure(
+                IAccelerationStructure* dest,
+                DeviceAddress source) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
+                int count,
+                IAccelerationStructure* const* structures,
+                AccessFlag::Enum sourceAccess,
+                AccessFlag::Enum destAccess) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
+                const char* rayGenShaderName,
+                int32_t width,
+                int32_t height,
+                int32_t depth) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                writeTimestamp(IQueryPool* pool, SlangInt index) override
+            {
+                static_cast<QueryPoolImpl*>(pool)->writeTimestamp(
+                    m_commandBuffer->m_cmdList, index);
+            }
+        };
+        RayTracingCommandEncoderImpl m_rayTracingCommandEncoder;
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            m_rayTracingCommandEncoder.init(m_renderer, this);
+            *outEncoder = &m_rayTracingCommandEncoder;
+        }
+#else
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override
+        {
+            *outEncoder = nullptr;
+        }
+#endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
     };
@@ -3691,8 +3585,7 @@ public:
                 auto transientHeap = cmdImpl->m_transientHeap;
                 auto& waitInfo = transientHeap->getQueueWaitInfo(m_queueIndex);
                 waitInfo.waitValue = m_fenceValue;
-                ResetEvent(waitInfo.fenceEvent);
-                m_fence->SetEventOnCompletion(m_fenceValue, waitInfo.fenceEvent);
+                waitInfo.fence = m_fence;
             }
             m_d3dQueue->Signal(m_fence, m_fenceValue);
             ResetEvent(globalWaitHandle);
@@ -3851,6 +3744,7 @@ public:
 
     DeviceInfo m_deviceInfo;
     ID3D12Device* m_device = nullptr;
+    ID3D12Device5* m_device5 = nullptr;
 
     VirtualObjectPool m_queueIndexAllocator;
 
@@ -3879,8 +3773,13 @@ SLANG_NO_THROW Result SLANG_MCALL D3D12Device::TransientResourceHeapImpl::synchr
     Array<HANDLE, 16> waitHandles;
     for (auto& waitInfo : m_waitInfos)
     {
-        if (waitInfo.waitValue != 0)
+        if (waitInfo.waitValue == 0)
+            continue;
+        if (waitInfo.fence)
+        {
+            waitInfo.fence->SetEventOnCompletion(waitInfo.waitValue, waitInfo.fenceEvent);
             waitHandles.add(waitInfo.fenceEvent);
+        }
     }
     WaitForMultipleObjects((DWORD)waitHandles.getCount(), waitHandles.getBuffer(), TRUE, INFINITE);
     m_viewHeap.deallocateAll();
@@ -3920,16 +3819,15 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
     return SLANG_OK;
 }
 
-Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter)
+Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline)
 {
-    RefPtr<PipelineStateBase> newPipeline;
     RootShaderObjectImpl* rootObjectImpl = &m_commandBuffer->m_rootShaderObject;
     m_renderer->maybeSpecializePipeline(m_currentPipeline, rootObjectImpl, newPipeline);
-    PipelineStateImpl* newPipelineImpl = static_cast<PipelineStateImpl*>(newPipeline.Ptr());
+    PipelineStateBase* newPipelineImpl = static_cast<PipelineStateBase*>(newPipeline.Ptr());
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
     auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
-    commandList->SetPipelineState(newPipelineImpl->m_pipelineState);
+    submitter->setPipelineState(newPipelineImpl);
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
     RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
     SLANG_RETURN_ON_FAIL(rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef()));
@@ -4325,11 +4223,6 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 
 Result D3D12Device::initialize(const Desc& desc)
 {
-    SLANG_RETURN_ON_FAIL(slangContext.initialize(
-        desc.slang,
-        SLANG_DXBC,
-        "sm_5_1",
-        makeArray(slang::PreprocessorMacroDesc{ "__D3D12__", "1" }).getView()));
 
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
 
@@ -4484,6 +4377,22 @@ Result D3D12Device::initialize(const Desc& desc)
                 auto minPrecisionSupport = options.MinPrecisionSupport;
             }
         }
+        // Check ray tracing support
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS5 options;
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(
+                    D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))))
+            {
+                if (options.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED)
+                {
+                    m_features.add("ray-tracing");
+                }
+                if (options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1)
+                {
+                    m_features.add("ray-query");
+                }
+            }
+        }
     }
 
     m_desc = desc;
@@ -4523,6 +4432,17 @@ Result D3D12Device::initialize(const Desc& desc)
         m_adapterName = String::fromWString(adapterDesc.Description);
         m_info.adapterName = m_adapterName.begin();
     }
+
+    // Initialize DXR interface.
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    m_device->QueryInterface<ID3D12Device5>(m_deviceInfo.m_device5.writeRef());
+    m_device5 = m_deviceInfo.m_device5.get();
+#endif
+    SLANG_RETURN_ON_FAIL(slangContext.initialize(
+        desc.slang,
+        m_device5 ? SLANG_DXIL : SLANG_DXBC,
+        m_device5 ? "sm_6_5" : "sm_5_1",
+        makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
     m_isInitialized = true;
     return SLANG_OK;
@@ -4581,6 +4501,7 @@ static D3D12_RESOURCE_FLAGS _calcResourceFlag(ResourceState state)
     case ResourceState::DepthWrite:
         return D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
     case ResourceState::UnorderedAccess:
+    case ResourceState::AccelerationStructure:
         return D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     default:
         return D3D12_RESOURCE_FLAG_NONE;
@@ -4985,7 +4906,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
-
+    viewImpl->m_desc = desc;
     switch (desc.type)
     {
     default:
@@ -5086,6 +5007,7 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
 
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
+    viewImpl->m_desc = desc;
 
     switch (desc.type)
     {
@@ -5365,25 +5287,12 @@ Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
                 (char*)diagnostics->getBufferPointer());
         }
         SLANG_RETURN_ON_FAIL(compileResult);
-        List<uint8_t>* shaderCodeDestBuffer = nullptr;
-        switch (stage)
-        {
-        case SLANG_STAGE_COMPUTE:
-            shaderCodeDestBuffer = &shaderProgram->m_computeShader;
-            break;
-        case SLANG_STAGE_VERTEX:
-            shaderCodeDestBuffer = &shaderProgram->m_vertexShader;
-            break;
-        case SLANG_STAGE_FRAGMENT:
-            shaderCodeDestBuffer = &shaderProgram->m_pixelShader;
-            break;
-        default:
-            SLANG_ASSERT(!"unsupported shader stage.");
-            return SLANG_FAIL;
-        }
-        shaderCodeDestBuffer->addRange(
+        ShaderBinary shaderBin;
+        shaderBin.stage = stage;
+        shaderBin.code.addRange(
             reinterpret_cast<const uint8_t*>(kernelCode->getBufferPointer()),
             (Index)kernelCode->getBufferSize());
+        shaderProgram->m_shaders.add(_Move(shaderBin));
     }
     returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;
@@ -5433,9 +5342,31 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
     D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 
     psoDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
-
-    psoDesc.VS = { programImpl->m_vertexShader.getBuffer(), SIZE_T(programImpl->m_vertexShader.getCount()) };
-    psoDesc.PS = { programImpl->m_pixelShader .getBuffer(), SIZE_T(programImpl->m_pixelShader .getCount()) };
+    for (auto& shaderBin : programImpl->m_shaders)
+    {
+        switch (shaderBin.stage)
+        {
+        case SLANG_STAGE_VERTEX:
+            psoDesc.VS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+            break;
+        case SLANG_STAGE_FRAGMENT:
+            psoDesc.PS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+            break;
+        case SLANG_STAGE_DOMAIN:
+            psoDesc.DS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+            break;
+        case SLANG_STAGE_HULL:
+            psoDesc.HS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+            break;
+        case SLANG_STAGE_GEOMETRY:
+            psoDesc.GS = { shaderBin.code.getBuffer(), SIZE_T(shaderBin.code.getCount()) };
+            break;
+        default:
+            getDebugCallback()->handleMessage(
+                DebugMessageType::Error, DebugMessageSource::Layer, "Unsupported shader stage.");
+            return SLANG_E_NOT_AVAILABLE;
+        }
+    }
 
     psoDesc.InputLayout = { inputLayoutImpl->m_elements.getBuffer(), UINT(inputLayoutImpl->m_elements.getCount()) };
     psoDesc.PrimitiveTopologyType = D3DUtil::getPrimitiveType(desc.primitiveType);
@@ -5546,8 +5477,8 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
         D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
         computeDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
         computeDesc.CS = {
-            programImpl->m_computeShader.getBuffer(),
-            SIZE_T(programImpl->m_computeShader.getCount())};
+            programImpl->m_shaders[0].code.getBuffer(),
+            SIZE_T(programImpl->m_shaders[0].code.getCount())};
 
 #ifdef GFX_NVAPI
         if (m_nvapi)
@@ -5661,11 +5592,591 @@ Result D3D12Device::QueryPoolImpl::init(const IQueryPool::Desc& desc, D3D12Devic
     return SLANG_OK;
 }
 
+Result D3D12Device::PlainBufferProxyQueryPoolImpl::init(
+    const IQueryPool::Desc& desc,
+    D3D12Device* device,
+    uint32_t stride)
+{
+    ComPtr<IBufferResource> bufferResource;
+    IBufferResource::Desc bufferDesc = {};
+    bufferDesc.defaultState = ResourceState::UnorderedAccess;
+    bufferDesc.elementSize = 0;
+    bufferDesc.type = IResource::Type::Buffer;
+    bufferDesc.sizeInBytes = desc.count * sizeof(uint64_t);
+    bufferDesc.format = Format::Unknown;
+    SLANG_RETURN_ON_FAIL(
+        device->createBufferResource(bufferDesc, nullptr, bufferResource.writeRef()));
+    m_bufferResource = static_cast<D3D12Device::BufferResourceImpl*>(bufferResource.get());
+    m_queryType = desc.type;
+    m_device = device;
+    m_stride = stride;
+    return SLANG_OK;
+}
+
 Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outState)
 {
-    RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
-    SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
-    returnComPtr(outState, queryPoolImpl);
+    switch (desc.type)
+    {
+    case QueryType::AccelerationStructureCompactedSize:
+    case QueryType::AccelerationStructureSerializedSize:
+        {
+            RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
+                new PlainBufferProxyQueryPoolImpl();
+            uint32_t stride = 8;
+            if (desc.type == QueryType::AccelerationStructureSerializedSize)
+                stride = 16;
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this, stride));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
+    default:
+        {
+            RefPtr<QueryPoolImpl> queryPoolImpl = new QueryPoolImpl();
+            SLANG_RETURN_ON_FAIL(queryPoolImpl->init(desc, this));
+            returnComPtr(outState, queryPoolImpl);
+            return SLANG_OK;
+        }
+    }   
+}
+
+#if SLANG_GFX_HAS_DXR_SUPPORT
+
+class D3D12AccelerationStructureImpl
+    : public AccelerationStructureBase
+    , public D3D12Device::ResourceViewInternalImpl
+{
+public:
+    RefPtr<D3D12Device::BufferResourceImpl> m_buffer;
+    uint64_t m_offset;
+    uint64_t m_size;
+    ComPtr<ID3D12Device5> m_device5;
+
+public:
+    virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
+    {
+        return m_buffer->getDeviceAddress() + m_offset;
+    }
+};
+
+Result D3D12Device::getAccelerationStructurePrebuildInfo(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IAccelerationStructure::PrebuildInfo* outPrebuildInfo)
+{
+    if (!m_device5)
+        return SLANG_E_NOT_AVAILABLE;
+    
+    D3DAccelerationStructureInputsBuilder inputsBuilder;
+    SLANG_RETURN_ON_FAIL(inputsBuilder.build(buildInputs, getDebugCallback()));
+
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo;
+    m_device5->GetRaytracingAccelerationStructurePrebuildInfo(&inputsBuilder.desc, &prebuildInfo);
+
+    outPrebuildInfo->resultDataMaxSize = prebuildInfo.ResultDataMaxSizeInBytes;
+    outPrebuildInfo->scratchDataSize = prebuildInfo.ScratchDataSizeInBytes;
+    outPrebuildInfo->updateScratchDataSize = prebuildInfo.UpdateScratchDataSizeInBytes;
+    return SLANG_OK;
+}
+
+Result D3D12Device::createAccelerationStructure(
+    const IAccelerationStructure::CreateDesc& desc,
+    IAccelerationStructure** outAS)
+{
+    RefPtr<D3D12AccelerationStructureImpl> result = new D3D12AccelerationStructureImpl();
+    result->m_device5 = m_device5;
+    result->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);
+    result->m_size = desc.size;
+    result->m_offset = desc.offset;
+    result->m_allocator = m_cpuViewHeap;
+    result->m_desc.type = IResourceView::Type::AccelerationStructure;
+    SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&result->m_descriptor));
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.RaytracingAccelerationStructure.Location =
+        result->m_buffer->getDeviceAddress()+ desc.offset;
+    m_device->CreateShaderResourceView(nullptr, &srvDesc, result->m_descriptor.cpuHandle);
+    returnComPtr(outAS, result);
+    return SLANG_OK;
+}
+
+void translatePostBuildInfoDescs(
+    int propertyQueryCount,
+    AccelerationStructureQueryDesc* queryDescs,
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC>& postBuildInfoDescs)
+{
+    postBuildInfoDescs.setCount(propertyQueryCount);
+    for (int i = 0; i < propertyQueryCount; i++)
+    {
+        switch (queryDescs[i].queryType)
+        {
+        case QueryType::AccelerationStructureCompactedSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        case QueryType::AccelerationStructureSerializedSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_SERIALIZATION_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        }
+    }
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::buildAccelerationStructure(
+    const IAccelerationStructure::BuildDesc& desc,
+    int propertyQueryCount,
+    AccelerationStructureQueryDesc* queryDescs)
+{
+    if (!m_commandBuffer->m_cmdList4)
+    {
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "Ray-tracing is not supported on current system.");
+        return;
+    }
+    D3D12AccelerationStructureImpl* destASImpl = nullptr;
+    if (desc.dest)
+        destASImpl = static_cast<D3D12AccelerationStructureImpl*>(desc.dest);
+    D3D12AccelerationStructureImpl* srcASImpl = nullptr;
+    if (desc.source)
+        srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(desc.source);
+    
+    D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC buildDesc = {};
+    buildDesc.DestAccelerationStructureData = destASImpl->getDeviceAddress();
+    buildDesc.SourceAccelerationStructureData = srcASImpl?srcASImpl->getDeviceAddress() : 0;
+    buildDesc.ScratchAccelerationStructureData = desc.scratchData;
+    D3DAccelerationStructureInputsBuilder builder;
+    builder.build(desc.inputs, getDebugCallback());
+    buildDesc.Inputs = builder.desc;
+
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC> postBuildInfoDescs;
+    translatePostBuildInfoDescs(propertyQueryCount, queryDescs, postBuildInfoDescs);
+    m_commandBuffer->m_cmdList4->BuildRaytracingAccelerationStructure(
+        &buildDesc, (UINT)propertyQueryCount, postBuildInfoDescs.getBuffer());
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::copyAccelerationStructure(
+    IAccelerationStructure* dest,
+    IAccelerationStructure* src,
+    AccelerationStructureCopyMode mode)
+{
+    auto destASImpl = static_cast<D3D12AccelerationStructureImpl*>(dest);
+    auto srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(src);
+    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE copyMode;
+    switch (mode)
+    {
+    case AccelerationStructureCopyMode::Clone:
+        copyMode = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_CLONE;
+        break;
+    case AccelerationStructureCopyMode::Compact:
+        copyMode = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_COMPACT;
+        break;
+    default:
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "Unsupported AccelerationStructureCopyMode.");
+        return;
+    }
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        destASImpl->getDeviceAddress(), srcASImpl->getDeviceAddress(), copyMode);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::
+    queryAccelerationStructureProperties(
+        int accelerationStructureCount,
+        IAccelerationStructure* const* accelerationStructures,
+        int queryCount,
+        AccelerationStructureQueryDesc* queryDescs)
+{
+    List<D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_DESC> postBuildInfoDescs;
+    List<DeviceAddress> asAddresses;
+    asAddresses.setCount(accelerationStructureCount);
+    for (int i = 0; i < accelerationStructureCount; i++)
+        asAddresses[i] = accelerationStructures[i]->getDeviceAddress();
+    translatePostBuildInfoDescs(queryCount, queryDescs, postBuildInfoDescs);
+    m_commandBuffer->m_cmdList4->EmitRaytracingAccelerationStructurePostbuildInfo(
+        postBuildInfoDescs.getBuffer(),
+        (UINT)accelerationStructureCount,
+        asAddresses.getBuffer());
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::serializeAccelerationStructure(
+    DeviceAddress dest,
+    IAccelerationStructure* src)
+{
+    auto srcASImpl = static_cast<D3D12AccelerationStructureImpl*>(src);
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        dest,
+        srcASImpl->getDeviceAddress(),
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_SERIALIZE);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::deserializeAccelerationStructure(
+    IAccelerationStructure* dest,
+    DeviceAddress source)
+{
+    auto destASImpl = static_cast<D3D12AccelerationStructureImpl*>(dest);
+    m_commandBuffer->m_cmdList4->CopyRaytracingAccelerationStructure(
+        dest->getDeviceAddress(),
+        source,
+        D3D12_RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE_DESERIALIZE);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::memoryBarrier(
+    int count,
+    IAccelerationStructure* const* structures,
+    AccessFlag::Enum sourceAccess,
+    AccessFlag::Enum destAccess)
+{
+    ShortList<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.setCount(count);
+    for (int i = 0; i < count; i++)
+    {
+        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+        barriers[i].UAV.pResource = static_cast<D3D12AccelerationStructureImpl*>(structures[i])
+                                        ->m_buffer->m_resource.getResource();
+    }
+    m_commandBuffer->m_cmdList4->ResourceBarrier((UINT)count, barriers.getArrayView().getBuffer());
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipeline(
+    IPipelineState* state, IShaderObject** outRootObject)
+{
+    bindPipelineImpl(state, outRootObject);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::dispatchRays(
+    const char* rayGenShaderName,
+    int32_t width,
+    int32_t height,
+    int32_t depth)
+{
+    RefPtr<PipelineStateBase> newPipeline;
+    PipelineStateBase* pipeline = m_currentPipeline.Ptr();
+    {
+        struct RayTracingSubmitter : public ComputeSubmitter
+        {
+            ID3D12GraphicsCommandList4* m_cmdList4;
+            RayTracingSubmitter(ID3D12GraphicsCommandList4* cmdList4)
+                : ComputeSubmitter(cmdList4), m_cmdList4(cmdList4)
+            {
+            }
+            virtual void setPipelineState(PipelineStateBase* pipeline) override
+            {
+                auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
+                m_cmdList4->SetPipelineState1(pipelineImpl->m_stateObject.get());
+            }
+        };
+        RayTracingSubmitter submitter(m_commandBuffer->m_cmdList4);
+        if (SLANG_FAILED(_bindRenderState(&submitter, newPipeline)))
+        {
+            assert(!"Failed to bind render state");
+        }
+        if (newPipeline)
+            pipeline = newPipeline.Ptr();
+    }
+    auto pipelineImpl = static_cast<RayTracingPipelineStateImpl*>(pipeline);
+    auto dispatchDesc = pipelineImpl->m_dispatchDesc;
+    int32_t rayGenShaderOffset = 0;
+    if (rayGenShaderName)
+    {
+        rayGenShaderOffset =
+            pipelineImpl->m_mapRayGenShaderNameToShaderTableIndex[rayGenShaderName].GetValue() *
+            D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+    }
+    dispatchDesc.RayGenerationShaderRecord.StartAddress += rayGenShaderOffset;
+    dispatchDesc.Width = (UINT)width;
+    dispatchDesc.Height = (UINT)height;
+    dispatchDesc.Depth = (UINT)depth;
+    m_commandBuffer->m_cmdList4->DispatchRays(&dispatchDesc);
+}
+
+Result D3D12Device::createRayTracingPipelineState(const RayTracingPipelineStateDesc& inDesc, IPipelineState** outState)
+{
+    if (!m_device5)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    RefPtr<RayTracingPipelineStateImpl> pipelineStateImpl = new RayTracingPipelineStateImpl();
+    pipelineStateImpl->init(inDesc);
+
+    auto program = static_cast<ShaderProgramImpl*>(inDesc.program);
+    auto slangProgram = program->slangProgram;
+    auto programLayout = slangProgram->getLayout();
+
+    if (!program->m_rootObjectLayout->m_rootSignature)
+    {
+        returnComPtr(outState, pipelineStateImpl);
+        return SLANG_OK;
+    }
+    List<D3D12_STATE_SUBOBJECT> subObjects;
+    ChunkedList<D3D12_DXIL_LIBRARY_DESC> dxilLibraries;
+    ChunkedList<D3D12_HIT_GROUP_DESC> hitGroups;
+    ChunkedList<ComPtr<ISlangBlob>> codeBlobs;
+    ComPtr<ISlangBlob> diagnostics;
+    ChunkedList<OSString> stringPool;
+    int32_t rayGenIndex = 0;
+    for (SlangUInt i = 0; i < programLayout->getEntryPointCount(); i++)
+    {
+        ComPtr<ISlangBlob> codeBlob;
+        auto compileResult =
+            slangProgram->getEntryPointCode(i, 0, codeBlob.writeRef(), diagnostics.writeRef());
+        if (diagnostics.get())
+        {
+            getDebugCallback()->handleMessage(
+                compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
+                DebugMessageSource::Slang,
+                (char*)diagnostics->getBufferPointer());
+        }
+        SLANG_RETURN_ON_FAIL(compileResult);
+        codeBlobs.add(codeBlob);
+        D3D12_DXIL_LIBRARY_DESC library = {};
+        library.DXILLibrary.BytecodeLength = codeBlob->getBufferSize();;
+        library.DXILLibrary.pShaderBytecode = codeBlob->getBufferPointer();
+
+        D3D12_STATE_SUBOBJECT dxilSubObject = {};
+        dxilSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY;
+        dxilSubObject.pDesc = dxilLibraries.add(library);
+        subObjects.add(dxilSubObject);
+
+        auto entryPointLayout = programLayout->getEntryPointByIndex(i);
+        switch (entryPointLayout->getStage())
+        {
+        case SLANG_STAGE_RAY_GENERATION:
+            pipelineStateImpl
+                ->m_mapRayGenShaderNameToShaderTableIndex[entryPointLayout->getName()] =
+                rayGenIndex;
+            rayGenIndex++;
+            break;
+        default:
+            break;
+        }
+    }
+    auto getWStr = [&](const char* name)
+    {
+        String str = String(name);
+        auto wstr = str.toWString();
+        return stringPool.add(wstr)->begin();
+    };
+    for (int i = 0; i < inDesc.hitGroupCount; i++)
+    {
+        auto hitGroup = inDesc.hitGroups[i];
+        D3D12_HIT_GROUP_DESC hitGroupDesc = {};
+        hitGroupDesc.Type = hitGroup.intersectionEntryPoint == nullptr
+                                ? D3D12_HIT_GROUP_TYPE_TRIANGLES
+                                : D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE;
+
+        if (hitGroup.anyHitEntryPoint)
+        {
+            hitGroupDesc.AnyHitShaderImport = getWStr(hitGroup.anyHitEntryPoint);
+        }
+        if (hitGroup.closestHitEntryPoint)
+        {
+            hitGroupDesc.ClosestHitShaderImport = getWStr(hitGroup.closestHitEntryPoint);
+        }
+        if (hitGroup.intersectionEntryPoint)
+        {
+            hitGroupDesc.IntersectionShaderImport = getWStr(hitGroup.intersectionEntryPoint);
+        }
+        StringBuilder hitGroupName;
+        hitGroupName << "hitgroup_" << i;
+        hitGroupDesc.HitGroupExport = getWStr(hitGroupName.ToString().getBuffer());
+
+        D3D12_STATE_SUBOBJECT hitGroupSubObject = {};
+        hitGroupSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_HIT_GROUP;
+        hitGroupSubObject.pDesc = hitGroups.add(hitGroupDesc);
+        subObjects.add(hitGroupSubObject);
+    }
+
+    D3D12_RAYTRACING_SHADER_CONFIG shaderConfig = {};
+    // According to DXR spec, fixed function triangle intersections must use float2 as ray attributes
+    // that defines the barycentric coordinates at intersection.
+    shaderConfig.MaxAttributeSizeInBytes = sizeof(float) * 2;
+    shaderConfig.MaxPayloadSizeInBytes = inDesc.maxRayPayloadSize;
+    D3D12_STATE_SUBOBJECT shaderConfigSubObject = {};
+    shaderConfigSubObject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_SHADER_CONFIG;
+    shaderConfigSubObject.pDesc = &shaderConfig;
+    subObjects.add(shaderConfigSubObject);
+
+    D3D12_GLOBAL_ROOT_SIGNATURE globalSignatureDesc = {};
+    globalSignatureDesc.pGlobalRootSignature = program->m_rootObjectLayout->m_rootSignature.get();
+    D3D12_STATE_SUBOBJECT globalSignatureSubobject = {};
+    globalSignatureSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE;
+    globalSignatureSubobject.pDesc = &globalSignatureDesc;
+    subObjects.add(globalSignatureSubobject);
+
+    D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
+    pipelineConfig.MaxTraceRecursionDepth = inDesc.maxRecursion;
+    D3D12_STATE_SUBOBJECT pipelineConfigSubobject = {};
+    pipelineConfigSubobject.Type = D3D12_STATE_SUBOBJECT_TYPE_RAYTRACING_PIPELINE_CONFIG;
+    pipelineConfigSubobject.pDesc = &pipelineConfig;
+    subObjects.add(pipelineConfigSubobject);
+
+    D3D12_STATE_OBJECT_DESC rtpsoDesc = {};
+    rtpsoDesc.Type = D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE;
+    rtpsoDesc.NumSubobjects = (UINT)subObjects.getCount();
+    rtpsoDesc.pSubobjects = subObjects.getBuffer();
+    SLANG_RETURN_ON_FAIL(m_device5->CreateStateObject(&rtpsoDesc, IID_PPV_ARGS(pipelineStateImpl->m_stateObject.writeRef())));
+
+    SLANG_RETURN_ON_FAIL(pipelineStateImpl->createShaderTables(this, slangProgram, inDesc));
+
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+Result D3D12Device::RayTracingPipelineStateImpl::createShaderTables(
+    D3D12Device* device,
+    slang::IComponentType* slangProgram,
+    const RayTracingPipelineStateDesc& desc)
+{
+    ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
+    m_stateObject->QueryInterface(stateObjectProperties.writeRef());
+    auto programLayout = slangProgram->getLayout();
+    struct ShaderIdentifier { uint32_t data[D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES / sizeof(uint32_t)]; };
+    List<ShaderIdentifier> rayGenIdentifiers, missIdentifiers, hitgroupIdentifiers;
+    for (SlangUInt i = 0; i < programLayout->getEntryPointCount(); i++)
+    {
+        auto entryPointLayout = programLayout->getEntryPointByIndex(i);
+        ShaderIdentifier identifier;
+        switch (entryPointLayout->getStage())
+        {
+        case SLANG_STAGE_RAY_GENERATION:
+            memcpy(
+                &identifier,
+                stateObjectProperties->GetShaderIdentifier(
+                    String(entryPointLayout->getName()).toWString().begin()),
+                sizeof(ShaderIdentifier));
+            rayGenIdentifiers.add(identifier);
+            break;
+        case SLANG_STAGE_MISS:
+            memcpy(
+                &identifier,
+                stateObjectProperties->GetShaderIdentifier(
+                    String(entryPointLayout->getName()).toWString().begin()),
+                sizeof(ShaderIdentifier));
+            missIdentifiers.add(identifier);
+            break;
+        default:
+            break;
+        }
+    }
+    for (int i = 0; i < desc.shaderTableHitGroupCount; i++)
+    {
+        StringBuilder hitgroupName;
+        hitgroupName << "hitgroup_" << desc.shaderTableHitGroupIndices[i];
+        ShaderIdentifier hitgroupIdentifier;
+        memcpy(
+            &hitgroupIdentifier,
+            stateObjectProperties->GetShaderIdentifier(hitgroupName.toWString().begin()),
+            sizeof(ShaderIdentifier));
+        hitgroupIdentifiers.add(hitgroupIdentifier);
+    }
+
+    auto createShaderTableResource = [&](ArrayView<ShaderIdentifier> content,
+                                         RefPtr<BufferResourceImpl>& outResource) -> Result
+    {
+        IBufferResource::Desc bufferDesc = {};
+        bufferDesc.type = IResource::Type::Buffer;
+        bufferDesc.defaultState = ResourceState::ShaderResource;
+        bufferDesc.allowedStates = ResourceStateSet(
+            ResourceState::CopySource,
+            ResourceState::UnorderedAccess,
+            ResourceState::ShaderResource);
+        bufferDesc.elementSize = 0;
+        bufferDesc.sizeInBytes = content.getCount() * sizeof(ShaderIdentifier);
+        bufferDesc.format = Format::Unknown;
+        ComPtr<IBufferResource> shaderTableResource;
+        SLANG_RETURN_ON_FAIL(device->createBufferResource(
+            bufferDesc, content.getBuffer(), shaderTableResource.writeRef()));
+        outResource = static_cast<BufferResourceImpl*>(shaderTableResource.get());
+        return SLANG_OK;
+    };
+
+    if (desc.shaderTableHitGroupCount)
+    {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(hitgroupIdentifiers.getArrayView(), m_hitgroupShaderTable));
+        m_dispatchDesc.HitGroupTable.SizeInBytes =
+            (uint64_t)(sizeof(ShaderIdentifier)) * desc.shaderTableHitGroupCount;
+        m_dispatchDesc.HitGroupTable.StrideInBytes = sizeof(ShaderIdentifier);
+        m_dispatchDesc.HitGroupTable.StartAddress = m_hitgroupShaderTable->getDeviceAddress();
+    }
+    if (rayGenIdentifiers.getCount())
+    {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(rayGenIdentifiers.getArrayView(), m_rayGenShaderTable));
+        m_dispatchDesc.RayGenerationShaderRecord.SizeInBytes = sizeof(ShaderIdentifier);
+        m_dispatchDesc.RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->getDeviceAddress();
+    }
+    if (missIdentifiers.getCount())
+    {
+        SLANG_RETURN_ON_FAIL(
+            createShaderTableResource(missIdentifiers.getArrayView(), m_missShaderTable));
+        m_dispatchDesc.MissShaderTable.SizeInBytes =
+            (uint64_t)(sizeof(ShaderIdentifier)) * missIdentifiers.getCount();
+        m_dispatchDesc.MissShaderTable.StrideInBytes = sizeof(ShaderIdentifier);
+        m_dispatchDesc.MissShaderTable.StartAddress = m_missShaderTable->getDeviceAddress();
+    }
+    return SLANG_OK;
+}
+
+#endif // SLANG_GFX_HAS_DXR_SUPPORT
+
+Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
+{
+    if (offset.bindingRangeIndex < 0)
+        return SLANG_E_INVALID_ARG;
+    auto layout = getLayout();
+    if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
+        return SLANG_E_INVALID_ARG;
+
+    auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+
+    ResourceViewInternalImpl* internalResourceView = nullptr;
+    switch (resourceView->getViewDesc()->type)
+    {
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    case IResourceView::Type::AccelerationStructure:
+        {
+            auto asImpl = static_cast<D3D12AccelerationStructureImpl*>(resourceView);
+            // Hold a reference to the resource to prevent its destruction.
+            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] = asImpl->m_buffer;
+            internalResourceView = asImpl;
+        }
+        break;
+#endif
+    default:
+        {
+            auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
+            // Hold a reference to the resource to prevent its destruction.
+            m_boundResources[bindingRange.baseIndex + offset.bindingArrayIndex] =
+                resourceViewImpl->m_resource;
+            internalResourceView = resourceViewImpl;
+        }
+        break;
+    }
+
+    auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
+    ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
+    d3dDevice->CopyDescriptorsSimple(
+        1,
+        m_descriptorSet.resourceTable.getCpuHandle(
+            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
+        internalResourceView->m_descriptor.cpuHandle,
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     return SLANG_OK;
 }
 

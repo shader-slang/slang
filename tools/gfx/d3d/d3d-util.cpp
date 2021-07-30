@@ -114,6 +114,8 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R_Float32:             return DXGI_FORMAT_R32_FLOAT;
         case Format::RGBA_Unorm_UInt8:      return DXGI_FORMAT_R8G8B8A8_UNORM;
         case Format::BGRA_Unorm_UInt8:      return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case Format::RGBA_Snorm_UInt16:     return DXGI_FORMAT_R16G16B16A16_SNORM;
+        case Format::RG_Snorm_UInt16:       return DXGI_FORMAT_R16G16_SNORM;
 
         case Format::RGBA_Float16:          return DXGI_FORMAT_R16G16B16A16_FLOAT;
         case Format::RG_Float16:            return DXGI_FORMAT_R16G16_FLOAT;
@@ -133,29 +135,33 @@ D3D12_RESOURCE_STATES D3DUtil::translateResourceState(ResourceState state)
 {
     switch (state)
     {
-    case gfx::ResourceState::Undefined:
+    case ResourceState::Undefined:
         return D3D12_RESOURCE_STATE_COMMON;
-    case gfx::ResourceState::ShaderResource:
+    case ResourceState::ShaderResource:
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    case gfx::ResourceState::UnorderedAccess:
+    case ResourceState::UnorderedAccess:
         return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    case gfx::ResourceState::RenderTarget:
+    case ResourceState::RenderTarget:
         return D3D12_RESOURCE_STATE_RENDER_TARGET;
-    case gfx::ResourceState::DepthRead:
+    case ResourceState::DepthRead:
         return D3D12_RESOURCE_STATE_DEPTH_READ;
-    case gfx::ResourceState::DepthWrite:
+    case ResourceState::DepthWrite:
         return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    case gfx::ResourceState::Present:
+    case ResourceState::Present:
         return D3D12_RESOURCE_STATE_PRESENT;
-    case gfx::ResourceState::CopySource:
+    case ResourceState::CopySource:
         return D3D12_RESOURCE_STATE_COPY_SOURCE;
-    case gfx::ResourceState::CopyDestination:
+    case ResourceState::CopyDestination:
         return D3D12_RESOURCE_STATE_COPY_DEST;
-    case gfx::ResourceState::ResolveSource:
+    case ResourceState::ResolveSource:
         return D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
-    case gfx::ResourceState::ResolveDestination:
+    case ResourceState::ResolveDestination:
         return D3D12_RESOURCE_STATE_RESOLVE_DEST;
+#if SLANG_GFX_HAS_DXR_SUPPORT
+    case ResourceState::AccelerationStructure:
+        return D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+#endif
     default:
         return D3D12_RESOURCE_STATE_COMMON;
     }
@@ -583,4 +589,67 @@ bool D3DUtil::isUAVBinding(slang::BindingType bindingType)
     return SLANG_OK;
 }
 
-} // renderer_test
+#if SLANG_GFX_HAS_DXR_SUPPORT
+Result D3DAccelerationStructureInputsBuilder::build(
+    const IAccelerationStructure::BuildInputs& buildInputs,
+    IDebugCallback* callback)
+{
+    if (buildInputs.geometryDescs)
+    {
+        geomDescs.setCount(buildInputs.descCount);
+        for (Index i = 0; i < geomDescs.getCount(); i++)
+        {
+            auto& inputGeomDesc = buildInputs.geometryDescs[i];
+            geomDescs[i].Flags = translateGeometryFlags(inputGeomDesc.flags);
+            switch (inputGeomDesc.type)
+            {
+            case IAccelerationStructure::GeometryType::Triangles:
+                geomDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+                geomDescs[i].Triangles.IndexBuffer = inputGeomDesc.content.triangles.indexData;
+                geomDescs[i].Triangles.IndexCount = inputGeomDesc.content.triangles.indexCount;
+                geomDescs[i].Triangles.IndexFormat =
+                    D3DUtil::getMapFormat(inputGeomDesc.content.triangles.indexFormat);
+                geomDescs[i].Triangles.Transform3x4 = inputGeomDesc.content.triangles.transform3x4;
+                geomDescs[i].Triangles.VertexBuffer.StartAddress =
+                    inputGeomDesc.content.triangles.vertexData;
+                geomDescs[i].Triangles.VertexBuffer.StrideInBytes =
+                    inputGeomDesc.content.triangles.vertexStride;
+                geomDescs[i].Triangles.VertexCount = inputGeomDesc.content.triangles.vertexCount;
+                geomDescs[i].Triangles.VertexFormat =
+                    D3DUtil::getMapFormat(inputGeomDesc.content.triangles.vertexFormat);
+                break;
+            case IAccelerationStructure::GeometryType::ProcedurePrimitives:
+                geomDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+                geomDescs[i].AABBs.AABBCount = inputGeomDesc.content.proceduralAABBs.count;
+                geomDescs[i].AABBs.AABBs.StartAddress = inputGeomDesc.content.proceduralAABBs.data;
+                geomDescs[i].AABBs.AABBs.StrideInBytes =
+                    inputGeomDesc.content.proceduralAABBs.stride;
+                break;
+            default:
+                callback->handleMessage(
+                    DebugMessageType::Error,
+                    DebugMessageSource::Layer,
+                    "invalid value of IAccelerationStructure::GeometryType.");
+                return SLANG_E_INVALID_ARG;
+            }
+        }
+    }
+    desc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+    desc.NumDescs = buildInputs.descCount;
+    switch (buildInputs.kind)
+    {
+    case IAccelerationStructure::Kind::TopLevel:
+        desc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+        desc.InstanceDescs = buildInputs.instanceDescs;
+        break;
+    case IAccelerationStructure::Kind::BottomLevel:
+        desc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+        desc.pGeometryDescs = geomDescs.getBuffer();
+        break;
+    }
+    desc.Flags = (D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS)buildInputs.flags;
+    return SLANG_OK;
+}
+#endif
+
+} // namespace gfx
