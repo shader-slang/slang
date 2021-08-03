@@ -286,6 +286,7 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(compileRequest, irModule);
         break;
 
+    case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
         break;
     }
