@@ -132,21 +132,18 @@ Any compilers not detected by the above logic are now now explicitly zeroed out.
 #   define SLANG_UNROLL
 #endif
 
-struct gfx_Renderer_0;
+struct gfx_Device_0;
 struct gfx_BufferResource_0;
 struct gfx_ShaderProgram_0;
-struct gfx_DescriptorSetLayout_0;
-struct gfx_PipelineLayout_0;
-struct gfx_DescriptorSet_0;
-struct gfx_BufferResource_0;
+struct gfx_ResourceView_0;
+struct gfx_TransientResourceHeap_0;
 struct gfx_PipelineState_0;
-struct gfx_CommandQueue_0;
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2);
-gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0);
-gfx_PipelineLayout_0* buildPipeline_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1);
-gfx_DescriptorSet_0* buildDescriptorSet_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1, gfx_BufferResource_0* _2);
-gfx_PipelineState_0* buildPipelineState_0(gfx_ShaderProgram_0* _0, gfx_Renderer_0* _1, gfx_PipelineLayout_0* _2);
-void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, uint32_t _4, uint32_t _5, uint32_t _6);
+
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0);
+gfx_TransientResourceHeap_0* buildTransientHeap_0(gfx_Device_0* _0);
+gfx_PipelineState_0* buildPipelineState_0(gfx_Device_0* _0, gfx_ShaderProgram_0* _1);
+gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1);
+void dispatchComputation_0(gfx_Device_0* _0, gfx_TransientResourceHeap_0* _1, gfx_PipelineState_0* _2, gfx_ResourceView_0* _3, uint32_t gridDimsX, uint32_t gridDimsY, uint32_t gridDimsZ);
 gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0);
 
 #endif

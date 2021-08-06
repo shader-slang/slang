@@ -3745,7 +3745,7 @@ namespace Slang
         parser->FillPosition(stmt);
         parser->ReadToken("__GPU_FOREACH");
         parser->ReadToken(TokenType::LParent);
-        stmt->renderer = parser->ParseArgExpr();
+        stmt->device = parser->ParseArgExpr();
         parser->ReadToken(TokenType::Comma);
         stmt->gridDims = parser->ParseArgExpr();
 

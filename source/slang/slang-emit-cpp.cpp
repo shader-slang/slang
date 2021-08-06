@@ -2710,22 +2710,20 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                         // Emit a wrapper function for calling the shader blob
                         m_writer->emit("void ");
                         m_writer->emit(entryPointName);
-                        m_writer->emit("_wrapper(gfx_Renderer_0* renderer, Vector<uint32_t, 3> gridDims, \n");
+                        m_writer->emit("_wrapper(gfx_Device_0* device, Vector<uint32_t, 3> gridDims, \n");
                         m_writer->emit("\tRWStructuredBuffer<float> buffer)\n{");
-                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(renderer, __");
+                       /* m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, __");
                         m_writer->emit(entryPointName);
                         m_writer->emit(", __");
                         m_writer->emit(entryPointName);
-                        m_writer->emit("Size);");
-                        m_writer->emit("\n\tgfx_DescriptorSetLayout_0* setLayout = buildDescriptorSetLayout_0(renderer);");
-                        m_writer->emit("\n\tgfx_PipelineLayout_0* pipelineLayout = buildPipeline_0(renderer, setLayout);");
-                        m_writer->emit("\n\tgfx_DescriptorSet_0* descriptorSet = ");
-                        m_writer->emit("buildDescriptorSet_0(renderer, setLayout, unconvertBuffer_0(buffer));");
+                        m_writer->emit("Size);");*/
+                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device);");
+                        m_writer->emit("\n\tgfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);");
                         m_writer->emit("\n\tgfx_PipelineState_0* pipelineState = ");
-                        m_writer->emit("buildPipelineState_0(shaderProgram, renderer, pipelineLayout);");
-
-                        m_writer->emit("\n\tdispatchComputation_0(renderer, pipelineState, pipelineLayout, ");
-                        m_writer->emit("descriptorSet, gridDims.x, gridDims.y, gridDims.z);");
+                        m_writer->emit("buildPipelineState_0(device, shaderProgram);");
+                        m_writer->emit("\n\tgfx_ResourceView_0* bufferView = createBufferView_0(device, unconvertBuffer_0(buffer));");
+                        m_writer->emit("\n\tdispatchComputation_0(device, transientHeap, pipelineState, ");
+                        m_writer->emit("bufferView, gridDims.x, gridDims.y, gridDims.z);");
                         m_writer->emit("\n}\n");
                     }
                 }

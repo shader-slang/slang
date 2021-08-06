@@ -1668,6 +1668,9 @@ static LegalVal legalizeInst(
         return legalizeConstruct(context, type);
     case kIROp_undefined:
         return LegalVal();
+    case kIROp_GpuForeach:
+        // This case should only happen when compiling for a target that does not support GpuForeach
+        return LegalVal();
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
