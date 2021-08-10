@@ -342,6 +342,9 @@ struct ResourceOutputSpecializationPass
         if(as<IRByteAddressBufferTypeBase>(type))
             return true;
 
+        if(as<IRSamplerStateTypeBase>(type))
+            return true;
+
         // TODO: more cases here?
 
         return false;
