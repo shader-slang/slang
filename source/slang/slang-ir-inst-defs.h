@@ -502,7 +502,13 @@ INST(GpuForeach, gpuForeach, 3, 0)
 INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
 
 // Wrapper for OptiX intrinsics used to load a single hit attribute
-INST(GetOptiXHitAttribute, getOptiXHitAttribute, 1, 0)
+// Takes two arguments: the type (either float or int), and the hit 
+// attribute index
+INST(GetOptiXHitAttribute, getOptiXHitAttribute, 2, 0)
+
+// Wrapper for OptiX intrinsics used to load shader binding table record data
+// using a pointer. 
+INST(GetOptiXSbtDataPtr, getOptiXSbtDataPointer, 0, 0)
 
 /* Decoration */
 
