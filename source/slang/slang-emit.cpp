@@ -467,7 +467,7 @@ Result linkAndOptimizeIR(
     //
     // TODO: We should consider whether there are cases that would require
     // iterating the passes as given here in order to achieve a fully
-    // specialized reuslt. If that is the case, we might consider implementing
+    // specialized result. If that is the case, we might consider implementing
     // a single combined pass that makes all of the relevant changes and
     // iterates to convergence.
     //
