@@ -1441,17 +1441,6 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::handleRequiredCapabilities(IRInst* inst)
-{
-    auto decoratedValue = inst;
-    while (auto specInst = as<IRSpecialize>(decoratedValue))
-    {
-        decoratedValue = getSpecializedValue(specInst);
-    }
-
-    handleRequiredCapabilitiesImpl(decoratedValue);
-}
-
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
@@ -2155,15 +2144,6 @@ void CLikeSourceEmitter::emitSemantics(IRInst* inst)
     emitSemanticsImpl(inst);
 }
 
-IRVarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
-{
-    auto decoration = var->findDecoration<IRLayoutDecoration>();
-    if (!decoration)
-        return nullptr;
-
-    return as<IRVarLayout>(decoration->getLayout());
-}
-
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
 {
     emitLayoutSemanticsImpl(inst, uniformSemanticSpelling);
@@ -2770,35 +2750,6 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     }
 
     emitType(type, name);
-}
-
-IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
-{
-    auto base = specInst->getBase();
-
-    // It is possible to have a `specialize(...)` where the first
-    // operand is also a `specialize(...)`, so that we need to
-    // look at what declaration is being specialized at the inner
-    // step to find the one being specialized at the outer step.
-    //
-    while(auto baseSpecialize = as<IRSpecialize>(base))
-    {
-        base = getSpecializedValue(baseSpecialize);
-    }
-
-    auto baseGeneric = as<IRGeneric>(base);
-    if (!baseGeneric)
-        return base;
-
-    auto lastBlock = baseGeneric->getLastBlock();
-    if (!lastBlock)
-        return base;
-
-    auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
-    if (!returnInst)
-        return base;
-
-    return returnInst->getVal();
 }
 
 void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)

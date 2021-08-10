@@ -5573,6 +5573,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
             deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+
             m_features.add("buffer-device-address");
         }
 
@@ -5606,6 +5607,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
+
     if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));

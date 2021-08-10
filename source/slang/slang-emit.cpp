@@ -902,6 +902,7 @@ SlangResult emitEntryPointsSourceFromIR(
 
 SlangResult emitSPIRVFromIR(
     BackEndCompileRequest*  compileRequest,
+    TargetRequest*          targetRequest,
     IRModule*               irModule,
     const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut);
@@ -933,11 +934,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    emitSPIRVFromIR(
-        compileRequest,
-        irModule,
-        irEntryPoints,
-        spirvOut);
+    emitSPIRVFromIR(compileRequest, targetRequest, irModule, irEntryPoints, spirvOut);
 
     return SLANG_OK;
 }

@@ -1100,6 +1100,11 @@ void TargetRequest::addCapability(CapabilityAtom capability)
     cookedCapabilities = CapabilitySet::makeEmpty();
 }
 
+void TargetRequest::setDirectSPIRVEmitMode()
+{
+    m_emitSPIRVDirectly = true;
+    cookedCapabilities.makeEmpty();
+}
 
 CapabilitySet TargetRequest::getTargetCaps()
 {
@@ -1131,9 +1136,18 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::GLSL:
     case CodeGenTarget::GLSL_Vulkan:
     case CodeGenTarget::GLSL_Vulkan_OneDesc:
+        atoms.add(CapabilityAtom::GLSL);
+        break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        atoms.add(CapabilityAtom::GLSL);
+        if (m_emitSPIRVDirectly)
+        {
+            atoms.add(CapabilityAtom::SPIRV_DIRECT);
+        }
+        else
+        {
+            atoms.add(CapabilityAtom::GLSL);
+        }
         break;
 
     case CodeGenTarget::HLSL:

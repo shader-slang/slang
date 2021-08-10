@@ -199,13 +199,15 @@ struct StructuredBuffer
         out uint numStructs,
         out uint stride);
 
-    __target_intrinsic(glsl, "$0._data[$1]") 
+    __target_intrinsic(glsl, "$0._data[$1]")
+    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
     T Load(int location);
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
+        __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
         get;
     };
 };
@@ -629,12 +631,14 @@ struct $(item.name)
     uint IncrementCounter();
 
     __target_intrinsic(glsl, "$0._data[$1]")
+    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
     T Load(int location);
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
+        __target_intrinsic(spirv_direct, "*StorageBuffer 65 resultType resultId _0 _1")
         ref;
     }
 };

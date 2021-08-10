@@ -1116,6 +1116,13 @@ struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }
 
+    bool hasAddressSpace() { return getOperandCount() > 1; }
+
+    IRIntegerValue getAddressSpace()
+    {
+        return getOperandCount() > 1 ? static_cast<IRIntLit*>(getOperand(1))->getValue() : -1;
+    }
+
     IR_PARENT_ISA(PtrTypeBase)
 };
 

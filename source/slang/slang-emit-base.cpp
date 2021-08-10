@@ -1,0 +1,55 @@
+#include "slang-emit-base.h"
+
+namespace Slang
+{
+
+IRInst* SourceEmitterBase::getSpecializedValue(IRSpecialize* specInst)
+{
+    auto base = specInst->getBase();
+
+    // It is possible to have a `specialize(...)` where the first
+    // operand is also a `specialize(...)`, so that we need to
+    // look at what declaration is being specialized at the inner
+    // step to find the one being specialized at the outer step.
+    //
+    while (auto baseSpecialize = as<IRSpecialize>(base))
+    {
+        base = getSpecializedValue(baseSpecialize);
+    }
+
+    auto baseGeneric = as<IRGeneric>(base);
+    if (!baseGeneric)
+        return base;
+
+    auto lastBlock = baseGeneric->getLastBlock();
+    if (!lastBlock)
+        return base;
+
+    auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
+    if (!returnInst)
+        return base;
+
+    return returnInst->getVal();
+}
+
+void SourceEmitterBase::handleRequiredCapabilities(IRInst* inst)
+{
+    auto decoratedValue = inst;
+    while (auto specInst = as<IRSpecialize>(decoratedValue))
+    {
+        decoratedValue = getSpecializedValue(specInst);
+    }
+
+    handleRequiredCapabilitiesImpl(decoratedValue);
+}
+
+IRVarLayout* SourceEmitterBase::getVarLayout(IRInst* var)
+{
+    auto decoration = var->findDecoration<IRLayoutDecoration>();
+    if (!decoration)
+        return nullptr;
+
+    return as<IRVarLayout>(decoration->getLayout());
+}
+
+}

@@ -1904,6 +1904,7 @@ struct IRBuilder
     IRInOutType*  getInOutType(IRType* valueType);
     IRRefType*  getRefType(IRType* valueType);
     IRPtrTypeBase*  getPtrType(IROp op, IRType* valueType);
+    IRPtrType* getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace);
 
     IRArrayTypeBase* getArrayTypeBase(
         IROp    op,
@@ -2733,6 +2734,14 @@ IRTargetSpecificDecoration* findBestTargetDecoration(
 IRTargetSpecificDecoration* findBestTargetDecoration(
         IRInst*         val,
         CapabilityAtom  targetCapabilityAtom);
+
+inline IRTargetIntrinsicDecoration* findBestTargetIntrinsicDecoration(
+    IRInst* inInst,
+    CapabilitySet const& targetCaps)
+{
+    return as<IRTargetIntrinsicDecoration>(findBestTargetDecoration(inInst, targetCaps));
+}
+
 
 }
 

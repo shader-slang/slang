@@ -1445,6 +1445,7 @@ namespace Slang
                 if (target == CodeGenTarget::SPIRV && compileRequest->shouldEmitSPIRVDirectly)
                 {
                     List<uint8_t> spirv;
+                    targetReq->setDirectSPIRVEmitMode();
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(compileRequest, entryPointIndices, targetReq, spirv));
                     auto spirvBlob = ListBlob::moveCreate(spirv);
                     downstreamResult = new BlobDownstreamCompileResult(DownstreamDiagnostics(), spirvBlob);
