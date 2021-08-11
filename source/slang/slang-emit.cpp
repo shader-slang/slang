@@ -459,6 +459,20 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
+    //
+    // After specialization of function outputs, we may find that there
+    // are cases where opaque-typed local variables can now be eliminated
+    // and turned into SSA temporaries. Such optimization may enable
+    // the following passes to "see" and specialize more cases.
+    //
+    // TODO: We should consider whether there are cases that will require
+    // iterating the passes as given here in order to achieve a fully
+    // specialized result. If that is the case, we might consider implementing
+    // a single combined pass that makes all of the relevant changes and
+    // iterates to convergence.
+    //
+    constructSSA(irModule);
+    //
     specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
