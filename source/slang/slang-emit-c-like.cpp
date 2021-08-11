@@ -540,19 +540,28 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
 
     for(auto c : name)
     {
-        // We will treat a dot character just like an underscore
-        // for the purposes of producing a scrubbed name, so
-        // that we translate `SomeType.someMethod` into
-        // `SomeType_someMethod`.
+        // We will treat a dot character or any path separator
+        // just like an underscore for the purposes of producing
+        // a scrubbed name, so that we translate `SomeType.someMethod`
+        // into `SomeType_someMethod`. This increases the readability
+        // of output code when the input used lots of nesting of
+        // code under types/namespaces/etc.
         //
         // By handling this case at the top of this loop, we
         // ensure that a `.`-turned-`_` is handled just like
         // a `_` in the original name, and will be properly
         // scrubbed for GLSL output.
         //
-        if(c == '.')
+        switch(c)
         {
+        default:
+            break;
+
+        case '.':
+        case '\\':
+        case '/':
             c = '_';
+            break;
         }
 
         if(((c >= 'a') && (c <= 'z'))
