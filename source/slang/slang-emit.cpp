@@ -465,7 +465,7 @@ Result linkAndOptimizeIR(
     // and turned into SSA temporaries. Such optimization may enable
     // the following passes to "see" and specialize more cases.
     //
-    // TODO: We should consider whether there are cases that would require
+    // TODO: We should consider whether there are cases that will require
     // iterating the passes as given here in order to achieve a fully
     // specialized result. If that is the case, we might consider implementing
     // a single combined pass that makes all of the relevant changes and
