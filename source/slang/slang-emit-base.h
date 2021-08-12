@@ -23,6 +23,8 @@ public:
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
     static IRVarLayout* getVarLayout(IRInst* var);
+
+    static BaseType extractBaseType(IRType* inType);
 };
 
 }

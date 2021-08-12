@@ -52,4 +52,25 @@ IRVarLayout* SourceEmitterBase::getVarLayout(IRInst* var)
     return as<IRVarLayout>(decoration->getLayout());
 }
 
+BaseType SourceEmitterBase::extractBaseType(IRType* inType)
+{
+    auto type = inType;
+    for (;;)
+    {
+        if (auto irBaseType = as<IRBasicType>(type))
+        {
+            return irBaseType->getBaseType();
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            type = vecType->getElementType();
+            continue;
+        }
+        else
+        {
+            return BaseType::Void;
+        }
+    }
+}
+
 }

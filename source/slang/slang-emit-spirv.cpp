@@ -266,6 +266,10 @@ void SpvInstParent::dumpTo(List<SpvWord>& ioWords)
 struct SpvSnippetEmitContext
 {
     SpvInst* resultType;
+    // True if resultType is float or vector of float.
+    bool isResultTypeFloat;
+    // True if resultType is signed.
+    bool isResultTypeSigned;
     Dictionary<SpvStorageClass, IRInst*> qualifiedResultTypes;
     List<SpvWord> argumentIds;
 };
@@ -675,19 +679,93 @@ struct SPIRVEmitContext
     void emitOperand(SpvBuiltIn builtin) { emitOperand((SpvWord)builtin); }
     void emitOperand(SpvStorageClass val) { emitOperand((SpvWord)val); }
 
-    Dictionary<IRIntegerValue, SpvInst*> m_spvIntConstants;
+    template<typename TConstant>
+    struct ConstantValueKey
+    {
+        IRType* type;
+        TConstant value;
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(type), Slang::getHashCode(value));
+        }
+        bool operator==(const ConstantValueKey& other) const
+        {
+            return type == other.type && value == other.value;
+        }
+    };
+    Dictionary<ConstantValueKey<IRIntegerValue>, SpvInst*> m_spvIntConstants;
+    Dictionary<ConstantValueKey<IRFloatingPointValue>, SpvInst*> m_spvFloatConstants;
     SpvInst* emitConstant(IRIntegerValue val, IRType* type)
     {
+        ConstantValueKey<IRIntegerValue> key;
+        key.value = val;
+        key.type = type;
         SpvInst* result = nullptr;
-        if (m_spvIntConstants.TryGetValue(val, result))
+        if (m_spvIntConstants.TryGetValue(key, result))
             return result;
-        return emitInst(
-            getSection(SpvLogicalSectionID::Constants),
-            nullptr,
-            SpvOpConstant,
-            type,
-            kResultID,
-            (SpvWord)val);
+        SpvWord valWord;
+        memcpy(&valWord, &val, sizeof(SpvWord));
+        if (type->getOp() == kIROp_Int64Type || type->getOp() == kIROp_UInt64Type)
+        {
+            SpvWord valHighWord;
+            memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
+            result = emitInst(
+                getSection(SpvLogicalSectionID::Constants),
+                nullptr,
+                SpvOpConstant,
+                type,
+                kResultID,
+                valWord,
+                valHighWord);
+        }
+        else
+        {
+            result = emitInst(
+                getSection(SpvLogicalSectionID::Constants),
+                nullptr,
+                SpvOpConstant,
+                type,
+                kResultID,
+                valWord);
+        }
+        m_spvIntConstants[key] = result;
+        return result;
+    }
+    SpvInst* emitConstant(IRFloatingPointValue val, IRType* type)
+    {
+        ConstantValueKey<IRFloatingPointValue> key;
+        key.value = val;
+        key.type = type;
+        SpvInst* result = nullptr;
+        if (m_spvFloatConstants.TryGetValue(key, result))
+            return result;
+        SpvWord valWord;
+        memcpy(&valWord, &val, sizeof(SpvWord));
+        if (type->getOp() == kIROp_DoubleType)
+        {
+            SpvWord valHighWord;
+            memcpy(&valHighWord, (char*)(&val) + 4, sizeof(SpvWord));
+            result = emitInst(
+                getSection(SpvLogicalSectionID::Constants),
+                nullptr,
+                SpvOpConstant,
+                type,
+                kResultID,
+                valWord,
+                valHighWord);
+        }
+        else
+        {
+            result = emitInst(
+                getSection(SpvLogicalSectionID::Constants),
+                nullptr,
+                SpvOpConstant,
+                type,
+                kResultID,
+                valWord);
+        }
+        m_spvFloatConstants[key] = result;
+        return result;
     }
     // As another convenience, there are often cases where
     // we will want to emit all of the operands of some
@@ -810,6 +888,22 @@ struct SPIRVEmitContext
         f();
         parent->addInst(spvInst);
         return spvInst;
+    }
+
+        /// The SPIRV OpExtInstImport inst that represents the GLSL450
+        /// extended instruction set.
+    SpvInst* m_glsl450ExtInst = nullptr;
+
+    SpvInst* getGLSL450ExtInst()
+    {
+        if (m_glsl450ExtInst)
+            return m_glsl450ExtInst;
+        m_glsl450ExtInst = emitInst(
+            getSection(SpvLogicalSectionID::ExtIntInstImports),
+            nullptr,
+            SpvOpExtInstImport,
+            UnownedStringSlice("GLSL.std.450"));
+        return m_glsl450ExtInst;
     }
 
     // Now that we've gotten the core infrastructure out of the way,
@@ -1401,6 +1495,9 @@ struct SPIRVEmitContext
             return emitSwizzle(parent, as<IRSwizzle>(inst));
         case kIROp_Construct:
             return emitConstruct(parent, inst);
+        case kIROp_BitCast:
+            return emitInst(
+                parent, inst, SpvOpBitcast, inst->getDataType(), kResultID, inst->getOperand(0));
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -1902,6 +1999,8 @@ struct SPIRVEmitContext
         SpvSnippet* snippet = getParsedSpvSnippet(intrinsic);
         SpvSnippetEmitContext context;
         context.resultType = ensureInst(inst->getFullType());
+        context.isResultTypeFloat = isFloatType(inst->getDataType());
+        context.isResultTypeSigned = isSignedType((IRType*)inst->getDataType());
         for (SlangUInt i = 0; i < inst->getArgCount(); i++)
         {
             auto argInst = ensureInst(inst->getArg(i));
@@ -1933,6 +2032,89 @@ struct SPIRVEmitContext
         return emitSpvSnippet(parent, inst, context, snippet);
     }
 
+    Dictionary<SpvSnippet::ASMConstant, SpvInst*> m_spvSnippetConstantInsts;
+
+    // Emit SPV Inst that represents a constant defined in a SpvSnippet.
+    SpvInst* maybeEmitSpvConstant(SpvSnippet::ASMConstant constant)
+    {
+        SpvInst* result = nullptr;
+        if (m_spvSnippetConstantInsts.TryGetValue(constant, result))
+            return result;
+
+        IRBuilder builder;
+        builder.sharedBuilder = &m_sharedIRBuilder;
+        builder.setInsertInto(m_irModule->getModuleInst());
+        switch (constant.type)
+        {
+        case SpvSnippet::ASMType::Float:
+            result = emitConstant(constant.floatValues[0], builder.getType(kIROp_FloatType));
+            break;
+        case SpvSnippet::ASMType::Float2:
+            {
+                auto floatType = builder.getType(kIROp_FloatType);
+                auto element1 = emitConstant(constant.floatValues[0], floatType);
+                auto element2 = emitConstant(constant.floatValues[1], floatType);
+                result = emitInst(
+                    getSection(SpvLogicalSectionID::Constants),
+                    nullptr,
+                    SpvOpConstantComposite,
+                    builder.getVectorType(floatType, builder.getIntValue(builder.getIntType(), 2)),
+                    kResultID,
+                    element1,
+                    element2);
+            }
+        case SpvSnippet::ASMType::Int:
+            result = emitConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
+            break;
+        case SpvSnippet::ASMType::UInt2:
+            {
+                auto uintType = builder.getType(kIROp_UIntType);
+                auto element1 = emitConstant((IRIntegerValue)constant.intValues[0], uintType);
+                auto element2 = emitConstant((IRIntegerValue)constant.intValues[1], uintType);
+                result = emitInst(
+                    getSection(SpvLogicalSectionID::Constants),
+                    nullptr,
+                    SpvOpConstantComposite,
+                    builder.getVectorType(uintType, builder.getIntValue(builder.getIntType(), 2)),
+                    kResultID,
+                    element1,
+                    element2);
+            }
+            break;
+        }
+        m_spvSnippetConstantInsts[constant] = result;
+        return result;
+    }
+
+    // Emit SPV Inst that represents a type defined in a SpvSnippet.
+    void emitSpvSnippetASMTypeOperand(SpvSnippet::ASMType type)
+    {
+        IRBuilder builder;
+        builder.sharedBuilder = &m_sharedIRBuilder;
+        builder.setInsertInto(m_irModule->getModuleInst());
+        IRType* irType = nullptr;
+        switch (type)
+        {
+        case SpvSnippet::ASMType::Float:
+            irType = builder.getType(kIROp_FloatType);
+            break;
+        case SpvSnippet::ASMType::Int:
+            irType = builder.getIntType();
+            break;
+        case SpvSnippet::ASMType::Float2:
+            irType = builder.getVectorType(
+                builder.getType(kIROp_FloatType), builder.getIntValue(builder.getIntType(), 2));
+            break;
+        case SpvSnippet::ASMType::UInt2:
+            irType = builder.getVectorType(
+                builder.getType(kIROp_UIntType), builder.getIntValue(builder.getIntType(), 2));
+            break;
+        default:
+            break;
+        }
+        emitOperand(irType);
+    }
+
     SpvInst* emitSpvSnippet(
         SpvInstParent* parent,
         IRCall* inst,
@@ -1950,7 +2132,7 @@ struct SPIRVEmitContext
                 switch (operand.type)
                 {
                 case SpvSnippet::ASMOperandType::SpvWord:
-                    emitOperand((SpvWord)operand.content);
+                    emitOperand(operand.content);
                     break;
                 case SpvSnippet::ASMOperandType::ObjectReference:
                     SLANG_ASSERT(
@@ -1973,7 +2155,49 @@ struct SPIRVEmitContext
                     break;
                 case SpvSnippet::ASMOperandType::InstReference:
                     SLANG_ASSERT(operand.content >= 0 && operand.content < emittedInsts.getCount());
-                    emitOperand(getID(emittedInsts[operand.content]));
+                    emitOperand(emittedInsts[operand.content]);
+                    break;
+                case SpvSnippet::ASMOperandType::GLSL450ExtInstSet:
+                    emitOperand(getGLSL450ExtInst());
+                    break;
+                case SpvSnippet::ASMOperandType::FloatIntegerSelection:
+                    if (context.isResultTypeFloat)
+                    {
+                        emitOperand(operand.content);
+                    }
+                    else
+                    {
+                        emitOperand(operand.content2);
+                    }
+                    break;
+                case SpvSnippet::ASMOperandType::FloatUnsignedSignedSelection:
+                    if (context.isResultTypeFloat)
+                    {
+                        emitOperand(operand.content);
+                    }
+                    else
+                    {
+                        if (context.isResultTypeSigned)
+                        {
+                            emitOperand(operand.content3);
+                        }
+                        else
+                        {
+                            emitOperand(operand.content2);
+                        }
+                    }
+                    break;
+                case SpvSnippet::ASMOperandType::TypeReference:
+                    {
+                        emitSpvSnippetASMTypeOperand((SpvSnippet::ASMType)operand.content);
+                    }
+                    break;
+                case SpvSnippet::ASMOperandType::ConstantReference:
+                    {
+                        SpvInst* spvConstant =
+                            maybeEmitSpvConstant(snippet->constants[operand.content]);
+                        emitOperand(spvConstant);
+                    }
                     break;
                 }
             }
@@ -2205,18 +2429,39 @@ struct SPIRVEmitContext
         }
     }
 
-    bool isSignedType(IRBasicType* basicType)
+    bool isSignedType(IRType* type)
     {
-        switch (basicType->getBaseType())
+        switch (type->getOp())
         {
-        case BaseType::Float:
-        case BaseType::Double:
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
             return true;
-        case BaseType::Int:
-        case BaseType::Int16:
-        case BaseType::Int64:
-        case BaseType::Int8:
+        case kIROp_IntType:
+        case kIROp_Int16Type:
+        case kIROp_Int64Type:
+        case kIROp_Int8Type:
             return true;
+        case kIROp_VectorType:
+            return isSignedType(as<IRVectorType>(type)->getElementType());
+        case kIROp_MatrixType:
+            return isSignedType(as<IRMatrixType>(type)->getElementType());
+        default:
+            return false;
+        }
+    }
+
+    bool isFloatType(IRInst* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_FloatType:
+        case kIROp_DoubleType:
+        case kIROp_HalfType:
+            return true;
+        case kIROp_VectorType:
+            return isFloatType(as<IRVectorType>(type)->getElementType());
+        case kIROp_MatrixType:
+            return isFloatType(as<IRMatrixType>(type)->getElementType());
         default:
             return false;
         }
@@ -2369,6 +2614,12 @@ struct SPIRVEmitContext
                 }
             }
         }
+    }
+
+    void diagnoseUnhandledInst(IRInst* inst)
+    {
+        m_sink->diagnose(
+            inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
     }
 
     SPIRVEmitContext(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
