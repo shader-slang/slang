@@ -2135,8 +2135,7 @@ struct SPIRVEmitContext
                     emitOperand(operand.content);
                     break;
                 case SpvSnippet::ASMOperandType::ObjectReference:
-                    SLANG_ASSERT(
-                        operand.content >= 0 && operand.content < context.argumentIds.getCount());
+                    SLANG_ASSERT(operand.content < (SpvWord)context.argumentIds.getCount());
                     emitOperand(context.argumentIds[operand.content]);
                     break;
                 case SpvSnippet::ASMOperandType::ResultId:
@@ -2154,7 +2153,7 @@ struct SPIRVEmitContext
                     }
                     break;
                 case SpvSnippet::ASMOperandType::InstReference:
-                    SLANG_ASSERT(operand.content >= 0 && operand.content < emittedInsts.getCount());
+                    SLANG_ASSERT(operand.content < (SpvWord)emittedInsts.getCount());
                     emitOperand(emittedInsts[operand.content]);
                     break;
                 case SpvSnippet::ASMOperandType::GLSL450ExtInstSet:
