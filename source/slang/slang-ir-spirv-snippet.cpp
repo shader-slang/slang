@@ -60,7 +60,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
             bool insideOperandList = true;
             while (insideOperandList)
             {
-                ASMOperand operand = {ASMOperandType::SpvWord, 0};
+                ASMOperand operand = {ASMOperandType::SpvWord, 0, 0, 0};
                 switch (tokenReader.NextToken().Type)
                 {
                 case Slang::Misc::TokenType::Semicolon:
