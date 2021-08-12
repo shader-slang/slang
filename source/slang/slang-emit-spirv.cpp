@@ -695,7 +695,7 @@ struct SPIRVEmitContext
     };
     Dictionary<ConstantValueKey<IRIntegerValue>, SpvInst*> m_spvIntConstants;
     Dictionary<ConstantValueKey<IRFloatingPointValue>, SpvInst*> m_spvFloatConstants;
-    SpvInst* emitConstant(IRIntegerValue val, IRType* type)
+    SpvInst* emitIntConstant(IRIntegerValue val, IRType* type)
     {
         ConstantValueKey<IRIntegerValue> key;
         key.value = val;
@@ -731,7 +731,7 @@ struct SPIRVEmitContext
         m_spvIntConstants[key] = result;
         return result;
     }
-    SpvInst* emitConstant(IRFloatingPointValue val, IRType* type)
+    SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type)
     {
         ConstantValueKey<IRFloatingPointValue> key;
         key.value = val;
@@ -2047,13 +2047,13 @@ struct SPIRVEmitContext
         switch (constant.type)
         {
         case SpvSnippet::ASMType::Float:
-            result = emitConstant(constant.floatValues[0], builder.getType(kIROp_FloatType));
+            result = emitFloatConstant(constant.floatValues[0], builder.getType(kIROp_FloatType));
             break;
         case SpvSnippet::ASMType::Float2:
             {
                 auto floatType = builder.getType(kIROp_FloatType);
-                auto element1 = emitConstant(constant.floatValues[0], floatType);
-                auto element2 = emitConstant(constant.floatValues[1], floatType);
+                auto element1 = emitFloatConstant(constant.floatValues[0], floatType);
+                auto element2 = emitFloatConstant(constant.floatValues[1], floatType);
                 result = emitInst(
                     getSection(SpvLogicalSectionID::Constants),
                     nullptr,
@@ -2064,13 +2064,13 @@ struct SPIRVEmitContext
                     element2);
             }
         case SpvSnippet::ASMType::Int:
-            result = emitConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
+            result = emitIntConstant((IRIntegerValue)constant.intValues[0], builder.getIntType());
             break;
         case SpvSnippet::ASMType::UInt2:
             {
                 auto uintType = builder.getType(kIROp_UIntType);
-                auto element1 = emitConstant((IRIntegerValue)constant.intValues[0], uintType);
-                auto element2 = emitConstant((IRIntegerValue)constant.intValues[1], uintType);
+                auto element1 = emitIntConstant((IRIntegerValue)constant.intValues[0], uintType);
+                auto element2 = emitIntConstant((IRIntegerValue)constant.intValues[1], uintType);
                 result = emitInst(
                     getSection(SpvLogicalSectionID::Constants),
                     nullptr,
@@ -2272,7 +2272,7 @@ struct SPIRVEmitContext
             baseId = getID(varInst);
         }
         SLANG_ASSERT(baseStructType && "field_address require base to be a struct.");
-        auto fieldId = emitConstant(
+        auto fieldId = emitIntConstant(
             getStructFieldId(baseStructType, as<IRStructKey>(fieldAddress->getField())),
             builder.getIntType());
         return emitInst(
@@ -2293,7 +2293,7 @@ struct SPIRVEmitContext
 
         IRStructType* baseStructType = as<IRStructType>(inst->getBase()->getDataType());
         SLANG_ASSERT(baseStructType && "field_extract require base to be a struct.");
-        auto fieldId = emitConstant(
+        auto fieldId = emitIntConstant(
             getStructFieldId(baseStructType, as<IRStructKey>(inst->getField())),
             builder.getIntType());
         
