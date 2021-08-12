@@ -1310,9 +1310,11 @@ __target_intrinsic(cpp, "$P_countbits($0)")
 uint countbits(uint value);
 
 // Cross product
+// TODO: SPIRV does not support integer vectors.
 __generic<T : __BuiltinArithmeticType>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl)
+__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 68 _0 _1")
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     return vector<T,3>(
@@ -1320,10 +1322,6 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
         left.z * right.x - left.x * right.z,
         left.x * right.y - left.y * right.x);
 }
-
-__generic<T:__BuiltinFloatingPointType>
-__target_intrinsic(spirv_direct, "12 resultType resultId glsl450 68 _0 _1")
-vector<T,3> cross(vector<T,3> left, vector<T,3> right);
 
 // Convert encoded color
 __target_intrinsic(hlsl)
