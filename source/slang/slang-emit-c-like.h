@@ -6,6 +6,7 @@
 
 #include "slang-compiler.h"
 
+#include "slang-emit-base.h"
 #include "slang-emit-precedence.h"
 #include "slang-emit-source-writer.h"
 
@@ -16,7 +17,7 @@
 namespace Slang
 {
 
-class CLikeSourceEmitter: public RefObject
+class CLikeSourceEmitter: public SourceEmitterBase
 {
 public:
     struct Desc
@@ -292,8 +293,6 @@ public:
     void emitSemantics(IRInst* inst);
     void emitSemanticsUsingVarLayout(IRVarLayout* varLayout);
 
-    static IRVarLayout* getVarLayout(IRInst* var);
-
     void emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling = "register");
 
         // When we are about to traverse an edge from one block to another,
@@ -322,8 +321,6 @@ public:
     void emitSimpleFunc(IRFunc* func) { emitSimpleFuncImpl(func); }
 
     void emitParamType(IRType* type, String const& name) { emitParamTypeImpl(type, name); }
-
-    IRInst* getSpecializedValue(IRSpecialize* specInst);
 
     void emitFuncDecl(IRFunc* func);
 
@@ -453,14 +450,7 @@ public:
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) { SLANG_UNUSED(varDecl); SLANG_UNUSED(varType); return false; }
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) { SLANG_UNUSED(inst); SLANG_UNUSED(inOuterPrec); return false; }
 
-        /// Inspect the capabilities required by `inst` (according to its decorations),
-        /// and ensure that those capabilities have been detected and stored in the
-        /// target-specific extension tracker.
-    void handleRequiredCapabilities(IRInst* inst);
-    virtual void handleRequiredCapabilitiesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
-
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
-
 
     void _emitArrayType(IRArrayType* arrayType, DeclaratorInfo* declarator);
     void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, DeclaratorInfo* declarator);

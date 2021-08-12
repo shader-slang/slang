@@ -226,7 +226,7 @@ struct VulkanExtendedFeatureProperties
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
     // Inline uniform block features
     VkPhysicalDeviceInlineUniformBlockFeaturesEXT inlineUniformBlockFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT};
 };
 
 struct VulkanApi

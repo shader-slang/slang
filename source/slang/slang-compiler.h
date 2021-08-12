@@ -1190,6 +1190,8 @@ namespace Slang
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
 
+        void setDirectSPIRVEmitMode();
+
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
         Profile getTargetProfile() { return targetProfile; }
@@ -1217,6 +1219,7 @@ namespace Slang
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
+        bool                    m_emitSPIRVDirectly = false;
     };
 
         /// Are we generating code for a D3D API?
