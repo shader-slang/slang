@@ -18,12 +18,30 @@ static SpvStorageClass translateStorageClass(String name)
     return (SpvStorageClass)-1;
 }
 
+SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
+{
+    auto word = tokenReader.ReadWord();
+    if (word == "float")
+        return SpvSnippet::ASMType::Float;
+    else if (word == "double")
+        return SpvSnippet::ASMType::Double;
+    else if (word == "uint2")
+        return SpvSnippet::ASMType::UInt2;
+    else if (word == "float2")
+        return SpvSnippet::ASMType::Float2;
+    else if (word == "int")
+        return SpvSnippet::ASMType::Int;
+    else if (word == "_p")
+        return SpvSnippet::ASMType::FloatOrDouble;
+    return SpvSnippet::ASMType::None;
+}
+
 RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
 {
     RefPtr<SpvSnippet> snippet = new SpvSnippet();
     try
     {
-        Dictionary<String, int> mapInstNameToIndex;
+        Dictionary<String, SpvWord> mapInstNameToIndex;
         Slang::Misc::TokenReader tokenReader(definition);
         // A leading "*" at the beginning of the snip modifies $resultType with
         // a storage class.
@@ -46,7 +64,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
             bool insideOperandList = true;
             while (insideOperandList)
             {
-                ASMOperand operand = {ASMOperandType::SpvWord, 0};
+                ASMOperand operand = {ASMOperandType::SpvWord, 0, 0, 0};
                 switch (tokenReader.NextToken().Type)
                 {
                 case Slang::Misc::TokenType::Semicolon:
@@ -60,6 +78,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                     break;
                 case Slang::Misc::TokenType::OpMod:
                     {
+                        tokenReader.ReadToken();
                         operand.type = SpvSnippet::ASMOperandType::InstReference;
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.TryGetValue(refName, operand.content))
@@ -72,17 +91,10 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                 case Slang::Misc::TokenType::Identifier:
                     {
                         auto identifier = tokenReader.ReadToken().Content;
-                        if (identifier.startsWith("_"))
-                        {
-                            operand.type = SpvSnippet::ASMOperandType::ObjectReference;
-                            operand.content =
-                                StringToInt(identifier.subString(1, identifier.getLength() - 1));
-                            inst.operands.add(operand);
-                        }
-                        else if (identifier == "resultType")
+                        if (identifier == "resultType")
                         {
                             operand.type = SpvSnippet::ASMOperandType::ResultTypeId;
-                            operand.content = -1;
+                            operand.content = (SpvWord)0xFFFFFFFF;
                             if (tokenReader.AdvanceIf("*"))
                             {
                                 // A "*" at operand qualifies the use of `resultType` with
@@ -97,6 +109,78 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                         else if (identifier == "resultId")
                         {
                             operand.type = SpvSnippet::ASMOperandType::ResultId;
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier == "glsl450")
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::GLSL450ExtInstSet;
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier == "fi")
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::FloatIntegerSelection;
+                            tokenReader.Read("(");
+                            operand.content = (SpvWord)tokenReader.ReadInt();
+                            tokenReader.Read(",");
+                            operand.content2 = (SpvWord)tokenReader.ReadInt();
+                            tokenReader.Read(")");
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier == "fus")
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::FloatUnsignedSignedSelection;
+                            tokenReader.Read("(");
+                            operand.content = (SpvWord)tokenReader.ReadInt();
+                            tokenReader.Read(",");
+                            operand.content2 = (SpvWord)tokenReader.ReadInt();
+                            tokenReader.Read(",");
+                            operand.content3 = (SpvWord)tokenReader.ReadInt();
+                            tokenReader.Read(")");
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier == "_type")
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::TypeReference;
+                            tokenReader.Read("(");
+                            operand.content = (SpvWord)parseASMType(tokenReader);
+                            tokenReader.Read(")");
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier.startsWith("_"))
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::ObjectReference;
+                            operand.content = (SpvWord)StringToInt(
+                                identifier.subString(1, identifier.getLength() - 1));
+                            inst.operands.add(operand);
+                        }
+                        else if (identifier == "const")
+                        {
+                            operand.type = SpvSnippet::ASMOperandType::ConstantReference;
+                            ASMConstant constant;
+                            memset(&constant, 0, sizeof(ASMConstant));
+                            tokenReader.Read("(");
+                            constant.type = parseASMType(tokenReader);
+                            int i = 0;
+                            while (tokenReader.AdvanceIf(","))
+                            {
+                                switch (constant.type)
+                                {
+                                case ASMType::Float:
+                                case ASMType::Float2:
+                                case ASMType::FloatOrDouble:
+                                    constant.floatValues[i] = tokenReader.ReadFloat();
+                                    ++i;
+                                    break;
+                                    
+                                default:
+                                    constant.intValues[i] = tokenReader.ReadInt();
+                                    ++i;
+                                    break;
+                                }
+                            }
+                            tokenReader.Read(")");
+                            snippet->constants.add(constant);
+                            operand.content = (SpvWord)(snippet->constants.getCount() - 1);
                             inst.operands.add(operand);
                         }
                         else

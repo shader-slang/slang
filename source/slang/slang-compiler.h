@@ -1184,13 +1184,15 @@ namespace Slang
         }
         void addCapability(CapabilityAtom capability);
 
+        bool shouldEmitSPIRVDirectly()
+        {
+            return (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY) != 0;
+        }
 
         bool isWholeProgramRequest()
         {
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
-
-        void setDirectSPIRVEmitMode();
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
@@ -1219,7 +1221,6 @@ namespace Slang
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
-        bool                    m_emitSPIRVDirectly = false;
     };
 
         /// Are we generating code for a D3D API?
@@ -1897,10 +1898,6 @@ namespace Slang
         // The default behavior is to make a best-effort guess as to what format is intended.
         //
         bool useUnknownImageFormatAsDefault = false;
-
-            /// Should SPIR-V be generated directly from Slang IR rather than via translation to GLSL?
-        bool shouldEmitSPIRVDirectly = false;
-
 
         // If true will disable generics/existential value specialization pass.
         bool disableSpecialization = false;

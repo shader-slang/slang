@@ -1100,12 +1100,6 @@ void TargetRequest::addCapability(CapabilityAtom capability)
     cookedCapabilities = CapabilitySet::makeEmpty();
 }
 
-void TargetRequest::setDirectSPIRVEmitMode()
-{
-    m_emitSPIRVDirectly = true;
-    cookedCapabilities.makeEmpty();
-}
-
 CapabilitySet TargetRequest::getTargetCaps()
 {
     if(!cookedCapabilities.isEmpty())
@@ -1140,7 +1134,7 @@ CapabilitySet TargetRequest::getTargetCaps()
         break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        if (m_emitSPIRVDirectly)
+        if (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
         {
             atoms.add(CapabilityAtom::SPIRV_DIRECT);
         }
