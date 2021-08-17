@@ -23,12 +23,16 @@ SpvSnippet::ASMType parseASMType(Slang::Misc::TokenReader& tokenReader)
     auto word = tokenReader.ReadWord();
     if (word == "float")
         return SpvSnippet::ASMType::Float;
+    else if (word == "double")
+        return SpvSnippet::ASMType::Double;
     else if (word == "uint2")
         return SpvSnippet::ASMType::UInt2;
     else if (word == "float2")
         return SpvSnippet::ASMType::Float2;
     else if (word == "int")
         return SpvSnippet::ASMType::Int;
+    else if (word == "_p")
+        return SpvSnippet::ASMType::FloatOrDouble;
     return SpvSnippet::ASMType::None;
 }
 
@@ -74,6 +78,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                     break;
                 case Slang::Misc::TokenType::OpMod:
                     {
+                        tokenReader.ReadToken();
                         operand.type = SpvSnippet::ASMOperandType::InstReference;
                         auto refName = tokenReader.ReadToken().Content;
                         if (!mapInstNameToIndex.TryGetValue(refName, operand.content))
@@ -111,7 +116,7 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                             operand.type = SpvSnippet::ASMOperandType::GLSL450ExtInstSet;
                             inst.operands.add(operand);
                         }
-                        else if (identifier == "f")
+                        else if (identifier == "fi")
                         {
                             operand.type = SpvSnippet::ASMOperandType::FloatIntegerSelection;
                             tokenReader.Read("(");
@@ -162,17 +167,21 @@ RefPtr<SpvSnippet> SpvSnippet::parse(UnownedStringSlice definition)
                                 {
                                 case ASMType::Float:
                                 case ASMType::Float2:
+                                case ASMType::FloatOrDouble:
                                     constant.floatValues[i] = tokenReader.ReadFloat();
                                     ++i;
                                     break;
+                                    
                                 default:
                                     constant.intValues[i] = tokenReader.ReadInt();
                                     ++i;
                                     break;
                                 }
                             }
+                            tokenReader.Read(")");
                             snippet->constants.add(constant);
                             operand.content = (SpvWord)(snippet->constants.getCount() - 1);
+                            inst.operands.add(operand);
                         }
                         else
                         {

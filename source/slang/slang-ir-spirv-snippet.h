@@ -64,6 +64,8 @@ struct SpvSnippet : public RefObject
         None,
         Int,
         Float,
+        Double,
+        FloatOrDouble, // Float or double type, depending on the result type of the intrinsic.
         Float2,
         UInt2,
     };
@@ -81,7 +83,9 @@ struct SpvSnippet : public RefObject
                 switch (type)
                 {
                 case ASMType::Float:
+                case ASMType::Double:
                 case ASMType::Float2:
+                case ASMType::FloatOrDouble:
                     result = combineHash(result, Slang::getHashCode(floatValues[i]));
                     break;
                 default:
@@ -98,6 +102,8 @@ struct SpvSnippet : public RefObject
             switch (type)
             {
             case ASMType::Float:
+            case ASMType::Double:
+            case ASMType::FloatOrDouble:
                 return floatValues[0] == other.floatValues[0];
             case ASMType::Float2:
                 return floatValues[0] == other.floatValues[0] &&

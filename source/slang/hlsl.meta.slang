@@ -200,14 +200,14 @@ struct StructuredBuffer
         out uint stride);
 
     __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
+    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 const(int, 0) _1; 61 resultType resultId %addr;")
     T Load(int location);
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
+        __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 const(int, 0) _1; 61 resultType resultId %addr;")
         get;
     };
 };
@@ -631,14 +631,14 @@ struct $(item.name)
     uint IncrementCounter();
 
     __target_intrinsic(glsl, "$0._data[$1]")
-    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 _1; 61 resultType resultId %addr;")
+    __target_intrinsic(spirv_direct, "%addr = 65 resultType*StorageBuffer resultId _0 const(int, 0) _1; 61 resultType resultId %addr;")
     T Load(int location);
     T Load(int location, out uint status);
 
     __subscript(uint index) -> T
     {
         __target_intrinsic(glsl, "$0._data[$1]")
-        __target_intrinsic(spirv_direct, "*StorageBuffer 65 resultType resultId _0 _1")
+        __target_intrinsic(spirv_direct, "*StorageBuffer 65 resultType resultId _0 const(int, 0) _1")
         ref;
     }
 };
@@ -2315,11 +2315,13 @@ __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0( 0.43429448190325182765112891891661) )" )
 __target_intrinsic(cuda, "$P_log10($0)")
 __target_intrinsic(cpp, "$P_log10($0)")
+__target_intrinsic(spirv_direct, "%baseElog = 12 resultType resultId glsl450 28 _0; 133 resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
 T log10(T x);
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 __target_intrinsic(hlsl)
 __target_intrinsic(glsl, "(log( $0 ) * $S0(0.43429448190325182765112891891661) )" )
+__target_intrinsic(spirv_direct, "%baseElog = 12 resultType resultId glsl450 28 _0; 142 resultType resultId _0 %baseElog const(_p,0.43429448190325182765112891891661)")
 vector<T,N> log10(vector<T,N> x)
 {
     VECTOR_MAP_UNARY(T, N, log10, x);

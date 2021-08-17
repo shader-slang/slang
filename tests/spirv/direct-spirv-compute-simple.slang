@@ -1,6 +1,6 @@
 // direct-spirv-compute-simple.slang
-
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -emit-spirv-directly
+//TESTD:SIMPLE:-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -emit-spirv-directly
 
 // Test runinng a shader generated from direct SPIR-V emit.
 

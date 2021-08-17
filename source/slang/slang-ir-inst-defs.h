@@ -627,10 +627,13 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
 
     INST(SemanticDecoration, semantic, 2, 0)
 
-    INST_RANGE(Decoration, HighLevelDeclDecoration, SemanticDecoration)
+        /// Marks a struct type as being used as a structured buffer block.
+        /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
+    INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
 
+    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBufferBlockDecoration)
 
-//
+    //
 
 // A `makeExistential(v : C, w) : I` instruction takes a value `v` of type `C`
 // and produces a value of interface type `I` by using the witness `w` which

@@ -1,6 +1,8 @@
 // slang-ir-spirv-legalize.cpp
 #include "slang-ir-spirv-legalize.h"
 
+#include "slang-ir-glsl-legalize.h"
+
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-emit-base.h"
@@ -13,7 +15,7 @@ namespace Slang
 // Legalization of IR for direct SPIRV emit.
 //
 
-struct StorageClassPropagationContext : public SourceEmitterBase
+struct SPIRVLegalizationContext : public SourceEmitterBase
 {
     SPIRVEmitSharedContext* m_sharedContext;
 
@@ -42,12 +44,52 @@ struct StorageClassPropagationContext : public SourceEmitterBase
         }
     }
 
-    StorageClassPropagationContext(SPIRVEmitSharedContext* sharedContext, IRModule* module)
+    SPIRVLegalizationContext(SPIRVEmitSharedContext* sharedContext, IRModule* module)
         : m_sharedContext(sharedContext), m_module(module)
     {
     }
 
-    void processGlobalParam(IRGlobalParam* inst) { processGlobalVar(inst); }
+    void processGlobalParam(IRGlobalParam* inst)
+    {
+        // If the global param is not a pointer type, make it so and insert explicit load insts.
+        auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
+        if (!ptrType)
+        {
+            SpvStorageClass storageClass = SpvStorageClassPrivate;
+            // Figure out storage class based on var layout.
+            if (auto layout = getVarLayout(inst))
+            {
+                if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
+                {
+                    String semanticName = systemValueAttr->getName();
+                    semanticName = semanticName.toLower();
+                    if (semanticName == "sv_dispatchthreadid")
+                    {
+                        storageClass = SpvStorageClassInput;
+                    }
+                }
+            }
+            // Make a pointer type of storageClass.
+            IRBuilder builder;
+            builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+            builder.setInsertBefore(inst);
+            ptrType = builder.getPtrType(kIROp_PtrType, inst->getFullType(), storageClass);
+            inst->setFullType(ptrType);
+            // Insert an explicit load at each use site.
+            List<IRUse*> uses;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                uses.add(use);
+            }
+            for (auto use : uses)
+            {
+                builder.setInsertBefore(use->getUser());
+                auto loadedValue = builder.emitLoad(inst);
+                use->set(loadedValue);
+            }
+        }
+        processGlobalVar(inst);
+    }
 
     void processGlobalVar(IRInst* inst)
     {
@@ -195,13 +237,34 @@ struct StorageClassPropagationContext : public SourceEmitterBase
         builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
         builder.setInsertBefore(inst);
         auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
-        auto ptrType = builder.getPtrType(kIROp_PtrType, arrayType, SpvStorageClassStorageBuffer);
+        auto structType = builder.createStructType();
+        auto arrayKey = builder.createStructKey();
+        builder.createStructField(structType, arrayKey, arrayType);
+        auto ptrType = builder.getPtrType(kIROp_PtrType, structType, SpvStorageClassStorageBuffer);
+        StringBuilder nameSb;
+        switch (inst->getOp())
+        {
+        case kIROp_HLSLRWStructuredBufferType:
+            nameSb << "RWStructuredBuffer";
+            break;
+        case kIROp_HLSLAppendStructuredBufferType:
+            nameSb << "AppendStructuredBuffer";
+            break;
+        case kIROp_HLSLConsumeStructuredBufferType:
+            nameSb << "ConsumeStructuredBuffer";
+            break;
+        default:
+            nameSb << "StructuredBuffer";
+            break;
+        }
+        builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
+        builder.addDecoration(structType, kIROp_SPIRVBufferBlockDecoration);
         inst->replaceUsesWith(ptrType);
         inst->removeAndDeallocate();
         addUsersToWorkList(ptrType);
     }
 
-    void propagate()
+    void processModule()
     {
         addToWorkList(m_module->getModuleInst());
         while (workList.Count() != 0)
@@ -240,19 +303,22 @@ struct StorageClassPropagationContext : public SourceEmitterBase
     }
 };
 
-void propagateStorageClass(SPIRVEmitSharedContext* sharedContext, IRModule* module)
+void legalizeSPIRV(SPIRVEmitSharedContext* sharedContext, IRModule* module)
 {
-    StorageClassPropagationContext context(sharedContext, module);
-    context.propagate();
+    SPIRVLegalizationContext context(sharedContext, module);
+    context.processModule();
 }
 
 void legalizeIRForSPIRV(
     SPIRVEmitSharedContext* context,
     IRModule* module,
+    const List<IRFunc*>& entryPoints,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    propagateStorageClass(context, module);
+    GLSLExtensionTracker extensionTracker;
+    legalizeEntryPointsForGLSL(module->getSession(), module, entryPoints, sink, &extensionTracker);
+    legalizeSPIRV(context, module);
 }
 
 } // namespace Slang

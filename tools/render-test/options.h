@@ -73,6 +73,8 @@ struct Options
 
     Slang::DownstreamArgs downstreamArgs;                    ///< Args to downstream tools. Here it's just slang
 
+    bool generateSPIRVDirectly = false;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(int argc, const char*const* argv, Slang::WriterHelper stdError, Options& outOptions);

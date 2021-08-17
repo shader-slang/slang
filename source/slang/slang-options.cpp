@@ -1163,7 +1163,7 @@ struct OptionsParser
                 }
                 else if( argValue == "-emit-spirv-directly" )
                 {
-                    requestImpl->getBackEndReq()->shouldEmitSPIRVDirectly = true;
+                    getCurrentTarget()->targetFlags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
                 }
                 else if (argValue == "-default-downstream-compiler")
                 {
