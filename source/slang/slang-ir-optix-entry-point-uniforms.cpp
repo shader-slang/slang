@@ -234,15 +234,16 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
                 //
                 IRInst* fieldVal = nullptr;
 
-                // Note: for an optix SBT pointer, we can't dereference
-                // optixGetSbtDataPointer() like builder->emitFieldAddress requires.
-                // (thus, this code differs from slang-ir-entry-point-uniforms.cpp)
-                // Instead, we always use emitFieldExtract, and then the SBT instruction
-                // emits a C-style cast to the appropriate struct type.
-                fieldVal = builder->emitFieldExtract(
-                    paramType,
+                // A constant buffer behaves like a pointer
+                // at the IR level, so we first do a pointer
+                // offset operation to compute what amounts
+                // to `&cb->field`, and then load from that address.
+                //
+                auto fieldAddress = builder->emitFieldAddress(
+                    builder->getPtrType(paramType),
                     collectedParam,
                     paramFieldKey);
+                fieldVal = builder->emitLoad(fieldAddress);
 
                 // We replace the value used at this use site, which
                 // will have a side effect of making `use` no longer
@@ -270,6 +271,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
 
         // Now, replace the collected parameter with OptiX SBT accesses.
         auto paramType = collectedParam->getFullType();
+        builder->setInsertBefore(entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
         IRInst* getAttr = builder->emitIntrinsicInst(paramType, kIROp_GetOptiXSbtDataPtr, 0, nullptr);
         collectedParam->replaceUsesWith(getAttr);
         collectedParam->removeAndDeallocate();
