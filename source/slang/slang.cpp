@@ -1100,7 +1100,6 @@ void TargetRequest::addCapability(CapabilityAtom capability)
     cookedCapabilities = CapabilitySet::makeEmpty();
 }
 
-
 CapabilitySet TargetRequest::getTargetCaps()
 {
     if(!cookedCapabilities.isEmpty())
@@ -1131,9 +1130,18 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::GLSL:
     case CodeGenTarget::GLSL_Vulkan:
     case CodeGenTarget::GLSL_Vulkan_OneDesc:
+        atoms.add(CapabilityAtom::GLSL);
+        break;
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        atoms.add(CapabilityAtom::GLSL);
+        if (targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+        {
+            atoms.add(CapabilityAtom::SPIRV_DIRECT);
+        }
+        else
+        {
+            atoms.add(CapabilityAtom::GLSL);
+        }
         break;
 
     case CodeGenTarget::HLSL:

@@ -2604,6 +2604,12 @@ namespace Slang
             operands);
     }
 
+    IRPtrType* IRBuilder::getPtrType(IROp op, IRType* valueType, IRIntegerValue addressSpace)
+    {
+        IRInst* operands[] = {valueType, getIntValue(getIntType(), addressSpace)};
+        return (IRPtrType*)getType(op, 2, operands);
+    }
+
     IRArrayTypeBase* IRBuilder::getArrayTypeBase(
         IROp    op,
         IRType* elementType,
