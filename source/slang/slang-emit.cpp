@@ -21,6 +21,7 @@
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-specialize.h"
@@ -249,12 +250,18 @@ Result linkAndOptimizeIR(
     // the global scope instead.
     //
     // TODO: We should skip this step for CUDA targets.
+    // (NM): we actually do need to do this step for OptiX based CUDA targets
     //
     {
         CollectEntryPointUniformParamsOptions passOptions;
         switch( target )
         {
         case CodeGenTarget::CUDASource:
+            collectOptiXEntryPointUniformParams(irModule);
+            #if 0
+            dumpIRIfEnabled(compileRequest, irModule, "OPTIX ENTRY POINT UNIFORMS COLLECTED");
+            #endif
+            validateIRModuleIfEnabled(compileRequest, irModule);
             break;
 
         case CodeGenTarget::CPPSource:
@@ -452,6 +459,20 @@ Result linkAndOptimizeIR(
     // pass down the target request along with the IR.
     //
     specializeResourceOutputs(compileRequest, targetRequest, irModule);
+    //
+    // After specialization of function outputs, we may find that there
+    // are cases where opaque-typed local variables can now be eliminated
+    // and turned into SSA temporaries. Such optimization may enable
+    // the following passes to "see" and specialize more cases.
+    //
+    // TODO: We should consider whether there are cases that will require
+    // iterating the passes as given here in order to achieve a fully
+    // specialized result. If that is the case, we might consider implementing
+    // a single combined pass that makes all of the relevant changes and
+    // iterates to convergence.
+    //
+    constructSSA(irModule);
+    //
     specializeFuncsForBufferLoadArgs(compileRequest, targetRequest, irModule);
     specializeResourceParameters(compileRequest, targetRequest, irModule);
 
@@ -895,6 +916,7 @@ SlangResult emitEntryPointsSourceFromIR(
 
 SlangResult emitSPIRVFromIR(
     BackEndCompileRequest*  compileRequest,
+    TargetRequest*          targetRequest,
     IRModule*               irModule,
     const List<IRFunc*>&    irEntryPoints,
     List<uint8_t>&          spirvOut);
@@ -926,11 +948,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
 
-    emitSPIRVFromIR(
-        compileRequest,
-        irModule,
-        irEntryPoints,
-        spirvOut);
+    emitSPIRVFromIR(compileRequest, targetRequest, irModule, irEntryPoints, spirvOut);
 
     return SLANG_OK;
 }

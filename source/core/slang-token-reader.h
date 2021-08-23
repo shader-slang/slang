@@ -73,7 +73,7 @@ namespace Misc {
         TokenType Type = TokenType::Unknown;
         String Content;
         CodePosition Position;
-        TokenFlags flags;
+        TokenFlags flags = 0;
         Token() = default;
         Token(TokenType type, const String & content, int line, int col, int pos, String fileName, TokenFlags flags = 0)
             : flags(flags)

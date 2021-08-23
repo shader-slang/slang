@@ -811,6 +811,13 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return true;
         }
+        case kIROp_GetOptiXSbtDataPtr:
+        {
+            m_writer->emit("((");
+            emitType(inst->getDataType());
+            m_writer->emit(")optixGetSbtDataPointer())");
+            return true;
+        }
         default: break;
     }
 

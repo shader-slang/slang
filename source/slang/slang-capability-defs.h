@@ -55,6 +55,7 @@ SLANG_CAPABILITY_ATOM0(GLSL,     glsl,      Concrete,TargetFormat,0)
 SLANG_CAPABILITY_ATOM0(C,        c,         Concrete,TargetFormat,0)
 SLANG_CAPABILITY_ATOM0(CPP,      cpp,       Concrete,TargetFormat,0)
 SLANG_CAPABILITY_ATOM0(CUDA,     cuda,      Concrete,TargetFormat,0)
+SLANG_CAPABILITY_ATOM0(SPIRV_DIRECT, spirv_direct, Concrete, TargetFormat, 0)
 
 // We have multiple capabilities for the various SPIR-V versions,
 // arranged so that they inherit from one another to represent which versions

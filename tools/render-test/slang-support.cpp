@@ -96,6 +96,8 @@ void ShaderCompilerUtil::Output::reset()
 
     spSetCodeGenTarget(slangRequest, input.target);
     spSetTargetProfile(slangRequest, 0, spFindProfile(out.session, input.profile.getBuffer()));
+    if (options.generateSPIRVDirectly)
+        spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
 
     // Define a macro so that shader code in a test can detect what language we
     // are nominally working with.

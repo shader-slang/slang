@@ -1442,7 +1442,7 @@ namespace Slang
             {
                 RefPtr<DownstreamCompileResult> downstreamResult;
 
-                if (target == CodeGenTarget::SPIRV && compileRequest->shouldEmitSPIRVDirectly)
+                if (target == CodeGenTarget::SPIRV && targetReq->shouldEmitSPIRVDirectly())
                 {
                     List<uint8_t> spirv;
                     SLANG_RETURN_ON_FAIL(emitSPIRVForEntryPointsDirectly(compileRequest, entryPointIndices, targetReq, spirv));

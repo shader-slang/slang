@@ -4944,6 +4944,7 @@ public:
         /// Note that the outShaderModule value should be cleaned up when no longer needed by caller
         /// via vkShaderModuleDestroy()
     VkPipelineShaderStageCreateInfo compileEntryPoint(
+        const char* entryPointName,
         ISlangBlob* code,
         VkShaderStageFlagBits stage,
         VkShaderModule& outShaderModule);
@@ -5188,6 +5189,7 @@ VkBool32 VKDevice::handleDebugMessage(VkDebugReportFlagsEXT flags, VkDebugReport
 }
 
 VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
+    const char* entryPointName,
     ISlangBlob* code,
     VkShaderStageFlagBits stage,
     VkShaderModule& outShaderModule)
@@ -5210,7 +5212,7 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
     shaderStageCreateInfo.stage = stage;
 
     shaderStageCreateInfo.module = module;
-    shaderStageCreateInfo.pName = "main";
+    shaderStageCreateInfo.pName = entryPointName;
 
     return shaderStageCreateInfo;
 }
@@ -5573,6 +5575,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.bufferDeviceAddressFeatures;
             deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
+
             m_features.add("buffer-device-address");
         }
 
@@ -5606,6 +5609,7 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
 
     deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
     deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
+
     if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
         return SLANG_FAIL;
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
@@ -6859,7 +6863,16 @@ Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
         SLANG_RETURN_ON_FAIL(compileResult);
         shaderProgram->m_codeBlobs.add(kernelCode);
         VkShaderModule shaderModule;
+        // HACK: our direct-spirv-emit path generates SPIRV that respects
+        // the original entry point name, while the glslang path always
+        // uses "main" as the name. We should introduce a compiler parameter
+        // to control the entry point naming behavior in SPIRV-direct path
+        // so we can remove the ad-hoc logic here.
+        const char* entryPointName = "main";
+        if (m_desc.slang.targetFlags & SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY)
+            entryPointName = entryPointInfo->getName();
         shaderProgram->m_stageCreateInfos.add(compileEntryPoint(
+            entryPointName,
             kernelCode,
             (VkShaderStageFlagBits)VulkanUtil::getShaderStage(stage),
             shaderModule));
@@ -7073,7 +7086,7 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
         returnComPtr(outState, pipelineStateImpl);
         return SLANG_OK;
     }
-
+    
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;

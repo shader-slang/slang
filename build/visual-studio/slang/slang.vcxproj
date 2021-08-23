@@ -209,6 +209,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-diagnostics.h" />
     <ClInclude Include="..\..\..\source\slang\slang-doc-extractor.h" />
     <ClInclude Include="..\..\..\source\slang\slang-doc-markdown-writer.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-emit-base.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-c-like.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-cpp.h" />
     <ClInclude Include="..\..\..\source\slang\slang-emit-cuda.h" />
@@ -252,6 +253,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure-scoping.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-restructure.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-sccp.h" />
@@ -262,6 +264,8 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-function-call.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize-resources.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-specialize.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-spirv-legalize.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-spirv-snippet.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-ssa.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-string-hash.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-strip-witness-tables.h" />
@@ -334,6 +338,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-extractor.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-doc-markdown-writer.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-emit-base.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-c-like.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-cpp.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-emit-cuda.cpp" />
@@ -377,6 +382,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure-scoping.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-restructure.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-sccp.cpp" />
@@ -387,6 +393,8 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-function-call.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize-resources.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-specialize.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-spirv-legalize.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-spirv-snippet.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-ssa.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-string-hash.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-strip-witness-tables.cpp" />

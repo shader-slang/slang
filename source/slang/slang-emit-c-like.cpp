@@ -540,19 +540,28 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
 
     for(auto c : name)
     {
-        // We will treat a dot character just like an underscore
-        // for the purposes of producing a scrubbed name, so
-        // that we translate `SomeType.someMethod` into
-        // `SomeType_someMethod`.
+        // We will treat a dot character or any path separator
+        // just like an underscore for the purposes of producing
+        // a scrubbed name, so that we translate `SomeType.someMethod`
+        // into `SomeType_someMethod`. This increases the readability
+        // of output code when the input used lots of nesting of
+        // code under types/namespaces/etc.
         //
         // By handling this case at the top of this loop, we
         // ensure that a `.`-turned-`_` is handled just like
         // a `_` in the original name, and will be properly
         // scrubbed for GLSL output.
         //
-        if(c == '.')
+        switch(c)
         {
+        default:
+            break;
+
+        case '.':
+        case '\\':
+        case '/':
             c = '_';
+            break;
         }
 
         if(((c >= 'a') && (c <= 'z'))
@@ -1441,17 +1450,6 @@ void CLikeSourceEmitter::_emitCallArgList(IRCall* inst)
     m_writer->emit(")");
 }
 
-void CLikeSourceEmitter::handleRequiredCapabilities(IRInst* inst)
-{
-    auto decoratedValue = inst;
-    while (auto specInst = as<IRSpecialize>(decoratedValue))
-    {
-        decoratedValue = getSpecializedValue(specInst);
-    }
-
-    handleRequiredCapabilitiesImpl(decoratedValue);
-}
-
 void CLikeSourceEmitter::emitCallExpr(IRCall* inst, EmitOpInfo outerPrec)
 {
     auto funcValue = inst->getOperand(0);
@@ -1945,27 +1943,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     maybeCloseParens(needClose);
 }
 
-BaseType CLikeSourceEmitter::extractBaseType(IRType* inType)
-{
-    auto type = inType;
-    for(;;)
-    {
-        if(auto irBaseType = as<IRBasicType>(type))
-        {
-            return irBaseType->getBaseType();
-        }
-        else if(auto vecType = as<IRVectorType>(type))
-        {
-            type = vecType->getElementType();
-            continue;
-        }
-        else
-        {
-            return BaseType::Void;
-        }
-    }
-}
-
 void CLikeSourceEmitter::emitInst(IRInst* inst)
 {
     try
@@ -2153,15 +2130,6 @@ void CLikeSourceEmitter::emitSemanticsUsingVarLayout(IRVarLayout* varLayout)
 void CLikeSourceEmitter::emitSemantics(IRInst* inst)
 {
     emitSemanticsImpl(inst);
-}
-
-IRVarLayout* CLikeSourceEmitter::getVarLayout(IRInst* var)
-{
-    auto decoration = var->findDecoration<IRLayoutDecoration>();
-    if (!decoration)
-        return nullptr;
-
-    return as<IRVarLayout>(decoration->getLayout());
 }
 
 void CLikeSourceEmitter::emitLayoutSemantics(IRInst* inst, char const* uniformSemanticSpelling)
@@ -2770,35 +2738,6 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
     }
 
     emitType(type, name);
-}
-
-IRInst* CLikeSourceEmitter::getSpecializedValue(IRSpecialize* specInst)
-{
-    auto base = specInst->getBase();
-
-    // It is possible to have a `specialize(...)` where the first
-    // operand is also a `specialize(...)`, so that we need to
-    // look at what declaration is being specialized at the inner
-    // step to find the one being specialized at the outer step.
-    //
-    while(auto baseSpecialize = as<IRSpecialize>(base))
-    {
-        base = getSpecializedValue(baseSpecialize);
-    }
-
-    auto baseGeneric = as<IRGeneric>(base);
-    if (!baseGeneric)
-        return base;
-
-    auto lastBlock = baseGeneric->getLastBlock();
-    if (!lastBlock)
-        return base;
-
-    auto returnInst = as<IRReturnVal>(lastBlock->getTerminator());
-    if (!returnInst)
-        return base;
-
-    return returnInst->getVal();
 }
 
 void CLikeSourceEmitter::emitFuncDecl(IRFunc* func)

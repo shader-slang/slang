@@ -41,19 +41,79 @@ namespace Slang
         Name*               name)
     {
         String str = getText(name);
+        Index length = str.getLength();
 
         // If the name consists of only traditional "identifer characters"
-        // (`[a-zA-Z_]`), then we wnat to emit it more or less directly.
+        // (`[a-zA-Z_]`), then we want to emit it more or less directly.
         //
-        // If it contains code points outside that range, we'll need to
-        // do something to encode them. I don't want to deal with
-        // that right now, so I'm going to ignore it.
+        bool allAllowed = true;
+        for (auto c : str)
+        {
+            if (('a' <= c) && (c <= 'z'))   continue;
+            if (('A' <= c) && (c <= 'Z'))   continue;
+            if (('0' <= c) && (c <= '9'))   continue;
+            if (c == '_')                   continue;
 
-        // We prefix the string with its byte length, so that
-        // decoding doesn't have to worry about finding a terminator.
-        Index length = str.getLength();
-        emit(context, length);
-        context->sb.append(str);
+            allAllowed = false;
+            break;
+        }
+        if (allAllowed)
+        {
+            // We prefix the string with its byte length, so that
+            // decoding doesn't have to worry about finding a terminator.
+            //
+            // Note: in this case `length` is the same as the number of
+            // code points and the number of extended grapheme clusters,
+            // since the entire name is within the ASCII subset.
+            //
+            emit(context, length);
+            context->sb.append(str);
+        }
+        else
+        {
+            // Other names that aren't pure ASCII require escaping. We
+            // will use a rather simple escaping scheme where the basic
+            // ASCII alphanumeric code points go through unmodified,
+            // and we use `_` as a kind of escape character.
+            //
+            StringBuilder encoded;
+
+            // TODO: This loop probalby ought to be over code points
+            // rather than bytes.
+            //
+            for (auto c : str)
+            {
+                if (('a' <= c) && (c <= 'z'))   { encoded.append(c); }
+                if (('A' <= c) && (c <= 'Z'))   { encoded.append(c); }
+                if (('0' <= c) && (c <= '9'))   { encoded.append(c); }
+
+                if (c == '_')
+                {
+                    encoded.append("_u");
+                }
+                else
+                {
+                    // Any byte that isn't within the allowed ranges
+                    // we be turned into hex, prefixed with `_` and
+                    // suffixed with `x`.
+                    //
+                    encoded.append("_");
+                    encoded.append(uint32_t((unsigned char)c), 16);
+                    encoded.appendChar('x');
+                }
+            }
+
+            context->sb.append("R");
+            emit(context, encoded.getLength());
+            context->sb.append(encoded);
+        }
+
+        // TODO: This logic does not rule out consecutive underscores,
+        // even though the GLSL target does not support consecutive underscores
+        // (or leading underscores, IIRC) in user identifiers.
+        //
+        // Realistically, that is best dealt with as a quirk of tha particular
+        // target, rather than adding complexity here.
     }
 
     void emitVal(
