@@ -46,6 +46,48 @@ namespace Slang
             inst->removeAndDeallocate();
         }
 
+        // Translates `createExistentialObject` insts, which takes a user defined
+        // type id and user defined value and turns into an existential value,
+        // into a `makeTuple` inst that makes the tuple representing the lowered
+        // existential value.
+        void processCreateExistentialObject(IRCreateExistentialObject* inst)
+        {
+            IRBuilder builderStorage;
+            auto builder = &builderStorage;
+            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder->setInsertBefore(inst);
+
+            // The result type of this `createExistentialObject` inst should already
+            // be lowered into a `TupleType(rttiType, WitnessTableIDType, AnyValueType)`
+            // in the previous `lowerGenericType` pass.
+            auto tupleType = inst->getDataType();
+            auto witnessTableIdType = cast<IRWitnessTableIDType>(tupleType->getOperand(1));
+            auto anyValueType = cast<IRAnyValueType>(tupleType->getOperand(2));
+
+            // Create a null value for `rttiObject` for now since it will not be used.
+            IRInst* rttiObject = builder->getIntValue(builder->getIntType(), 0);
+
+            // Pack the user provided value into `AnyValue`.
+            IRInst* packedValue = inst->getValue();
+            if (packedValue->getDataType()->getOp() != kIROp_AnyValueType)
+                packedValue = builder->emitPackAnyValue(anyValueType, packedValue);
+
+            // Use the user provided `typeID` value as the witness table ID field in the
+            // newly constructed tuple.
+            // All `WitnessTableID` types are lowered into `uint2`s, so we need to create
+            // a `uint2` value from `typeID` to stay consistent with the convention.
+            IRInst* vectorArgs[2] = {
+                inst->getTypeID(), builder->getIntValue(builder->getUIntType(), 0)};
+            auto uint2Type = builder->getVectorType(
+                builder->getUIntType(), builder->getIntValue(builder->getIntType(), 2));
+            IRInst* typeIdValue = builder->emitMakeVector(uint2Type, 2, vectorArgs);
+            typeIdValue = builder->emitBitCast(witnessTableIdType, typeIdValue);
+            IRInst* tupleArgs[] = {rttiObject, typeIdValue, packedValue};
+            auto tuple = builder->emitMakeTuple(tupleType, 3, tupleArgs);
+            inst->replaceUsesWith(tuple);
+            inst->removeAndDeallocate();
+        }
+
         IRInst* extractTupleElement(IRBuilder* builder, IRInst* value, UInt index)
         {
             auto tupleType = cast<IRTupleType>(sharedContext->lowerType(builder, value->getDataType()));
@@ -137,6 +179,10 @@ namespace Slang
             if (auto makeExistential = as<IRMakeExistentialWithRTTI>(inst))
             {
                 processMakeExistential(makeExistential);
+            }
+            else if (auto createExistentialObject = as<IRCreateExistentialObject>(inst))
+            {
+                processCreateExistentialObject(createExistentialObject);
             }
             else if (auto getValueFromBoundInterface = as<IRGetValueFromBoundInterface>(inst))
             {

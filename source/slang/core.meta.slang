@@ -1901,6 +1901,12 @@ __generic<T, U>
 __intrinsic_op($(kIROp_BitCast))
 T bit_cast(U value);
 
+// Create Existential object
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_CreateExistentialObject))
+T createDynamicObject(uint typeId, U value);
+
 // Specialized function
 
 /// Given a string returns an integer hash of that string.

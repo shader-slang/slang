@@ -1721,6 +1721,14 @@ struct IRMakeExistentialWithRTTI : IRInst
     IR_LEAF_ISA(MakeExistentialWithRTTI)
 };
 
+struct IRCreateExistentialObject : IRInst
+{
+    IRInst* getTypeID() { return getOperand(0); }
+    IRInst* getValue() { return getOperand(1); }
+
+    IR_LEAF_ISA(CreateExistentialObject)
+};
+
     /// Generalizes `IRMakeExistential` by allowing a type with existential sub-fields to be boxed
 struct IRWrapExistential : IRInst
 {
