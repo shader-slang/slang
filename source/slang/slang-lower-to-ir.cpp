@@ -8255,6 +8255,11 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
     {
         visitChildren(specialized);
     }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
 RefPtr<IRModule> generateIRForSpecializedComponentType(
@@ -8265,6 +8270,65 @@ RefPtr<IRModule> generateIRForSpecializedComponentType(
     return context.process(componentType, sink);
 }
 
+    /// Context for generating IR code to represent a `TypeConformance`
+struct TypeConformanceIRGenContext
+{
+    DiagnosticSink* sink;
+    Linkage* linkage;
+    Session* session;
+    IRGenContext* context;
+    IRBuilder* builder;
+
+    RefPtr<IRModule> process(
+        TypeConformance* typeConformance,
+        Int conformanceIdOverride,
+        DiagnosticSink* inSink)
+    {
+        sink = inSink;
+
+        linkage = typeConformance->getLinkage();
+        session = linkage->getSessionImpl();
+
+        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_obfuscateCode);
+        SharedIRGenContext* sharedContext = &sharedContextStorage;
+
+        IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
+        context = &contextStorage;
+
+        SharedIRBuilder sharedBuilderStorage;
+        SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
+        sharedBuilder->module = nullptr;
+        sharedBuilder->session = session;
+
+        IRBuilder builderStorage;
+        builder = &builderStorage;
+        builder->sharedBuilder = sharedBuilder;
+
+        RefPtr<IRModule> module = builder->createModule();
+        sharedBuilder->module = module;
+
+        builder->setInsertInto(module->getModuleInst());
+
+        context->irBuilder = builder;
+
+        auto witness = lowerSimpleVal(context, typeConformance->getSubtypeWitness());
+        builder->addPublicDecoration(witness);
+        if (conformanceIdOverride != -1)
+        {
+            builder->addSequentialIDDecoration(witness, conformanceIdOverride);
+        }
+        return module;
+    }
+};
+
+RefPtr<IRModule> generateIRForTypeConformance(
+    TypeConformance* typeConformance,
+    Int conformanceIdOverride,
+    DiagnosticSink* sink)
+{
+    TypeConformanceIRGenContext context;
+    return context.process(typeConformance, conformanceIdOverride, sink);
+}
 
 RefPtr<IRModule> TargetProgram::getOrCreateIRModuleForLayout(DiagnosticSink* sink)
 {

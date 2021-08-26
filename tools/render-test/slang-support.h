@@ -33,11 +33,20 @@ struct ShaderCompileRequest
         SlangStage slangStage;
     };
 
+    struct TypeConformance
+    {
+    public:
+        Slang::String derivedTypeName;
+        Slang::String baseTypeName;
+        Int idOverride;
+    };
+
     SourceInfo source;
     Slang::List<EntryPoint> entryPoints;
 
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
+    Slang::List<TypeConformance> typeConformances;
 };
 
 
