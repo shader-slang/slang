@@ -2735,6 +2735,11 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
         SLANG_UNUSED(specializationInfo);
     }
 
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
+
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(module);
@@ -2920,6 +2925,10 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         }
     }
 
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
     /// Recursively collect the global shader parameters and entry points in `program`.
@@ -3146,6 +3155,11 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         auto base = specialized->getBaseComponentType();
         _completeBindings(m_context, base, m_counters);
     }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
     /// A visitor used by `_completeBindings`.
@@ -3272,6 +3286,10 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         m_counters->entryPointCounter += specialized->getEntryPointCount();
     }
 
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
 static void _completeBindings(

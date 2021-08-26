@@ -19,8 +19,11 @@ struct UserDefinedPackedType
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<float> gOutputBuffer;
 
-//TEST_INPUT: set gObj = new StructuredBuffer<UserDefinedPackedType>[new UserDefinedPackedType{[1.0, 0.0, 0.0], 0}, new UserDefinedPackedType{[2.0, 3.0, 4.0], 1}];
+//TEST_INPUT: set gObj = new StructuredBuffer<UserDefinedPackedType>[new UserDefinedPackedType{[1.0, 2.0, 3.0], 3}, new UserDefinedPackedType{[2.0, 3.0, 4.0], 4}];
 RWStructuredBuffer<UserDefinedPackedType> gObj;
+
+//TEST_INPUT: type_conformance FloatVal:IInterface = 3
+//TEST_INPUT: type_conformance Float4Val:IInterface = 4
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
@@ -35,8 +38,7 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     gOutputBuffer[0] = result;
 }
 
-// Type must be marked `public` to ensure it is visible in the generated DLL.
-public struct FloatVal : IInterface
+struct FloatVal : IInterface
 {
     float val;
     float run()
@@ -46,7 +48,7 @@ public struct FloatVal : IInterface
 };
 interface ISomething{void g();}
 struct Float4Struct : ISomething { float4 val; void g() {} }
-public struct Float4Val : IInterface
+struct Float4Val : IInterface
 {
     Float4Struct val;
     float run()

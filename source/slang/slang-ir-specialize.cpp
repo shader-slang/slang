@@ -2158,6 +2158,11 @@ IRInst* specializeGenericImpl(
             if( auto returnValInst = as<IRReturnVal>(ii) )
             {
                 auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
+
+                // Clone decorations on the orignal `specialize` inst over to the newly specialized
+                // value.
+                cloneInstDecorationsAndChildren(
+                    &env, &sharedBuilderStorage, specializeInst, specializedVal);
                 return specializedVal;
             }
 
