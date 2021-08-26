@@ -285,6 +285,16 @@ public:
     Slang::RefPtr<AggVal> rootVal;
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
+
+    class TypeConformanceVal
+    {
+    public:
+        Slang::String derivedTypeName;
+        Slang::String baseTypeName;
+        Int idOverride = -1;
+    };
+    Slang::List<TypeConformanceVal> typeConformances;
+
     int numRenderTargets = 1;
 
     Slang::Index findEntryIndexByName(const Slang::String& name) const;

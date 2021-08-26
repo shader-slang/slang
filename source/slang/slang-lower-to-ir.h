@@ -43,5 +43,14 @@ namespace Slang
     RefPtr<IRModule> generateIRForSpecializedComponentType(
         SpecializedComponentType*   componentType,
         DiagnosticSink*             sink);
-}
+
+        /// Generate an IR module to represent a user specified `TypeConformance` component type.
+        /// The generated IR will include an extern symbol representing the type conformance
+        /// (typically a `IRWitnessTable` or a `specialize(IRWitnessTable)` inst), with a `public`
+        /// decoration to keep the referenced witness table alive during linking.
+    RefPtr<IRModule> generateIRForTypeConformance(
+        TypeConformance* typeConformance,
+        Int conformanceIdOverride,
+        DiagnosticSink* sink);
+    }
 #endif
