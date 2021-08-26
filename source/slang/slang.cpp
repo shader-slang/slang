@@ -1043,6 +1043,33 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentType(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    slang::ITypeConformance** outConformanceComponentType,
+    SlangInt conformanceIdOverride,
+    ISlangBlob** outDiagnostics)
+{
+    RefPtr<TypeConformance> result;
+    DiagnosticSink sink;
+    try
+    {
+        SharedSemanticsContext sharedSemanticsContext(this, nullptr, &sink);
+        SemanticsVisitor visitor(&sharedSemanticsContext);
+        auto witness =
+            visitor.tryGetSubtypeWitness((Slang::Type*)type, (Slang::Type*)interfaceType);
+        if (auto subtypeWitness = as<SubtypeWitness>(witness))
+        {
+            result = new TypeConformance(this, subtypeWitness, conformanceIdOverride, &sink);
+        }
+    }
+    catch (...)
+    {}
+    sink.getBlobIfNeeded(outDiagnostics);
+    *outConformanceComponentType = result.detach();
+    return result ? SLANG_OK : SLANG_FAIL;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
     SlangCompileRequest**   outCompileRequest)
 {
@@ -3033,6 +3060,11 @@ struct EnumerateModulesVisitor : ComponentTypeVisitor
     {
         visitChildren(specialized);
     }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
 
@@ -3070,6 +3102,11 @@ struct EnumerateIRModulesVisitor : ComponentTypeVisitor
         visitChildren(specialized);
 
         m_callback(specialized->getIRModule(), m_userData);
+    }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        m_callback(conformance->getIRModule(), m_userData);
     }
 };
 
@@ -3393,6 +3430,11 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
     {
         visitChildren(specialized);
     }
+
+    void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(conformance);
+    }
 };
 
 SpecializedComponentType::SpecializedComponentType(
@@ -3608,7 +3650,10 @@ SpecializedComponentType::SpecializedComponentType(
         { visitChildren(composite, specializationInfo); }
         void visitSpecialized(SpecializedComponentType* specialized) SLANG_OVERRIDE
         { visitChildren(specialized); }
-
+        void visitTypeConformance(TypeConformance* conformance) SLANG_OVERRIDE
+        {
+            SLANG_UNUSED(conformance);
+        }
         EntryPointMangledNameCollector(ASTBuilder* astBuilder):
             m_astBuilder(astBuilder)
         {

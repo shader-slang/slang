@@ -296,6 +296,92 @@ namespace Slang
         return empty;
     }
 
+    TypeConformance::TypeConformance(
+        Linkage* linkage,
+        SubtypeWitness* witness,
+        Int confomrmanceIdOverride,
+        DiagnosticSink* sink)
+        : ComponentType(linkage)
+        , m_subtypeWitness(witness)
+        , m_conformanceIdOverride(confomrmanceIdOverride)
+    {
+        addDepedencyFromWitness(witness);
+        m_irModule = generateIRForTypeConformance(this, m_conformanceIdOverride, sink);
+    }
+
+    void TypeConformance::addDepedencyFromWitness(SubtypeWitness* witness)
+    {
+        if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+        {
+            auto declModule = getModule(declaredWitness->declRef.getDecl());
+            m_moduleDependency.addDependency(declModule);
+            m_pathDependency.addDependency(declModule);
+            if (m_requirementSet.Add(declModule))
+            {
+                m_requirements.add(declModule);
+            }
+            // TODO: handle the specialization arguments in declaredWitness->declRef.substitutions.
+        }
+        else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
+        {
+            addDepedencyFromWitness(transitiveWitness->midToSup);
+            addDepedencyFromWitness(transitiveWitness->subToMid);
+        }
+        else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
+        {
+            auto left = as<SubtypeWitness>(conjunctionWitness->leftWitness);
+            if (left)
+                addDepedencyFromWitness(left);
+            auto right = as<SubtypeWitness>(conjunctionWitness->rightWitness);
+            if (right)
+                addDepedencyFromWitness(right);
+        }
+    }
+
+    ISlangUnknown* TypeConformance::getInterface(const Guid& guid)
+    {
+        if (guid == slang::ITypeConformance::getTypeGuid())
+            return static_cast<slang::ITypeConformance*>(this);
+
+        return Super::getInterface(guid);
+    }
+
+    List<Module*> const& TypeConformance::getModuleDependencies()
+    {
+        return m_moduleDependency.getModuleList();
+    }
+
+    List<String> const& TypeConformance::getFilePathDependencies()
+    {
+        return m_pathDependency.getFilePathList();
+    }
+
+    Index TypeConformance::getRequirementCount() { return m_requirements.getCount(); }
+
+    RefPtr<ComponentType> TypeConformance::getRequirement(Index index)
+    {
+        return m_requirements[index];
+    }
+
+    void TypeConformance::acceptVisitor(
+        ComponentTypeVisitor* visitor,
+        ComponentType::SpecializationInfo* specializationInfo)
+    {
+        SLANG_UNUSED(specializationInfo);
+        visitor->visitTypeConformance(this);
+    }
+
+    RefPtr<ComponentType::SpecializationInfo> TypeConformance::_validateSpecializationArgsImpl(
+        SpecializationArg const* args,
+        Index argCount,
+        DiagnosticSink* sink)
+    {
+        SLANG_UNUSED(args);
+        SLANG_UNUSED(argCount);
+        SLANG_UNUSED(sink);
+        return nullptr;
+    }
+
     //
 
     Profile Profile::lookUp(UnownedStringSlice const& name)

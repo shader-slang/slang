@@ -850,6 +850,125 @@ namespace Slang
         Profile m_profile;
     };
 
+    class TypeConformance
+        : public ComponentType
+        , public slang::ITypeConformance
+    {
+        typedef ComponentType Super;
+
+    public:
+        SLANG_REF_OBJECT_IUNKNOWN_ALL
+
+        ISlangUnknown* getInterface(const Guid& guid);
+
+        TypeConformance(
+            Linkage* linkage,
+            SubtypeWitness* witness,
+            Int confomrmanceIdOverride,
+            DiagnosticSink* sink);
+
+        // Forward `IComponentType` methods
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE
+        {
+            return Super::getSession();
+        }
+
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
+            getLayout(SlangInt targetIndex, slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getLayout(targetIndex, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
+            slang::SpecializationArg const* specializationArgs,
+            SlangInt specializationArgCount,
+            slang::IComponentType** outSpecializedComponentType,
+            ISlangBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::specialize(
+                specializationArgs,
+                specializationArgCount,
+                outSpecializedComponentType,
+                outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            slang::IComponentType** outLinkedComponentType,
+            ISlangBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::link(outLinkedComponentType, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int entryPointIndex,
+            int targetIndex,
+            ISlangSharedLibrary** outSharedLibrary,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointHostCallable(
+                entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
+        }
+
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE;
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE;
+
+        SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE { return 0; }
+
+        /// Get the existential type parameter at `index`.
+        SpecializationParam const& getSpecializationParam(Index /*index*/) SLANG_OVERRIDE
+        {
+            static SpecializationParam emptyParam;
+            return emptyParam;
+        }
+
+        Index getRequirementCount() SLANG_OVERRIDE;
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE;
+        Index getEntryPointCount() SLANG_OVERRIDE { return 0; };
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE
+        {
+            SLANG_UNUSED(index);
+            return nullptr;
+        }
+        String getEntryPointMangledName(Index /*index*/) SLANG_OVERRIDE { return ""; }
+
+        Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE
+        {
+            SLANG_UNUSED(index);
+            return ShaderParamInfo();
+        }
+
+        SubtypeWitness* getSubtypeWitness() { return m_subtypeWitness; }
+        IRModule* getIRModule() { return m_irModule.Ptr(); }
+    protected:
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+            SLANG_OVERRIDE;
+
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const* args,
+            Index argCount,
+            DiagnosticSink* sink) SLANG_OVERRIDE;
+    private:
+        SubtypeWitness* m_subtypeWitness;
+        ModuleDependencyList m_moduleDependency;
+        FilePathDependencyList m_pathDependency;
+        List<RefPtr<Module>> m_requirements;
+        HashSet<Module*> m_requirementSet;
+        RefPtr<IRModule> m_irModule;
+        Int m_conformanceIdOverride;
+        void addDepedencyFromWitness(SubtypeWitness* witness);
+    };
+
     enum class PassThroughMode : SlangPassThroughIntegral
     {
         None = SLANG_PASS_THROUGH_NONE,	                    ///< don't pass through: use Slang compiler
@@ -1312,6 +1431,12 @@ namespace Slang
             slang::TypeReflection* type,
             slang::TypeReflection* interfaceType,
             uint32_t*              outId) override;
+        SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
+            slang::TypeReflection* type,
+            slang::TypeReflection* interfaceType,
+            slang::ITypeConformance** outConformance,
+            SlangInt conformanceIdOverride,
+            ISlangBlob** outDiagnostics) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompileRequest(
             SlangCompileRequest**   outCompileRequest) override;
 
@@ -1749,6 +1874,7 @@ namespace Slang
         virtual void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) = 0;
         virtual void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
         virtual void visitSpecialized(SpecializedComponentType* specialized) = 0;
+        virtual void visitTypeConformance(TypeConformance* conformance) = 0;
 
     protected:
         // These helpers can be used to recurse into the logical children of a

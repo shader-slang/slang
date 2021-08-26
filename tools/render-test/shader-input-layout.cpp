@@ -837,6 +837,17 @@ namespace renderer_test
             parentForNewVal->addField(field);
         }
 
+        void parseTypeConformance(Misc::TokenReader& parser)
+        {
+            ShaderInputLayout::TypeConformanceVal conformance;
+            conformance.derivedTypeName = parseTypeName(parser);
+            parser.Read(":");
+            conformance.baseTypeName = parseTypeName(parser);
+            if (parser.AdvanceIf("="))
+                conformance.idOverride = parser.ReadInt();
+            layout->typeConformances.add(conformance);
+        }
+
         void parseLine(Misc::TokenReader& parser)
         {
             if (parser.LookAhead("entryPointSpecializationArg")
@@ -871,6 +882,10 @@ namespace renderer_test
             else if( parser.AdvanceIf("set") )
             {
                 parseSetEntry(parser);
+            }
+            else if (parser.AdvanceIf("type_conformance"))
+            {
+                parseTypeConformance(parser);
             }
             else
             {

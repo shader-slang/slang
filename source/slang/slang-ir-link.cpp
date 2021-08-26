@@ -274,7 +274,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 
     default:
         {
-            // In the deafult case, assume that we have some sort of "hoistable"
+            // In the default case, assume that we have some sort of "hoistable"
             // instruction that requires us to create a clone of it.
 
             UInt argCount = originalValue->getOperandCount();
@@ -439,6 +439,8 @@ static void cloneExtraDecorations(
 
             case kIROp_BindExistentialSlotsDecoration:
             case kIROp_LayoutDecoration:
+            case kIROp_PublicDecoration:
+            case kIROp_SequentialIDDecoration:
                 if(!clonedInst->findDecorationImpl(decoration->getOp()))
                 {
                     cloneInst(context, builder, decoration);
