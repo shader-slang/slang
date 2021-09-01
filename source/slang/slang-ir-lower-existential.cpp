@@ -65,7 +65,11 @@ namespace Slang
             auto anyValueType = cast<IRAnyValueType>(tupleType->getOperand(2));
 
             // Create a null value for `rttiObject` for now since it will not be used.
-            IRInst* rttiObject = builder->getIntValue(builder->getIntType(), 0);
+            auto uint2Type = builder->getVectorType(
+                builder->getUIntType(), builder->getIntValue(builder->getIntType(), 2));
+            IRInst* zero = builder->getIntValue(builder->getUIntType(), 0);
+            IRInst* zeroVectorArgs[] = { zero, zero };
+            IRInst* rttiObject = builder->emitMakeVector(uint2Type, 2, zeroVectorArgs);
 
             // Pack the user provided value into `AnyValue`.
             IRInst* packedValue = inst->getValue();
@@ -78,8 +82,7 @@ namespace Slang
             // a `uint2` value from `typeID` to stay consistent with the convention.
             IRInst* vectorArgs[2] = {
                 inst->getTypeID(), builder->getIntValue(builder->getUIntType(), 0)};
-            auto uint2Type = builder->getVectorType(
-                builder->getUIntType(), builder->getIntValue(builder->getIntType(), 2));
+            
             IRInst* typeIdValue = builder->emitMakeVector(uint2Type, 2, vectorArgs);
             typeIdValue = builder->emitBitCast(witnessTableIdType, typeIdValue);
             IRInst* tupleArgs[] = {rttiObject, typeIdValue, packedValue};
