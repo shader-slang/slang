@@ -2094,16 +2094,17 @@ namespace Slang
         SerialContainerUtil::WriteOptions options;
 
         options.compressionType = linkage->serialCompressionType;
-        if (linkage->debugInfoLevel != DebugInfoLevel::None)
-        {
-            options.optionFlags |= SerialOptionFlag::SourceLocation;
-        }
         if (linkage->m_obfuscateCode)
         {
             // If code is obfuscated, we *disable* AST output as it is not obfuscated and will reveal
             // too much about IR.
             // Also currently only IR is needed.
             options.optionFlags &= ~SerialOptionFlag::ASTModule;
+        }
+        else if (linkage->debugInfoLevel != DebugInfoLevel::None && linkage->getSourceManager())
+        {
+            options.optionFlags |= SerialOptionFlag::SourceLocation;
+            options.sourceManager = linkage->getSourceManager();
         }
 
         {
