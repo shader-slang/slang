@@ -83,11 +83,13 @@ namespace Slang
             //
             for (auto c : str)
             {
-                if (('a' <= c) && (c <= 'z'))   { encoded.append(c); }
-                if (('A' <= c) && (c <= 'Z'))   { encoded.append(c); }
-                if (('0' <= c) && (c <= '9'))   { encoded.append(c); }
-
-                if (c == '_')
+                if (('a' <= c) && (c <= 'z')
+                    || ('A' <= c) && (c <= 'Z')
+                    || ('0' <= c) && (c <= '9'))
+                {
+                    encoded.append(c);
+                }
+                else if (c == '_')
                 {
                     encoded.append("_u");
                 }

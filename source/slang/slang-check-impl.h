@@ -23,15 +23,15 @@ namespace Slang
 
     // A flat representation of basic types (scalars, vectors and matrices)
     // that can be used as lookup key in caches
-    enum class BasicTypeKey : uint8_t
+    enum class BasicTypeKey : uint16_t
     {
-        Invalid = 0xff,                 ///< Value that can never be a valid type                
+        Invalid = 0xffff,                 ///< Value that can never be a valid type
     };
 
-    SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 1, IntegerLiteralValue dim2 = 1)
+    SLANG_FORCE_INLINE BasicTypeKey makeBasicTypeKey(BaseType baseType, IntegerLiteralValue dim1 = 0, IntegerLiteralValue dim2 = 0)
     {
-        SLANG_ASSERT(dim1 > 0 && dim2 > 0);
-        return BasicTypeKey((uint8_t(baseType) << 4) | ((uint8_t(dim1) - 1) << 2) | (uint8_t(dim2) - 1));
+        SLANG_ASSERT(dim1 >= 0 && dim2 >= 0);
+        return BasicTypeKey((uint8_t(baseType) << 8) | (uint8_t(dim1) << 4) | uint8_t(dim2));
     }
 
     inline BasicTypeKey makeBasicTypeKey(Type* typeIn)
