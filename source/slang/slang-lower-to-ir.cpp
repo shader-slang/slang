@@ -6712,9 +6712,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 HashSet<IRInst*> valuesToClone;
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
+                // For Function Types, we always clone all generic parameters regardless of whether
+                // the generic parameter appears in the function signature or not.
+                if (returnType->getOp() == kIROp_FuncType)
+                {
+                    for (auto genericParam : parentGeneric->getParams())
+                    {
+                        markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
+                    }
+                }
                 if (valuesToClone.Count() == 0)
                 {
-                    // If returnType is independent of generic parameters, set
+                    // If the new generic has no parameters, set
                     // the generic inst's type to just `returnType`.
                     parentGeneric->setFullType((IRType*)returnType);
                 }
@@ -6737,8 +6746,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     }
                     IRInst* clonedReturnType = nullptr;
                     cloneEnv.mapOldValToNew.TryGetValue(returnType, clonedReturnType);
-                    SLANG_ASSERT(clonedReturnType);
-                    typeBuilder.emitReturn(clonedReturnType);
+                    if (clonedReturnType)
+                    {
+                        // If the type has explicit dependency on generic parameters, use
+                        // the cloned type.
+                        typeBuilder.emitReturn(clonedReturnType);
+                    }
+                    else
+                    {
+                        // Otherwise just use the original type value directly.
+                        typeBuilder.emitReturn(returnType);
+                    }
                     parentGeneric->setFullType((IRType*)typeGeneric);
                     returnType = typeGeneric;
                 }
