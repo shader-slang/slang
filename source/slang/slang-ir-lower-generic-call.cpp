@@ -218,9 +218,6 @@ namespace Slang
             auto newCall = builder->emitCallInst(calleeRetType, newCallee, args);
             auto callInstType = callInst->getDataType();
             auto unpackInst = maybeUnpackValue(builder, callInstType, calleeRetType, newCall);
-            callInst->replaceUsesWith(unpackInst);
-            callInst->removeAndDeallocate();
-
             // Unpack other `out` arguments.
             for (auto& item : argsToUnpack)
             {
@@ -229,6 +226,8 @@ namespace Slang
                 auto unpackedVal = builder->emitUnpackAnyValue(originalValType, packedVal);
                 builder->emitStore(item.dstArg, unpackedVal);
             }
+            callInst->replaceUsesWith(unpackInst);
+            callInst->removeAndDeallocate();
         }
 
         IRInst* findInnerMostSpecializingBase(IRSpecialize* inst)
