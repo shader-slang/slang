@@ -161,6 +161,17 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 
     spvtools::OptimizerOptions spvOptOptions;
 
+    // To compile some large shaders the default is not enough.
+    // That although this limit is exceeded, the final optimized output is typically well
+    // within the range.
+    //
+    // See kDefaultMaxIdBound for description of this limit.
+    //
+    // If a compilation produces a warning like
+    // `0:0: ID overflow. Try running compact-ids.`
+    // it might be fixable by raising the multiplier to a larger value.
+    spvOptOptions.set_max_id_bound(kDefaultMaxIdBound * 4);
+
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
@@ -182,7 +193,47 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
         }
-#endif
+#elif 1
+        // 6Mb 27 secs (all passes up to 9) 
+        // 9Mb 25 secs (all passes up to 7)
+        // 8Mb 15 secs (all passes) -(5,6,7)
+        // 6Mb 15 secs (all passes) -(6,7) 
+
+        // This list of passes takes the previous 'default optimization'
+        // passes (as listed above) and tries to combine them in order with the 'new' passes below.
+        // The issue with the passes below is that although it produces smaller SPIR-V fairly quickly
+        // it can cause serious problem on some drivers.
+        // 
+        // Across a wide range of compilations this produced SPIR-V that is less than half size of the
+        // previous -O1 passes above.
+        {
+            optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());           // 1
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());       // 2
+
+            optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+            optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+
+            optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
+
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+
+            optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
+
+            optimizer.RegisterPass(spvtools::CreateCCPPass());                  // 4 *
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass());       // 5
+            //optimizer.RegisterPass(spvtools::CreateIfConversionPass());         // 6
+            //optimizer.RegisterPass(spvtools::CreateBlockMergePass());           // 7 *
+
+            optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+
+            optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass()); // 8
+
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+
+            optimizer.RegisterPass(spvtools::CreateVectorDCEPass());            // 9
+        }
+#else
         // The following selection of passes was created by
         // 1) Taking the list of passes from optimizer.RegisterSizePasses
         // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V output size and compilation speed
@@ -242,6 +293,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
         }
+#endif
 
         break;
     case SLANG_OPTIMIZATION_LEVEL_HIGH:
@@ -256,17 +308,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         // Use the same passes when specifying the "-O" flag in spirv-opt
         // Roughly equivalent to `RegisterPerformancePasses`
 
-        // To compile some large shaders the default is not enough.
-        // That although this limit is exceeded, the final optimized output is typically well
-        // within the range.
-        //
-        // See kDefaultMaxIdBound for description of this limit.
-        //
-        // If a compilation produces a warning like
-        // `0:0: ID overflow. Try running compact-ids.`
-        // it might be fixable by raising the multiplier to a larger value.
-        spvOptOptions.set_max_id_bound(kDefaultMaxIdBound * 4);
-
+        
         optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
         optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
         optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
