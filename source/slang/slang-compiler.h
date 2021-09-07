@@ -1301,6 +1301,10 @@ namespace Slang
         {
             lineDirectiveMode = mode;
         }
+        void setDumpIntermediates(bool value)
+        {
+            dumpIntermediates = value;
+        }
         void addCapability(CapabilityAtom capability);
 
         bool shouldEmitSPIRVDirectly()
@@ -1312,6 +1316,8 @@ namespace Slang
         {
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
+
+        bool shouldDumpIntermediates() { return dumpIntermediates; }
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
@@ -1340,6 +1346,7 @@ namespace Slang
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
+        bool                    dumpIntermediates = false;
     };
 
         /// Are we generating code for a D3D API?
