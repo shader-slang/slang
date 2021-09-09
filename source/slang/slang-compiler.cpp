@@ -2049,6 +2049,7 @@ namespace Slang
             m_program);
         backEndRequest->shouldDumpIR =
             (m_targetReq->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR) != 0;
+        backEndRequest->shouldDumpIntermediates = m_targetReq->shouldDumpIntermediates();
 
         return _createEntryPointResult(
             entryPointIndex,

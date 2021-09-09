@@ -3921,6 +3921,13 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
     getBackEndReq()->shouldDumpIntermediates = (enable != 0);
+
+    // Change all existing targets to use the new setting.
+    auto linkage = getLinkage();
+    for (auto& target : linkage->targets)
+    {
+        target->setDumpIntermediates(enable != 0);
+    }
 }
 
 void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)
