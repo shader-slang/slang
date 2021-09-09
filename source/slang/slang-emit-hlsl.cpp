@@ -479,7 +479,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     emitType(inst->getDataType());
                     m_writer->emit(")");
                     break;
-
+                case BaseType::Half:
+                    m_writer->emit("f16tof32");
+                    break;
                 case BaseType::Float:
                     // Note: at present HLSL only supports
                     // reinterpreting integer bits as a `float`.
@@ -511,9 +513,16 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 case BaseType::UInt:
                 case BaseType::Int:
                     break;
-
+                case BaseType::UInt16:
+                case BaseType::Int16:
+                    break;
                 case BaseType::Float:
                     m_writer->emit("asuint(");
+                    closeCount++;
+                    break;
+
+                case BaseType::Half:
+                    m_writer->emit("f32tof16(");
                     closeCount++;
                     break;
             }
@@ -750,18 +759,30 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_VoidType:
         case kIROp_BoolType:
         case kIROp_Int8Type:
-        case kIROp_Int16Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
         case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
-        case kIROp_HalfType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
+            return;
+        }
+        case kIROp_Int16Type:
+        {
+            m_writer->emit("min16int");
+            return;
+        }
+        case kIROp_UInt16Type:
+        {
+            m_writer->emit("min16uint");
+            return;
+        }
+        case kIROp_HalfType:
+        {
+            m_writer->emit("min16float");
             return;
         }
         case kIROp_StructType:
