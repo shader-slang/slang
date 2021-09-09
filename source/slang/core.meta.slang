@@ -1907,6 +1907,12 @@ __generic<T, U>
 __intrinsic_op($(kIROp_CreateExistentialObject))
 T createDynamicObject(uint typeId, U value);
 
+// Reinterpret
+__generic<T, U>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_Reinterpret))
+T reinterpret(U value);
+
 // Specialized function
 
 /// Given a string returns an integer hash of that string.
