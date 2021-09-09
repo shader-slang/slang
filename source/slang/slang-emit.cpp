@@ -21,6 +21,7 @@
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-lower-bit-cast.h"
+#include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-restructure-scoping.h"
@@ -326,6 +327,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(compileRequest, irModule, "AFTER-SPECIALIZE");
 
     eliminateDeadCode(irModule);
+
+    lowerReinterpret(targetRequest, irModule, sink);
 
     // For targets that supports dynamic dispatch, we need to lower the
     // generics / interface types to ordinary functions and types using
