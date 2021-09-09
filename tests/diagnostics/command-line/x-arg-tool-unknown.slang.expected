@@ -1,6 +1,6 @@
 result code = 1
 standard error = {
-(1): error 100000: downstream tool name not known, allowed names are [ fxc, dxc, glslang, clang, visualstudio, gcc, genericcpp, nvrtc, downstream, linker ]
+(1): error 100000: downstream tool name not known, allowed names are [ fxc, dxc, glslang, clang, visualstudio, gcc, genericcpp, nvrtc, llvm, downstream, linker ]
 tests/diagnostics/command-line/x-arg-tool-unknown.slang -entry main -stage compute -o myKernel.dxbc -o myKernel.dxbc -Xthingy
                                                                                                                      ^
 }
