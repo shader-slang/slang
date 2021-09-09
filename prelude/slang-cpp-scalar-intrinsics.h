@@ -59,7 +59,7 @@ float F32_log(float f);
 float F32_log10(float f);
 float F32_exp2(float f);
 float F32_exp(float f);
-float F32_abs(float f);
+SLANG_FORCE_INLINE float F32_abs(float f) { return f < 0.0f ? -f : f; }
 float F32_trunc(float f);
 float F32_sqrt(float f);
 
@@ -179,7 +179,7 @@ double F64_log(double f);
 double F64_log10(float f);
 double F64_exp2(double f);
 double F64_exp(double f);
-double F64_abs(double f);
+SLANG_FORCE_INLINE double F64_abs(double f) { return f < 0.0 ? -f : f; }
 double F64_trunc(double f);
 double F64_sqrt(double f);
 
