@@ -979,7 +979,8 @@ namespace Slang
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
         Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
         GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
-        NVRTC = SLANG_PASS_THROUGH_NVRTC,
+        NVRTC = SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC CUDA compiler
+        LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);

@@ -480,6 +480,7 @@ namespace Slang
             {
                 return SourceLanguage::GLSL;
             }
+            case PassThroughMode::LLVM:
             case PassThroughMode::Clang:
             case PassThroughMode::VisualStudio:
             case PassThroughMode::Gcc:
@@ -493,6 +494,7 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            
             default: break;
         }
         SLANG_ASSERT(!"Unknown compiler");
