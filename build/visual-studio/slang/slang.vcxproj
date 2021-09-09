@@ -251,6 +251,7 @@
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-function.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generic-type.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-generics.h" />
+    <ClInclude Include="..\..\..\source\slang\slang-ir-lower-reinterpret.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-lower-tuple-types.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-missing-return.h" />
     <ClInclude Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.h" />
@@ -380,6 +381,7 @@
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-function.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generic-type.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-generics.cpp" />
+    <ClCompile Include="..\..\..\source\slang\slang-ir-lower-reinterpret.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-lower-tuple-types.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-missing-return.cpp" />
     <ClCompile Include="..\..\..\source\slang\slang-ir-optix-entry-point-uniforms.cpp" />
