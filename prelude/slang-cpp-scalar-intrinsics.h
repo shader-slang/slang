@@ -68,8 +68,8 @@ bool F32_isfinite(float f);
 bool F32_isinf(float f);
 
 // Binary
-float F32_min(float a, float b);
-float F32_max(float a, float b);
+SLANG_FORCE_INLINE float F32_min(float a, float b) { return a < b ? a : b; }
+SLANG_FORCE_INLINE float F32_max(float a, float b) { return a > b ? a : b; }
 float F32_pow(float a, float b);
 float F32_fmod(float a, float b);
 float F32_remainder(float a, float b);
@@ -188,8 +188,8 @@ bool F64_isfinite(double f);
 bool F64_isinf(double f);
 
 // Binary
-double F64_min(double a, double b);
-double F64_max(double a, double b);
+SLANG_FORCE_INLINE double F64_min(double a, double b) { return a < b ? a : b; }
+SLANG_FORCE_INLINE double F64_max(double a, double b) { return a > b ? a : b; }
 double F64_pow(double a, double b);
 double F64_fmod(double a, double b);
 double F64_remainder(double a, double b);
