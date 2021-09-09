@@ -1,11 +1,16 @@
 #ifndef SLANG_LLVM_H
 #define SLANG_LLVM_H
 
-/* 
-For now disable asserts. We probably want them to call out to a function
-*/
+#ifndef SLANG_PRELUDE_ASSERT(x)
+#   ifdef DEBUG
+extern "C" void assertFailure(const char* msg);
+#       define SLANG_PRELUDE_EXPECT(VALUE, MSG) if(VALUE) {} else assertFailure("assertion failed: '" MSG "'")
+#       define SLANG_PRELUDE_ASSERT(VALUE) SLANG_PRELUDE_EXPECT(VALUE, #VALUE)
+#   else // DEBUG
 
-#define SLANG_PRELUDE_ASSERT(x)
+#       define SLANG_PRELUDE_ASSERT(x) 
+#   endif // DEBUG
+#endif
 
 /*
 Taken from stddef.h 
