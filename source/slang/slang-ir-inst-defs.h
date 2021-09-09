@@ -548,105 +548,105 @@ INST(HighLevelDeclDecoration,               highLevelDecl,          1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
     INST(PartitioningDecoration,            partioning,             1, 0)
     INST(DomainDecoration,                  domain,                 1, 0)
-INST(MaxVertexCountDecoration, maxVertexCount, 1, 0)
-INST(InstanceDecoration, instance, 1, 0)
-INST(NumThreadsDecoration, numThreads, 3, 0)
+    INST(MaxVertexCountDecoration,          maxVertexCount,         1, 0)
+    INST(InstanceDecoration,                instance,               1, 0)
+    INST(NumThreadsDecoration,              numThreads,             3, 0)
 
-// Added to IRParam parameters to an entry point
-/* GeometryInputPrimitiveTypeDecoration */
-INST(PointInputPrimitiveTypeDecoration, pointPrimitiveType, 0, 0)
-INST(LineInputPrimitiveTypeDecoration, linePrimitiveType, 0, 0)
-INST(TriangleInputPrimitiveTypeDecoration, trianglePrimitiveType, 0, 0)
-INST(LineAdjInputPrimitiveTypeDecoration, lineAdjPrimitiveType, 0, 0)
-INST(TriangleAdjInputPrimitiveTypeDecoration, triangleAdjPrimitiveType, 0, 0)
-INST_RANGE(GeometryInputPrimitiveTypeDecoration, PointInputPrimitiveTypeDecoration, TriangleAdjInputPrimitiveTypeDecoration)
+        // Added to IRParam parameters to an entry point
+    /* GeometryInputPrimitiveTypeDecoration */
+        INST(PointInputPrimitiveTypeDecoration,  pointPrimitiveType,     0, 0)
+        INST(LineInputPrimitiveTypeDecoration,   linePrimitiveType,      0, 0)
+        INST(TriangleInputPrimitiveTypeDecoration, trianglePrimitiveType, 0, 0)
+        INST(LineAdjInputPrimitiveTypeDecoration,  lineAdjPrimitiveType,  0, 0)
+        INST(TriangleAdjInputPrimitiveTypeDecoration, triangleAdjPrimitiveType, 0, 0)
+    INST_RANGE(GeometryInputPrimitiveTypeDecoration, PointInputPrimitiveTypeDecoration, TriangleAdjInputPrimitiveTypeDecoration)
 
-INST(StreamOutputTypeDecoration, streamOutputTypeDecoration, 1, 0)
+    INST(StreamOutputTypeDecoration,       streamOutputTypeDecoration,    1, 0)
 
-/// An `[entryPoint]` decoration marks a function that represents a shader entry point
-INST(EntryPointDecoration, entryPoint, 2, 0)
+        /// An `[entryPoint]` decoration marks a function that represents a shader entry point
+    INST(EntryPointDecoration,              entryPoint,             2, 0)
 
-/// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
-INST(EntryPointParamDecoration, entryPointParam, 0, 0)
+        /// Used to mark parameters that are moved from entry point parameters to global params as coming from the entry point.
+    INST(EntryPointParamDecoration,         entryPointParam,        0, 0)
 
-/// A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
-/// even if it does not otherwise reference it.
-INST(DependsOnDecoration, dependsOn, 1, 0)
+        /// A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
+        /// even if it does not otherwise reference it.
+    INST(DependsOnDecoration,               dependsOn,              1, 0)
 
-/// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
-INST(KeepAliveDecoration, keepAlive, 0, 0)
+        /// A `[keepAlive]` decoration marks an instruction that should not be eliminated.
+    INST(KeepAliveDecoration,              keepAlive,             0, 0)
 
-INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
+    INST(BindExistentialSlotsDecoration, bindExistentialSlots, 0, 0)
 
-/// A `[format(f)]` decoration specifies that the format of an image should be `f`
-INST(FormatDecoration, format, 1, 0)
+        /// A `[format(f)]` decoration specifies that the format of an image should be `f`
+    INST(FormatDecoration, format, 1, 0)
 
-/// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
-INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
+        /// An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial codegen
+    INST(UnsafeForceInlineEarlyDecoration, unsafeForceInlineEarly, 0, 0)
 
-/// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
-INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
+        /// A `[naturalSizeAndAlignment(s,a)]` decoration is attached to a type to indicate that is has natural size `s` and alignment `a`
+    INST(NaturalSizeAndAlignmentDecoration, naturalSizeAndAlignment, 2, 0)
 
-/// A `[naturalOffset(o)]` decoration is attached to a field to indicate that it has natural offset `o` in the parent type
-INST(NaturalOffsetDecoration, naturalOffset, 1, 0)
+        /// A `[naturalOffset(o)]` decoration is attached to a field to indicate that it has natural offset `o` in the parent type
+    INST(NaturalOffsetDecoration, naturalOffset, 1, 0)
 
-/* LinkageDecoration */
-INST(ImportDecoration, import, 1, 0)
-INST(ExportDecoration, export, 1, 0)
-INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
+    /* LinkageDecoration */
+        INST(ImportDecoration, import, 1, 0)
+        INST(ExportDecoration, export, 1, 0)
+    INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
-/* Decorations for RTTI objects */
-INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
-INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
-INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
+    /* Decorations for RTTI objects */
+    INST(RTTITypeSizeDecoration, RTTI_typeSize, 1, 0)
+    INST(AnyValueSizeDecoration, AnyValueSize, 1, 0)
+    INST(SequentialIDDecoration, SequentialIDDecoration, 1, 0)
 
-INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
+    INST(TypeConstraintDecoration, TypeConstraintDecoration, 1, 0)
 
+    
+    INST(BuiltinDecoration, BuiltinDecoration, 0, 0)
 
-INST(BuiltinDecoration, BuiltinDecoration, 0, 0)
+        /// The decorated instruction requires NVAPI to be included via prelude when compiling for D3D.
+    INST(RequiresNVAPIDecoration, requiresNVAPI, 0, 0)
 
-/// The decorated instruction requires NVAPI to be included via prelude when compiling for D3D.
-INST(RequiresNVAPIDecoration, requiresNVAPI, 0, 0)
+        /// The decorated instruction is part of the NVAPI "magic" and should always use its original name
+    INST(NVAPIMagicDecoration, nvapiMagic, 1, 0)
 
-/// The decorated instruction is part of the NVAPI "magic" and should always use its original name
-INST(NVAPIMagicDecoration, nvapiMagic, 1, 0)
+        /// A decoration that applies to an entire IR module, and indicates the register/space binding
+        /// that the NVAPI shader parameter intends to use.
+    INST(NVAPISlotDecoration, nvapiSlot, 2, 0)
 
-/// A decoration that applies to an entire IR module, and indicates the register/space binding
-/// that the NVAPI shader parameter intends to use.
-INST(NVAPISlotDecoration, nvapiSlot, 2, 0)
+        /// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
+    INST(NoInlineDecoration, noInline, 0, 0)
 
-/// Applie to an IR function and signals that inlining should not be performed unless unavoidable.
-INST(NoInlineDecoration, noInline, 0, 0)
+    INST(PayloadDecoration, payload, 0, 0)
 
-INST(PayloadDecoration, payload, 0, 0)
+    /* StageAccessDecoration */
+        INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
+        INST(StageWriteAccessDecoration, stageWriteAccess, 0, 0)
+    INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
 
-/* StageAccessDecoration */
-INST(StageReadAccessDecoration, stageReadAccess, 0, 0)
-INST(StageWriteAccessDecoration, stageWriteAccess, 0, 0)
-INST_RANGE(StageAccessDecoration, StageReadAccessDecoration, StageWriteAccessDecoration)
+    INST(SemanticDecoration, semantic, 2, 0)
 
-INST(SemanticDecoration, semantic, 2, 0)
+        /// Marks a struct type as being used as a structured buffer block.
+        /// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
+    INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
 
-/// Marks a struct type as being used as a structured buffer block.
-/// Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
-INST(SPIRVBufferBlockDecoration, spvBufferBlock, 0, 0)
+    INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBufferBlockDecoration)
 
-INST_RANGE(Decoration, HighLevelDeclDecoration, SPIRVBufferBlockDecoration)
-
-//
+    //
 
 // A `makeExistential(v : C, w) : I` instruction takes a value `v` of type `C`
 // and produces a value of interface type `I` by using the witness `w` which
 // shows that `C` conforms to `I`.
 //
-INST(MakeExistential, makeExistential, 2, 0)
+INST(MakeExistential,                   makeExistential,                2, 0)
 // A `MakeExistentialWithRTTI(v, w, t)` is the same with `MakeExistential`,
 // but with the type of `v` being an explict operand.
-INST(MakeExistentialWithRTTI, makeExistentialWithRTTI, 3, 0)
+INST(MakeExistentialWithRTTI,           makeExistentialWithRTTI,        3, 0)
 
 // A 'CreateExistentialObject<I>(typeID, T)` packs user-provided `typeID` and a
 // value of any type, and constructs an existential value of type `I`.
-INST(CreateExistentialObject, createExistentialObject, 2, 0)
+INST(CreateExistentialObject,           createExistentialObject,        2, 0)
 
 // A `wrapExistential(v, T0,w0, T1,w0) : T` instruction is similar to `makeExistential`.
 // but applies to a value `v` that is of type `BindExistentials(T, T0,w0, ...)`. The
@@ -709,4 +709,3 @@ INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
 #undef USE_OTHER
 #undef INST_RANGE
 #undef INST
-
