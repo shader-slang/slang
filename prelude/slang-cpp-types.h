@@ -1,6 +1,6 @@
 #ifndef SLANG_PRELUDE_CPP_TYPES_H
 #define SLANG_PRELUDE_CPP_TYPES_H
-#include <stdint.h>
+
 #ifndef SLANG_PRELUDE_ASSERT
 #   ifdef _DEBUG
 #       define SLANG_PRELUDE_ASSERT(VALUE) assert(VALUE)

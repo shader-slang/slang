@@ -27,7 +27,8 @@ namespace Slang
         x(clang, CLANG) \
         x(gcc, GCC) \
         x(genericcpp, GENERIC_C_CPP) \
-        x(nvrtc, NVRTC)
+        x(nvrtc, NVRTC) \
+        x(llvm, LLVM)
 
 namespace { // anonymous
 
@@ -136,7 +137,8 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
     x(NVRTC,            "NVRTC") \
     x(FXC,              "fxc") \
     x(DXC,              "dxc") \
-    x(GLSLANG,          "glslang")
+    x(GLSLANG,          "glslang") \
+    x(LLVM,             "LLVM/Clang")
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
@@ -192,15 +194,15 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
 
     SLANG_PASS_THROUGH_TYPES(SLANG_PASS_THROUGH_NAME_TO_TYPE)
 
-        // Other options
-        if (slice == "c" || slice == "cpp")
-        {
-            return SLANG_PASS_THROUGH_GENERIC_C_CPP;
-        }
-        else if (slice == "vs")
-        {
-            return SLANG_PASS_THROUGH_VISUAL_STUDIO;
-        }
+    // Other options
+    if (slice == "c" || slice == "cpp")
+    {
+        return SLANG_PASS_THROUGH_GENERIC_C_CPP;
+    }
+    else if (slice == "vs")
+    {
+        return SLANG_PASS_THROUGH_VISUAL_STUDIO;
+    }
 
     return SLANG_PASS_THROUGH_NONE;
 }

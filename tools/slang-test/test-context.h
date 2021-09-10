@@ -28,7 +28,8 @@ struct PassThroughFlag
         GCC = 1 << int(SLANG_PASS_THROUGH_GCC),
         Clang = 1 << int(SLANG_PASS_THROUGH_CLANG),
         Generic_C_CPP = 1 << int(SLANG_PASS_THROUGH_GENERIC_C_CPP),
-        NVRTC = 1 << int(SLANG_PASS_THROUGH_NVRTC)
+        NVRTC = 1 << int(SLANG_PASS_THROUGH_NVRTC),
+        LLVM = 1 << int(SLANG_PASS_THROUGH_LLVM),
     };
 };
 

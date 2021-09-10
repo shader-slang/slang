@@ -12,12 +12,7 @@
 namespace Slang
 {
     namespace { // anonymous
-    struct FunctionInfo
-    {
-        const char* name;
-        PassThroughMode compilerType;
-    };
-
+    
     class SinkSharedLibraryLoader : public RefObject, public ISlangSharedLibraryLoader
     {
     public:
@@ -101,6 +96,7 @@ namespace Slang
             getOrLoadDownstreamCompiler(PassThroughMode::Clang, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::Gcc, sink);
             getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, sink);
+            getOrLoadDownstreamCompiler(PassThroughMode::LLVM, sink);
         }
 
         // Mark that we have tried to load it

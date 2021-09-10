@@ -5,17 +5,22 @@
 // to use the version in the std namespace. 
 // https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
  
-#if SLANG_GCC_FAMILY && __GNUC__ < 6
-#   include <cmath>
-#   define SLANG_PRELUDE_STD std::
-#else
-#   include <math.h>
-#   define SLANG_PRELUDE_STD
-#endif
+#ifdef SLANG_LLVM
+#   include "slang-llvm.h"
+#else // SLANG_LLVM
+#   if SLANG_GCC_FAMILY && __GNUC__ < 6
+#       include <cmath>
+#       define SLANG_PRELUDE_STD std::
+#   else
+#       include <math.h>
+#       define SLANG_PRELUDE_STD
+#   endif
 
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
+#   include <assert.h>
+#   include <stdlib.h>
+#   include <string.h>
+#   include <stdint.h>
+#endif // SLANG_LLVM
 
 #if defined(_MSC_VER)
 #   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
@@ -26,8 +31,12 @@
 
 #ifdef __cplusplus    
 #   define SLANG_PRELUDE_EXTERN_C extern "C"
+#   define SLANG_PRELUDE_EXTERN_C_START extern "C" {
+#   define SLANG_PRELUDE_EXTERN_C_END }
 #else
 #   define SLANG_PRELUDE_EXTERN_C 
+#   define SLANG_PRELUDE_EXTERN_C_START
+#   define SLANG_PRELUDE_EXTERN_C_END 
 #endif    
 
 #define SLANG_PRELUDE_EXPORT SLANG_PRELUDE_EXTERN_C SLANG_PRELUDE_SHARED_LIB_EXPORT

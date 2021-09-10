@@ -22,6 +22,7 @@
 #include "slang-fxc-compiler.h"
 #include "slang-dxc-compiler.h"
 #include "slang-glslang-compiler.h"
+#include "slang-llvm-compiler.h"
 
 namespace Slang
 {
@@ -37,6 +38,7 @@ static DownstreamCompiler::Infos _calcInfos()
     infos.infos[int(SLANG_PASS_THROUGH_CLANG)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_VISUAL_STUDIO)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
     infos.infos[int(SLANG_PASS_THROUGH_GCC)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
+    infos.infos[int(SLANG_PASS_THROUGH_LLVM)] = Info(SourceLanguageFlag::CPP | SourceLanguageFlag::C);
 
     infos.infos[int(SLANG_PASS_THROUGH_NVRTC)] = Info(SourceLanguageFlag::CUDA);
 
@@ -198,6 +200,16 @@ SlangResult DownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget,
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
+
+Index DownstreamDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) const
+{
+    Index count = 0;
+    for (const auto& msg : diagnostics)
+    {
+        count += Index(Index(msg.severity) >= Index(severity));
+    }
+    return count;
+}
 
 Index DownstreamDiagnostics::getCountBySeverity(Diagnostic::Severity severity) const
 {
@@ -660,21 +672,43 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         return compiler;
     }
 
-    // If we are gcc, we can try clang and vice versa
-    if (desc.type == SLANG_PASS_THROUGH_GCC || desc.type == SLANG_PASS_THROUGH_CLANG)
     {
-        DownstreamCompiler::Desc compatible = desc;
-        compatible.type = (compatible.type == SLANG_PASS_THROUGH_CLANG) ? SLANG_PASS_THROUGH_GCC : SLANG_PASS_THROUGH_CLANG;
+        // These compilers should be usable interchangably. The order is important, as the first one that matches will
+        // be used, so LLVM is used before CLANG or GCC if appropriate
+        const SlangPassThrough compatiblePassThroughs[] =
+        {
+            SLANG_PASS_THROUGH_LLVM,
+            SLANG_PASS_THROUGH_CLANG,
+            SLANG_PASS_THROUGH_GCC,
+        };
 
-        compiler = findCompiler(compilers, MatchType::MinGreaterEqual, compatible);
-        if (compiler)
+        bool isCompatible = false;
+        for (auto passThrough : compatiblePassThroughs)
         {
-            return compiler;
+            if (desc.type == passThrough)
+            {
+                isCompatible = true;
+                break;
+            }
         }
-        compiler = findCompiler(compilers, MatchType::MinAbsolute, compatible);
-        if (compiler)
+
+        if (isCompatible)
         {
-            return compiler;
+            for (auto passThrough : compatiblePassThroughs)
+            {
+                if (passThrough != desc.type)
+                {
+                    DownstreamCompiler::Desc compatible;
+                    
+                    compatible.type = passThrough;
+                    // Find the latest version.
+                    compiler = findCompiler(compilers, MatchType::Newest, compatible);
+                    if (compiler)
+                    {
+                        return compiler;
+                    }
+                }
+            }
         }
     }
 
@@ -702,7 +736,25 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         case SLANG_SOURCE_LANGUAGE_CPP:
         case SLANG_SOURCE_LANGUAGE_C:
         {
-            compiler = findClosestCompiler(set, getCompiledWithDesc());
+
+#if 0
+            // TODO(JS): We can't just enable this because we can currently only use slang-llvm, if we want to 'host-callable'
+            // It *can't* handle pass through (the includes are not available with just the dll),
+            // As it stands it doesn't support ext/obj/shared library output
+
+            // If we have LLVM, lets use that as the default
+            {
+                DownstreamCompiler::Desc desc;
+                desc.type = SLANG_PASS_THROUGH_LLVM;
+                compiler = findCompiler(set, MatchType::Newest, desc);
+            }
+#endif
+
+            // Find the compiler closest to the compiler this was compiled with
+            if (!compiler)
+            {
+                compiler = findClosestCompiler(set, getCompiledWithDesc());
+            }
             break;
         }
         case SLANG_SOURCE_LANGUAGE_CUDA:
@@ -735,6 +787,7 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_LLVM)] = &LLVMDownstreamCompilerUtil::locateCompilers;
 }
 
 static String _getParentPath(const String& path)
@@ -892,6 +945,21 @@ void DownstreamCompilerSet::getCompilers(List<DownstreamCompiler*>& outCompilers
     outCompilers.addRange((DownstreamCompiler*const*)m_compilers.begin(), m_compilers.getCount());
 }
 
+bool DownstreamCompilerSet::hasSharedLibrary(ISlangSharedLibrary* lib)
+{
+    const Index foundIndex = m_sharedLibraries.findFirstIndex([lib](ISlangSharedLibrary* inLib) -> bool { return lib == inLib;  });
+    return(foundIndex >= 0);
+}
+
+void DownstreamCompilerSet::addSharedLibrary(ISlangSharedLibrary* lib)
+{
+    SLANG_ASSERT(lib);
+    if (!hasSharedLibrary(lib))
+    {
+        m_sharedLibraries.add(ComPtr<ISlangSharedLibrary>(lib));
+    }
+}
+
 bool DownstreamCompilerSet::hasCompiler(SlangPassThrough compilerType) const
 {
     for (DownstreamCompiler* compiler : m_compilers)
@@ -904,7 +972,6 @@ bool DownstreamCompilerSet::hasCompiler(SlangPassThrough compilerType) const
     }
     return false;
 }
-
 
 void DownstreamCompilerSet::remove(SlangPassThrough compilerType)
 {
@@ -931,7 +998,5 @@ void DownstreamCompilerSet::addCompiler(DownstreamCompiler* compiler)
         m_compilers.add(compiler);
     }
 }
-
-
 
 }
