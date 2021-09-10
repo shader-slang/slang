@@ -1,7 +1,7 @@
 #ifndef SLANG_LLVM_H
 #define SLANG_LLVM_H
 
-#ifndef SLANG_PRELUDE_ASSERT(x)
+#ifndef SLANG_PRELUDE_ASSERT
 #   ifdef DEBUG
 extern "C" void assertFailure(const char* msg);
 #       define SLANG_PRELUDE_EXPECT(VALUE, MSG) if(VALUE) {} else assertFailure("assertion failed: '" MSG "'")
