@@ -3430,46 +3430,40 @@ SlangResult innerMain(int argc, char** argv)
     // An un-categorized test will always belong to the `full` category
     categorySet.defaultCategory = fullTestCategory;
 
-    TestCategory* fxcCategory = nullptr;
-    TestCategory* dxcCategory = nullptr;
-    TestCategory* glslangCategory = nullptr;
-    TestCategory* nvrtcCategory = nullptr; 
+    // All following values are initialized to '0', so null.
+    TestCategory* passThroughCategories[SLANG_PASS_THROUGH_COUNT_OF] = { nullptr };
 
     // Work out what backends/pass-thrus are available
     {
         SlangSession* session = context.getSession();
 
+        StdWriters::getOut().print("Supported backends:");
+
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
-            SlangPassThrough passThru = SlangPassThrough(i);
+            const SlangPassThrough passThru = SlangPassThrough(i);
+            if (passThru == SLANG_PASS_THROUGH_NONE)
+            {
+                continue;
+            }
 
             if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
             {
                 context.availableBackendFlags |= PassThroughFlags(1) << int(i);
+
+                StringBuilder buf;
+
+                auto name = TypeTextUtil::getPassThroughName(passThru);
+
+                buf << " " << name;
+
+                SLANG_ASSERT(passThroughCategories[i] == nullptr);
+                passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
+
+                StdWriters::getOut().write(buf.getBuffer(), buf.getLength());
             }
         }
 
-        StdWriters::getOut().print("Supported backends:");
-        if (context.availableBackendFlags & PassThroughFlag::Fxc)
-        {
-            StdWriters::getOut().print(" fxc");
-            fxcCategory = categorySet.add("fxc", fullTestCategory);
-        }
-        if (context.availableBackendFlags & PassThroughFlag::Glslang)
-        {
-            StdWriters::getOut().print(" glslang");
-            glslangCategory = categorySet.add("glslang", fullTestCategory);
-        }
-        if (context.availableBackendFlags & PassThroughFlag::Dxc)
-        {
-            StdWriters::getOut().print(" dxc");
-            dxcCategory = categorySet.add("dxc", fullTestCategory);
-        }
-        if (context.availableBackendFlags & PassThroughFlag::NVRTC)
-        {
-            StdWriters::getOut().print(" nvrtc");
-            nvrtcCategory = categorySet.add("nvrtc", fullTestCategory);
-        }
         StdWriters::getOut().print("\n");
     }
 

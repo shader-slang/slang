@@ -1793,6 +1793,13 @@ namespace Slang
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
+                    if (targetReq->getTarget() == CodeGenTarget::HostCallable)
+                    {
+                        // Some HostCallable are not directly representable as a 'binary'.
+                        // So here, we just ignore if that appears the case, and don't output an unexpected error.
+                        return;
+                    }
+
                     SLANG_UNEXPECTED("No blob to emit");
                     return;
                 }

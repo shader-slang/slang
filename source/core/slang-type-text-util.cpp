@@ -137,7 +137,8 @@ static const ArchiveTypeInfo s_archiveTypeInfos[] =
     x(NVRTC,            "NVRTC") \
     x(FXC,              "fxc") \
     x(DXC,              "dxc") \
-    x(GLSLANG,          "glslang")
+    x(GLSLANG,          "glslang") \
+    x(LLVM,             "LLVM/Clang")
 
 /* static */UnownedStringSlice TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough type)
 {
