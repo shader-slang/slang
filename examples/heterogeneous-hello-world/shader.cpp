@@ -1,4 +1,4 @@
-#include "C:/code/slang/prelude/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-prelude.h"
 
 
 #ifdef SLANG_PRELUDE_NAMESPACE
