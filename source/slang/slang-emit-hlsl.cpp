@@ -766,23 +766,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         case kIROp_UInt64Type:
         case kIROp_FloatType:
         case kIROp_DoubleType:
-        {
-            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
-            return;
-        }
         case kIROp_Int16Type:
-        {
-            m_writer->emit("min16int");
-            return;
-        }
         case kIROp_UInt16Type:
         {
-            m_writer->emit("min16uint");
-            return;
-        }
         case kIROp_HalfType:
-        {
-            m_writer->emit("min16float");
+            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
         case kIROp_StructType:

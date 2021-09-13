@@ -1432,7 +1432,48 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                         emitType(inst->getDataType());
                     }
                     break;
-
+                case BaseType::UInt16:
+                    if (fromType == BaseType::Half)
+                    {
+                        m_writer->emit("uint16_t(packHalf2x16(vec2(");
+                        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                        m_writer->emit(", 0.0)))");
+                        return true;
+                    }
+                    else
+                    {
+                        emitType(inst->getDataType());
+                    }
+                    break;
+                case BaseType::Int16:
+                    if (fromType == BaseType::Half)
+                    {
+                        m_writer->emit("int16_t(packHalf2x16(vec2(");
+                        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                        m_writer->emit(", 0.0)))");
+                        return true;
+                    }
+                    else
+                    {
+                        emitType(inst->getDataType());
+                    }
+                    break;
+                case BaseType::Half:
+                    switch (fromType)
+                    {
+                    case BaseType::Int16:
+                    case BaseType::UInt16:
+                    case BaseType::Int:
+                    case BaseType::UInt:
+                        m_writer->emit("float16_t(unpackHalf2x16(uint(");
+                        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                        m_writer->emit(")).x)");
+                        return true;
+                    default:
+                        emitType(inst->getDataType());
+                        break;
+                    }
+                    break;
                 case BaseType::Float:
                     switch (fromType)
                     {
