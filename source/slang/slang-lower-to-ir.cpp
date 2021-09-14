@@ -4345,13 +4345,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        auto renderer = getSimpleVal(context, lowerRValueExpr(context, stmt->renderer));
+        auto device = getSimpleVal(context, lowerRValueExpr(context, stmt->device));
         auto gridDims = getSimpleVal(context, lowerRValueExpr(context, stmt->gridDims));
 
         List<IRInst*> irArgs;
         if (auto callExpr = as<InvokeExpr>(stmt->kernelCall))
         {
-            irArgs.add(renderer);
+            irArgs.add(device);
             irArgs.add(gridDims);
             auto fref = getSimpleVal(context, lowerRValueExpr(context, callExpr->functionExpr));
             irArgs.add(fref);

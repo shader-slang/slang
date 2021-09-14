@@ -125,7 +125,7 @@ class GpuForeachStmt : public ScopeStmt
 {
     SLANG_AST_CLASS(GpuForeachStmt)
 
-    Expr* renderer = nullptr;
+    Expr* device = nullptr;
     Expr* gridDims = nullptr;
     VarDecl* dispatchThreadID = nullptr;
     Expr* kernelCall = nullptr;
