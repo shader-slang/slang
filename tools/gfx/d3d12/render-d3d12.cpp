@@ -604,7 +604,7 @@ public:
         {
             uint64_t waitValue;
             HANDLE fenceEvent;
-            ID3D12Fence* fence = nullptr;
+            ComPtr<ID3D12Fence> fence = nullptr;
         };
         ShortList<QueueWaitInfo, 4> m_waitInfos;
 
