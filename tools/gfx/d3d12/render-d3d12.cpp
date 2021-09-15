@@ -4287,36 +4287,44 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    FlagCombiner combiner;
-    // TODO: we should probably provide a command-line option
-    // to override UseDebug of default rather than leave it
-    // up to each back-end to specify.
+    if (desc.existingDeviceHandle == 0)
+    {
+        FlagCombiner combiner;
+        // TODO: we should probably provide a command-line option
+        // to override UseDebug of default rather than leave it
+        // up to each back-end to specify.
 #if ENABLE_DEBUG_LAYER
-    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
 #else
-    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
-    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
-    
-    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
 
-    const int numCombinations = combiner.getNumCombinations();
-    for (int i = 0; i < numCombinations; ++i)
-    {
-        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
+        const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+
+        const int numCombinations = combiner.getNumCombinations();
+        for (int i = 0; i < numCombinations; ++i)
         {
-            break;
+            if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
+            {
+                break;
+            }
         }
-    }
 
-    if (!m_deviceInfo.m_adapter)
+        if (!m_deviceInfo.m_adapter)
+        {
+            // Couldn't find an adapter
+            return SLANG_FAIL;
+        }
+
+        // Set the device
+        m_device = m_deviceInfo.m_device;
+    }
+    else
     {
-        // Couldn't find an adapter
-        return SLANG_FAIL;
+        // Set the existing device stored in desc
+        m_device = (ID3D12Device*)desc.existingDeviceHandle;
     }
-
-    // Set the device
-    m_device = m_deviceInfo.m_device;
 
     // NVAPI
     if (desc.nvapiExtnSlot >= 0)

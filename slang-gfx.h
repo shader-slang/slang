@@ -1424,6 +1424,8 @@ public:
         DeviceType deviceType = DeviceType::Default;
         // Name to identify the adapter to use
         const char* adapter = nullptr;
+        // The device handle. If 0, a device will need to be created.
+        uint64_t existingDeviceHandle = 0;
         // Number of required features.
         int requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
