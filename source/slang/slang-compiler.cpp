@@ -2291,7 +2291,7 @@ namespace Slang
         // really need/want to do anything too elaborate
 
         static uint32_t counter = 0;
-#ifdef WIN32
+#ifdef _WIN32
         uint32_t id = InterlockedIncrement(&counter);
 #else
         // TODO: actually implement the case for other platforms
