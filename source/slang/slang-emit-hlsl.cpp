@@ -480,7 +480,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     m_writer->emit(")");
                     break;
                 case BaseType::Half:
-                    m_writer->emit("f16tof32");
+                    m_writer->emit("asfloat16");
                     break;
                 case BaseType::Float:
                     // Note: at present HLSL only supports
@@ -522,7 +522,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     break;
 
                 case BaseType::Half:
-                    m_writer->emit("f32tof16(");
+                    m_writer->emit("asuint16(");
                     closeCount++;
                     break;
             }
