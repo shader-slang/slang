@@ -1425,7 +1425,7 @@ public:
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Device handles (if they already exist)
-        struct existingDeviceHandles
+        struct ExistingDeviceHandles
         {
             // For D3D12, this only contains a single value for the ID3D12Device.
             // For Vulkan, the first value is the VkInstance and the second is the VkDevice.
