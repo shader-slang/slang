@@ -1424,8 +1424,13 @@ public:
         DeviceType deviceType = DeviceType::Default;
         // Name to identify the adapter to use
         const char* adapter = nullptr;
-        // The device handle. If 0, a device will need to be created.
-        uint64_t existingDeviceHandle = 0;
+        // Device handles (if they already exist)
+        struct existingDeviceHandles
+        {
+            // For D3D12, this only contains a single value for the ID3D12Device.
+            // For Vulkan, the first value is the VkInstance and the second is the VkDevice.
+            uint64_t values[2] = { 0 };
+        } existingDeviceHandles;
         // Number of required features.
         int requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
