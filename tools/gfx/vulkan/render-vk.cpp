@@ -5323,7 +5323,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const Desc::ExistingDeviceHandles h
     }
     else
     {
-        instance = *(VkInstance*)handles.getVkInstance();
+        instance = (VkInstance)handles.getVkInstance();
     }
     if (!instance)
         return SLANG_FAIL;
@@ -5384,7 +5384,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const Desc::ExistingDeviceHandles h
     }
     else
     {
-        physicalDevice = *(VkPhysicalDevice*)handles.getVkPhysicalDevice();
+        physicalDevice = (VkPhysicalDevice)handles.getVkPhysicalDevice();
     }
 
     SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevice));
@@ -5637,7 +5637,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const Desc::ExistingDeviceHandles h
     }
     else
     {
-        m_device = *(VkDevice*)handles.getVkDevice();
+        m_device = (VkDevice)handles.getVkDevice();
     }
 
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
