@@ -4287,7 +4287,7 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles.values[0] == 0)
+    if (desc.existingDeviceHandles.getD3D12Device() == 0)
     {
         FlagCombiner combiner;
         // TODO: we should probably provide a command-line option
@@ -4320,7 +4320,7 @@ Result D3D12Device::initialize(const Desc& desc)
     else
     {
         // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.values[0];
+        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
     }
 
     // Set the device
