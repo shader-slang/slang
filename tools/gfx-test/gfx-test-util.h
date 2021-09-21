@@ -23,7 +23,7 @@ namespace gfx_test
         uint8_t* expectedResult,
         size_t expectedBufferSize);
 
-    template<typename T, size_t count>
+    template<typename T, Slang::Index count>
     Slang::Result compareComputeResult(
         gfx::IDevice* device,
         gfx::IBufferResource* buffer,
