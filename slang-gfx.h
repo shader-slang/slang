@@ -1427,9 +1427,35 @@ public:
         // Device handles (if they already exist)
         struct ExistingDeviceHandles
         {
+        public:
+            // The following functions create an ExistingDeviceHandles object containing the provided handles.
+            static ExistingDeviceHandles fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
+            {
+                ExistingDeviceHandles handles = {};
+                handles.values[0] = instance;
+                handles.values[1] = physicalDevice;
+                handles.values[2] = device;
+                return handles;
+            }
+
+            static ExistingDeviceHandles fromD3D12Handle(void* device)
+            {
+                ExistingDeviceHandles handles = {};
+                handles.values[0] = (uint64_t)device;
+                return handles;
+            }
+
+            // The following functions provide a way of getting handles from values.
+            uint64_t getD3D12Device() const { return values[0]; }
+
+            uint64_t getVkInstance() const { return values[0]; }
+            uint64_t getVkPhysicalDevice() const { return values[1]; }
+            uint64_t getVkDevice() const { return values[2]; }
+
+        private:
             // For D3D12, this only contains a single value for the ID3D12Device.
-            // For Vulkan, the first value is the VkInstance and the second is the VkDevice.
-            uint64_t values[2] = { 0 };
+            // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
+            uint64_t values[3] = { 0 };
         } existingDeviceHandles;
         // Number of required features.
         int requiredFeatureCount = 0;
