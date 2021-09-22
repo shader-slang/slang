@@ -17,7 +17,7 @@ namespace gfx_test
         slang::ProgramLayout*& slangReflection);
 
         /// Reads back the content of `buffer` and compares it against `expectedResult`.
-    Slang::Result _compareComputeResult(
+    Slang::Result compareComputeResult(
         gfx::IDevice* device,
         gfx::IBufferResource* buffer,
         uint8_t* expectedResult,
@@ -33,6 +33,6 @@ namespace gfx_test
         size_t bufferSize = sizeof(T) * count;
         expectedBuffer.setCount(bufferSize);
         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
-        return _compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
+        return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
     }
 }

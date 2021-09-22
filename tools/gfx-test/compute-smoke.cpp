@@ -120,7 +120,7 @@ namespace gfx_test
         }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
         const char* searchPaths[] = { "", "../../tools/gfx-test", "tools/gfx-test" };
-        deviceDesc.slang.searchPathCount = (SlangInt)(sizeof(searchPaths) / sizeof(const char*));
+        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         deviceDesc.slang.searchPaths = searchPaths;
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))

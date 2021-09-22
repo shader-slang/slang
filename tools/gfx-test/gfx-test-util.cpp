@@ -58,7 +58,7 @@ namespace gfx_test
         return SLANG_OK;
     }
 
-    Slang::Result _compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)
+    Slang::Result compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
