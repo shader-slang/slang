@@ -134,6 +134,8 @@ public:
     {
         return m_info;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(Desc::ExistingDeviceHandles* outHandle) override;
         /// Dtor
     ~VKDevice();
 
@@ -5221,6 +5223,12 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Result VKDevice::getNativeHandle(Desc::ExistingDeviceHandles* outHandle)
+{
+    outHandle = &Desc::ExistingDeviceHandles::fromVulkanHandles((uint64_t)m_api.m_instance, (uint64_t)m_api.m_physicalDevice, (uint64_t)m_api.m_device);
+    return SLANG_OK;
+}
 
 Result VKDevice::initVulkanInstanceAndDevice(const Desc::ExistingDeviceHandles handles, bool useValidationLayer)
 {

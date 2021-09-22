@@ -285,6 +285,12 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
+Result DebugDevice::getNativeHandle(Desc::ExistingDeviceHandles* outHandle)
+{
+    outHandle = &Desc::ExistingDeviceHandles::createDummyHandles();
+    return SLANG_OK;
+}
+
 Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
 {
     SLANG_GFX_API_FUNC;

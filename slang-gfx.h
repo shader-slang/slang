@@ -1445,6 +1445,13 @@ public:
                 return handles;
             }
 
+            // This creates and returns an ExistingDeviceHandles object as values is zeroed by default.
+            static ExistingDeviceHandles createDummyHandles()
+            {
+                ExistingDeviceHandles handles = {};
+                return handles;
+            }
+
             // The following functions provide a way of getting handles from values.
             uint64_t getD3D12Device() const { return values[0]; }
 
@@ -1469,6 +1476,8 @@ public:
         // Configurations for Slang compiler.
         SlangDesc slang = {};
     };
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(Desc::ExistingDeviceHandles* outHandle) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 
