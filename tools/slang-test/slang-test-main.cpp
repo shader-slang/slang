@@ -17,6 +17,8 @@
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-render-api-util.h"
 
+#include "tools/unit-test/slang-unit-test.h"
+#undef SLANG_UNIT_TEST
 
 #include "directory-util.h"
 #include "test-context.h"
@@ -38,6 +40,7 @@
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
+
 
 using namespace Slang;
 
@@ -3389,6 +3392,62 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+    /// Loads a DLL containing unit test functions and run them one by one.
+static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, const char* moduleName)
+{
+    SharedLibrary::Handle moduleHandle;
+    SLANG_RETURN_ON_FAIL(SharedLibrary::load(
+        Path::combine(context->exeDirectoryPath, moduleName).getBuffer(),
+        moduleHandle));
+    slang::UnitTestGetModuleFunc getModuleFunc =
+        (slang::UnitTestGetModuleFunc) SharedLibrary::findSymbolAddressByName(
+            moduleHandle, "slangUnitTestGetModule");
+    if (!getModuleFunc)
+        return SLANG_FAIL;
+
+    slang::IUnitTestModule* testModule = getModuleFunc();
+    if (!testModule)
+        return SLANG_FAIL;
+
+    slang::UnitTestContext unitTestContext;
+    unitTestContext.slangGlobalSession = context->getSession();
+    unitTestContext.workDirectory = "";
+    unitTestContext.enabledApis = context->options.enabledApis;
+    auto testCount = testModule->getTestCount();
+    for (SlangInt i = 0; i < testCount; i++)
+    {
+        StringBuilder sb;
+        StringWriter messageWriter(&sb, WriterFlag::Enum::AutoFlush);
+        auto testFunc = testModule->getTestFunc(i);
+        auto testName = testModule->getTestName(i);
+
+        StringBuilder filePath;
+        filePath << moduleName << "/" << testName << ".internal";
+
+        testOptions.command = filePath;
+
+        if (shouldRunTest(context, testOptions.command))
+        {
+            if (testPassesCategoryMask(context, testOptions))
+            {
+                unitTestContext.outputWriter = &messageWriter;
+                TestReporter::get()->startTest(testOptions.command);
+                auto result = testFunc(&unitTestContext);
+                if (sb.getLength())
+                    TestReporter::get()->message(TestMessageType::Info, sb.ProduceString());
+
+                if (result == SLANG_E_NOT_AVAILABLE)
+                    TestReporter::get()->addResult(TestResult::Ignored);
+                else if (SLANG_FAILED(result))
+                    TestReporter::get()->addResult(TestResult::Fail);
+                else
+                    TestReporter::get()->addResult(TestResult::Pass);
+                TestReporter::get()->endTest();
+            }
+        }
+    }
+    return SLANG_OK;
+}
 
 SlangResult innerMain(int argc, char** argv)
 {
@@ -3594,6 +3653,11 @@ SlangResult innerMain(int argc, char** argv)
                 cur = cur->m_next;
             }
 
+            {
+                TestOptions testOptions;
+                testOptions.categories.add(unitTestCategory);
+                runUnitTestModule(&context, testOptions, "gfx-test-tool");
+            }
             TestReporter::set(nullptr);
         }
 

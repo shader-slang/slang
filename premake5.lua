@@ -1251,6 +1251,11 @@ standardProject("slang", "source/slang")
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
     filter {}
        
+toolSharedLibrary "gfx-test"
+    uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
+    includedirs { "." }
+    addSourceDir "tools/unit-test"
+    links { "gfx", "gfx-util", "slang", "core" }
     
 if enableProfile then
     tool "slang-profile"
