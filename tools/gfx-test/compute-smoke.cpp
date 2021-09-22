@@ -96,19 +96,50 @@ namespace gfx_test
             Slang::makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
     }
 
-    SLANG_UNIT_TEST(computeSmoke)
+    SlangResult computeSmokeTestAPI(slang::UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
+        if ((api & context->enabledApis) == 0)
+        {
+            return SLANG_E_NOT_AVAILABLE;
+        }
         Slang::ComPtr<IDevice> device;
         IDevice::Desc deviceDesc = {};
+        switch (api)
+        {
+        case Slang::RenderApiFlag::D3D11:
+            deviceDesc.deviceType = gfx::DeviceType::DirectX11;
+            break;
+        case Slang::RenderApiFlag::D3D12:
+            deviceDesc.deviceType = gfx::DeviceType::DirectX12;
+            break;
+        case Slang::RenderApiFlag::Vulkan:
+            deviceDesc.deviceType = gfx::DeviceType::Vulkan;
+            break;
+        default:
+            return SLANG_E_NOT_AVAILABLE;
+        }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
         const char* searchPaths[] = { "", "../../tools/gfx-test", "tools/gfx-test" };
         deviceDesc.slang.searchPathCount = (SlangInt)(sizeof(searchPaths) / sizeof(const char*));
         deviceDesc.slang.searchPaths = searchPaths;
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
+        {
             return SLANG_E_NOT_AVAILABLE;
+        }
 
-        return computeSmokeTestImpl(device, context);
+        SLANG_RETURN_ON_FAIL(computeSmokeTestImpl(device, context));
+        return SLANG_OK;
+    }
+
+    SLANG_UNIT_TEST(computeSmokeD3D11)
+    {
+        return computeSmokeTestAPI(context, Slang::RenderApiFlag::D3D11);
+    }
+
+    SLANG_UNIT_TEST(computeSmokeVulkan)
+    {
+        return computeSmokeTestAPI(context, Slang::RenderApiFlag::Vulkan);
     }
 
 }

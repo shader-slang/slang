@@ -3412,7 +3412,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     slang::UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
-
+    unitTestContext.enabledApis = context->options.enabledApis;
     auto testCount = testModule->getTestCount();
     for (SlangInt i = 0; i < testCount; i++)
     {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "slang.h"
+#include "source/core/slang-render-api-util.h"
 
 namespace slang
 {
@@ -9,6 +10,7 @@ namespace slang
         slang::IGlobalSession* slangGlobalSession;
         const char* workDirectory;
         ISlangWriter* outputWriter;
+        Slang::RenderApiFlags enabledApis;
     };
 
     typedef SlangResult (*UnitTestFunc)(UnitTestContext*);
