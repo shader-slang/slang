@@ -285,9 +285,9 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(Desc::ExistingDeviceHandles* outHandle)
+Result DebugDevice::getNativeHandle(NativeHandles* outHandle)
 {
-    outHandle = &Desc::ExistingDeviceHandles::createDummyHandles();
+    baseObject->getNativeHandle(outHandle);
     return SLANG_OK;
 }
 

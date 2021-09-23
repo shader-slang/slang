@@ -248,9 +248,9 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(Desc::ExistingDeviceHandles* outHandle)
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(NativeHandles* outHandle)
 {
-    outHandle = &Desc::ExistingDeviceHandles::createDummyHandles();
+    *outHandle = {};
     return SLANG_OK;
 }
 

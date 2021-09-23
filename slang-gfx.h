@@ -1418,52 +1418,47 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
+    struct NativeHandles
+    {
+    public:
+        // The following functions create an ExistingDeviceHandles object containing the provided handles.
+        static NativeHandles fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
+        {
+            NativeHandles handles = {};
+            handles.values[0] = instance;
+            handles.values[1] = physicalDevice;
+            handles.values[2] = device;
+            return handles;
+        }
+
+        static NativeHandles fromD3D12Handle(void* device)
+        {
+            NativeHandles handles = {};
+            handles.values[0] = (uint64_t)device;
+            return handles;
+        }
+
+        // The following functions provide a way of getting handles from values.
+        uint64_t getD3D12Device() const { return values[0]; }
+
+        uint64_t getVkInstance() const { return values[0]; }
+        uint64_t getVkPhysicalDevice() const { return values[1]; }
+        uint64_t getVkDevice() const { return values[2]; }
+
+    private:
+        // For D3D12, this only contains a single value for the ID3D12Device.
+        // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
+        uint64_t values[3] = { 0 };
+    };
+
     struct Desc
     {
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
+        // The device's handles.
+        NativeHandles handles = {};
         // Name to identify the adapter to use
         const char* adapter = nullptr;
-        // Device handles (if they already exist)
-        struct ExistingDeviceHandles
-        {
-        public:
-            // The following functions create an ExistingDeviceHandles object containing the provided handles.
-            static ExistingDeviceHandles fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
-            {
-                ExistingDeviceHandles handles = {};
-                handles.values[0] = instance;
-                handles.values[1] = physicalDevice;
-                handles.values[2] = device;
-                return handles;
-            }
-
-            static ExistingDeviceHandles fromD3D12Handle(void* device)
-            {
-                ExistingDeviceHandles handles = {};
-                handles.values[0] = (uint64_t)device;
-                return handles;
-            }
-
-            // This creates and returns an ExistingDeviceHandles object as values is zeroed by default.
-            static ExistingDeviceHandles createDummyHandles()
-            {
-                ExistingDeviceHandles handles = {};
-                return handles;
-            }
-
-            // The following functions provide a way of getting handles from values.
-            uint64_t getD3D12Device() const { return values[0]; }
-
-            uint64_t getVkInstance() const { return values[0]; }
-            uint64_t getVkPhysicalDevice() const { return values[1]; }
-            uint64_t getVkDevice() const { return values[2]; }
-
-        private:
-            // For D3D12, this only contains a single value for the ID3D12Device.
-            // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
-            uint64_t values[3] = { 0 };
-        } existingDeviceHandles;
         // Number of required features.
         int requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
@@ -1477,7 +1472,7 @@ public:
         SlangDesc slang = {};
     };
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(Desc::ExistingDeviceHandles* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandles* outHandle) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 

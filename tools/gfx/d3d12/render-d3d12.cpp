@@ -146,7 +146,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(Desc::ExistingDeviceHandles* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandles* outHandle) override;
 
     ~D3D12Device();
 
@@ -4117,9 +4117,9 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(Desc::ExistingDeviceHandles* outHandle)
+Result D3D12Device::getNativeHandle(NativeHandles* outHandle)
 {
-    outHandle = &Desc::ExistingDeviceHandles::fromD3D12Handle(m_device);
+    *outHandle = NativeHandles::fromD3D12Handle(m_device);
     return SLANG_OK;
 }
 
@@ -4295,7 +4295,7 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles.getD3D12Device() == 0)
+    if (desc.handles.getD3D12Device() == 0)
     {
         FlagCombiner combiner;
         // TODO: we should probably provide a command-line option
@@ -4328,7 +4328,7 @@ Result D3D12Device::initialize(const Desc& desc)
     else
     {
         // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
+        m_deviceInfo.m_device = (ID3D12Device*)desc.handles.getD3D12Device();
     }
 
     // Set the device
