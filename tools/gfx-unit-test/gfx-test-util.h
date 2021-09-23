@@ -12,19 +12,18 @@ namespace gfx_test
     Slang::Result loadShaderProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
-        ISlangWriter* diagnosticWriter,
         const char* shaderModuleName,
         slang::ProgramLayout*& slangReflection);
 
         /// Reads back the content of `buffer` and compares it against `expectedResult`.
-    Slang::Result compareComputeResult(
+    void compareComputeResult(
         gfx::IDevice* device,
         gfx::IBufferResource* buffer,
         uint8_t* expectedResult,
         size_t expectedBufferSize);
 
     template<typename T, Slang::Index count>
-    Slang::Result compareComputeResult(
+    void compareComputeResult(
         gfx::IDevice* device,
         gfx::IBufferResource* buffer,
         Slang::Array<T, count> expectedResult)
@@ -35,4 +34,8 @@ namespace gfx_test
         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
         return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
     }
+
+#define GFX_CHECK_CALL(x) {auto callResult = (x); SLANG_CHECK(!SLANG_FAILED(callResult))}
+#define GFX_CHECK_CALL_ABORT(x) {auto callResult = (x); SLANG_CHECK_ABORT(!SLANG_FAILED(callResult))}
+
 }

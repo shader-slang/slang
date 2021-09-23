@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-string-util.h"
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 //#include <math.h>
 
@@ -112,7 +112,7 @@ static bool _areApproximatelyEqual(double a, double b, double fixedEpsilon = 1e-
     return _calcULPDistance(a, b) <= ulpsEpsilon;
 }
 
-static void stringUnitTest()
+SLANG_UNIT_TEST(string)
 {
     {
         UnownedStringSlice checkLines[] = { UnownedStringSlice::fromLiteral("") };
@@ -260,5 +260,3 @@ static void stringUnitTest()
         }
     }
 }
-
-SLANG_UNIT_TEST("String", stringUnitTest);
