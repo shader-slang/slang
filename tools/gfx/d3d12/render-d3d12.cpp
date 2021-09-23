@@ -146,6 +146,8 @@ public:
         return m_info;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+
     ~D3D12Device();
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -4114,6 +4116,12 @@ Result D3D12Device::captureTextureToSurface(
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NativeHandle::fromD3D12Handle(m_device);
+    return SLANG_OK;
+}
 
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {

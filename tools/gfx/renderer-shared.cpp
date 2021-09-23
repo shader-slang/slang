@@ -248,6 +248,12 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = {};
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::getFeatures(
     const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
 {

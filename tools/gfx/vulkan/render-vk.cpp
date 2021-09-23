@@ -53,7 +53,7 @@ public:
         kMaxDescriptorSets = 8,
     };
     // Renderer    implementation
-    Result initVulkanInstanceAndDevice(Desc::ExistingDeviceHandles handles, bool useValidationLayer);
+    Result initVulkanInstanceAndDevice(NativeHandle handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
@@ -134,6 +134,8 @@ public:
     {
         return m_info;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
         /// Dtor
     ~VKDevice();
 
@@ -5222,7 +5224,13 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result VKDevice::initVulkanInstanceAndDevice(const Desc::ExistingDeviceHandles handles, bool useValidationLayer)
+Result VKDevice::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NativeHandle::fromVulkanHandles((uint64_t)m_api.m_instance, (uint64_t)m_api.m_physicalDevice, (uint64_t)m_api.m_device);
+    return SLANG_OK;
+}
+
+Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool useValidationLayer)
 {
     m_features.clear();
 
