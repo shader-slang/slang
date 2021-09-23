@@ -285,10 +285,9 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(NativeHandles* outHandle)
+Result DebugDevice::getNativeHandle(NativeHandle* outHandle)
 {
-    baseObject->getNativeHandle(outHandle);
-    return SLANG_OK;
+    return baseObject->getNativeHandle(outHandle);
 }
 
 Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
