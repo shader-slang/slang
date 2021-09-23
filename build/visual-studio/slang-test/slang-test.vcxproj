@@ -179,14 +179,14 @@
     <ClCompile Include="..\..\..\tools\slang-test\test-reporter.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\core\core.vcxproj">
-      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">
       <Project>{12C1E89D-F5D0-41D3-8E8D-FB3F358F8126}</Project>
     </ProjectReference>
     <ProjectReference Include="..\slang\slang.vcxproj">
       <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\core\core.vcxproj">
+      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
     </ProjectReference>
     <ProjectReference Include="..\miniz\miniz.vcxproj">
       <Project>{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}</Project>
