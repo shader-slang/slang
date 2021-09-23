@@ -1255,13 +1255,13 @@ toolSharedLibrary "gfx-unit-test"
     uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
     includedirs { "." }
     addSourceDir "tools/unit-test"
-    links { "gfx", "gfx-util", "slang", "core" }
+    links {  "core", "slang", "gfx", "gfx-util" }
 
 toolSharedLibrary "slang-unit-test"
     uuid "0162864E-7651-4B5E-9105-C571105276EA"
     includedirs { "." }
     addSourceDir "tools/unit-test"
-    links { "slang", "compiler-core", "core", "lz4", "miniz" }
+    links { "lz4", "miniz", "core", "compiler-core",  "slang" }
     
 if enableProfile then
     tool "slang-profile"
