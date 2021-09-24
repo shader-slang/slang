@@ -5,17 +5,22 @@
 // to use the version in the std namespace. 
 // https://stackoverflow.com/questions/39130040/cmath-hides-isnan-in-math-h-in-c14-c11
  
-#if SLANG_GCC_FAMILY && __GNUC__ < 6
-#   include <cmath>
-#   define SLANG_PRELUDE_STD std::
-#else
-#   include <math.h>
-#   define SLANG_PRELUDE_STD
-#endif
+#ifdef SLANG_LLVM
+#   include "slang-llvm.h"
+#else // SLANG_LLVM
+#   if SLANG_GCC_FAMILY && __GNUC__ < 6
+#       include <cmath>
+#       define SLANG_PRELUDE_STD std::
+#   else
+#       include <math.h>
+#       define SLANG_PRELUDE_STD
+#   endif
 
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
+#   include <assert.h>
+#   include <stdlib.h>
+#   include <string.h>
+#   include <stdint.h>
+#endif // SLANG_LLVM
 
 #if defined(_MSC_VER)
 #   define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
@@ -26,8 +31,12 @@
 
 #ifdef __cplusplus    
 #   define SLANG_PRELUDE_EXTERN_C extern "C"
+#   define SLANG_PRELUDE_EXTERN_C_START extern "C" {
+#   define SLANG_PRELUDE_EXTERN_C_END }
 #else
 #   define SLANG_PRELUDE_EXTERN_C 
+#   define SLANG_PRELUDE_EXTERN_C_START
+#   define SLANG_PRELUDE_EXTERN_C_END 
 #endif    
 
 #define SLANG_PRELUDE_EXPORT SLANG_PRELUDE_EXTERN_C SLANG_PRELUDE_SHARED_LIB_EXPORT
@@ -123,21 +132,18 @@ Any compilers not detected by the above logic are now now explicitly zeroed out.
 #   define SLANG_UNROLL
 #endif
 
-struct gfx_Renderer_0;
+struct gfx_Device_0;
 struct gfx_BufferResource_0;
 struct gfx_ShaderProgram_0;
-struct gfx_DescriptorSetLayout_0;
-struct gfx_PipelineLayout_0;
-struct gfx_DescriptorSet_0;
-struct gfx_BufferResource_0;
+struct gfx_ResourceView_0;
+struct gfx_TransientResourceHeap_0;
 struct gfx_PipelineState_0;
-struct gfx_CommandQueue_0;
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Renderer_0* _0, unsigned char _1[], size_t _2);
-gfx_DescriptorSetLayout_0* buildDescriptorSetLayout_0(gfx_Renderer_0* _0);
-gfx_PipelineLayout_0* buildPipeline_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1);
-gfx_DescriptorSet_0* buildDescriptorSet_0(gfx_Renderer_0* _0, gfx_DescriptorSetLayout_0* _1, gfx_BufferResource_0* _2);
-gfx_PipelineState_0* buildPipelineState_0(gfx_ShaderProgram_0* _0, gfx_Renderer_0* _1, gfx_PipelineLayout_0* _2);
-void dispatchComputation_0(gfx_Renderer_0* _0, gfx_PipelineState_0* _1, gfx_PipelineLayout_0* _2, gfx_DescriptorSet_0* _3, uint32_t _4, uint32_t _5, uint32_t _6);
+
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0);
+gfx_TransientResourceHeap_0* buildTransientHeap_0(gfx_Device_0* _0);
+gfx_PipelineState_0* buildPipelineState_0(gfx_Device_0* _0, gfx_ShaderProgram_0* _1);
+gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1);
+void dispatchComputation_0(gfx_Device_0* _0, gfx_TransientResourceHeap_0* _1, gfx_PipelineState_0* _2, gfx_ResourceView_0* _3, uint32_t gridDimsX, uint32_t gridDimsY, uint32_t gridDimsZ);
 gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0);
 
 #endif

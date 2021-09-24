@@ -979,7 +979,8 @@ namespace Slang
         VisualStudio = SLANG_PASS_THROUGH_VISUAL_STUDIO,    ///< Visual studio compiler
         Gcc = SLANG_PASS_THROUGH_GCC,                       ///< Gcc compiler
         GenericCCpp = SLANG_PASS_THROUGH_GENERIC_C_CPP,     ///< Generic C/C++ compiler
-        NVRTC = SLANG_PASS_THROUGH_NVRTC,
+        NVRTC = SLANG_PASS_THROUGH_NVRTC,                   ///< NVRTC CUDA compiler
+        LLVM = SLANG_PASS_THROUGH_LLVM,                     ///< LLVM 'compiler'
         CountOf = SLANG_PASS_THROUGH_COUNT_OF,              
     };
     void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -1301,6 +1302,10 @@ namespace Slang
         {
             lineDirectiveMode = mode;
         }
+        void setDumpIntermediates(bool value)
+        {
+            dumpIntermediates = value;
+        }
         void addCapability(CapabilityAtom capability);
 
         bool shouldEmitSPIRVDirectly()
@@ -1312,6 +1317,8 @@ namespace Slang
         {
             return (targetFlags & SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM) != 0;
         }
+
+        bool shouldDumpIntermediates() { return dumpIntermediates; }
 
         Linkage* getLinkage() { return linkage; }
         CodeGenTarget getTarget() { return format; }
@@ -1340,6 +1347,7 @@ namespace Slang
         List<CapabilityAtom>    rawCapabilities;
         CapabilitySet           cookedCapabilities;
         LineDirectiveMode       lineDirectiveMode = LineDirectiveMode::Default;
+        bool                    dumpIntermediates = false;
     };
 
         /// Are we generating code for a D3D API?

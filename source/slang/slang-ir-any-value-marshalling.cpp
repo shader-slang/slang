@@ -99,6 +99,33 @@ namespace Slang
                     sink->diagnose(concreteType->sourceLoc, Diagnostics::typeDoesNotFitAnyValueSize, concreteType);
                 }
             }
+            void ensureOffsetAt4ByteBoundary()
+            {
+                if (intraFieldOffset)
+                {
+                    fieldOffset++;
+                    intraFieldOffset = 0;
+                }
+            }
+            void ensureOffsetAt2ByteBoundary()
+            {
+                if (intraFieldOffset == 0)
+                    return;
+                if (intraFieldOffset <= 2)
+                {
+                    intraFieldOffset = 2;
+                    return;
+                }
+                fieldOffset++;
+                intraFieldOffset = 0;
+                return;
+            }
+            void advanceOffset(uint32_t bytes)
+            {
+                intraFieldOffset += bytes;
+                fieldOffset += intraFieldOffset / 4;
+                intraFieldOffset = intraFieldOffset % 4;
+            }
         };
 
         void emitMarshallingCode(
@@ -208,6 +235,7 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
+                    ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
@@ -218,11 +246,12 @@ namespace Slang
                             anyValInfo->fieldKeys[fieldOffset]);
                         builder->emitStore(dstAddr, dstVal);
                     }
-                    fieldOffset++;
+                    advanceOffset(4);
                     break;
                 }
                 case kIROp_UIntType:
                 {
+                    ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
@@ -232,17 +261,53 @@ namespace Slang
                             anyValInfo->fieldKeys[fieldOffset]);
                         builder->emitStore(dstAddr, srcVal);
                     }
-                    fieldOffset++;
+                    advanceOffset(4);
+                    break;
+                }
+                case kIROp_Int16Type:
+                case kIROp_UInt16Type:
+                case kIROp_HalfType:
+                {
+                    ensureOffsetAt2ByteBoundary();
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcVal = builder->emitLoad(concreteVar);
+                        if (dataType->getOp() == kIROp_HalfType)
+                        {
+                            srcVal = builder->emitBitCast(builder->getType(kIROp_UInt16Type), srcVal);
+                        }
+                        srcVal = builder->emitConstructorInst(builder->getType(kIROp_UIntType), 1, &srcVal);
+                        auto dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto dstVal = builder->emitLoad(dstAddr);
+                        if (intraFieldOffset == 0)
+                        {
+                            dstVal = builder->emitBitAnd(
+                                dstVal->getFullType(), dstVal,
+                                builder->getIntValue(builder->getUIntType(), 0xFFFF0000));
+                        }
+                        else
+                        {
+                            srcVal = builder->emitShl(
+                                srcVal->getFullType(), srcVal,
+                                builder->getIntValue(builder->getUIntType(), 16));
+                            dstVal = builder->emitBitAnd(
+                                dstVal->getFullType(), dstVal,
+                                builder->getIntValue(builder->getUIntType(), 0xFFFF));
+                        }
+                        dstVal = builder->emitBitOr(dstVal->getFullType(), dstVal, srcVal);
+                        builder->emitStore(dstAddr, dstVal);
+                    }
+                    advanceOffset(2);
                     break;
                 }
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
                 case kIROp_DoubleType:
                 case kIROp_Int8Type:
-                case kIROp_Int16Type:
                 case kIROp_UInt8Type:
-                case kIROp_UInt16Type:
-                case kIROp_HalfType:
                     SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                     break;
                 default:
@@ -253,6 +318,7 @@ namespace Slang
             virtual void marshalResourceHandle(IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
             {
                 SLANG_UNUSED(dataType);
+                ensureOffsetAt4ByteBoundary();
                 if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcVal = builder->emitLoad(concreteVar);
@@ -269,7 +335,7 @@ namespace Slang
                     auto dstAddr2 = builder->emitFieldAddress(
                         uintPtrType, anyValueVar, anyValInfo->fieldKeys[fieldOffset + 1]);
                     builder->emitStore(dstAddr2, highBits);
-                    fieldOffset += 2;
+                    advanceOffset(8);
                 }
             }
         };
@@ -302,6 +368,13 @@ namespace Slang
             builder.emitStore(concreteTypedVar, param);
             auto resultVar = builder.emitVar(anyValInfo->type);
 
+            // Initialize fields to 0 to prevent downstream compiler error.
+            for (uint32_t offset = 0; offset < (uint32_t)anyValInfo->fieldKeys.getCount(); offset++)
+            {
+                auto fieldAddr = builder.emitFieldAddress(builder.getUIntType(), resultVar, anyValInfo->fieldKeys[offset]);
+                builder.emitStore(fieldAddr, builder.getIntValue(builder.getUIntType(), 0));
+            }
+
             TypePackingContext context;
             context.anyValInfo = anyValInfo;
             context.fieldOffset = context.intraFieldOffset = 0;
@@ -310,13 +383,6 @@ namespace Slang
             emitMarshallingCode(&builder, &context, concreteTypedVar);
 
             context.validateAnyTypeSize(sharedContext->sink, type);
-
-            // Initialize the rest of unused fields to 0 to prevent downstream compiler error.
-            for (uint32_t offset = context.fieldOffset; offset < (uint32_t)anyValInfo->fieldKeys.getCount(); offset++)
-            {
-                auto fieldAddr = builder.emitFieldAddress(builder.getUIntType(), resultVar, context.anyValInfo->fieldKeys[offset]);
-                builder.emitStore(fieldAddr, builder.getIntValue(builder.getUIntType(), 0));
-            }
 
             auto load = builder.emitLoad(resultVar);
             builder.emitReturn(load);
@@ -332,6 +398,7 @@ namespace Slang
                 case kIROp_IntType:
                 case kIROp_FloatType:
                 {
+                    ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcAddr = builder->emitFieldAddress(
@@ -342,11 +409,12 @@ namespace Slang
                         srcVal = builder->emitBitCast(dataType, srcVal);
                         builder->emitStore(concreteVar, srcVal);
                     }
-                    fieldOffset++;
+                    advanceOffset(4);
                     break;
                 }
                 case kIROp_UIntType:
                 {
+                    ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcAddr = builder->emitFieldAddress(
@@ -356,17 +424,55 @@ namespace Slang
                         auto srcVal = builder->emitLoad(srcAddr);
                         builder->emitStore(concreteVar, srcVal);
                     }
-                    fieldOffset++;
+                    advanceOffset(4);
+                    break;
+                }
+                case kIROp_Int16Type:
+                case kIROp_UInt16Type:
+                case kIROp_HalfType:
+                {
+                    ensureOffsetAt2ByteBoundary();
+                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto srcAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset]);
+                        auto srcVal = builder->emitLoad(srcAddr);
+                        if (intraFieldOffset == 0)
+                        {
+                            srcVal = builder->emitBitAnd(
+                                srcVal->getFullType(), srcVal,
+                                builder->getIntValue(builder->getUIntType(), 0xFFFF));
+                        }
+                        else
+                        {
+                            srcVal = builder->emitShr(
+                                srcVal->getFullType(), srcVal,
+                                builder->getIntValue(builder->getUIntType(), 16));
+                        }
+                        if (dataType->getOp() == kIROp_Int16Type)
+                        {
+                            srcVal = builder->emitConstructorInst(builder->getType(kIROp_Int16Type), 1, &srcVal);
+                        }
+                        else
+                        {
+                            srcVal = builder->emitConstructorInst(builder->getType(kIROp_UInt16Type), 1, &srcVal);
+                        }
+                        if (dataType->getOp() == kIROp_HalfType)
+                        {
+                            srcVal = builder->emitBitCast(dataType, srcVal);
+                        }
+                        builder->emitStore(concreteVar, srcVal);
+                    }
+                    advanceOffset(2);
                     break;
                 }
                 case kIROp_UInt64Type:
                 case kIROp_Int64Type:
                 case kIROp_DoubleType:
                 case kIROp_Int8Type:
-                case kIROp_Int16Type:
                 case kIROp_UInt8Type:
-                case kIROp_UInt16Type:
-                case kIROp_HalfType:
                     SLANG_UNIMPLEMENTED_X("AnyValue type packing for non 32-bit elements");
                     break;
                 default:
@@ -377,6 +483,7 @@ namespace Slang
             virtual void marshalResourceHandle(
                 IRBuilder* builder, IRType* dataType, IRInst* concreteVar) override
             {
+                ensureOffsetAt4ByteBoundary();
                 if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcAddr = builder->emitFieldAddress(
@@ -390,7 +497,7 @@ namespace Slang
                     auto combinedBits = builder->emitMakeUInt64(lowBits, highBits);
                     combinedBits = builder->emitBitCast(dataType, combinedBits);
                     builder->emitStore(concreteVar, combinedBits);
-                    fieldOffset += 2;
+                    advanceOffset(8);
                 }
             }
         };
@@ -540,5 +647,98 @@ namespace Slang
         AnyValueMarshallingContext context;
         context.sharedContext = sharedContext;
         context.processModule();
+    }
+
+    SlangInt alignUp(SlangInt x, SlangInt alignment)
+    {
+        return (x + alignment - 1) / alignment * alignment;
+    }
+
+    SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_IntType:
+        case kIROp_FloatType:
+        case kIROp_UIntType:
+            return alignUp(offset, 4) + 4;
+        case kIROp_UInt64Type:
+        case kIROp_Int64Type:
+        case kIROp_DoubleType:
+            return -1;
+        case kIROp_Int16Type:
+        case kIROp_UInt16Type:
+        case kIROp_HalfType:
+            return alignUp(offset, 2) + 2;
+        case kIROp_UInt8Type:
+        case kIROp_Int8Type:
+            return -1;
+        case kIROp_VectorType:
+        {
+            auto vectorType = static_cast<IRVectorType*>(type);
+            auto elementType = vectorType->getElementType();
+            auto elementCount = getIntVal(vectorType->getElementCount());
+            for (IRIntegerValue i = 0; i < elementCount; i++)
+            {
+                offset = _getAnyValueSizeRaw(elementType, offset);
+                if (offset < 0) return offset;
+            }
+            return offset;
+        }
+        case kIROp_MatrixType:
+        {
+            auto matrixType = static_cast<IRMatrixType*>(type);
+            auto elementType = matrixType->getElementType();
+            auto colCount = getIntVal(matrixType->getColumnCount());
+            auto rowCount = getIntVal(matrixType->getRowCount());
+            for (IRIntegerValue i = 0; i < colCount; i++)
+            {
+                for (IRIntegerValue j = 0; j < rowCount; j++)
+                {
+                    offset = _getAnyValueSizeRaw(elementType, offset);
+                    if (offset < 0) return offset;
+                }
+            }
+            return offset;
+        }
+        case kIROp_StructType:
+        {
+            auto structType = cast<IRStructType>(type);
+            for (auto field : structType->getFields())
+            {
+                offset = _getAnyValueSizeRaw(field->getFieldType(), offset);
+                if (offset < 0) return offset;
+            }
+            return offset;
+        }
+        case kIROp_ArrayType:
+        {
+            auto arrayType = cast<IRArrayType>(type);
+            for (IRIntegerValue i = 0; i < getIntVal(arrayType->getElementCount()); i++)
+            {
+                offset = _getAnyValueSizeRaw(arrayType->getElementType(), offset);
+                if (offset < 0) return offset;
+            }
+            return offset;
+        }
+        case kIROp_InterfaceType:
+        {
+            // TODO: implement anyValue packing for interface types.
+            return -1;
+        }
+        default:
+            if (as<IRTextureTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+            {
+                return alignUp(offset, 4) + 8;
+            }
+            return -1;
+        }
+    }
+
+    SlangInt getAnyValueSize(IRType* type)
+    {
+        auto rawSize = _getAnyValueSizeRaw(type, 0);
+        if (rawSize < 0) return rawSize;
+        return alignUp(rawSize, 4);
     }
 }

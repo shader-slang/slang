@@ -290,7 +290,7 @@ namespace Slang
 
     void SemanticsStmtVisitor::visitGpuForeachStmt(GpuForeachStmt*stmt)
     {
-        stmt->renderer = CheckExpr(stmt->renderer);
+        stmt->device = CheckExpr(stmt->device);
         stmt->gridDims = CheckExpr(stmt->gridDims);
         ensureDeclBase(stmt->dispatchThreadID, DeclCheckState::Checked);
         WithOuterStmt subContext(this, stmt);

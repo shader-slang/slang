@@ -4100,6 +4100,18 @@ namespace Slang
         return inst;
     }
 
+    IRInst* IRBuilder::emitBitOr(IRType* type, IRInst* left, IRInst* right)
+    {
+        auto inst = createInst<IRInst>(
+            this,
+            kIROp_BitOr,
+            type,
+            left,
+            right);
+        addInst(inst);
+        return inst;
+    }
+
     IRInst* IRBuilder::emitBitNot(IRType* type, IRInst* value)
     {
         auto inst = createInst<IRInst>(

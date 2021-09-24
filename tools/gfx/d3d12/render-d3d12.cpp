@@ -146,6 +146,8 @@ public:
         return m_info;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+
     ~D3D12Device();
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -604,7 +606,7 @@ public:
         {
             uint64_t waitValue;
             HANDLE fenceEvent;
-            ID3D12Fence* fence = nullptr;
+            ComPtr<ID3D12Fence> fence = nullptr;
         };
         ShortList<QueueWaitInfo, 4> m_waitInfos;
 
@@ -4115,6 +4117,12 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
+Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NativeHandle::fromD3D12Handle(m_device);
+    return SLANG_OK;
+}
+
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
     outDeviceInfo.clear();
@@ -4287,32 +4295,40 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    FlagCombiner combiner;
-    // TODO: we should probably provide a command-line option
-    // to override UseDebug of default rather than leave it
-    // up to each back-end to specify.
-#if ENABLE_DEBUG_LAYER
-    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
-#else
-    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
-#endif
-    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
-    
-    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-
-    const int numCombinations = combiner.getNumCombinations();
-    for (int i = 0; i < numCombinations; ++i)
+    if (desc.existingDeviceHandles.getD3D12Device() == 0)
     {
-        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
+        FlagCombiner combiner;
+        // TODO: we should probably provide a command-line option
+        // to override UseDebug of default rather than leave it
+        // up to each back-end to specify.
+#if ENABLE_DEBUG_LAYER
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
+#else
+        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
+#endif
+        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+
+        const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
+
+        const int numCombinations = combiner.getNumCombinations();
+        for (int i = 0; i < numCombinations; ++i)
         {
-            break;
+            if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
+            {
+                break;
+            }
+        }
+
+        if (!m_deviceInfo.m_adapter)
+        {
+            // Couldn't find an adapter
+            return SLANG_FAIL;
         }
     }
-
-    if (!m_deviceInfo.m_adapter)
+    else
     {
-        // Couldn't find an adapter
-        return SLANG_FAIL;
+        // Store the existing device handle in desc in m_deviceInfo
+        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
     }
 
     // Set the device

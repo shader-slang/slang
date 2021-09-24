@@ -37,6 +37,14 @@
 #include <unistd.h>
 #endif
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
+#endif
+
 #ifdef _MSC_VER
 #pragma warning(disable: 4996)
 #endif
@@ -480,6 +488,7 @@ namespace Slang
             {
                 return SourceLanguage::GLSL;
             }
+            case PassThroughMode::LLVM:
             case PassThroughMode::Clang:
             case PassThroughMode::VisualStudio:
             case PassThroughMode::Gcc:
@@ -493,6 +502,7 @@ namespace Slang
             {
                 return SourceLanguage::CUDA;
             }
+            
             default: break;
         }
         SLANG_ASSERT(!"Unknown compiler");
@@ -1791,6 +1801,13 @@ namespace Slang
                 ComPtr<ISlangBlob> blob;
                 if (SLANG_FAILED(result.getBlob(blob)))
                 {
+                    if (targetReq->getTarget() == CodeGenTarget::HostCallable)
+                    {
+                        // Some HostCallable are not directly representable as a 'binary'.
+                        // So here, we just ignore if that appears the case, and don't output an unexpected error.
+                        return;
+                    }
+
                     SLANG_UNEXPECTED("No blob to emit");
                     return;
                 }
@@ -2049,6 +2066,7 @@ namespace Slang
             m_program);
         backEndRequest->shouldDumpIR =
             (m_targetReq->getTargetFlags() & SLANG_TARGET_FLAG_DUMP_IR) != 0;
+        backEndRequest->shouldDumpIntermediates = m_targetReq->shouldDumpIntermediates();
 
         return _createEntryPointResult(
             entryPointIndex,
@@ -2281,7 +2299,7 @@ namespace Slang
         // really need/want to do anything too elaborate
 
         static uint32_t counter = 0;
-#ifdef WIN32
+#ifdef _WIN32
         uint32_t id = InterlockedIncrement(&counter);
 #else
         // TODO: actually implement the case for other platforms

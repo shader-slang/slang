@@ -668,6 +668,7 @@ INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
 INST(BitCast,                           bitCast,                    1, 0)
+INST(Reinterpret,                       reinterpret,                1, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
@@ -708,4 +709,3 @@ INST_RANGE(Attr, PendingLayoutAttr, VarOffsetAttr)
 #undef USE_OTHER
 #undef INST_RANGE
 #undef INST
-

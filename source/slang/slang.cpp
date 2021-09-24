@@ -1066,8 +1066,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     catch (...)
     {}
     sink.getBlobIfNeeded(outDiagnostics);
+    bool success = (result != nullptr);
     *outConformanceComponentType = result.detach();
-    return result ? SLANG_OK : SLANG_FAIL;
+    return success ? SLANG_OK : SLANG_FAIL;
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompileRequest(
@@ -3920,6 +3921,13 @@ void EndToEndCompileRequest::setCompileFlags(SlangCompileFlags flags)
 void EndToEndCompileRequest::setDumpIntermediates(int enable)
 {
     getBackEndReq()->shouldDumpIntermediates = (enable != 0);
+
+    // Change all existing targets to use the new setting.
+    auto linkage = getLinkage();
+    for (auto& target : linkage->targets)
+    {
+        target->setDumpIntermediates(enable != 0);
+    }
 }
 
 void EndToEndCompileRequest::setDumpIntermediatePrefix(const char* prefix)

@@ -1418,10 +1418,45 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
+    struct NativeHandle
+    {
+    public:
+        // The following functions create an ExistingDeviceHandles object containing the provided handles.
+        static NativeHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
+        {
+            NativeHandle handles = {};
+            handles.values[0] = instance;
+            handles.values[1] = physicalDevice;
+            handles.values[2] = device;
+            return handles;
+        }
+
+        static NativeHandle fromD3D12Handle(void* device)
+        {
+            NativeHandle handles = {};
+            handles.values[0] = (uint64_t)device;
+            return handles;
+        }
+
+        // The following functions provide a way of getting handles from values.
+        uint64_t getD3D12Device() const { return values[0]; }
+
+        uint64_t getVkInstance() const { return values[0]; }
+        uint64_t getVkPhysicalDevice() const { return values[1]; }
+        uint64_t getVkDevice() const { return values[2]; }
+
+    private:
+        // For D3D12, this only contains a single value for the ID3D12Device.
+        // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
+        uint64_t values[3] = { 0 };
+    };
+
     struct Desc
     {
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
+        // The device's handles (if they exist).
+        NativeHandle existingDeviceHandles = {};
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
@@ -1436,6 +1471,8 @@ public:
         // Configurations for Slang compiler.
         SlangDesc slang = {};
     };
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 

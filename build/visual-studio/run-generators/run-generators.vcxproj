@@ -156,6 +156,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\prelude\slang-cpp-scalar-intrinsics.h" />
     <ClInclude Include="..\..\..\prelude\slang-cpp-types.h" />
+    <ClInclude Include="..\..\..\prelude\slang-llvm.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\core\slang-string.cpp" />

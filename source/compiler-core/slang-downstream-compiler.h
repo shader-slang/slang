@@ -82,6 +82,9 @@ struct DownstreamDiagnostics
         /// Reset to an initial empty state
     void reset() { diagnostics.clear(); rawDiagnostics = String(); result = SLANG_OK; }
 
+        /// Count the number of diagnostics which have 'severity' or greater 
+    Index getCountAtLeastSeverity(Diagnostic::Severity severity) const;
+
         /// Get the number of diagnostics by severity
     Index getCountBySeverity(Diagnostic::Severity severity) const;
         /// True if there are any diagnostics  of severity
@@ -108,7 +111,7 @@ struct DownstreamDiagnostics
 
     String rawDiagnostics;
 
-    SlangResult result;
+    SlangResult result = SLANG_OK;
     List<Diagnostic> diagnostics;
 };
 
@@ -203,9 +206,9 @@ public:
             /// Ctor
         explicit Desc(SlangPassThrough inType = SLANG_PASS_THROUGH_NONE, Int inMajorVersion = 0, Int inMinorVersion = 0):type(inType), majorVersion(inMajorVersion), minorVersion(inMinorVersion) {}
 
-        SlangPassThrough type;          ///< The type of the compiler
-        Int majorVersion;               ///< Major version (interpretation is type specific)
-        Int minorVersion;               ///< Minor version
+        SlangPassThrough type;      ///< The type of the compiler
+        Int majorVersion;           ///< Major version (interpretation is type specific)
+        Int minorVersion;           ///< Minor version (interpretation is type specific)
     };
 
     enum class OptimizationLevel
@@ -462,14 +465,33 @@ public:
 
     void clear() { m_compilers.clear(); }
 
+    bool hasSharedLibrary(ISlangSharedLibrary* lib);
+    void addSharedLibrary(ISlangSharedLibrary* lib);
+
+    ~DownstreamCompilerSet()
+    {
+        // A compiler may be implemented in a shared library, so release all first.
+        m_compilers.clearAndDeallocate();
+        for (auto& defaultCompiler : m_defaultCompilers)
+        {
+            defaultCompiler.setNull();
+        }
+
+        // Release any shared libraries
+        m_sharedLibraries.clearAndDeallocate();
+    }
+
 protected:
 
     Index _findIndex(const DownstreamCompiler::Desc& desc) const;
+
 
     RefPtr<DownstreamCompiler> m_defaultCompilers[int(SLANG_SOURCE_LANGUAGE_COUNT_OF)];
     // This could be a dictionary/map - but doing a linear search is going to be fine and it makes
     // somethings easier.
     List<RefPtr<DownstreamCompiler>> m_compilers;
+
+    List<ComPtr<ISlangSharedLibrary>> m_sharedLibraries;
 };
 
 typedef SlangResult (*DownstreamCompilerLocatorFunc)(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
