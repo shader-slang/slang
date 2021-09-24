@@ -5,13 +5,14 @@
 struct SlangUnitTest
 {
     const char* name;
-    slang::UnitTestFunc func;
+    UnitTestFunc func;
 };
 
-class SlangUnitTestModule : public slang::IUnitTestModule
+class SlangUnitTestModule : public IUnitTestModule
 {
 public:
     Slang::List<SlangUnitTest> tests;
+    ITestReporter* testReporter = nullptr;
 
     virtual SlangInt getTestCount() override
     {
@@ -22,10 +23,21 @@ public:
         return tests[index].name;
     }
 
-    virtual slang::UnitTestFunc getTestFunc(SlangInt index) override
+    virtual UnitTestFunc getTestFunc(SlangInt index) override
     {
         return tests[index].func;
     }
+
+    virtual void setTestReporter(ITestReporter* reporter) override
+    {
+        testReporter = reporter;
+    }
+
+    virtual void destroy() override
+    {
+        tests = decltype(tests)();
+    }
+
 };
 
 SlangUnitTestModule* _getTestModule()
@@ -34,15 +46,20 @@ SlangUnitTestModule* _getTestModule()
     return &testModule;
 }
 
+ITestReporter* getTestReporter()
+{
+    return _getTestModule()->testReporter;
+}
+
 extern "C"
 {
-SLANG_DLL_EXPORT slang::IUnitTestModule* slangUnitTestGetModule()
+SLANG_DLL_EXPORT IUnitTestModule* slangUnitTestGetModule()
 {
     return _getTestModule();
 }
 }
 
-slang::UnitTestRegisterHelper::UnitTestRegisterHelper(const char* name, UnitTestFunc testFunc)
+UnitTestRegisterHelper::UnitTestRegisterHelper(const char* name, UnitTestFunc testFunc)
 {
     _getTestModule()->tests.add(SlangUnitTest{ name, testFunc });
 }

@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-list.h"
 
 using namespace Slang;
 
-static void freeListUnitTest()
+SLANG_UNIT_TEST(freeList)
 {
     FreeList freeList;
     freeList.init(sizeof(int), sizeof(void*), 10);
@@ -51,4 +51,3 @@ static void freeListUnitTest()
     }
 }
 
-SLANG_UNIT_TEST("FreeList", freeListUnitTest);

@@ -4,7 +4,7 @@
 #include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-json-value.h"
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -101,7 +101,7 @@ static bool _areEqual(SourceManager* sourceManager, const List<JSONToken>& toks,
     return true;
 }
 
-static void jsonUnitTest()
+SLANG_UNIT_TEST(json)
 {
     SourceManager sourceManager;
     sourceManager.initialize(nullptr, nullptr);
@@ -318,4 +318,3 @@ static void jsonUnitTest()
     }
 }
 
-SLANG_UNIT_TEST("JSON", jsonUnitTest);
