@@ -20,9 +20,6 @@
     <ClCompile Include="..\..\..\tools\gfx-test\compute-smoke.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-test\existing-device-handle-test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-test\gfx-test-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

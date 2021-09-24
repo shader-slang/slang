@@ -9,22 +9,22 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    SlangResult existingDeviceHandleTestImpl(IDevice* device, slang::UnitTestContext* context)
+    void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
         transientHeapDesc.constantBufferSize = 4096;
-        SLANG_RETURN_ON_FAIL(
+        GFX_CHECK_CALL_ABORT(
             device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        SLANG_RETURN_ON_FAIL(loadShaderProgram(device, shaderProgram, context->outputWriter, "compute-smoke", slangReflection));
+        GFX_CHECK_CALL_ABORT(loadShaderProgram(device, shaderProgram, "compute-smoke", slangReflection));
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
         ComPtr<gfx::IPipelineState> pipelineState;
-        SLANG_RETURN_ON_FAIL(
+        GFX_CHECK_CALL_ABORT(
             device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
         const int numberCount = 4;
@@ -42,7 +42,7 @@ namespace gfx_test
         bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
 
         ComPtr<IBufferResource> numbersBuffer;
-        SLANG_RETURN_ON_FAIL(device->createBufferResource(
+        GFX_CHECK_CALL_ABORT(device->createBufferResource(
             bufferDesc,
             (void*)initialData,
             numbersBuffer.writeRef()));
@@ -51,7 +51,7 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
-        SLANG_RETURN_ON_FAIL(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
+        GFX_CHECK_CALL_ABORT(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
 
         // We have done all the set up work, now it is time to start recording a command buffer for
         // GPU execution.
@@ -69,7 +69,7 @@ namespace gfx_test
 
             // Now we can use this type to create a shader object that can be bound to the root object.
             ComPtr<IShaderObject> transformer;
-            SLANG_RETURN_ON_FAIL(device->createShaderObject(
+            GFX_CHECK_CALL_ABORT(device->createShaderObject(
                 addTransformerType, ShaderObjectContainerType::None, transformer.writeRef()));
             // Set the `c` field of the `AddTransformer`.
             float c = 1.0f;
@@ -90,17 +90,17 @@ namespace gfx_test
             queue->wait();
         }
 
-        return compareComputeResult(
+        compareComputeResult(
             device,
             numbersBuffer,
             Slang::makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
     }
 
-    SlangResult existingDeviceHandleTestAPI(slang::UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    void existingDeviceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
         if ((api & context->enabledApis) == 0)
         {
-            return SLANG_E_NOT_AVAILABLE;
+            return SLANG_IGNORE_TEST;
         }
         Slang::ComPtr<IDevice> device;
         IDevice::Desc deviceDesc = {};
@@ -116,16 +116,16 @@ namespace gfx_test
             deviceDesc.deviceType = gfx::DeviceType::Vulkan;
             break;
         default:
-            return SLANG_E_NOT_AVAILABLE;
+            return SLANG_IGNORE_TEST;
         }
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {
-            return SLANG_E_NOT_AVAILABLE;
+            return SLANG_IGNORE_TEST;
         }
 
         IDevice::NativeHandle handle = {};
-        SLANG_RETURN_ON_FAIL(device->getNativeHandle(&handle));
+        GFX_CHECK_CALL_ABORT(device->getNativeHandle(&handle));
         Slang::ComPtr<IDevice> testDevice;
         IDevice::Desc testDeviceDesc = {};
         switch (api)
@@ -140,31 +140,30 @@ namespace gfx_test
             testDeviceDesc.deviceType = gfx::DeviceType::Vulkan;
             break;
         default:
-            return SLANG_E_NOT_AVAILABLE;
+            return SLANG_IGNORE_TEST;
         }
         testDeviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        const char* searchPaths[] = { "", "../../tools/gfx-test", "tools/gfx-test" };
+        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
         testDeviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
         testDeviceDesc.slang.searchPaths = searchPaths;
         testDeviceDesc.existingDeviceHandles = handle;
         auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
         if (SLANG_FAILED(createTestDeviceResult))
         {
-            return SLANG_E_NOT_AVAILABLE;
+            return SLANG_IGNORE_TEST;
         }
 
-        SLANG_RETURN_ON_FAIL(existingDeviceHandleTestImpl(testDevice, context));
-        return SLANG_OK;
+        existingDeviceHandleTestImpl(testDevice, context);
     }
 
     SLANG_UNIT_TEST(existingDeviceHandleD3D12)
     {
-        return existingDeviceHandleTestAPI(context, Slang::RenderApiFlag::D3D12);
+        return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
     SLANG_UNIT_TEST(existingDeviceHandleVulkan)
     {
-        return existingDeviceHandleTestAPI(context, Slang::RenderApiFlag::Vulkan);
+        return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
 }
