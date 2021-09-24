@@ -2454,9 +2454,15 @@ void Linkage::_diagnoseErrorInImportedModule(
 {
     for(auto info = m_modulesBeingImported; info; info = info->next)
     {
-        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+            sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
-    sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+    try
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
+    }
+    catch (const AbortCompilationException&)
+    {
+    }
 }
 
 RefPtr<Module> Linkage::loadModule(
