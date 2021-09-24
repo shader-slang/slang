@@ -68,12 +68,12 @@ class TestReporter : public ITestReporter
     void startSuite(const Slang::String& name);
     void endSuite();
 
-    virtual void startTest(const char* testName) override;
-    virtual void addResult(TestResult result) override;
-    virtual void addResultWithLocation(TestResult result, const char* testText, const char* file, int line) override;
-    virtual void addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line) override;
-    virtual void addExecutionTime(double time) override;
-    virtual void endTest() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(TestResult result, const char* testText, const char* file, int line) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL addExecutionTime(double time) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL endTest() override;
     
         /// Runs start/endTest and outputs the result
     TestResult addTest(const Slang::String& testName, bool isPass);
@@ -83,7 +83,7 @@ class TestReporter : public ITestReporter
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
     void messageFormat(TestMessageType type, char const* message, ...);
-    virtual void message(TestMessageType type, char const* message) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, char const* message) override;
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
 
