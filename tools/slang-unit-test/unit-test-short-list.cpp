@@ -1,6 +1,7 @@
 // unit-test-path.cpp
 
-#include "test-context.h"
+#include "source/core/slang-basic.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -15,7 +16,7 @@ static bool _checkArrayView(ArrayView<T> v0, ArrayView<T> v1)
     return true;
 }
 
-static void shortListUnitTest()
+SLANG_UNIT_TEST(shortList)
 {
     {
         ShortList<String, 4> shortList = { "a", "b", "c" };
@@ -74,5 +75,3 @@ static void shortListUnitTest()
             List<String>{"a", "b", "c", "d", "e"}.getArrayView()));
     }
 }
-
-SLANG_UNIT_TEST("ShortList", shortListUnitTest);

@@ -755,7 +755,7 @@ tool "slang-embed"
 tool "slang-test"
     uuid "0C768A18-1D25-4000-9F37-DA5FE99E3B64"
     includedirs { "." }
-    links { "core", "compiler-core", "slang", "miniz", "lz4" }
+    links { "compiler-core", "slang", "core", "miniz", "lz4" }
     
     -- We want to set to the root of the project, but that doesn't seem to work with '.'. 
     -- So set a path that resolves to the same place.
@@ -1251,11 +1251,17 @@ standardProject("slang", "source/slang")
         defines { "SLANG_ENABLE_IR_BREAK_ALLOC=1" }
     filter {}
        
-toolSharedLibrary "gfx-test"
+toolSharedLibrary "gfx-unit-test"
     uuid "092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519"
     includedirs { "." }
     addSourceDir "tools/unit-test"
-    links { "gfx", "gfx-util", "slang", "core" }
+    links {  "core", "slang", "gfx", "gfx-util" }
+
+toolSharedLibrary "slang-unit-test"
+    uuid "0162864E-7651-4B5E-9105-C571105276EA"
+    includedirs { "." }
+    addSourceDir "tools/unit-test"
+    links { "lz4", "miniz", "core", "compiler-core",  "slang" }
     
 if enableProfile then
     tool "slang-profile"

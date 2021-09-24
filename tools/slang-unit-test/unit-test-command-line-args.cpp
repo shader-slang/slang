@@ -2,11 +2,11 @@
 
 #include "../../source/compiler-core/slang-command-line-args.h"
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-static void commandLineArgsUnitTest()
+SLANG_UNIT_TEST(commandLineArgs)
 {
     RefPtr<CommandLineContext> context = new CommandLineContext;
 
@@ -123,4 +123,3 @@ static void commandLineArgsUnitTest()
 
 }
 
-SLANG_UNIT_TEST("CommandLineArgs", commandLineArgsUnitTest);
