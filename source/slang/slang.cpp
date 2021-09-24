@@ -2456,13 +2456,7 @@ void Linkage::_diagnoseErrorInImportedModule(
     {
             sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
-    try
-    {
-        sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
-    }
-    catch (const AbortCompilationException&)
-    {
-    }
+    sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
 }
 
 RefPtr<Module> Linkage::loadModule(
@@ -2518,7 +2512,13 @@ RefPtr<Module> Linkage::loadModule(
 
     if (errorCountAfter != errorCountBefore)
     {
-        _diagnoseErrorInImportedModule(sink);
+        try
+        {
+            _diagnoseErrorInImportedModule(sink);
+        }
+        catch (const AbortCompilationException&)
+        {
+        }
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
