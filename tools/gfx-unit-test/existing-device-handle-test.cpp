@@ -118,6 +118,10 @@ namespace gfx_test
         default:
             return SLANG_IGNORE_TEST;
         }
+        deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
+        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
+        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
+        deviceDesc.slang.searchPaths = searchPaths;
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {
@@ -127,25 +131,7 @@ namespace gfx_test
         IDevice::NativeHandle handle = {};
         GFX_CHECK_CALL_ABORT(device->getNativeHandle(&handle));
         Slang::ComPtr<IDevice> testDevice;
-        IDevice::Desc testDeviceDesc = {};
-        switch (api)
-        {
-        case Slang::RenderApiFlag::D3D11:
-            testDeviceDesc.deviceType = gfx::DeviceType::DirectX11;
-            break;
-        case Slang::RenderApiFlag::D3D12:
-            testDeviceDesc.deviceType = gfx::DeviceType::DirectX12;
-            break;
-        case Slang::RenderApiFlag::Vulkan:
-            testDeviceDesc.deviceType = gfx::DeviceType::Vulkan;
-            break;
-        default:
-            return SLANG_IGNORE_TEST;
-        }
-        testDeviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
-        testDeviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
-        testDeviceDesc.slang.searchPaths = searchPaths;
+        IDevice::Desc testDeviceDesc = deviceDesc;
         testDeviceDesc.existingDeviceHandles = handle;
         auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
         if (SLANG_FAILED(createTestDeviceResult))
