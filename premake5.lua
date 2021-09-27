@@ -208,10 +208,7 @@ end
 workspace "slang"
     -- We will support debug/release configuration and x86/x64 builds.
     configurations { "Debug", "Release" }
-    platforms { "x86", "x64"}
-    
-    if os.target() == "linux" then
-        platforms {"aarch64" }
+    platforms { "x86", "x64", "aarch64" }
     end
     
     if buildLocation then
@@ -249,6 +246,7 @@ workspace "slang"
         architecture "x86"
     filter { "platforms:aarch64"}
         architecture "ARM"
+        editandcontinue "Off"
 
 
     filter { "toolset:clang or gcc*" }
