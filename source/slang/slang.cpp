@@ -822,13 +822,21 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     const char*     moduleName,
     slang::IBlob**  outDiagnostics)
 {
-    auto name = getNamePool()->getName(moduleName);
+    try
+    {
+        auto name = getNamePool()->getName(moduleName);
 
-    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    auto module = findOrImportModule(name, SourceLoc(), &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
+        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+        auto module = findOrImportModule(name, SourceLoc(), &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
 
-    return asExternal(module);
+        return asExternal(module);
+
+    }
+    catch (const AbortCompilationException&)
+    {
+        return nullptr;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
@@ -2512,13 +2520,7 @@ RefPtr<Module> Linkage::loadModule(
 
     if (errorCountAfter != errorCountBefore)
     {
-        try
-        {
-            _diagnoseErrorInImportedModule(sink);
-        }
-        catch (const AbortCompilationException&)
-        {
-        }
+        _diagnoseErrorInImportedModule(sink);
         // Something went wrong during the parsing, so we should bail out.
         return nullptr;
     }
