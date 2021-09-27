@@ -19,32 +19,32 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{0C768A18-1D25-4000-9F37-DA5FE99E3B64}</ProjectGuid>
+    <ProjectGuid>{092DAB9F-1DA5-4538-ADD7-1A8D1DBFD519}</ProjectGuid>
     <IgnoreWarnCompileDuplicatedFilename>true</IgnoreWarnCompileDuplicatedFilename>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>slang-test</RootNamespace>
+    <RootNamespace>gfx-unit-test-tool</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
     <PlatformToolset>v142</PlatformToolset>
@@ -68,66 +68,68 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\debug\slang-test\</IntDir>
-    <TargetName>slang-test</TargetName>
-    <TargetExt>.exe</TargetExt>
+    <IntDir>..\..\..\intermediate\windows-x86\debug\gfx-unit-test-tool\</IntDir>
+    <TargetName>gfx-unit-test-tool</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\debug\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\debug\slang-test\</IntDir>
-    <TargetName>slang-test</TargetName>
-    <TargetExt>.exe</TargetExt>
+    <IntDir>..\..\..\intermediate\windows-x64\debug\gfx-unit-test-tool\</IntDir>
+    <TargetName>gfx-unit-test-tool</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x86\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x86\release\slang-test\</IntDir>
-    <TargetName>slang-test</TargetName>
-    <TargetExt>.exe</TargetExt>
+    <IntDir>..\..\..\intermediate\windows-x86\release\gfx-unit-test-tool\</IntDir>
+    <TargetName>gfx-unit-test-tool</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\..\bin\windows-x64\release\</OutDir>
-    <IntDir>..\..\..\intermediate\windows-x64\release\slang-test\</IntDir>
-    <TargetName>slang-test</TargetName>
-    <TargetExt>.exe</TargetExt>
+    <IntDir>..\..\..\intermediate\windows-x64\release\gfx-unit-test-tool\</IntDir>
+    <TargetName>gfx-unit-test-tool</TargetName>
+    <TargetExt>.dll</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\..\bin\windows-x86\debug\gfx-unit-test-tool.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ImportLibrary>..\..\..\bin\windows-x64\debug\gfx-unit-test-tool.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -137,16 +139,17 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\..\bin\windows-x86\release\gfx-unit-test-tool.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -156,43 +159,37 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ImportLibrary>..\..\..\bin\windows-x64\release\gfx-unit-test-tool.lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\tools\slang-test\directory-util.h" />
-    <ClInclude Include="..\..\..\tools\slang-test\options.h" />
-    <ClInclude Include="..\..\..\tools\slang-test\parse-diagnostic-util.h" />
-    <ClInclude Include="..\..\..\tools\slang-test\slangc-tool.h" />
-    <ClInclude Include="..\..\..\tools\slang-test\test-context.h" />
-    <ClInclude Include="..\..\..\tools\slang-test\test-reporter.h" />
+    <ClInclude Include="..\..\..\tools\gfx-unit-test\gfx-test-util.h" />
+    <ClInclude Include="..\..\..\tools\unit-test\slang-unit-test.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\slang-test\directory-util.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\options.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\parse-diagnostic-util.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\slang-test-main.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\slangc-tool.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\test-context.cpp" />
-    <ClCompile Include="..\..\..\tools\slang-test\test-reporter.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
+    <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\compiler-core\compiler-core.vcxproj">
-      <Project>{12C1E89D-F5D0-41D3-8E8D-FB3F358F8126}</Project>
+    <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\core\core.vcxproj">
+      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
     </ProjectReference>
     <ProjectReference Include="..\slang\slang.vcxproj">
       <Project>{DB00DA62-0533-4AFD-B59F-A67D5B3A0808}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\core\core.vcxproj">
-      <Project>{F9BE7957-8399-899E-0C49-E714FDDD4B65}</Project>
+    <ProjectReference Include="..\gfx\gfx.vcxproj">
+      <Project>{222F7498-B40C-4F3F-A704-DDEB91A4484A}</Project>
     </ProjectReference>
-    <ProjectReference Include="..\miniz\miniz.vcxproj">
-      <Project>{E76ACB11-4A12-4F0A-BE1E-CE0B8836EB7F}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\lz4\lz4.vcxproj">
-      <Project>{E1EC8075-823E-46E5-BC38-C124CCCDF878}</Project>
+    <ProjectReference Include="..\gfx-util\gfx-util.vcxproj">
+      <Project>{F5ADB74E-02A7-44FB-AA3B-FC02F8AC7A4B}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

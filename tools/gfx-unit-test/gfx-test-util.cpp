@@ -1,4 +1,5 @@
 #include "gfx-test-util.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include <slang-com-ptr.h>
 
@@ -6,18 +7,17 @@ using Slang::ComPtr;
 
 namespace gfx_test
 {
-    void diagnoseIfNeeded(ISlangWriter* diagnosticWriter, slang::IBlob* diagnosticsBlob)
+    void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
     {
         if (diagnosticsBlob != nullptr)
         {
-            diagnosticWriter->write((const char*)diagnosticsBlob->getBufferPointer(), diagnosticsBlob->getBufferSize());
+            getTestReporter()->message(TestMessageType::Info, (const char*)diagnosticsBlob->getBufferPointer());
         }
     }
 
     Slang::Result loadShaderProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
-        ISlangWriter* diagnosticWriter,
         const char* shaderModuleName,
         slang::ProgramLayout*& slangReflection)
     {
@@ -25,7 +25,7 @@ namespace gfx_test
         SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
         slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
-        diagnoseIfNeeded(diagnosticWriter, diagnosticsBlob);
+        diagnoseIfNeeded(diagnosticsBlob);
         if (!module)
             return SLANG_FAIL;
 
@@ -44,7 +44,7 @@ namespace gfx_test
             componentTypes.getCount(),
             composedProgram.writeRef(),
             diagnosticsBlob.writeRef());
-        diagnoseIfNeeded(diagnosticWriter, diagnosticsBlob);
+        diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
         slangReflection = composedProgram->getLayout();
 
@@ -58,22 +58,29 @@ namespace gfx_test
         return SLANG_OK;
     }
 
-    Slang::Result compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)
+    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
-        SLANG_RETURN_ON_FAIL(device->readBufferResource(
+        GFX_CHECK_CALL_ABORT(device->readBufferResource(
             buffer, 0, expectedBufferSize, resultBlob.writeRef()));
         if (resultBlob->getBufferSize() < expectedBufferSize)
-            return SLANG_FAIL;
+        {
+            getTestReporter()->addResult(TestResult::Fail);
+            return;
+        }
 
         // Compare results.
         auto result = reinterpret_cast<const uint8_t*>(resultBlob->getBufferPointer());
         for (int i = 0; i < expectedBufferSize; i++)
         {
             if (expectedResult[i] != result[i])
-                return SLANG_FAIL;
+            {
+                getTestReporter()->addResult(TestResult::Fail);
+                return;
+            }
+
         }
-        return SLANG_OK;
+        getTestReporter()->addResult(TestResult::Pass);
     }
 }

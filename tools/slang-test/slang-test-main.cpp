@@ -3399,25 +3399,23 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(
         Path::combine(context->exeDirectoryPath, moduleName).getBuffer(),
         moduleHandle));
-    slang::UnitTestGetModuleFunc getModuleFunc =
-        (slang::UnitTestGetModuleFunc) SharedLibrary::findSymbolAddressByName(
+    UnitTestGetModuleFunc getModuleFunc =
+        (UnitTestGetModuleFunc) SharedLibrary::findSymbolAddressByName(
             moduleHandle, "slangUnitTestGetModule");
     if (!getModuleFunc)
         return SLANG_FAIL;
 
-    slang::IUnitTestModule* testModule = getModuleFunc();
+    IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
         return SLANG_FAIL;
-
-    slang::UnitTestContext unitTestContext;
+    testModule->setTestReporter(TestReporter::get());
+    UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     auto testCount = testModule->getTestCount();
     for (SlangInt i = 0; i < testCount; i++)
     {
-        StringBuilder sb;
-        StringWriter messageWriter(&sb, WriterFlag::Enum::AutoFlush);
         auto testFunc = testModule->getTestFunc(i);
         auto testName = testModule->getTestName(i);
 
@@ -3430,22 +3428,13 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                unitTestContext.outputWriter = &messageWriter;
-                TestReporter::get()->startTest(testOptions.command);
-                auto result = testFunc(&unitTestContext);
-                if (sb.getLength())
-                    TestReporter::get()->message(TestMessageType::Info, sb.ProduceString());
-
-                if (result == SLANG_E_NOT_AVAILABLE)
-                    TestReporter::get()->addResult(TestResult::Ignored);
-                else if (SLANG_FAILED(result))
-                    TestReporter::get()->addResult(TestResult::Fail);
-                else
-                    TestReporter::get()->addResult(TestResult::Pass);
+                TestReporter::get()->startTest(testOptions.command.getBuffer());
+                testFunc(&unitTestContext);
                 TestReporter::get()->endTest();
             }
         }
     }
+    testModule->destroy();
     return SLANG_OK;
 }
 
@@ -3623,40 +3612,16 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::set(&reporter);
 
             // Run the unit tests
-            TestRegister* cur = TestRegister::s_first;
-            while (cur)
             {
-                StringBuilder filePath;
-                filePath << "unit-tests/" << cur->m_name << ".internal";
-
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                testOptions.command = filePath;
-
-                if (shouldRunTest(&context, testOptions.command))
-                {
-                    if (testPassesCategoryMask(&context, testOptions))
-                    {
-                        reporter.startTest(testOptions.command);
-                        // Run the test function
-                        cur->m_func();
-                        reporter.endTest();
-                    }
-                    else
-                    {
-                        reporter.addTest(testOptions.command, TestResult::Ignored);
-                    }
-                }
-
-                // Next
-                cur = cur->m_next;
+                runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
             }
-
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, "gfx-test-tool");
+                runUnitTestModule(&context, testOptions, "gfx-unit-test-tool");
             }
             TestReporter::set(nullptr);
         }
