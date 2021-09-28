@@ -35,7 +35,7 @@ namespace gfx_test
         return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
     }
 
-#define GFX_CHECK_CALL(x) {auto callResult = (x); SLANG_CHECK(!SLANG_FAILED(callResult))}
-#define GFX_CHECK_CALL_ABORT(x) {auto callResult = (x); SLANG_CHECK_ABORT(!SLANG_FAILED(callResult))}
+#define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
+#define GFX_CHECK_CALL_ABORT(x) SLANG_CHECK_ABORT(!SLANG_FAILED(x))
 
 }
