@@ -949,7 +949,7 @@ end
 
 function getWinArm64BuildDir(isArm64)
     if isArm64 then
-        return path.getabsolute("bin/windows-x64/%{cfg.buildcfg:lower()}")
+        return "%{wks.location}/bin/windows-x64/%{cfg.buildcfg:lower()}"
     else
         return "%{cfg.targetdir}"
     end
