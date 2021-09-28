@@ -959,8 +959,6 @@ function astReflectGenerator(isArm64)
     local f = getWinArm64Filter(isArm64)
     local builddir = getWinArm64BuildDir(isArm64)
 
-    print(builddir)
-
     table.insert(f, "files:**/slang-ast-reflect.h")
     filter(f)
 
