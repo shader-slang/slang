@@ -4008,6 +4008,8 @@ public:
             case ResourceState::ResolveSource:
             case ResourceState::CopySource:
                 return VK_ACCESS_TRANSFER_READ_BIT;
+            case ResourceState::AccelerationStructure:
+                return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
             default:
                 assert(!"Unsupported");
                 return VkAccessFlagBits(0);
