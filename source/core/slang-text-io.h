@@ -52,7 +52,7 @@ class StreamReader : public TextReader
 public:
     virtual SlangResult readToEnd(String& outString) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_index == m_buffer.getCount() && m_stream->isEnd(); }
-    virtual void close() { m_stream->close(); }
+    virtual void close() SLANG_OVERRIDE { m_stream->close(); }
 
     void releaseStream() { m_stream.setNull(); }
 
