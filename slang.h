@@ -3931,6 +3931,13 @@ namespace slang
             const char* moduleName,
             IBlob**     outDiagnostics = nullptr) = 0;
 
+            /** Load a module from Slang source code.
+            */
+        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
+            const char* moduleName,
+            slang::IBlob* source,
+            slang::IBlob** outDiagnostics = nullptr) = 0;
+
             /** Combine multiple component types to create a composite component type.
 
             The `componentTypes` array must contain `componentTypeCount` pointers
