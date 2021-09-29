@@ -120,6 +120,14 @@ namespace Slang
         return UnownedStringSlice(start, end);
     }
 
+    UnownedStringSlice UnownedStringSlice::trimStart() const
+    {
+        const char* start = m_begin;
+
+        while (start < m_end && CharUtil::isHorizontalWhitespace(*start)) start++;
+        return UnownedStringSlice(start, m_end);
+    }
+
     UnownedStringSlice UnownedStringSlice::trim(char c) const
     {
         const char* start = m_begin;

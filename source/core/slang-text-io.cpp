@@ -178,7 +178,8 @@ char StreamReader::readBufferChar()
 	}
 	return 0;
 }
-int TextReader::read(char * destBuffer, int length)
+
+int TextReader::read(char* destBuffer, int length)
 {
 	int i = 0;
 	for (i = 0; i < length; i++)
@@ -206,36 +207,6 @@ int TextReader::read(char * destBuffer, int length)
 		}
 	}
 	return i;
-}
-
-String StreamReader::readLine()
-{
-	StringBuilder sb(256);
-	while (!isEnd())
-	{
-		try
-		{
-			auto ch = read();
-			if (isEnd())
-				break;
-			if (ch == '\r')
-			{
-				if (peek() == '\n')
-					read();
-				break;
-			}
-			else if (ch == '\n')
-			{
-				break;
-			}
-			sb.Append(ch);
-		}
-		catch (const EndOfStreamException&)
-		{
-			break;
-		}
-	}
-	return sb.ProduceString();
 }
 
 String StreamReader::readToEnd()

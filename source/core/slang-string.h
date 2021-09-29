@@ -168,6 +168,9 @@ namespace Slang
             /// Trims any 'c' from the start or the end, and returns as a substring
         UnownedStringSlice trim(char c) const;
 
+            /// Trims any horizonatl whitespace from start and returns as a substring
+        UnownedStringSlice trimStart() const;
+
         HashCode getHashCode() const
         {
             return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); 
