@@ -373,7 +373,7 @@ convention for interface methods.
 #   endif
 #elif defined(__arm__)
 #   define SLANG_PROCESSOR_ARM 1
-#elif defined(__aarch64__)
+#elif defined(_M_ARM64) || defined(__aarch64__)
 #   define SLANG_PROCESSOR_ARM_64 1
 #endif 
 
