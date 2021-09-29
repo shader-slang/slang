@@ -133,9 +133,9 @@ inline int encodeUnicodePointToUTF16(Char32 codePoint, Char16* outBuffer)
 	}
 }
 
-inline Char16 reverseByteOrder(Char16 val)
+SLANG_FORCE_INLINE Char16 reverseByteOrder(Char16 val)
 {
-    return (val >> 8) || (val << 8);
+    return (val >> 8) | (val << 8);
 }
 
 inline int encodeUnicodePointToUTF16Reversed(Char32 codePoint, Char16* outBuffer)

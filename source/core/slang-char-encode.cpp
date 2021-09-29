@@ -3,9 +3,6 @@
 namespace Slang
 {
 
-
-
-
 class Utf8CharEncoding : public CharEncoding 
 {
 public:
