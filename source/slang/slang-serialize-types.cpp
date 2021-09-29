@@ -16,7 +16,7 @@ namespace { // anonymous
 
 struct CharReader
 {
-    char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
+    char operator()(Index pos) const { SLANG_UNUSED(pos); return *m_pos++; }
     CharReader(const char* pos) :m_pos(pos) {}
     mutable const char* m_pos;
 };

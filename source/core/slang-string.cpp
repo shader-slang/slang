@@ -219,9 +219,9 @@ namespace Slang
     {
         List<char> buf;
 #ifdef _WIN32
-        Slang::CharEncoding::UTF16->decode((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF16->decode((const Byte*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
 #else
-        Slang::CharEncoding::UTF32->decode((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF32->decode((const Byte*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
 #endif
         return String(buf.begin(), buf.end());
     }
@@ -230,9 +230,9 @@ namespace Slang
     {
         List<char> buf;
 #ifdef _WIN32
-        Slang::CharEncoding::UTF16->decode((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF16->decode((const Byte*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
 #else
-        Slang::CharEncoding::UTF32->decode((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF32->decode((const Byte*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
 #endif
         return String(buf.begin(), buf.end());
     }
@@ -241,9 +241,9 @@ namespace Slang
     {
         List<char> buf;
 #ifdef _WIN32
-        Slang::CharEncoding::UTF16->decode((const char*)&ch, (int)(sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF16->decode((const Byte*)&ch, (int)(sizeof(wchar_t)), buf);
 #else
-        Slang::CharEncoding::UTF32->decode((const char*)&ch, (int)(sizeof(wchar_t)), buf);
+        Slang::CharEncoding::UTF32->decode((const Byte*)&ch, (int)(sizeof(wchar_t)), buf);
 #endif
         return String(buf.begin(), buf.end());
     }
@@ -263,7 +263,7 @@ namespace Slang
         }
         else
         {
-            List<char> buf;
+            List<Byte> buf;
             switch(sizeof(wchar_t))
             {
             case 2:

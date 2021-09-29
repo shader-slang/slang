@@ -11,16 +11,16 @@ template <typename ReadByteFunc>
 Char32 getUnicodePointFromUTF8(const ReadByteFunc& get)
 {
     Char32 codePoint = 0;
-	int leading = get(0);
-	int mask = 0x80;
-	int count = 0;
+	uint32_t leading = Byte(get(0));
+    uint32_t mask = 0x80;
+    Index count = 0;
 	while (leading & mask)
 	{
 		count++;
 		mask >>= 1;
 	}
 	codePoint = (leading & (mask - 1));
-	for (int i = 1; i <= count - 1; i++)
+	for (Index i = 1; i <= count - 1; i++)
 	{
 		codePoint <<= 6;
 		codePoint += (get(i) & 0x3F);
@@ -31,14 +31,14 @@ Char32 getUnicodePointFromUTF8(const ReadByteFunc& get)
 template <typename ReadByteFunc>
 Char32 getUnicodePointFromUTF16(const ReadByteFunc& get)
 {
-	int byte0 = (unsigned char)get(0);
-	int byte1 = (unsigned char)get(1);
-	int word0 = byte0 + (byte1 << 8);
+    uint32_t byte0 = Byte(get(0));
+    uint32_t byte1 = Byte(get(1));
+    uint32_t word0 = byte0 + (byte1 << 8);
 	if (word0 >= 0xD800 && word0 <= 0xDFFF)
 	{
-		int byte2 = (unsigned char)get(2);
-		int byte3 = (unsigned char)get(3);
-		int word1 = byte2 + (byte3 << 8);
+        uint32_t byte2 = Byte(get(2));
+        uint32_t byte3 = Byte(get(3));
+        uint32_t word1 = byte2 + (byte3 << 8);
 		return Char32(((word0 & 0x3FF) << 10) + (word1 & 0x3FF) + 0x10000);
 	}
 	else
@@ -48,14 +48,14 @@ Char32 getUnicodePointFromUTF16(const ReadByteFunc& get)
 template <typename ReadByteFunc>
 Char32 getUnicodePointFromUTF16Reversed(const ReadByteFunc& get)
 {
-	int byte0 = (unsigned char)get(0);
-	int byte1 = (unsigned char)get(1);
-	int word0 = (byte0 << 8) + byte1;
+    uint32_t byte0 = Byte(get(0));
+    uint32_t byte1 = Byte(get(1));
+    uint32_t word0 = (byte0 << 8) + byte1;
 	if (word0 >= 0xD800 && word0 <= 0xDFFF)
 	{
-		int byte2 = (unsigned char)get(2);
-		int byte3 = (unsigned char)get(3);
-		int word1 = (byte2 << 8) + byte3;
+        uint32_t byte2 = Byte(get(2));
+        uint32_t byte3 = Byte(get(3));
+        uint32_t word1 = (byte2 << 8) + byte3;
 		return Char32(((word0 & 0x3FF) << 10) + (word1 & 0x3FF));
 	}
 	else
@@ -65,10 +65,10 @@ Char32 getUnicodePointFromUTF16Reversed(const ReadByteFunc& get)
 template <typename ReadByteFunc>
 Char32 getUnicodePointFromUTF32(const ReadByteFunc& get)
 {
-	int byte0 = (unsigned char)get(0);
-	int byte1 = (unsigned char)get(1);
-	int byte2 = (unsigned char)get(2);
-	int byte3 = (unsigned char)get(3);
+	uint32_t byte0 = Byte(get(0));
+    uint32_t byte1 = Byte(get(1));
+    uint32_t byte2 = Byte(get(2));
+    uint32_t byte3 = Byte(get(3));
 	return Char32(byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24));
 }
 
@@ -155,8 +155,10 @@ class CharEncoding
 public:
 	static CharEncoding* UTF8,* UTF16,* UTF16Reversed,* UTF32;
 
-	virtual void encode(const UnownedStringSlice& str, List<char>& ioBuffer) = 0;
-	virtual void decode(const char* buffer, int length, List<char>& ioBuffer) = 0;
+        /// Encode Utf8 held in slice append into ioBuffer
+	virtual void encode(const UnownedStringSlice& str, List<Byte>& ioBuffer) = 0;
+        /// Decode buffer into Utf8 held in ioBuffer
+	virtual void decode(const Byte* buffer, int length, List<char>& ioBuffer) = 0;
 
 	virtual ~CharEncoding()	{}
 };

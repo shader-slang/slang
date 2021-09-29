@@ -71,13 +71,13 @@ namespace Slang
 
             Char32 codePoint = 0;
             if (m_encoding == CharEncoding::UTF8)
-                codePoint = getUnicodePointFromUTF8([&](int) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF8([&](Index) {return readBufferChar(); });
             else if (m_encoding == CharEncoding::UTF16)
-                codePoint = getUnicodePointFromUTF16([&](int) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF16([&](Index) {return readBufferChar(); });
             else if (m_encoding == CharEncoding::UTF16Reversed)
-                codePoint = getUnicodePointFromUTF16Reversed([&](int) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF16Reversed([&](Index) {return readBufferChar(); });
             else if (m_encoding == CharEncoding::UTF32)
-                codePoint = getUnicodePointFromUTF32([&](int) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF32([&](Index) {return readBufferChar(); });
 
             m_decodedCharSize = encodeUnicodePointToUTF8(codePoint, m_decodedChar);
         }
@@ -161,7 +161,7 @@ namespace Slang
         StreamWriter(RefPtr<Stream> stream, CharEncoding* encoding = CharEncoding::UTF8);
 
     private:
-        List<char> m_encodingBuffer;
+        List<Byte> m_encodingBuffer;
         RefPtr<Stream> m_stream;
         CharEncoding* m_encoding;
 	};
