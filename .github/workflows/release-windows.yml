@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         configuration: ['Release']
-        platform: ['Win32', 'x64']
+        platform: ['Win32', 'x64', 'aarch64']
     steps:
       - uses: actions/checkout@v2.3.4
         with:
@@ -24,6 +24,10 @@ jobs:
       - name: premake
         run:
           .\premake.bat vs2017 --enable-embed-stdlib=true
+      - name: msbuild (x64 tools)
+        if: ${{ matrix.platform == 'aarch64' }}
+        run:
+          MSBuild.exe slang.sln -v:m -m -target:slang-cpp-extractor;slang-generate;slang-embed -property:Configuration=Release -property:Platform=x64 -property:WindowsTargetPlatformVersion=10.0.19041.0
       - name: msbuild
         run:
           MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0
@@ -31,7 +35,11 @@ jobs:
         id: archive
         run: |
           echo "achiving files..."
-          if ("${{matrix.platform}}" -eq "x64")
+          if ("${{matrix.platform}}" -eq "aarch64")
+          {
+            $slangDeployPlatform = "win-aarch64"
+          }
+          elseif ("${{matrix.platform}}" -eq "x64")
           {
             $slangDeployPlatform = "win64"
           }
@@ -61,7 +69,7 @@ jobs:
 
           $srcArchive = "slang-$slangVersion-source.zip"
           echo "::set-output name=SLANG_SOURCE_ARCHIVE::$srcArchive"
-          
+
           7z a "$srcArchive" slang.h
           7z a "$srcArchive" slang-com-helper.h
           7z a "$srcArchive" slang-com-ptr.h
