@@ -53,7 +53,7 @@ public:
         kMaxDescriptorSets = 8,
     };
     // Renderer    implementation
-    Result initVulkanInstanceAndDevice(NativeHandle handles, bool useValidationLayer);
+    Result initVulkanInstanceAndDevice(NativeDeviceHandle handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
@@ -135,7 +135,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeDeviceHandle* outHandle) override;
         /// Dtor
     ~VKDevice();
 
@@ -4338,6 +4338,13 @@ public:
             }
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeBufferHandle* outHandle) override
+        {
+            *outHandle = NativeBufferHandle::fromVulkanHandle((uint64_t)m_commandBuffer);
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -4395,6 +4402,13 @@ public:
         {
             auto& vkAPI = m_renderer->m_api;
             vkAPI.vkQueueWaitIdle(m_queue);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeQueueHandle* outHandle) override
+        {
+            *outHandle = NativeQueueHandle::fromVulkanHandle((uint64_t)m_queue);
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override
@@ -5224,13 +5238,13 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result VKDevice::getNativeHandle(NativeHandle* outHandle)
+Result VKDevice::getNativeHandle(NativeDeviceHandle* outHandle)
 {
-    *outHandle = NativeHandle::fromVulkanHandles((uint64_t)m_api.m_instance, (uint64_t)m_api.m_physicalDevice, (uint64_t)m_api.m_device);
+    *outHandle = NativeDeviceHandle::fromVulkanHandles((uint64_t)m_api.m_instance, (uint64_t)m_api.m_physicalDevice, (uint64_t)m_api.m_device);
     return SLANG_OK;
 }
 
-Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool useValidationLayer)
+Result VKDevice::initVulkanInstanceAndDevice(const NativeDeviceHandle handles, bool useValidationLayer)
 {
     m_features.clear();
 

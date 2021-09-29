@@ -285,7 +285,7 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(NativeHandle* outHandle)
+Result DebugDevice::getNativeHandle(NativeDeviceHandle* outHandle)
 {
     return baseObject->getNativeHandle(outHandle);
 }
@@ -814,6 +814,11 @@ void DebugCommandBuffer::close()
     baseObject->close();
 }
 
+Result DebugCommandBuffer::getNativeHandle(NativeBufferHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
+
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
 {
     if (m_renderCommandEncoder.isOpen || m_resourceCommandEncoder.isOpen ||
@@ -1145,6 +1150,11 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
 }
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
+
+Result DebugCommandQueue::getNativeHandle(NativeQueueHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
 
 Result DebugTransientResourceHeap::synchronizeAndReset()
 {
