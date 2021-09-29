@@ -839,6 +839,36 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     }
 }
 
+SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
+    const char* moduleName,
+    slang::IBlob* source,
+    slang::IBlob** outDiagnostics)
+{
+    try
+    {
+        auto name = getNamePool()->getName(moduleName);
+        RefPtr<LoadedModule> loadedModule;
+        if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
+        {
+            return loadedModule;
+        }
+        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+        auto module = loadModule(
+            name,
+            PathInfo::makeFromString(moduleName),
+            source,
+            SourceLoc(),
+            &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+        return asExternal(module);
+
+    }
+    catch (const AbortCompilationException&)
+    {
+        return nullptr;
+    }
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType* const*   componentTypes,
     SlangInt                        componentTypeCount,
