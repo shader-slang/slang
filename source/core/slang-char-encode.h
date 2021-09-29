@@ -7,6 +7,16 @@
 namespace Slang
 {
 
+// NOTE! Order must be kept the same to match up with 
+enum class CharEncodeType
+{
+    UTF8,
+    UTF16,
+    UTF16Reversed,
+    UTF32,
+    CountOf,
+};
+
 template <typename ReadByteFunc>
 Char32 getUnicodePointFromUTF8(const ReadByteFunc& get)
 {
@@ -161,6 +171,28 @@ public:
 	virtual void decode(const Byte* buffer, int length, List<char>& ioBuffer) = 0;
 
 	virtual ~CharEncoding()	{}
+
+        /// Get the encoding type
+    CharEncodeType getEncodingType() const { return m_encodingType; }
+
+        /// Given some bytes determines a character encoding type, based on the initial bytes.
+        /// If can't be determined will assume UTF8.
+        /// Outputs the offset to the first non mark in outOffset
+    static CharEncodeType determineEncoding(const Byte* bytes, size_t bytesCount, size_t& outOffset);
+
+        /// Get the 
+    static CharEncoding* getEncoding(CharEncodeType type) { return g_encoding[Index(type)]; }
+
+    CharEncoding(CharEncodeType encodingType) :
+        m_encodingType(encodingType)
+    {
+    }
+
+protected:
+
+    CharEncodeType m_encodingType;
+
+    static CharEncoding*const g_encoding[Index(CharEncodeType::CountOf)];
 };
 
 }

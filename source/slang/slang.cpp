@@ -271,11 +271,12 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
             RefPtr<FileStream> stream = new FileStream;
             SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
-            StreamWriter writer(stream);
+            StreamWriter writer;
+            SLANG_RETURN_ON_FAIL(writer.init(stream));
 
             for (auto& docString : docStrings)
             {
-                writer.write(docString);
+                SLANG_RETURN_ON_FAIL(writer.write(docString));
             }
         }
     }

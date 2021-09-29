@@ -98,7 +98,11 @@ struct App
         // the line ending convention of the host platform)
         //
 
-        String contents = File::readAllText(inputPath);
+        String contents;
+        {
+            auto res = File::readAllText(inputPath, contents);
+            SLANG_ASSERT(SLANG_SUCCEEDED(res));
+        }
 
         LineParser lineReader(contents.getUnownedSlice());
 

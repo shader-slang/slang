@@ -4,9 +4,13 @@ namespace Slang
 {
 
 
+
+
 class Utf8CharEncoding : public CharEncoding 
 {
 public:
+    typedef CharEncoding Super;
+
 	virtual void encode(const UnownedStringSlice& slice, List<Byte>& ioBuffer) override
 	{
         ioBuffer.addRange((const Byte*)slice.begin(), slice.getLength());
@@ -15,11 +19,14 @@ public:
 	{
         ioChars.addRange((const char*)bytes, length);
 	}
+    Utf8CharEncoding() : Super(CharEncodeType::UTF8) {}
 };
 
 class Utf32CharEncoding : public CharEncoding
 {
 public:
+    typedef CharEncoding Super;
+
 	virtual void encode(const UnownedStringSlice& slice, List<Byte>& ioBuffer) override
 	{
 		Index ptr = 0;
@@ -49,15 +56,17 @@ public:
                 ioBuffer.addRange(buf, count);
 		}
 	}
+
+    Utf32CharEncoding() : Super(CharEncodeType::UTF32) {}
 };
 
 class Utf16CharEncoding : public CharEncoding //UTF16
 {
-private:
-	bool m_reverseOrder = false;
 public:
-	Utf16CharEncoding(bool reverseOrder)
-		: m_reverseOrder(reverseOrder)
+    typedef CharEncoding Super;
+	Utf16CharEncoding(bool reverseOrder):
+        Super(reverseOrder ? CharEncodeType::UTF16Reversed : CharEncodeType::UTF16),
+		m_reverseOrder(reverseOrder)
 	{}
 	virtual void encode(const UnownedStringSlice& slice, List<Byte>& ioBuffer) override
 	{
@@ -99,17 +108,77 @@ public:
             ioBuffer.addRange((const char*)buf, count);
 		}
 	}
+
+private:
+    bool m_reverseOrder = false;
 };
+
+/* static */CharEncodeType CharEncoding::determineEncoding(const Byte* bytes, size_t bytesCount, size_t& outOffset)
+{
+    // TODO(JS): Assumes the bytes are suitably aligned
+
+    if (bytesCount >= 3 && bytes[0] == 0xef && bytes[1] == 0xbb && bytes[2] == 0xbf)
+    {
+        outOffset = 3;
+        return CharEncodeType::UTF8;
+    }
+    else if (bytesCount >= 2)
+    {
+        Char16 c;
+        ::memcpy(&c, bytes, 2);
+
+        if (c == kUTF16Header)
+        {
+            outOffset = 2;
+            return CharEncodeType::UTF16;
+        }
+        else if (c == kUTF16ReversedHeader)
+        {
+            outOffset = 2;
+            return CharEncodeType::UTF16Reversed;
+        }
+    }
+    else
+    {
+        // If we don't have a 'mark' byte then we are bit stumped. We'll look for a null bytes and assume they mean we have a 16 bit encoding
+        for (size_t i = 0; i < bytesCount; i += 2)
+        {
+#if SLANG_LITTLE_ENDIAN
+            const auto low = bytes[i];
+            const auto high = bytes[i + 1];
+#else
+            const auto low = bytes[i + 1];
+            const auto high = bytes[i];
+#endif 
+            if ((low == 0) ^ (high == 0))
+            {
+                outOffset = 2;
+                return (high == 0) ? CharEncodeType::UTF16 : CharEncodeType::UTF16Reversed;
+            }
+        }
+    }
+
+    // Assume it's UTF8 or 7 bit ascii which UTF8 is a superset of
+    outOffset = 0;
+    return CharEncodeType::UTF8;
+}
 
 static Utf8CharEncoding _utf8Encoding;
 static Utf16CharEncoding _utf16Encoding(false);
-static 	Utf16CharEncoding _utf16EncodingReversed(true);
+static Utf16CharEncoding _utf16EncodingReversed(true);
 static Utf32CharEncoding _utf32Encoding;
+
+/* static */CharEncoding* const CharEncoding::g_encoding[Index(CharEncodeType::CountOf)]
+{
+    &_utf8Encoding,             // UTF8,
+    &_utf16Encoding,            // UTF16,
+    &_utf16EncodingReversed,    // UTF16Reversed,
+    &_utf32Encoding,            // UTF32,
+};
 
 CharEncoding* CharEncoding::UTF8 = &_utf8Encoding;
 CharEncoding* CharEncoding::UTF16 = &_utf16Encoding;
 CharEncoding* CharEncoding::UTF16Reversed = &_utf16EncodingReversed;
 CharEncoding* CharEncoding::UTF32 = &_utf32Encoding;
-
 	
 } // namespace Slang

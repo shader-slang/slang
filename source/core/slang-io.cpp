@@ -825,16 +825,16 @@ namespace Slang
         return _getExecutablePath();
     }
 
-    Slang::String File::readAllText(const Slang::String& fileName)
+    SlangResult File::readAllText(const Slang::String& fileName, String& outText)
     {
         RefPtr<FileStream> stream(new FileStream);
-        if (SLANG_FAILED(stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)))
-        {
-            throw IOException("Failed opening '" + fileName + "'.");
-        }
+        SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
-        StreamReader reader(stream);
-        return reader.readToEnd();
+        StreamReader reader;
+        SLANG_RETURN_ON_FAIL(reader.init(stream));
+        SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
+
+        return SLANG_OK;
     }
 
     SlangResult File::readAllBytes(const Slang::String& path, Slang::List<unsigned char>& out)
@@ -907,16 +907,16 @@ namespace Slang
         return SLANG_OK;
     }
     
-    void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
+    SlangResult File::writeAllText(const Slang::String& fileName, const Slang::String& text)
     {
         RefPtr<FileStream> stream = new FileStream;
-        if (SLANG_FAILED(stream->init(fileName, FileMode::Create)))
-        {
-            throw IOException("Failed opening for write '" + fileName + "'.");
-        }
+        SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
 
-        StreamWriter writer(stream);
-        writer.write(text);
+        StreamWriter writer;
+        SLANG_RETURN_ON_FAIL(writer.init(stream));
+        SLANG_RETURN_ON_FAIL(writer.write(text));
+
+        return SLANG_OK;
     }
 
 

@@ -1,49 +1,40 @@
 #include "slang-text-io.h"
 
+#include "../../slang-com-helper.h"
+
 namespace Slang
 {
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamWriter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-StreamWriter::StreamWriter(const String& path, CharEncoding* encoding)
+SlangResult StreamWriter::init(const String& path, CharEncoding* encoding)
 {
-    FileStream* fileStream = new FileStream;
-    m_stream = fileStream;
-
-    if (SLANG_FAILED(fileStream->init(path, FileMode::Create)))
-    {
-        StringBuilder buf;
-        buf << "Unable to open '" << path << "'";
-        throw IOException(buf.ProduceString());
-    }
-
-	m_encoding = encoding;
-	if (encoding == CharEncoding::UTF16)
-	{
-		m_stream->write(&kUTF16Header, 2);
-	}
-	else if (encoding == CharEncoding::UTF16Reversed)
-	{
-		m_stream->write(&kUTF16ReversedHeader, 2);
-	}
+    RefPtr<FileStream> fileStream = new FileStream;
+    SLANG_RETURN_ON_FAIL(fileStream->init(path, FileMode::Create));
+    return init(fileStream, encoding);
 }
 
-StreamWriter::StreamWriter(RefPtr<Stream> stream, CharEncoding* encoding)
+SlangResult StreamWriter::init(RefPtr<Stream> stream, CharEncoding* encoding)
 {
 	m_stream = stream;
 	m_encoding = encoding;
 	if (encoding == CharEncoding::UTF16)
 	{
-		m_stream->write(&kUTF16Header, 2);
+		SLANG_RETURN_ON_FAIL(m_stream->write(&kUTF16Header, 2));
 	}
 	else if (encoding == CharEncoding::UTF16Reversed)
 	{
-		m_stream->write(&kUTF16ReversedHeader, 2);
+		SLANG_RETURN_ON_FAIL(m_stream->write(&kUTF16ReversedHeader, 2));
 	}
+
+    return SLANG_OK;
 }
 
-void StreamWriter::writeSlice(const UnownedStringSlice& slice)
+SlangResult StreamWriter::writeSlice(const UnownedStringSlice& slice)
 {
+    // TODO(JS):
+    // We can do better here. On Linux, this is a no-op and can just write directly (assuming slice only contains \n)
+    
 	m_encodingBuffer.clear();
 
     StringBuilder sb;
@@ -67,101 +58,68 @@ void StreamWriter::writeSlice(const UnownedStringSlice& slice)
 			sb << slice[i];
 	}
 
+    // NOTE! This assumes that sb contains *complete* utf8 code points, which it might not, as encoder is only able to handle complete code points.
     m_encodingBuffer.clear();
 	m_encoding->encode(sb.getUnownedSlice(), m_encodingBuffer);
-	m_stream->write(m_encodingBuffer.getBuffer(), m_encodingBuffer.getCount());
+	return m_stream->write(m_encodingBuffer.getBuffer(), m_encodingBuffer.getCount());
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-StreamReader::StreamReader(const String& path)
+StreamReader::StreamReader()
 {
-    FileStream* fileStream = new FileStream;
-    m_stream = fileStream;
-
-    if (SLANG_FAILED(fileStream->init(path, FileMode::Open)))
-    {
-        StringBuilder buf;
-        buf << "Unable to open '" << path << "'";
-        throw IOException(buf.ProduceString());
-    }
-
-	readBuffer();
-	m_encoding = determineEncoding();
-
-	if (m_encoding == nullptr)
-		m_encoding = CharEncoding::UTF8;
 }
 
-StreamReader::StreamReader(RefPtr<Stream> stream, CharEncoding * encoding)
+SlangResult StreamReader::init(const String& path)
+{
+    RefPtr<FileStream> fileStream = new FileStream;
+    SLANG_RETURN_ON_FAIL(fileStream->init(path, FileMode::Open));
+    return init(fileStream);
+}
+
+SlangResult StreamReader::init(RefPtr<Stream> stream, CharEncoding* encoding)
 {
     m_stream = stream;
     m_encoding = encoding;
-	readBuffer();
-	auto determinedEncoding = determineEncoding();
-	if (m_encoding == nullptr)
-        m_encoding = determinedEncoding;
-}
+	SLANG_RETURN_ON_FAIL(readBuffer());
 
-static bool _hasNullBytes(char * str, int len)
-{
-    bool hasSeenNull = false;
-    for (int i = 0; i < len - 1; i++)
-        if (str[i] == 0)
-            hasSeenNull = true;
-        else if (hasSeenNull)
-            return true;
-    return false;
-}
+    if (encoding == nullptr)
+    {
+        size_t offset;
+        m_encodingType = CharEncoding::determineEncoding((const Byte*)m_buffer.getBuffer(), m_buffer.getCount(), offset);
+        m_encoding = CharEncoding::getEncoding(m_encodingType);
+        m_index = Index(offset);
+    }
+    else
+    {
+        m_encodingType = encoding->getEncodingType();
+        m_encoding = encoding;
+    }
 
-CharEncoding* StreamReader::determineEncoding()
-{
-    // TODO(JS): Assumes the bytes are suitably aligned
-
-	if (m_buffer.getCount() >= 3 && (unsigned char)(m_buffer[0]) == 0xEF && (unsigned char)(m_buffer[1]) == 0xBB && (unsigned char)(m_buffer[2]) == 0xBF)
-	{
-		m_index += 3;
-		return CharEncoding::UTF8;
-	}
-	else if (*((unsigned short*)(m_buffer.getBuffer())) == 0xFEFF)
-	{
-        m_index += 2;
-		return CharEncoding::UTF16;
-	}
-	else if (*((unsigned short*)(m_buffer.getBuffer())) == 0xFFFE)
-	{
-        m_index += 2;
-		return CharEncoding::UTF16Reversed;
-	}
-	else
-	{
-        // find null bytes
-        if (_hasNullBytes(m_buffer.getBuffer(), (int)m_buffer.getCount()))
-        {
-            return CharEncoding::UTF16;
-        }
-		return CharEncoding::UTF8;
-	}
+    return SLANG_OK;
 }
 		
-void StreamReader::readBuffer()
+SlangResult StreamReader::readBuffer()
 {
+    m_buffer.setCount(0);
+    m_index = 0;
+
     if (m_stream->isEnd())
     {
-        throw EndOfStreamException();
+        return SLANG_OK;
     }
 
 	m_buffer.setCount(4096);
+
+    // TODO(JS): Not clear this is necessary
     memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(m_buffer[0]));
 
     size_t readBytes;
-    if (SLANG_FAILED(m_stream->read(m_buffer.getBuffer(), m_buffer.getCount(), readBytes)))
-    {
-        throw IOException("Error reading from stream");
-    }
+    SLANG_RETURN_ON_FAIL(m_stream->read(m_buffer.getBuffer(), m_buffer.getCount(), readBytes));
 
 	m_buffer.setCount(Index(readBytes));
 	m_index = 0;
+    return SLANG_OK;
 }
 
 char StreamReader::readBufferChar()
@@ -170,70 +128,36 @@ char StreamReader::readBufferChar()
 	{
 		return m_buffer[m_index++];
 	}
-	if (!m_stream->isEnd())
-		readBuffer();
-	if (m_index < m_buffer.getCount())
+
+	readBuffer();
+
+    if (m_index < m_buffer.getCount())
 	{
 		return m_buffer[m_index++];
 	}
 	return 0;
 }
 
-int TextReader::read(char* destBuffer, int length)
-{
-	int i = 0;
-	for (i = 0; i < length; i++)
-	{
-		try
-		{
-			auto ch = read();
-			if (isEnd())
-				break;
-			if (ch == '\r')
-			{
-				if (peek() == '\n')
-					read();
-				break;
-			}
-			else if (ch == '\n')
-			{
-				break;
-			}
-			destBuffer[i] = ch;
-		}
-		catch (const EndOfStreamException& )
-		{
-			break;
-		}
-	}
-	return i;
-}
-
-String StreamReader::readToEnd()
+SlangResult StreamReader::readToEnd(String& outString)
 {
 	StringBuilder sb(16384);
 	while (!isEnd())
 	{
-		try
-		{
-			auto ch = read();
-			if (isEnd())
-				break;
-			if (ch == '\r')
-			{
-				sb.Append('\n');
-				if (peek() == '\n')
-					read();
-			}
-			else
-				sb.Append(ch);
-		}
-		catch (const EndOfStreamException&)
-		{
+		auto ch = read();
+		if (isEnd())
 			break;
+		if (ch == '\r')
+		{
+			sb.Append('\n');
+			if (peek() == '\n')
+				read();
 		}
+		else
+			sb.Append(ch);
 	}
-	return sb.ProduceString();
+
+	outString = sb.ProduceString();
+    return SLANG_OK;
 }
 
 } // namespace Slang

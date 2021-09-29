@@ -6,28 +6,6 @@
 namespace Slang
 {
 
-class IOException : public Exception
-{
-public:
-	IOException()
-	{}
-	IOException(const String & message)
-		: Slang::Exception(message)
-	{
-	}
-};
-
-class EndOfStreamException : public IOException
-{
-public:
-	EndOfStreamException()
-	{}
-	EndOfStreamException(const String & message)
-		: IOException(message)
-	{
-	}
-};
-
 enum class SeekOrigin
 {
 	Start, End, Current

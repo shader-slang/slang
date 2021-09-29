@@ -14,10 +14,8 @@ class TextReader
 {
 public:	
 	virtual void close(){}
-	virtual String readToEnd()=0;
+    virtual SlangResult readToEnd(String& outString) = 0;
 	virtual bool isEnd() = 0;
-
-	int read(char* buffer, int count);
 
 	char read()
 	{
@@ -52,14 +50,16 @@ protected:
 class StreamReader : public TextReader
 {
 public:
-    virtual String readToEnd() SLANG_OVERRIDE;
+    virtual SlangResult readToEnd(String& outString) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_index == m_buffer.getCount() && m_stream->isEnd(); }
     virtual void close() { m_stream->close(); }
 
     void releaseStream() { m_stream.setNull(); }
 
-    StreamReader(const String& path);
-    StreamReader(RefPtr<Stream> stream, CharEncoding* encoding = nullptr);
+    StreamReader();
+
+    SlangResult init(const String& path);
+    SlangResult init(RefPtr<Stream> stream, CharEncoding* encoding = nullptr);
 
 protected:
     virtual void readChar() SLANG_OVERRIDE
@@ -67,39 +67,55 @@ protected:
         m_decodedCharIndex = 0;
 
         Char32 codePoint = 0;
-        if (m_encoding == CharEncoding::UTF8)
-            codePoint = getUnicodePointFromUTF8([&](Index) {return readBufferChar(); });
-        else if (m_encoding == CharEncoding::UTF16)
-            codePoint = getUnicodePointFromUTF16([&](Index) {return readBufferChar(); });
-        else if (m_encoding == CharEncoding::UTF16Reversed)
-            codePoint = getUnicodePointFromUTF16Reversed([&](Index) {return readBufferChar(); });
-        else if (m_encoding == CharEncoding::UTF32)
-            codePoint = getUnicodePointFromUTF32([&](Index) {return readBufferChar(); });
+        switch (m_encodingType)
+        {
+            case CharEncodeType::UTF8:
+            {
+                codePoint = getUnicodePointFromUTF8([&](Index) {return readBufferChar(); });
+                break;
+            }
+            case CharEncodeType::UTF16:
+            {
+                codePoint = getUnicodePointFromUTF16([&](Index) {return readBufferChar(); });
+                break;
+            }
+            case CharEncodeType::UTF16Reversed:
+            {
+                codePoint = getUnicodePointFromUTF16Reversed([&](Index) {return readBufferChar(); });
+                break;
+            }
+            case CharEncodeType::UTF32:
+            {
+                codePoint = getUnicodePointFromUTF32([&](Index) {return readBufferChar(); });
+                break;
+            }
+        }
 
         m_decodedCharSize = encodeUnicodePointToUTF8(codePoint, m_decodedChar);
     }
 
 private:
     char readBufferChar();
-    void readBuffer();
-    CharEncoding* determineEncoding();
-
+    SlangResult readBuffer();
+    
     RefPtr<Stream> m_stream;
     List<char> m_buffer;
-    CharEncoding* m_encoding;
-    Index m_index;                  ///< Index into buffer
+
+    CharEncodeType m_encodingType = CharEncodeType::UTF8;
+    CharEncoding* m_encoding = nullptr;
+    Index m_index = 0;                  ///< Index into buffer
 };
 
 class TextWriter
 {
 public:
 		
-	virtual void writeSlice(const UnownedStringSlice& slice) = 0;
+	virtual SlangResult writeSlice(const UnownedStringSlice& slice) = 0;
 	virtual void close(){}
 
-    void write(const UnownedStringSlice& slice) { writeSlice(slice); }
-    void write(const char* str) { writeSlice(UnownedStringSlice(str)); }
-    void write(const String& str) { writeSlice(str.getUnownedSlice()); }
+    SlangResult write(const UnownedStringSlice& slice) { return writeSlice(slice); }
+    SlangResult write(const char* str) { return writeSlice(UnownedStringSlice(str)); }
+    SlangResult write(const String& str) { return writeSlice(str.getUnownedSlice()); }
 
     virtual ~TextWriter() { close(); }
 
@@ -149,18 +165,20 @@ class StreamWriter : public TextWriter
 {
 public:
     // TextWriter		
-    virtual void writeSlice(const UnownedStringSlice& slice) SLANG_OVERRIDE;
+    virtual SlangResult writeSlice(const UnownedStringSlice& slice) SLANG_OVERRIDE;
     virtual void close() SLANG_OVERRIDE { m_stream->close(); }
 
     void releaseStream() { m_stream.setNull();  }
 
-    StreamWriter(const String& path, CharEncoding* encoding = CharEncoding::UTF8);
-    StreamWriter(RefPtr<Stream> stream, CharEncoding* encoding = CharEncoding::UTF8);
+    StreamWriter() {}
+    
+    SlangResult init(const String& path, CharEncoding* encoding = CharEncoding::UTF8);
+    SlangResult init(RefPtr<Stream> stream, CharEncoding* encoding = CharEncoding::UTF8);
 
 private:
     List<Byte> m_encodingBuffer;
     RefPtr<Stream> m_stream;
-    CharEncoding* m_encoding;
+    CharEncoding* m_encoding = nullptr;
 };
 
 }

@@ -5,78 +5,80 @@
 namespace CppExtract {
 using namespace Slang;
 
-/* static */SlangResult FileUtil::readAllText(const Slang::String& fileName, DiagnosticSink* sink, String& outRead)
+namespace { // anonymous 
+struct DiagnosticReporter
 {
-    RefPtr<FileStream> stream = new FileStream;
-    SlangResult res = stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
-
-    if (SLANG_FAILED(res))
+    SlangResult report(SlangResult res)
     {
-        if (sink)
+        if (SLANG_FAILED(res))
         {
-            sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
+            if (m_sink)
+            {
+                if (res == SLANG_E_CANNOT_OPEN)
+                {
+                    m_sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, m_filename);
+                }
+                else
+                {
+                    m_sink->diagnose(SourceLoc(), CPPDiagnostics::errorAccessingFile, m_filename);
+                }
+            }
         }
         return res;
     }
 
-    try
+    DiagnosticReporter(const String& filename, DiagnosticSink* sink) :
+        m_filename(filename),
+        m_sink(sink)
     {
-        StreamReader reader(stream);
-        outRead = reader.readToEnd();
     }
-    catch (IOException&)
-    {
-        if (sink)
-        {
-            sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
-        }
-    }
+
+    DiagnosticSink* m_sink;
+    String m_filename;
+};
+
+} // anonymous
+
+/* static */SlangResult FileUtil::readAllText(const Slang::String& fileName, DiagnosticSink* sink, String& outRead)
+{
+    DiagnosticReporter reporter(fileName, sink);
+        
+    RefPtr<FileStream> stream = new FileStream;
+    SLANG_RETURN_ON_FAIL(reporter.report(stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite)));
+
+    StreamReader reader;
+    SLANG_RETURN_ON_FAIL(reporter.report(reader.init(stream)));
+    SLANG_RETURN_ON_FAIL(reporter.report(reader.readToEnd(outRead)));
+
     return SLANG_OK;
 }
 
 /* static */SlangResult FileUtil::writeAllText(const Slang::String& fileName, DiagnosticSink* sink, const UnownedStringSlice& text)
 {
-    try
+    // TODO(JS):
+    // There is an optimization/behavior here,that checks if the contents has changed. It only writes if it hasn't
+    // That might not be what you want (both because of extra work of read, the file modified stamp or other reasons, file is write only etc)
+    // NOTE! That this also does the work of the comparison after it is decoded, but the *bytes* might actually be different.
+
+    if (File::exists(fileName))
     {
-        // TODO(JS):
-        // There is an optimization/behavior here,that checks if the contents has changed. It only writes if it hasn't
-        // That might not be what you want (both because of extra work of read, the file modified stamp or other reasons, file is write only etc)
-        // NOTE! That this also does the work of the comparison after it is decoded, but the *bytes* might actually be different.
-
-        if (File::exists(fileName))
+        String existingText;
+        if (SLANG_SUCCEEDED(readAllText(fileName, nullptr, existingText)))
         {
-            String existingText;
-            if (readAllText(fileName, nullptr, existingText) == SLANG_OK)
-            {
-                if (existingText == text)
-                    return SLANG_OK;
-            }
+            if (existingText == text)
+                return SLANG_OK;
         }
-
-        RefPtr<FileStream> stream = new FileStream;
-        SlangResult res = stream->init(fileName, FileMode::Create);
-
-        if (SLANG_FAILED(res))
-        {
-            if (sink)
-            {
-                sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
-            }
-        }
-
-        StreamWriter writer(stream);
-        writer.write(text);
-    }
-    catch (const IOException&)
-    {
-        if (sink)
-        {
-            sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
-        }
-        return SLANG_FAIL;
     }
 
-    return SLANG_OK;
+    DiagnosticReporter reporter(fileName, sink);
+
+    RefPtr<FileStream> stream = new FileStream;
+    SLANG_RETURN_ON_FAIL(reporter.report(stream->init(fileName, FileMode::Create)));
+
+    StreamWriter writer;
+    SLANG_RETURN_ON_FAIL(reporter.report(writer.init(stream)));
+    SLANG_RETURN_ON_FAIL(reporter.report(writer.write(text)))
+    return SLANG_OK;   
 }
 
 /* static */ void FileUtil::indent(Index indentCount, StringBuilder& out)
