@@ -29,7 +29,7 @@ namespace Slang
 
     static const UInt kMaxUInt = ~UInt(0);
     static const Int kMaxInt = Int(kMaxUInt >> 1);
-    
+
 //	typedef unsigned short Word;
 
 	typedef intptr_t PtrInt;
@@ -41,6 +41,18 @@ namespace Slang
     typedef Int Index;
 
     static const Index kMaxIndex = kMaxInt;
+
+    typedef uint8_t Byte;
+
+    // TODO(JS):
+    // Perhaps these should be named Utf8, Utf16 and UnicodePoint/Rune/etc? For now, just keep it simple
+    //
+    typedef char Char8;
+    // 16 bit character. Note much like in utf8, a character may or may not represent a code point (it can be part of a code point).  
+    typedef uint16_t Char16;
+
+    // Can always hold a unicode code point.
+    typedef uint32_t Char32;
 
 	template <typename T>
 	inline T&& _Move(T & obj)

@@ -217,37 +217,42 @@ namespace Slang
 
     String String::fromWString(const wchar_t * wstr)
     {
+        List<char> buf;
 #ifdef _WIN32
-        return Slang::CharEncoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        Slang::CharEncoding::UTF16->decode((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
 #else
-        return Slang::CharEncoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        Slang::CharEncoding::UTF32->decode((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)), buf);
 #endif
+        return String(buf.begin(), buf.end());
     }
 
     String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
     {
+        List<char> buf;
 #ifdef _WIN32
-        return Slang::CharEncoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        Slang::CharEncoding::UTF16->decode((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
 #else
-        return Slang::CharEncoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        Slang::CharEncoding::UTF32->decode((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)), buf);
 #endif
+        return String(buf.begin(), buf.end());
     }
 
     String String::fromWChar(const wchar_t ch)
     {
+        List<char> buf;
 #ifdef _WIN32
-        return Slang::CharEncoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+        Slang::CharEncoding::UTF16->decode((const char*)&ch, (int)(sizeof(wchar_t)), buf);
 #else
-        return Slang::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+        Slang::CharEncoding::UTF32->decode((const char*)&ch, (int)(sizeof(wchar_t)), buf);
 #endif
+        return String(buf.begin(), buf.end());
     }
 
-    String String::fromUnicodePoint(unsigned int codePoint)
+    /* static */String String::fromUnicodePoint(Char32 codePoint)
     {
         char buf[6];
         int len = Slang::encodeUnicodePointToUTF8(buf, (int)codePoint);
-        buf[len] = 0;
-        return String(buf);
+        return String(buf, buf + len);
     }
 
     OSString String::toWString(Index* outLength) const
@@ -262,11 +267,11 @@ namespace Slang
             switch(sizeof(wchar_t))
             {
             case 2:
-                Slang::CharEncoding::UTF16->GetBytes(buf, *this);                
+                Slang::CharEncoding::UTF16->encode(getUnownedSlice(), buf); 
                 break;
 
             case 4:
-                Slang::CharEncoding::UTF32->GetBytes(buf, *this);                
+                Slang::CharEncoding::UTF32->encode(getUnownedSlice(), buf);
                 break;
 
             default:

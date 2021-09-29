@@ -7,82 +7,80 @@ namespace Slang
 class Utf8CharEncoding : public CharEncoding 
 {
 public:
-	virtual void GetBytes(List<char> & result, const String & str) override
+	virtual void encode(const UnownedStringSlice& slice, List<char>& ioBuffer) override
 	{
-		result.addRange(str.getBuffer(), str.getLength());
+        ioBuffer.addRange(slice.begin(), slice.getLength());
 	}
-	virtual String ToString(const char * bytes, int /*length*/) override
+	virtual void decode(const char* bytes, int length, List<char>& ioChars) override
 	{
-		return String(bytes);
+        ioChars.addRange(bytes, length);
 	}
 };
 
 class Utf32CharEncoding : public CharEncoding
 {
 public:
-	virtual void GetBytes(List<char> & result, const String & str) override
+	virtual void encode(const UnownedStringSlice& slice, List<char>& ioBuffer) override
 	{
 		Index ptr = 0;
-		while (ptr < str.getLength())
+		while (ptr < slice.getLength())
 		{
-			int codePoint = getUnicodePointFromUTF8([&](int)
+            Char32 codePoint = getUnicodePointFromUTF8([&](int)
 			{
-				if (ptr < str.getLength())
-					return str[ptr++];
+				if (ptr < slice.getLength())
+					return slice[ptr++];
 				else
 					return '\0';
 			});
-			result.addRange((char*)&codePoint, 4);
+            ioBuffer.addRange((char*)&codePoint, 4);
 		}
 	}
-	virtual String ToString(const char * bytes, int length) override
+	virtual void decode(const char * bytes, int length, List<char>& ioBuffer) override
 	{
-		StringBuilder sb;
-		int * content = (int*)bytes;
+		const Char32* content = (const Char32*)bytes;
 		for (int i = 0; i < (length >> 2); i++)
 		{
 			char buf[5];
 			int count = encodeUnicodePointToUTF8(buf, content[i]);
-			for (int j = 0; j < count; j++)
-				sb.Append(buf[j]);
+            for (int j = 0; j < count; j++)
+                ioBuffer.addRange(buf, count);
 		}
-		return sb.ProduceString();
 	}
 };
 
 class Utf16CharEncoding : public CharEncoding //UTF16
 {
 private:
-	bool reverseOrder = false;
+	bool m_reverseOrder = false;
 public:
-	Utf16CharEncoding(bool pReverseOrder)
-		: reverseOrder(pReverseOrder)
+	Utf16CharEncoding(bool reverseOrder)
+		: m_reverseOrder(reverseOrder)
 	{}
-	virtual void GetBytes(List<char> & result, const String & str) override
+	virtual void encode(const UnownedStringSlice& slice, List<char>& ioBuffer) override
 	{
 		Index ptr = 0;
-		while (ptr < str.getLength())
+		while (ptr < slice.getLength())
 		{
-			int codePoint = getUnicodePointFromUTF8([&](int)
+            Char32 codePoint = getUnicodePointFromUTF8([&](int)
 			{
-				if (ptr < str.getLength())
-					return str[ptr++];
+				if (ptr < slice.getLength())
+					return slice[ptr++];
 				else
 					return '\0';
 			});
-			unsigned short buffer[2];
+
+			Char16 buffer[2];
 			int count;
-			if (!reverseOrder)
+			if (!m_reverseOrder)
 				count = encodeUnicodePointToUTF16(buffer, codePoint);
 			else
 				count = encodeUnicodePointToUTF16Reversed(buffer, codePoint);
-			result.addRange((char*)buffer, count * 2);
+            ioBuffer.addRange((char*)buffer, count * 2);
 		}
 	}
-	virtual String ToString(const char * bytes, int length) override
+	virtual void decode(const char * bytes, int length, List<char>& ioBuffer) override
 	{
 		int ptr = 0;
-		StringBuilder sb;
 		while (ptr < length)
 		{
 			int codePoint = getUnicodePointFromUTF16([&](int)
@@ -92,12 +90,11 @@ public:
 				else
 					return '\0';
 			});
+
 			char buf[5];
 			int count = encodeUnicodePointToUTF8(buf, codePoint);
-			for (int i = 0; i < count; i++)
-				sb.Append(buf[i]);
+            ioBuffer.addRange(buf, count);
 		}
-		return sb.ProduceString();
 	}
 };
 

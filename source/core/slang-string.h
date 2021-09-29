@@ -409,7 +409,7 @@ namespace Slang
         static String fromWString(const wchar_t * wstr);
         static String fromWString(const wchar_t * wstr, const wchar_t * wend);
         static String fromWChar(const wchar_t ch);
-        static String fromUnicodePoint(unsigned int codePoint);
+        static String fromUnicodePoint(Char32 codePoint);
         String()
         {
         }

@@ -7,14 +7,10 @@
 namespace Slang
 {
 
-
-typedef uint16_t Char16;
-typedef uint32_t Char32;
-
 template <typename ReadCharFunc>
-int getUnicodePointFromUTF8(const ReadCharFunc & get)
+Char32 getUnicodePointFromUTF8(const ReadCharFunc & get)
 {
-	int codePoint = 0;
+    Char32 codePoint = 0;
 	int leading = get(0);
 	int mask = 0x80;
 	int count = 0;
@@ -33,7 +29,7 @@ int getUnicodePointFromUTF8(const ReadCharFunc & get)
 }
 
 template <typename ReadCharFunc>
-int getUnicodePointFromUTF16(const ReadCharFunc & get)
+Char32 getUnicodePointFromUTF16(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -43,14 +39,14 @@ int getUnicodePointFromUTF16(const ReadCharFunc & get)
 		int byte2 = (unsigned char)get(2);
 		int byte3 = (unsigned char)get(3);
 		int word1 = byte2 + (byte3 << 8);
-		return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF) + 0x10000;
+		return Char32(((word0 & 0x3FF) << 10) + (word1 & 0x3FF) + 0x10000);
 	}
 	else
-		return word0;
+		return Char32(word0);
 }
 
 template <typename ReadCharFunc>
-int getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
+Char32 getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -60,24 +56,24 @@ int getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 		int byte2 = (unsigned char)get(2);
 		int byte3 = (unsigned char)get(3);
 		int word1 = (byte2 << 8) + byte3;
-		return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
+		return Char32(((word0 & 0x3FF) << 10) + (word1 & 0x3FF));
 	}
 	else
-		return word0;
+		return Char32(word0);
 }
 
 template <typename ReadCharFunc>
-int getUnicodePointFromUTF32(const ReadCharFunc & get)
+Char32 getUnicodePointFromUTF32(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
 	int byte2 = (unsigned char)get(2);
 	int byte3 = (unsigned char)get(3);
-	return byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24);
+	return Char32(byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24));
 }
 
 // Encode functions return the amount of elements output to the buffer
-inline int encodeUnicodePointToUTF8(char* buffer, int codePoint)
+inline int encodeUnicodePointToUTF8(char* buffer, Char32 codePoint)
 {
     // TODO(JS): This doesn't support the full UTF8 range, which can go up to 0x10FFFF
 
@@ -114,7 +110,7 @@ inline int encodeUnicodePointToUTF8(char* buffer, int codePoint)
 	return count;
 }
 
-inline int encodeUnicodePointToUTF16(Char16* buffer, int codePoint)
+inline int encodeUnicodePointToUTF16(Char16* buffer, Char32 codePoint)
 {
 	int count = 0;
 	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
@@ -135,7 +131,7 @@ inline Char16 reverseByteOrder(Char16 val)
     return (val >> 8) || (val << 8);
 }
 
-inline int encodeUnicodePointToUTF16Reversed(Char16* buffer, int codePoint)
+inline int encodeUnicodePointToUTF16Reversed(Char16* buffer, Char32 codePoint)
 {
 	int count = 0;
 	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
@@ -159,8 +155,8 @@ class CharEncoding
 public:
 	static CharEncoding* UTF8,* UTF16,* UTF16Reversed,* UTF32;
 
-	virtual void GetBytes(List<char>& buffer, const String & str) = 0;
-	virtual String ToString(const char * buffer, int length) = 0;
+	virtual void encode(const UnownedStringSlice& str, List<char>& ioBuffer) = 0;
+	virtual void decode(const char* buffer, int length, List<char>& ioBuffer) = 0;
 
 	virtual ~CharEncoding()	{}
 };

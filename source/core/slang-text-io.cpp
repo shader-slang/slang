@@ -67,7 +67,8 @@ void StreamWriter::writeSlice(const UnownedStringSlice& slice)
 			sb << slice[i];
 	}
 
-	m_encoding->GetBytes(m_encodingBuffer, sb.ProduceString());
+    m_encodingBuffer.clear();
+	m_encoding->encode(sb.getUnownedSlice(), m_encodingBuffer);
 	m_stream->write(m_encodingBuffer.getBuffer(), m_encodingBuffer.getCount());
 }
 
