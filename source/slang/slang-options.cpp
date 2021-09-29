@@ -1151,7 +1151,8 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(referenceModuleName));
 
                     // We need to deserialize and add the modules
-                    FileStream fileStream(referenceModuleName.value, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+                    FileStream fileStream;
+                    SLANG_RETURN_ON_FAIL(fileStream.init(referenceModuleName.value, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
 
                     // TODO: probably near an error when we can't open the file?
 

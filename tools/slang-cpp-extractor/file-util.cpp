@@ -7,28 +7,30 @@ using namespace Slang;
 
 /* static */SlangResult FileUtil::readAllText(const Slang::String& fileName, DiagnosticSink* sink, String& outRead)
 {
-    try
-    {
-        StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-        outRead = reader.ReadToEnd();
-    }
-    catch (const IOException&)
+    RefPtr<FileStream> stream = new FileStream;
+    SlangResult res = stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+
+    if (SLANG_FAILED(res))
     {
         if (sink)
         {
             sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
         }
-        return SLANG_FAIL;
-    }
-    catch (...)
-    {
-        if (sink)
-        {
-            sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
-        }
-        return SLANG_FAIL;
+        return res;
     }
 
+    try
+    {
+        StreamReader reader(stream);
+        outRead = reader.ReadToEnd();
+    }
+    catch (IOException&)
+    {
+        if (sink)
+        {
+            sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
+        }
+    }
     return SLANG_OK;
 }
 
@@ -36,17 +38,33 @@ using namespace Slang;
 {
     try
     {
+        // TODO(JS):
+        // There is an optimization/behavior here,that checks if the contents has changed. It only writes if it hasn't
+        // That might not be what you want (both because of extra work of read, the file modified stamp or other reasons, file is write only etc)
+        // NOTE! That this also does the work of the comparison after it is decoded, but the *bytes* might actually be different.
+
         if (File::exists(fileName))
         {
             String existingText;
-
             if (readAllText(fileName, nullptr, existingText) == SLANG_OK)
             {
                 if (existingText == text)
                     return SLANG_OK;
             }
         }
-        StreamWriter writer(new FileStream(fileName, FileMode::Create));
+
+        RefPtr<FileStream> stream = new FileStream;
+        SlangResult res = stream->init(fileName, FileMode::Create);
+
+        if (SLANG_FAILED(res))
+        {
+            if (sink)
+            {
+                sink->diagnose(SourceLoc(), CPPDiagnostics::cannotOpenFile, fileName);
+            }
+        }
+
+        StreamWriter writer(stream);
         writer.Write(text);
     }
     catch (const IOException&)

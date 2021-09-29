@@ -27,12 +27,20 @@ namespace Slang
     typedef SlangUInt UInt;
     typedef SlangInt Int;
 
+    static const UInt kMaxUInt = ~UInt(0);
+    static const Int kMaxInt = Int(kMaxUInt >> 1);
+    
 //	typedef unsigned short Word;
 
 	typedef intptr_t PtrInt;
 
+    // TODO(JS): It looks like Index is actually 64 bit on 64 bit targets(!)
+    // Previous discussions landed on Index being int32_t.
+
     // Type used for indexing, in arrays/views etc
     typedef Int Index;
+
+    static const Index kMaxIndex = kMaxInt;
 
 	template <typename T>
 	inline T&& _Move(T & obj)

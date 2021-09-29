@@ -269,7 +269,9 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         {
             String fileName("stdlib-doc.md");
 
-            StreamWriter writer(new FileStream(fileName, FileMode::Create));
+            RefPtr<FileStream> stream = new FileStream;
+            SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
+            StreamWriter writer(stream);
 
             for (auto& docString : docStrings)
             {

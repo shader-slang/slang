@@ -391,20 +391,14 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
         return SLANG_OK;
     }
 
+    List<uint8_t> contents;
     // Read the binary
-    try
-    {
         // Read the contents of the binary
-        List<uint8_t> contents = File::readAllBytes(m_moduleFilePath);
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-        m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
-        outBlob = m_binaryBlob;
-        return SLANG_OK;
-    }
-    catch (const Slang::IOException&)
-    {
-        return SLANG_FAIL;
-    }
+    m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
+    outBlob = m_binaryBlob;
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/

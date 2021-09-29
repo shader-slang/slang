@@ -16,7 +16,7 @@ namespace Slang
 
         static String readAllText(const String& fileName);
 
-        static List<unsigned char> readAllBytes(const String& fileName);
+        static SlangResult readAllBytes(const String& fileName, List<unsigned char>& out);
         static SlangResult readAllBytes(const String& fileName, ScopedAllocation& out);
 
         static void writeAllText(const String& fileName, const String& text);

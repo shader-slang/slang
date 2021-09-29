@@ -122,7 +122,15 @@ namespace Slang
 
 	StreamWriter::StreamWriter(const String & path, Encoding * encoding)
 	{
-		this->stream = new FileStream(path, FileMode::Create);
+        FileStream* fileStream = new FileStream;
+        this->stream = fileStream;
+
+        if (SLANG_FAILED(fileStream->init(path, FileMode::Create)))
+        {
+            StringBuilder buf;
+            buf << "Unable to open '" << path << "'";
+            throw IOException(buf.ProduceString());
+        }
 		this->encoding = encoding;
 		if (encoding == Encoding::UTF16)
 		{
@@ -149,12 +157,11 @@ namespace Slang
 	void StreamWriter::Write(const String & str)
 	{
 		encodingBuffer.clear();
-		StringBuilder sb;
-		String newLine;
+        StringBuilder sb;
 #ifdef _WIN32
-		newLine = "\r\n";
+		const char newLine[] = "\r\n";
 #else
-		newLine = "\n";
+		const char newLine = "\n";
 #endif
 		for (Index i = 0; i < str.getLength(); i++)
 		{
@@ -178,7 +185,16 @@ namespace Slang
 
 	StreamReader::StreamReader(const String & path)
 	{
-		stream = new FileStream(path, FileMode::Open);
+        FileStream* fileStream = new FileStream;
+        this->stream = fileStream;
+
+        if (SLANG_FAILED(fileStream->init(path, FileMode::Open)))
+        {
+            StringBuilder buf;
+            buf << "Unable to open '" << path << "'";
+            throw IOException(buf.ProduceString());
+        }
+
 		ReadBuffer();
 		encoding = DetermineEncoding();
 		if (encoding == 0)
@@ -235,10 +251,21 @@ namespace Slang
 		
 	void StreamReader::ReadBuffer()
 	{
+        if (stream->isEnd())
+        {
+            throw EndOfStreamException();
+        }
+
 		buffer.setCount(4096);
         memset(buffer.getBuffer(), 0, buffer.getCount() * sizeof(buffer[0]));
-		auto len = stream->read(buffer.getBuffer(), buffer.getCount());
-		buffer.setCount((int)len);
+
+        size_t readBytes;
+        if (SLANG_FAILED(stream->read(buffer.getBuffer(), buffer.getCount(), readBytes)))
+        {
+            throw IOException("Error reading from stream");
+        }
+
+		buffer.setCount(Index(readBytes));
 		ptr = 0;
 	}
 

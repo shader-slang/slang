@@ -38,13 +38,15 @@ class Stream : public RefObject
 public:
     virtual ~Stream() {}
 	virtual Int64 getPosition()=0;
-	virtual void seek(SeekOrigin origin, Int64 offset)=0;
-	virtual size_t read(void * buffer, size_t length) = 0;
-	virtual size_t write(const void * buffer, size_t length) = 0;
+	virtual SlangResult seek(SeekOrigin origin, Int64 offset)=0;
+	virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) = 0;
+	virtual SlangResult write(const void* buffer, size_t length) = 0;
 	virtual bool isEnd() = 0;
 	virtual bool canRead() = 0;
 	virtual bool canWrite() = 0;
 	virtual void close() = 0;
+
+    SlangResult readAll(void* buffer, size_t length);
 };
 
 enum class FileMode
@@ -69,9 +71,9 @@ public:
     typedef Stream Super;
 
     virtual Int64 getPosition() SLANG_OVERRIDE { return m_position; }
-    virtual void seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
-    virtual size_t read(void * buffer, size_t length) SLANG_OVERRIDE;
-    virtual size_t write(const void * buffer, size_t length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return 0; }
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
+    virtual SlangResult read(void * buffer, size_t length, size_t& outReadByts) SLANG_OVERRIDE;
+    virtual SlangResult write(const void * buffer, size_t length) SLANG_OVERRIDE { SLANG_UNUSED(buffer); SLANG_UNUSED(length); return SLANG_E_NOT_IMPLEMENTED; }
     virtual bool isEnd() SLANG_OVERRIDE { return m_atEnd; }
     virtual bool canRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
@@ -120,7 +122,7 @@ class OwnedMemoryStream : public MemoryStreamBase
 public:
     typedef MemoryStreamBase Super;
 
-    virtual size_t write(const void* buffer, size_t length) SLANG_OVERRIDE;
+    virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
 
         /// Set the contents
     void setContent(const void* contents, size_t contentsSize)
@@ -151,21 +153,24 @@ public:
     typedef Stream Super;
 
     // Stream interface
-	virtual Int64 getPosition();
-	virtual void seek(SeekOrigin origin, Int64 offset);
-	virtual size_t read(void* buffer, size_t length);
-	virtual size_t write(const void* buffer, size_t length);
-	virtual bool canRead();
-	virtual bool canWrite();
-	virtual void close();
-	virtual bool isEnd();
+	virtual Int64 getPosition() SLANG_OVERRIDE;
+	virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
+	virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
+	virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
+	virtual bool canRead() SLANG_OVERRIDE;
+	virtual bool canWrite() SLANG_OVERRIDE;
+	virtual void close() SLANG_OVERRIDE;
+	virtual bool isEnd() SLANG_OVERRIDE;
 
-    FileStream(const String& fileName, FileMode fileMode = FileMode::Open);
-    FileStream(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
+    FileStream();
+    
+    SlangResult init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
+    SlangResult init(const String& fileName, FileMode fileMode = FileMode::Open);
+
     ~FileStream();
 
 private:
-    void _init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
+    SlangResult _init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share);
 
     FILE* m_handle;
     FileAccess m_fileAccess;            
