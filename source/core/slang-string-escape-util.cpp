@@ -352,7 +352,7 @@ SlangResult CppStringEscapeHandler::appendUnescaped(const UnownedStringSlice& sl
 
                     char* chars = out.prepareForAppend(maxUtf8EncodeCount);
 
-                    int numChars = EncodeUnicodePointToUTF8(chars, int(value));
+                    int numChars = encodeUnicodePointToUTF8(chars, int(value));
                     out.appendInPlace(chars, numChars);
 
                     start = cur;
@@ -812,7 +812,7 @@ SlangResult JSONStringEscapeHandler::appendUnescaped(const UnownedStringSlice& s
                     // Need to encode in UTF8 to concat
 
                     char buf[8];
-                    int len = EncodeUnicodePointToUTF8(buf, value);
+                    int len = encodeUnicodePointToUTF8(buf, value);
 
                     out.append(buf, buf + len);
 

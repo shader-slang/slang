@@ -275,7 +275,7 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
 
             for (auto& docString : docStrings)
             {
-                writer.Write(docString);
+                writer.write(docString);
             }
         }
     }

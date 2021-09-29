@@ -25,7 +25,7 @@ public:
 		Index ptr = 0;
 		while (ptr < str.getLength())
 		{
-			int codePoint = GetUnicodePointFromUTF8([&](int)
+			int codePoint = getUnicodePointFromUTF8([&](int)
 			{
 				if (ptr < str.getLength())
 					return str[ptr++];
@@ -42,7 +42,7 @@ public:
 		for (int i = 0; i < (length >> 2); i++)
 		{
 			char buf[5];
-			int count = EncodeUnicodePointToUTF8(buf, content[i]);
+			int count = encodeUnicodePointToUTF8(buf, content[i]);
 			for (int j = 0; j < count; j++)
 				sb.Append(buf[j]);
 		}
@@ -63,7 +63,7 @@ public:
 		Index ptr = 0;
 		while (ptr < str.getLength())
 		{
-			int codePoint = GetUnicodePointFromUTF8([&](int)
+			int codePoint = getUnicodePointFromUTF8([&](int)
 			{
 				if (ptr < str.getLength())
 					return str[ptr++];
@@ -73,9 +73,9 @@ public:
 			unsigned short buffer[2];
 			int count;
 			if (!reverseOrder)
-				count = EncodeUnicodePointToUTF16(buffer, codePoint);
+				count = encodeUnicodePointToUTF16(buffer, codePoint);
 			else
-				count = EncodeUnicodePointToUTF16Reversed(buffer, codePoint);
+				count = encodeUnicodePointToUTF16Reversed(buffer, codePoint);
 			result.addRange((char*)buffer, count * 2);
 		}
 	}
@@ -85,7 +85,7 @@ public:
 		StringBuilder sb;
 		while (ptr < length)
 		{
-			int codePoint = GetUnicodePointFromUTF16([&](int)
+			int codePoint = getUnicodePointFromUTF16([&](int)
 			{
 				if (ptr < length)
 					return bytes[ptr++];
@@ -93,7 +93,7 @@ public:
 					return '\0';
 			});
 			char buf[5];
-			int count = EncodeUnicodePointToUTF8(buf, codePoint);
+			int count = encodeUnicodePointToUTF8(buf, codePoint);
 			for (int i = 0; i < count; i++)
 				sb.Append(buf[i]);
 		}

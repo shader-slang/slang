@@ -218,25 +218,25 @@ namespace Slang
     String String::fromWString(const wchar_t * wstr)
     {
 #ifdef _WIN32
-        return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        return Slang::CharEncoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
 #else
-        return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+        return Slang::CharEncoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
 #endif
     }
 
     String String::fromWString(const wchar_t * wstr, const wchar_t * wend)
     {
 #ifdef _WIN32
-        return Slang::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        return Slang::CharEncoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
 #else
-        return Slang::Encoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+        return Slang::CharEncoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
 #endif
     }
 
     String String::fromWChar(const wchar_t ch)
     {
 #ifdef _WIN32
-        return Slang::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+        return Slang::CharEncoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
 #else
         return Slang::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
 #endif
@@ -245,7 +245,7 @@ namespace Slang
     String String::fromUnicodePoint(unsigned int codePoint)
     {
         char buf[6];
-        int len = Slang::EncodeUnicodePointToUTF8(buf, (int)codePoint);
+        int len = Slang::encodeUnicodePointToUTF8(buf, (int)codePoint);
         buf[len] = 0;
         return String(buf);
     }
@@ -262,11 +262,11 @@ namespace Slang
             switch(sizeof(wchar_t))
             {
             case 2:
-                Slang::Encoding::UTF16->GetBytes(buf, *this);                
+                Slang::CharEncoding::UTF16->GetBytes(buf, *this);                
                 break;
 
             case 4:
-                Slang::Encoding::UTF32->GetBytes(buf, *this);                
+                Slang::CharEncoding::UTF32->GetBytes(buf, *this);                
                 break;
 
             default:

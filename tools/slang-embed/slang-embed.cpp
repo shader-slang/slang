@@ -95,9 +95,9 @@ struct App
         // the line ending convention of the host platform)
         //
         Slang::StreamReader streamReader(inputPath);
-        while (!streamReader.IsEnd())
+        while (!streamReader.isEnd())
         {
-            auto line = streamReader.ReadLine();
+            auto line = streamReader.readLine();
             Slang::String trimedLine = line.trimStart();
             if (trimedLine.startsWith("#include"))
             {

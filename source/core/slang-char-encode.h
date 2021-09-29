@@ -12,7 +12,7 @@ typedef uint16_t Char16;
 typedef uint32_t Char32;
 
 template <typename ReadCharFunc>
-int GetUnicodePointFromUTF8(const ReadCharFunc & get)
+int getUnicodePointFromUTF8(const ReadCharFunc & get)
 {
 	int codePoint = 0;
 	int leading = get(0);
@@ -33,7 +33,7 @@ int GetUnicodePointFromUTF8(const ReadCharFunc & get)
 }
 
 template <typename ReadCharFunc>
-int GetUnicodePointFromUTF16(const ReadCharFunc & get)
+int getUnicodePointFromUTF16(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -50,7 +50,7 @@ int GetUnicodePointFromUTF16(const ReadCharFunc & get)
 }
 
 template <typename ReadCharFunc>
-int GetUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
+int getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -67,7 +67,7 @@ int GetUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 }
 
 template <typename ReadCharFunc>
-int GetUnicodePointFromUTF32(const ReadCharFunc & get)
+int getUnicodePointFromUTF32(const ReadCharFunc & get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -76,8 +76,11 @@ int GetUnicodePointFromUTF32(const ReadCharFunc & get)
 	return byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24);
 }
 
-inline int EncodeUnicodePointToUTF8(char * buffer, int codePoint)
+// Encode functions return the amount of elements output to the buffer
+inline int encodeUnicodePointToUTF8(char* buffer, int codePoint)
 {
+    // TODO(JS): This doesn't support the full UTF8 range, which can go up to 0x10FFFF
+
 	int count = 0;
 	if (codePoint <= 0x7F)
 		buffer[count++] = ((char)codePoint);
@@ -111,39 +114,39 @@ inline int EncodeUnicodePointToUTF8(char * buffer, int codePoint)
 	return count;
 }
 
-inline int EncodeUnicodePointToUTF16(unsigned short * buffer, int codePoint)
+inline int encodeUnicodePointToUTF16(Char16* buffer, int codePoint)
 {
 	int count = 0;
 	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
-		buffer[count++] = (unsigned short)codePoint;
+		buffer[count++] = (Char16)codePoint;
 	else
 	{
 		int sub = codePoint - 0x10000;
 		int high = (sub >> 10) + 0xD800;
 		int low = (sub & 0x3FF) + 0xDC00;
-		buffer[count++] = (unsigned short)high;
-		buffer[count++] = (unsigned short)low;
+		buffer[count++] = (Char16)high;
+		buffer[count++] = (Char16)low;
 	}
 	return count;
 }
 
-inline Char16 ReverseByteOrder(Char16 val)
+inline Char16 reverseByteOrder(Char16 val)
 {
     return (val >> 8) || (val << 8);
 }
 
-inline int EncodeUnicodePointToUTF16Reversed(unsigned short * buffer, int codePoint)
+inline int encodeUnicodePointToUTF16Reversed(Char16* buffer, int codePoint)
 {
 	int count = 0;
 	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
-		buffer[count++] = ReverseByteOrder((unsigned short)codePoint);
+		buffer[count++] = reverseByteOrder((Char16)codePoint);
 	else
 	{
 		int sub = codePoint - 0x10000;
 		int high = (sub >> 10) + 0xD800;
 		int low = (sub & 0x3FF) + 0xDC00;
-		buffer[count++] = ReverseByteOrder((unsigned short)high);
-		buffer[count++] = ReverseByteOrder((unsigned short)low);
+		buffer[count++] = reverseByteOrder((Char16)high);
+		buffer[count++] = reverseByteOrder((Char16)low);
 	}
 	return count;
 }

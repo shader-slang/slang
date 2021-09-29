@@ -834,7 +834,7 @@ namespace Slang
         }
 
         StreamReader reader(stream);
-        return reader.ReadToEnd();
+        return reader.readToEnd();
     }
 
     SlangResult File::readAllBytes(const Slang::String& path, Slang::List<unsigned char>& out)
@@ -916,7 +916,7 @@ namespace Slang
         }
 
         StreamWriter writer(stream);
-        writer.Write(text);
+        writer.write(text);
     }
 
 

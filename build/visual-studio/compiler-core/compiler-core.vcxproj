@@ -171,7 +171,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-args.h" />
-    <ClInclude Include="..\..\..\source\compiler-core\slang-command-line-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-core-diagnostics.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-diagnostic-sink.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-downstream-compiler.h" />
@@ -200,7 +199,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-args.cpp" />
-    <ClCompile Include="..\..\..\source\compiler-core\slang-command-line-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-core-diagnostics.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-diagnostic-sink.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-downstream-compiler.cpp" />

@@ -22,7 +22,7 @@ using namespace Slang;
     try
     {
         StreamReader reader(stream);
-        outRead = reader.ReadToEnd();
+        outRead = reader.readToEnd();
     }
     catch (IOException&)
     {
@@ -65,7 +65,7 @@ using namespace Slang;
         }
 
         StreamWriter writer(stream);
-        writer.Write(text);
+        writer.write(text);
     }
     catch (const IOException&)
     {
