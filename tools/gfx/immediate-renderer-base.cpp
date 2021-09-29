@@ -268,9 +268,9 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL close() override { }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(NativeBufferHandle* outHandle)
+        getNativeHandle(NativeHandle* outHandle)
     {
-        *outHandle = {};
+        *outHandle = 0;
         return SLANG_OK;
     }
 
@@ -411,7 +411,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(NativeQueueHandle* outHandle) override
+        getNativeHandle(NativeHandle* outHandle) override
     {
         return getRenderer()->m_queue->getNativeHandle(outHandle);
     }

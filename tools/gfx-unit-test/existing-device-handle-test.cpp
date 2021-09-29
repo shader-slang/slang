@@ -128,7 +128,7 @@ namespace gfx_test
             return SLANG_IGNORE_TEST;
         }
 
-        IDevice::NativeDeviceHandle handle = {};
+        IDevice::NativeHandle handle = {};
         GFX_CHECK_CALL_ABORT(device->getNativeHandle(&handle));
         Slang::ComPtr<IDevice> testDevice;
         IDevice::Desc testDeviceDesc = deviceDesc;

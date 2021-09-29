@@ -285,7 +285,7 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(NativeDeviceHandle* outHandle)
+Result DebugDevice::getNativeHandle(NativeHandle* outHandle)
 {
     return baseObject->getNativeHandle(outHandle);
 }
@@ -814,7 +814,7 @@ void DebugCommandBuffer::close()
     baseObject->close();
 }
 
-Result DebugCommandBuffer::getNativeHandle(NativeBufferHandle* outHandle)
+Result DebugCommandBuffer::getNativeHandle(NativeHandle* outHandle)
 {
     return baseObject->getNativeHandle(outHandle);
 }
@@ -1151,7 +1151,7 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
 
-Result DebugCommandQueue::getNativeHandle(NativeQueueHandle* outHandle)
+Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
 {
     return baseObject->getNativeHandle(outHandle);
 }

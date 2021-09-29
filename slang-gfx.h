@@ -1221,31 +1221,8 @@ public:
 class ICommandBuffer : public ISlangUnknown
 {
 public:
-    struct NativeBufferHandle
-    {
-    public:
-        // Returns a NativeHandle object containing the provided handle.
-        static NativeBufferHandle fromD3D12Handle(void* buffer)
-        {
-            NativeBufferHandle handle = {};
-            handle.value = (uint64_t)buffer;
-            return handle;
-        }
-
-        static NativeBufferHandle fromVulkanHandle(uint64_t buffer)
-        {
-            NativeBufferHandle handle = {};
-            handle.value = buffer;
-            return handle;
-        }
-
-        // Get the handle of the command buffer stored in this.
-        uint64_t getCommandBuffer() const { return value; }
-
-    private:
-        // The handle for the command buffer.
-        uint64_t value = 0;
-    };
+    // For D3D12, this is the pointer to the buffer. For Vulkan, this is the buffer itself.
+    typedef uint64_t NativeHandle;
 
     // Only one encoder may be open at a time. User must call `ICommandEncoder::endEncoding`
     // before calling other `encode*Commands` methods.
@@ -1293,7 +1270,7 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeBufferHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1312,31 +1289,8 @@ public:
         QueueType type;
     };
 
-    struct NativeQueueHandle
-    {
-    public:
-        // Returns a NativeHandle object containing the provided handle.
-        static NativeQueueHandle fromD3D12Handle(void* queue)
-        {
-            NativeQueueHandle handle = {};
-            handle.value = (uint64_t)queue;
-            return handle;
-        }
-
-        static NativeQueueHandle fromVulkanHandle(uint64_t queue)
-        {
-            NativeQueueHandle handle = {};
-            handle.value = queue;
-            return handle;
-        }
-
-        // Get the command queue handle stored in this.
-        uint64_t getCommandQueue() const { return value; }
-
-    private:
-        // The handle for the command queue.
-        uint64_t value = 0;
-    };
+    // For D3D12, this is the pointer to the queue. For Vulkan, this is the queue itself.
+    typedef uint64_t NativeHandle;
 
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
@@ -1348,7 +1302,7 @@ public:
     }
     virtual SLANG_NO_THROW void SLANG_MCALL wait() = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeQueueHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -1475,22 +1429,22 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
-    struct NativeDeviceHandle
+    struct NativeHandle
     {
     public:
         // The following functions return a NativeHandle object containing the provided handles.
-        static NativeDeviceHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
+        static NativeHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
         {
-            NativeDeviceHandle handles = {};
+            NativeHandle handles = {};
             handles.values[0] = instance;
             handles.values[1] = physicalDevice;
             handles.values[2] = device;
             return handles;
         }
 
-        static NativeDeviceHandle fromD3D12Handle(void* device)
+        static NativeHandle fromD3D12Handle(void* device)
         {
-            NativeDeviceHandle handles = {};
+            NativeHandle handles = {};
             handles.values[0] = (uint64_t)device;
             return handles;
         }
@@ -1513,7 +1467,7 @@ public:
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
         // The device's handles (if they exist).
-        NativeDeviceHandle existingDeviceHandles = {};
+        NativeHandle existingDeviceHandles = {};
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
@@ -1529,7 +1483,7 @@ public:
         SlangDesc slang = {};
     };
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeDeviceHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 

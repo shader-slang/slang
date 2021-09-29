@@ -146,7 +146,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeDeviceHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 
     ~D3D12Device();
 
@@ -3514,9 +3514,9 @@ public:
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeBufferHandle* outHandle) override
+            getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = NativeBufferHandle::fromD3D12Handle(m_cmdList);
+            *outHandle = (uint64_t)m_cmdList.readRef();
             return SLANG_OK;
         }
     };
@@ -3610,9 +3610,9 @@ public:
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeQueueHandle* outHandle) override
+            getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = NativeQueueHandle::fromD3D12Handle(m_d3dQueue);
+            *outHandle = (uint64_t)m_d3dQueue.readRef();
             return SLANG_OK;
         }
     };
@@ -4131,9 +4131,9 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(NativeDeviceHandle* outHandle)
+Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
 {
-    *outHandle = NativeDeviceHandle::fromD3D12Handle(m_device);
+    *outHandle = NativeHandle::fromD3D12Handle(m_device);
     return SLANG_OK;
 }
 
