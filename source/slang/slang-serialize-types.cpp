@@ -37,11 +37,15 @@ struct CharReader
     stringTable.clear();
     for (const auto& slice : slices)
     {
+        // TODO(JS):
+        // This is a bit of a hack. We need to store the string length, along with the string contents. We don't want to write
+        // the size as (say) uint32, because most strings are short. So we just save off the length as a utf8 encoding.
+        // As it stands this *does* have an arguable problem because encoding isn't of the full 32 bits. 
         const int len = int(slice.getLength());
         
         // We need to write into the the string array
         char prefixBytes[6];
-        const int numPrefixBytes = encodeUnicodePointToUTF8(prefixBytes, len);
+        const int numPrefixBytes = encodeUnicodePointToUTF8(len, prefixBytes);
         const Index baseIndex = stringTable.getCount();
 
         stringTable.setCount(baseIndex + numPrefixBytes + len);

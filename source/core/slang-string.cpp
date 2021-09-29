@@ -251,7 +251,7 @@ namespace Slang
     /* static */String String::fromUnicodePoint(Char32 codePoint)
     {
         char buf[6];
-        int len = Slang::encodeUnicodePointToUTF8(buf, (int)codePoint);
+        int len = Slang::encodeUnicodePointToUTF8(codePoint, buf);
         return String(buf, buf + len);
     }
 

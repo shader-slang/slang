@@ -68,7 +68,8 @@ namespace Slang
         virtual void readChar() SLANG_OVERRIDE
         {
             m_decodedCharIndex = 0;
-            int codePoint = 0;
+
+            Char32 codePoint = 0;
             if (m_encoding == CharEncoding::UTF8)
                 codePoint = getUnicodePointFromUTF8([&](int) {return readBufferChar(); });
             else if (m_encoding == CharEncoding::UTF16)
@@ -77,7 +78,8 @@ namespace Slang
                 codePoint = getUnicodePointFromUTF16Reversed([&](int) {return readBufferChar(); });
             else if (m_encoding == CharEncoding::UTF32)
                 codePoint = getUnicodePointFromUTF32([&](int) {return readBufferChar(); });
-            m_decodedCharSize = encodeUnicodePointToUTF8(m_decodedChar, codePoint);
+
+            m_decodedCharSize = encodeUnicodePointToUTF8(codePoint, m_decodedChar);
         }
 
     private:

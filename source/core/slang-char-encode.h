@@ -7,8 +7,8 @@
 namespace Slang
 {
 
-template <typename ReadCharFunc>
-Char32 getUnicodePointFromUTF8(const ReadCharFunc & get)
+template <typename ReadByteFunc>
+Char32 getUnicodePointFromUTF8(const ReadByteFunc& get)
 {
     Char32 codePoint = 0;
 	int leading = get(0);
@@ -28,8 +28,8 @@ Char32 getUnicodePointFromUTF8(const ReadCharFunc & get)
 	return codePoint;
 }
 
-template <typename ReadCharFunc>
-Char32 getUnicodePointFromUTF16(const ReadCharFunc & get)
+template <typename ReadByteFunc>
+Char32 getUnicodePointFromUTF16(const ReadByteFunc& get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -45,8 +45,8 @@ Char32 getUnicodePointFromUTF16(const ReadCharFunc & get)
 		return Char32(word0);
 }
 
-template <typename ReadCharFunc>
-Char32 getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
+template <typename ReadByteFunc>
+Char32 getUnicodePointFromUTF16Reversed(const ReadByteFunc& get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -62,8 +62,8 @@ Char32 getUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 		return Char32(word0);
 }
 
-template <typename ReadCharFunc>
-Char32 getUnicodePointFromUTF32(const ReadCharFunc & get)
+template <typename ReadByteFunc>
+Char32 getUnicodePointFromUTF32(const ReadByteFunc& get)
 {
 	int byte0 = (unsigned char)get(0);
 	int byte1 = (unsigned char)get(1);
@@ -73,57 +73,54 @@ Char32 getUnicodePointFromUTF32(const ReadCharFunc & get)
 }
 
 // Encode functions return the amount of elements output to the buffer
-inline int encodeUnicodePointToUTF8(char* buffer, Char32 codePoint)
+inline int encodeUnicodePointToUTF8(Char32 codePoint, char* outBuffer)
 {
-    // TODO(JS): This doesn't support the full UTF8 range, which can go up to 0x10FFFF
-
-	int count = 0;
-	if (codePoint <= 0x7F)
-		buffer[count++] = ((char)codePoint);
+    char* const dst = outBuffer;
+    // TODO(JS): This supports 4 + 6 * 3 = 22 bits.
+    // The standard allows up to 0x10FFFF.
+    if (codePoint <= 0x7F)
+    {
+        dst[0] = char(codePoint);
+        return 1;
+    }
 	else if (codePoint <= 0x7FF)
 	{
-		unsigned char byte = (unsigned char)(0xC0 + (codePoint >> 6));
-		buffer[count++] = ((char)byte);
-		byte = 0x80 + (codePoint & 0x3F);
-		buffer[count++] = ((char)byte);
+        dst[0] = char(0xC0 + (codePoint >> 6));
+        dst[1] = char(0x80 + (codePoint & 0x3F));
+        return 2;
 	}
 	else if (codePoint <= 0xFFFF)
 	{
-		unsigned char byte = (unsigned char)(0xE0 + (codePoint >> 12));
-		buffer[count++] = ((char)byte);
-		byte = (unsigned char)(0x80 + ((codePoint >> 6) & (0x3F)));
-		buffer[count++] = ((char)byte);
-		byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-		buffer[count++] = ((char)byte);
+        dst[0] = char(0xE0 + (codePoint >> 12));
+        dst[1] = char(0x80 + ((codePoint >> 6) & (0x3F)));
+        dst[2] = char(0x80 + (codePoint & 0x3F));
+        return 3;
 	}
 	else
 	{
-		unsigned char byte = (unsigned char)(0xF0 + (codePoint >> 18));
-		buffer[count++] = ((char)byte);
-		byte = (unsigned char)(0x80 + ((codePoint >> 12) & 0x3F));
-		buffer[count++] = ((char)byte);
-		byte = (unsigned char)(0x80 + ((codePoint >> 6) & 0x3F));
-		buffer[count++] = ((char)byte);
-		byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-		buffer[count++] = ((char)byte);
+		dst[0] = char(0xF0 + (codePoint >> 18));
+        dst[1] = char(0x80 + ((codePoint >> 12) & 0x3F));
+        dst[2] = char(0x80 + ((codePoint >> 6) & 0x3F));
+        dst[3] = char(0x80 + (codePoint & 0x3F));
+        return 4;
 	}
-	return count;
 }
 
-inline int encodeUnicodePointToUTF16(Char16* buffer, Char32 codePoint)
+inline int encodeUnicodePointToUTF16(Char32 codePoint, Char16* outBuffer)
 {
-	int count = 0;
-	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
-		buffer[count++] = (Char16)codePoint;
+    Char16* const dst = outBuffer;
+    if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
+    {
+        dst[0] = Char16(codePoint);
+        return 1;
+    }
 	else
 	{
-		int sub = codePoint - 0x10000;
-		int high = (sub >> 10) + 0xD800;
-		int low = (sub & 0x3FF) + 0xDC00;
-		buffer[count++] = (Char16)high;
-		buffer[count++] = (Char16)low;
+		const uint32_t sub = codePoint - 0x10000;
+		dst[0] = Char16((sub >> 10) + 0xD800);
+		dst[1] = Char16((sub & 0x3FF) + 0xDC00);
+        return 2;
 	}
-	return count;
 }
 
 inline Char16 reverseByteOrder(Char16 val)
@@ -131,20 +128,23 @@ inline Char16 reverseByteOrder(Char16 val)
     return (val >> 8) || (val << 8);
 }
 
-inline int encodeUnicodePointToUTF16Reversed(Char16* buffer, Char32 codePoint)
+inline int encodeUnicodePointToUTF16Reversed(Char32 codePoint, Char16* outBuffer)
 {
-	int count = 0;
-	if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
-		buffer[count++] = reverseByteOrder((Char16)codePoint);
+    Char16* const dst = outBuffer;
+    if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
+    {
+        dst[0] = reverseByteOrder(Char16(codePoint));
+        return 1;
+    }
 	else
 	{
-		int sub = codePoint - 0x10000;
-		int high = (sub >> 10) + 0xD800;
-		int low = (sub & 0x3FF) + 0xDC00;
-		buffer[count++] = reverseByteOrder((Char16)high);
-		buffer[count++] = reverseByteOrder((Char16)low);
+        const uint32_t sub = codePoint - 0x10000;
+        const uint32_t high = (sub >> 10) + 0xD800;
+        const uint32_t low = (sub & 0x3FF) + 0xDC00;
+		dst[0] = reverseByteOrder(Char16(high));
+		dst[1] = reverseByteOrder(Char16(low));
+        return 2;
 	}
-	return count;
 }
 
 static const Char16 kUTF16Header = 0xFEFF;
