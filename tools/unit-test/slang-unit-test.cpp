@@ -14,26 +14,26 @@ public:
     Slang::List<SlangUnitTest> tests;
     ITestReporter* testReporter = nullptr;
 
-    virtual SlangInt getTestCount() override
+    virtual SLANG_NO_THROW SlangInt SLANG_MCALL getTestCount() override
     {
         return tests.getCount();
     }
-    virtual const char* getTestName(SlangInt index) override
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getTestName(SlangInt index) override
     {
         return tests[index].name;
     }
 
-    virtual UnitTestFunc getTestFunc(SlangInt index) override
+    virtual SLANG_NO_THROW UnitTestFunc SLANG_MCALL getTestFunc(SlangInt index) override
     {
         return tests[index].func;
     }
 
-    virtual void setTestReporter(ITestReporter* reporter) override
+    virtual SLANG_NO_THROW void SLANG_MCALL setTestReporter(ITestReporter* reporter) override
     {
         testReporter = reporter;
     }
 
-    virtual void destroy() override
+    virtual SLANG_NO_THROW void SLANG_MCALL destroy() override
     {
         tests = decltype(tests)();
     }
