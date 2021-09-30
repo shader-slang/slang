@@ -5,7 +5,7 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 
-#ifdef _WIN32
+#if SLANG_WINDOWS_FAMILY
 #include <d3d12.h>
 #endif
 
@@ -29,19 +29,21 @@ namespace gfx_test
         {
             SLANG_CHECK(handle != 0);
         }
+#if SLANG_WINDOWS_FAMILY
         else
         {
             auto d3d12Handle = (ID3D12GraphicsCommandList*)handle;
-            Slang::ComPtr<ID3D12GraphicsCommandList4> testHandle;
-            GFX_CHECK_CALL_ABORT(d3d12Handle->QueryInterface<ID3D12GraphicsCommandList4>(testHandle.writeRef()));
+            Slang::ComPtr<ID3D12CommandList> testHandle;
+            GFX_CHECK_CALL_ABORT(d3d12Handle->QueryInterface<ID3D12CommandList>(testHandle.writeRef()));
         }
+#endif
     }
 
     void getBufferHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
         if ((api & context->enabledApis) == 0)
         {
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
         Slang::ComPtr<IDevice> device;
         IDevice::Desc deviceDesc = {};
@@ -57,7 +59,7 @@ namespace gfx_test
             deviceDesc.deviceType = gfx::DeviceType::Vulkan;
             break;
         default:
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
@@ -66,13 +68,13 @@ namespace gfx_test
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
 
         getBufferHandleTestImpl(device, context);
     }
 
-#ifdef _WIN32
+#if SLANG_WINDOWS_FAMILY
     SLANG_UNIT_TEST(getBufferHandleD3D12)
     {
         return getBufferHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
