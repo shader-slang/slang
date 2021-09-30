@@ -14,10 +14,10 @@ namespace Slang {
 
 namespace { // anonymous
 
-struct CharReader
+struct ByteReader
 {
-    char operator()(Index pos) const { SLANG_UNUSED(pos); return *m_pos++; }
-    CharReader(const char* pos) :m_pos(pos) {}
+    Byte operator()() const { return Byte(*m_pos++); }
+    ByteReader(const char* pos) :m_pos(pos) {}
     mutable const char* m_pos;
 };
 
@@ -65,7 +65,7 @@ struct CharReader
 
     while (cur < end)
     {
-        CharReader reader(cur);
+        ByteReader reader(cur);
         const int len = getUnicodePointFromUTF8(reader);
         slicesOut.add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
@@ -91,7 +91,7 @@ struct CharReader
 
     while (cur < end)
     {
-        CharReader reader(cur);
+        ByteReader reader(cur);
         const int len = getUnicodePointFromUTF8(reader);
         outPool.add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
