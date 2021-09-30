@@ -7,11 +7,7 @@
 
 #include <stdint.h>
 
-#ifdef __GNUC__
-#define CORE_LIB_ALIGN_16(x) x __attribute__((aligned(16)))
-#else
-#define CORE_LIB_ALIGN_16(x) __declspec(align(16)) x
-#endif
+#include "slang-signal.h"
 
 #define VARIADIC_TEMPLATE
 
@@ -68,15 +64,7 @@ namespace Slang
 		v1 = _Move(tmp);
 	}
 
-#ifdef _MSC_VER
-#   define SLANG_RETURN_NEVER __declspec(noreturn)
-//#elif SLANG_CLANG
-//#   define SLANG_RETURN_NEVER [[noreturn]]
-#else
-#   define SLANG_RETURN_NEVER [[noreturn]]
-//#   define SLANG_RETURN_NEVER /* empty */
-#endif
-
+// TODO: Shouldn't these be SLANG_ prefixed?
 #ifdef _MSC_VER
 #define UNREACHABLE_RETURN(x)
 #define UNREACHABLE(x)
@@ -85,27 +73,17 @@ namespace Slang
 #define UNREACHABLE(x) x;
 #endif
 
-    SLANG_RETURN_NEVER void signalUnexpectedError(char const* message);
 }
 
-#define SLANG_UNEXPECTED(reason) \
-    Slang::signalUnexpectedError("unexpected: " reason)
-
-#define SLANG_UNIMPLEMENTED_X(what) \
-    Slang::signalUnexpectedError("unimplemented: " what)
-
-#define SLANG_UNREACHABLE(msg) \
-    Slang::signalUnexpectedError("unreachable code executed: " msg)
-
 #ifdef _DEBUG
-#define SLANG_EXPECT(VALUE, MSG) if(VALUE) {} else Slang::signalUnexpectedError("assertion failed: '" MSG "'")
+#define SLANG_EXPECT(VALUE, MSG) if(VALUE) {} else SLANG_ASSERT_FAILURE(MSG)
 #define SLANG_ASSERT(VALUE) SLANG_EXPECT(VALUE, #VALUE)
 #else
 #define SLANG_EXPECT(VALUE, MSG) do {} while(0)
 #define SLANG_ASSERT(VALUE) do {} while(0)
 #endif
 
-#define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else Slang::signalUnexpectedError("assertion failed")
+#define SLANG_RELEASE_ASSERT(VALUE) if(VALUE) {} else SLANG_ASSERT_FAILURE(#VALUE)
 #define SLANG_RELEASE_EXPECT(VALUE, WHAT) if(VALUE) {} else SLANG_UNEXPECTED(WHAT)
 
 template<typename T> void slang_use_obj(T&) {}

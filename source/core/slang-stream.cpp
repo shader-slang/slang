@@ -148,8 +148,8 @@ SlangResult FileStream::_init(const String& fileName, FileMode fileMode, FileAcc
         shFlag = _SH_DENYNO;
         break;
     default:
-        throw ArgumentException("Invalid file share mode.");
-        break;
+        SLANG_ASSERT(!"Invalid file share mode.");
+        return SLANG_FAIL;
     }
     if (share == FileShare::None)
 #pragma warning(suppress:4996)

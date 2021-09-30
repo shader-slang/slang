@@ -622,9 +622,9 @@ namespace Slang
                 len = getLength() - id;
 #if _DEBUG
             if (id < 0 || id >= getLength() || (id + len) > getLength())
-                throw "SubString: index out of range.";
+                SLANG_ASSERT_FAILURE("SubString: index out of range.");
             if (len < 0)
-                throw "SubString: length less than zero.";
+                SLANG_ASSERT_FAILURE("SubString: length less than zero.");
 #endif
             return StringSlice(m_buffer, id, id + len);
         }
@@ -1000,9 +1000,9 @@ namespace Slang
         {
 #if _DEBUG
             if (id >= length || id < 0)
-                throw "Remove: Index out of range.";
+                SLANG_ASSERT_FAILURE("Remove: Index out of range.");
             if (len < 0)
-                throw "Remove: remove length smaller than zero.";
+                SLANG_ASSERT_FAILURE("Remove: remove length smaller than zero.");
 #endif
             int actualDelLength = ((id + len) >= length) ? (length - id) : len;
             for (int i = id + actualDelLength; i <= length; i++)

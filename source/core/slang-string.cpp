@@ -11,15 +11,6 @@ namespace Slang
     // for anything that uses core
     static const auto s_charUtilLink = CharUtil::_ensureLink();
 
-    // TODO: this belongs in a different file:
-
-    SLANG_RETURN_NEVER void signalUnexpectedError(char const* message)
-    {
-        // Can be useful to uncomment during debug when problem is on CI
-        // printf("Unexpected: %s\n", message);
-        throw InternalError(message);
-    }
-
     // OSString
 
     OSString::OSString()
