@@ -1200,11 +1200,11 @@ if enableEmbedStdLib then
         local f = getWinArm64Filter(true)
         filter(f)
             buildinputs { '"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap"' .. executableSuffix }
-            prebuildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source ' .. absOutputPath }
+            buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source ' .. absOutputPath }
         f = getWinArm64Filter(false)
         filter(f)
             buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
-            prebuildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source ' .. absOutputPath }
+            buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "' .. absOutputPath .. '"' }
 end
 
 
