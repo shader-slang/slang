@@ -23,6 +23,14 @@ namespace gfx_test
             device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
 
         auto commandBuffer = transientHeap->createCommandBuffer();
+        struct CloseComandBufferRAII
+        {
+            ICommandBuffer* m_commandBuffer;
+            ~CloseComandBufferRAII()
+            {
+                m_commandBuffer->close();
+            }
+        } closeCommandBufferRAII{ commandBuffer };
         ICommandBuffer::NativeHandle handle = 0;
         GFX_CHECK_CALL_ABORT(commandBuffer->getNativeHandle(&handle));
         if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
