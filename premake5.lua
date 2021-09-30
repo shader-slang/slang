@@ -1192,7 +1192,8 @@ if enableEmbedStdLib then
         -- We need slangc-bootstrap to build the embedded stdlib
         dependson { "slangc-bootstrap" }
 
-        local absOutputPath = "%{wks.location}/source/slang/slang-stdlib-generated.h"
+        local absDirectory = path.getabsolute("source/slang")
+        local absOutputPath = absDirectory .. "/slang-stdlib-generated.h"
 
         -- Note! Has to be an absolute path else doesn't work(!)
         buildoutputs { absOutputPath }
