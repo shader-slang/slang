@@ -8,23 +8,43 @@ namespace Slang
 
 enum class SeekOrigin
 {
-	Start, End, Current
+	Start,      ///< Seek from the start of the stream
+    End,        ///< Seek from the end of the stream
+    Current,    ///< Seek from the current cursor position
 };
 
 class Stream : public RefObject
 {
 public:
     virtual ~Stream() {}
+        /// Get the current 'cursor' position in the stream
 	virtual Int64 getPosition()=0;
+        /// Seek the cursor to a position. How the seek is performed is dependent on the 'origin' and the offset required.
+        /// NOTE that *any* seek will reset the 'end of stream' status. See 'read' for requirements for 'isEnd' to be reached.
 	virtual SlangResult seek(SeekOrigin origin, Int64 offset)=0;
+        /// Read from the current position into buffer.
+        /// If there are less bytes available than requested only the amount available will be read. outReadBytes holds the actual amount of bytes read.
+        /// It is valid (and not an error) for read to return 0 bytes read - even if the end of the stream.
+        /// 
+        /// 'isEnd' only becomes true when a read is performed *past* the end of a stream.
+        /// If a non zero read is performed from the end then isEnd must be true.
+        /// 
+        /// Will return an error if there is a reading failure.
 	virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) = 0;
+        /// Write to the stream from current position
 	virtual SlangResult write(const void* buffer, size_t length) = 0;
+        /// True if the of the stream has been hit. The 'read' method has more discussion as to when this can occur.
 	virtual bool isEnd() = 0;
+        /// Returns true if it's possible to read from the stream. 
 	virtual bool canRead() = 0;
+        /// Returns true when it's possible to write to the stream. 
 	virtual bool canWrite() = 0;
+        /// Close the stream. Once closed no more operations can be performed on the stream.
+        /// Implies any pending data is flushed.
 	virtual void close() = 0;
 
-    SlangResult readAll(void* buffer, size_t length);
+        /// Helper function that will also *fail* if the specified amount of bytes aren't read.
+    SlangResult readExactly(void* buffer, size_t length);
 };
 
 enum class FileMode

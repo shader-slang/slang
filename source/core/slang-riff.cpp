@@ -73,7 +73,7 @@ namespace Slang
 {
     outReadSize = 0;
 
-    SLANG_RETURN_ON_FAIL(stream->readAll(outData, size));
+    SLANG_RETURN_ON_FAIL(stream->readExactly(outData, size));
 
     const size_t alignedSize = getPadSize(size);
     // Skip to the alignment
@@ -99,7 +99,7 @@ namespace Slang
     // Read the header
     if (headerSize > sizeof(RiffHeader))
     {
-        SLANG_RETURN_ON_FAIL(stream->readAll(outHeader + 1, headerSize - sizeof(RiffHeader)));
+        SLANG_RETURN_ON_FAIL(stream->readExactly(outHeader + 1, headerSize - sizeof(RiffHeader)));
     }
  
     const size_t payloadSize = chunk.size - (headerSize - sizeof(RiffHeader));
@@ -117,7 +117,7 @@ namespace Slang
     if (isListType(outHeader.chunk.type))
     {
         // Read the sub type
-        SLANG_RETURN_ON_FAIL(stream->readAll(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader)));
+        SLANG_RETURN_ON_FAIL(stream->readExactly(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader)));
     }
 
     return SLANG_OK;

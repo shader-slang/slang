@@ -9,7 +9,7 @@ namespace Slang
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-SlangResult Stream::readAll(void* buffer, size_t length)
+SlangResult Stream::readExactly(void* buffer, size_t length)
 {
     size_t readBytes;
     SLANG_RETURN_ON_FAIL(read(buffer, length, readBytes));
