@@ -3516,7 +3516,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_cmdList.readRef();
+            *outHandle = (uint64_t)m_cmdList.get();
             return SLANG_OK;
         }
     };
@@ -3612,7 +3612,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_d3dQueue.readRef();
+            *outHandle = (uint64_t)m_d3dQueue.get();
             return SLANG_OK;
         }
     };
