@@ -71,22 +71,22 @@ protected:
         {
             case CharEncodeType::UTF8:
             {
-                codePoint = getUnicodePointFromUTF8([&](Index) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF8([&]() -> Byte {return readBufferChar(); });
                 break;
             }
             case CharEncodeType::UTF16:
             {
-                codePoint = getUnicodePointFromUTF16([&](Index) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF16([&]() -> Byte {return readBufferChar(); });
                 break;
             }
             case CharEncodeType::UTF16Reversed:
             {
-                codePoint = getUnicodePointFromUTF16Reversed([&](Index) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF16Reversed([&]() -> Byte {return readBufferChar(); });
                 break;
             }
             case CharEncodeType::UTF32:
             {
-                codePoint = getUnicodePointFromUTF32([&](Index) {return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF32([&]() -> Byte {return readBufferChar(); });
                 break;
             }
         }

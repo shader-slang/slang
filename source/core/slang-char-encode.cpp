@@ -29,7 +29,7 @@ public:
 		Index ptr = 0;
 		while (ptr < slice.getLength())
 		{
-            const Char32 codePoint = getUnicodePointFromUTF8([&](Index)
+            const Char32 codePoint = getUnicodePointFromUTF8([&]() -> Byte
 			{
 				if (ptr < slice.getLength())
 					return slice[ptr++];
@@ -70,7 +70,7 @@ public:
 		Index index = 0;
 		while (index < slice.getLength())
 		{
-            const Char32 codePoint = getUnicodePointFromUTF8([&](Index)
+            const Char32 codePoint = getUnicodePointFromUTF8([&]() -> Byte
 			{
 				if (index < slice.getLength())
 					return slice[index++];
@@ -92,7 +92,7 @@ public:
 		Index index = 0;
 		while (index < length)
 		{
-			const Char32 codePoint = getUnicodePointFromUTF16([&](Index)
+			const Char32 codePoint = getUnicodePointFromUTF16([&]() -> Byte
 			{
                 if (index < length)
                     return bytes[index++];
