@@ -3976,7 +3976,7 @@ public:
             }
         }
 
-        static VkAccessFlagBits calcAccessFlagBits(ResourceState state)
+        static VkAccessFlagBits calcAccessFlags(ResourceState state)
         {
             switch (state)
             {
@@ -4016,16 +4016,20 @@ public:
             }
         }
 
-        static VkPipelineStageFlagBits calcPipelineStageFlagBits(ResourceState state)
+        static VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
         {
             switch (state)
             {
+            case ResourceState::Undefined:
+            case ResourceState::PreInitialized:
+                assert(src);
+                return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             case ResourceState::IndexBuffer:
                 return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
             case ResourceState::ConstantBuffer:
             case ResourceState::UnorderedAccess:
                 return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT | 
+                    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
                     VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
                     VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
                     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
@@ -4044,6 +4048,8 @@ public:
             case ResourceState::ResolveSource:
             case ResourceState::ResolveDestination:
                 return VK_PIPELINE_STAGE_TRANSFER_BIT;
+            case ResourceState::Present:
+                return src ? VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
             default:
                 assert(!"Unsupported");
                 return VkPipelineStageFlagBits(0);
@@ -4090,7 +4096,7 @@ public:
                     size,
                     data);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst) 
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
             {
                 auto image = static_cast<TextureResourceImpl*>(texture);
                 auto desc = image->getDesc();
@@ -4105,29 +4111,29 @@ public:
                 barrier.subresourceRange.baseMipLevel = 0;
                 barrier.subresourceRange.layerCount = desc->arraySize;
                 barrier.subresourceRange.levelCount = desc->numMipLevels;
-                barrier.srcAccessMask = calcAccessFlagBits(src);
-                barrier.dstAccessMask = calcAccessFlagBits(dst);
+                barrier.srcAccessMask = calcAccessFlags(src);
+                barrier.dstAccessMask = calcAccessFlags(dst);
 
-               VkPipelineStageFlagBits srcStage = calcPipelineStageFlagBits(src); 
-               VkPipelineStageFlagBits dstStage = calcPipelineStageFlagBits(dst); 
+               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
                 vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst) 
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
             {
                 auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
 
                 VkBufferMemoryBarrier barrier = {};
                 barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-                barrier.srcAccessMask = calcAccessFlagBits(src);
-                barrier.dstAccessMask = calcAccessFlagBits(dst);
+                barrier.srcAccessMask = calcAccessFlags(src);
+                barrier.dstAccessMask = calcAccessFlags(dst);
                 barrier.buffer = bufferImpl->m_buffer.m_buffer;
                 barrier.offset = 0;
                 barrier.size = buffer->getDesc()->sizeInBytes;
 
-               VkPipelineStageFlagBits srcStage = calcPipelineStageFlagBits(src); 
-               VkPipelineStageFlagBits dstStage = calcPipelineStageFlagBits(dst); 
+               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
                 vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 1, &barrier, 0, nullptr);
