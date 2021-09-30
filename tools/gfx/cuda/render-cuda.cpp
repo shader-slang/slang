@@ -1011,6 +1011,13 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = 0;
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -1067,6 +1074,13 @@ public:
             auto resultCode = cuStreamSynchronize(stream);
             if (resultCode != cudaSuccess)
                 SLANG_CUDA_HANDLE_ERROR(resultCode);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)stream;
+            return SLANG_OK;
         }
 
     public:
