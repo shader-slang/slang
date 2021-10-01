@@ -35,6 +35,7 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(commandBuffer->getNativeHandle(&handle));
         if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
         {
+            // Check that the handle is not null, which is defined as 0.
             SLANG_CHECK(handle != 0);
         }
 #if SLANG_WINDOWS_FAMILY
