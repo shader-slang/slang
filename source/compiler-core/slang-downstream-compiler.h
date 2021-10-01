@@ -67,12 +67,12 @@ struct DownstreamDiagnostic
         /// Given diagnostics in inText that are colon delimited, use lineParser to do per line parsing.
     static SlangResult parseColonDelimitedDiagnostics(const UnownedStringSlice& inText, Int pathIndex, LineParser lineParser, List<DownstreamDiagnostic>& outDiagnostics);
 
-    Severity severity;              ///< The severity of error
-    Stage stage;                    ///< The stage the error came from
-    String text;                    ///< The text of the error
-    String code;                    ///< The compiler specific error code
-    String filePath;                ///< The path the error originated from
-    Int fileLine;                   ///< The line number the error came from
+    Severity severity = Severity::Unknown;          ///< The severity of error
+    Stage stage = Stage::Compile;                   ///< The stage the error came from
+    String text;                                    ///< The text of the error
+    String code;                                    ///< The compiler specific error code
+    String filePath;                                ///< The path the error originated from
+    Int fileLine = 0;                               ///< The line number the error came from
 };
 
 struct DownstreamDiagnostics

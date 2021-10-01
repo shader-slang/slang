@@ -249,7 +249,10 @@ newoption {
  
  
      filter { "toolset:clang or gcc*" }
-         buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",  "-fvisibility=hidden" , "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"}
+         -- Makes all symbols hidden by default unless explicitly 'exported'
+         buildoptions { "-fvisibility=hidden" } 
+         -- Warnings
+         buildoptions { "-Wno-unused-parameter", "-Wno-type-limits", "-Wno-sign-compare", "-Wno-unused-variable", "-Wno-reorder", "-Wno-switch", "-Wno-return-type", "-Wno-unused-local-typedefs", "-Wno-parentheses",   "-Wno-ignored-optimization-argument", "-Wno-unknown-warning-option", "-Wno-class-memaccess"}
  
      filter { "toolset:gcc*"}
          buildoptions { "-Wno-unused-but-set-variable", "-Wno-implicit-fallthrough"  }
@@ -272,9 +275,15 @@ newoption {
      filter { "configurations:release" }
          optimize "On"
          defines { "NDEBUG" }
- 
+
      filter { "system:linux" }
-         linkoptions{  "-Wl,-rpath,'$$ORIGIN',--no-as-needed", "-ldl"}
+         links { "dl" }
+         --
+         -- `--start-group`  - allows libraries to be listed in any order (do not require dependency order)
+         -- `--no-undefined` - by default if a symbol is not found in a link it will assume it will be resolved at runtime (!)
+         --                    this option ensures that all the referenced symbols exist
+         --
+         linkoptions{ "-Wl,-rpath,'$$ORIGIN',--no-as-needed,--no-undefined,--start-group" }
  
  function dump(o)
      if type(o) == 'table' then
