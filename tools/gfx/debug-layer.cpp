@@ -814,6 +814,11 @@ void DebugCommandBuffer::close()
     baseObject->close();
 }
 
+Result DebugCommandBuffer::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
+
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
 {
     if (m_renderCommandEncoder.isOpen || m_resourceCommandEncoder.isOpen ||
@@ -1159,6 +1164,11 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
 }
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
+
+Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
 
 Result DebugTransientResourceHeap::synchronizeAndReset()
 {

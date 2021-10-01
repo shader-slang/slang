@@ -277,6 +277,13 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() override { }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(NativeHandle* outHandle)
+    {
+        *outHandle = 0;
+        return SLANG_OK;
+    }
+
     void execute()
     {
         for (auto& cmd : m_writer.m_commands)
@@ -412,6 +419,12 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(NativeHandle* outHandle) override
+    {
+        return getRenderer()->m_queue->getNativeHandle(outHandle);
+    }
 };
 
 using TransientResourceHeapImpl =

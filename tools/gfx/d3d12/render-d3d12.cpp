@@ -3520,6 +3520,13 @@ public:
 #endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_cmdList.get();
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -3608,6 +3615,13 @@ public:
             ResetEvent(globalWaitHandle);
             m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
             WaitForSingleObject(globalWaitHandle, INFINITE);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_d3dQueue.get();
+            return SLANG_OK;
         }
     };
 

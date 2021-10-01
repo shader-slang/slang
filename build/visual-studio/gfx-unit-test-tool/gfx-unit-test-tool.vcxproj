@@ -274,6 +274,8 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-queue-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>

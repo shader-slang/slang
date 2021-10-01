@@ -23,6 +23,12 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-handle-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-queue-handle-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

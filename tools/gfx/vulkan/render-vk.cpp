@@ -4492,6 +4492,13 @@ public:
             }
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_commandBuffer;
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -4549,6 +4556,13 @@ public:
         {
             auto& vkAPI = m_renderer->m_api;
             vkAPI.vkQueueWaitIdle(m_queue);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_queue;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override

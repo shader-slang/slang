@@ -1225,6 +1225,9 @@ public:
 class ICommandBuffer : public ISlangUnknown
 {
 public:
+    // For D3D12, this is the pointer to the buffer. For Vulkan, this is the buffer itself.
+    typedef uint64_t NativeHandle;
+
     // Only one encoder may be open at a time. User must call `ICommandEncoder::endEncoding`
     // before calling other `encode*Commands` methods.
     // Once `endEncoding` is called, the `ICommandEncoder` object becomes obsolete and is
@@ -1270,6 +1273,8 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1287,6 +1292,10 @@ public:
     {
         QueueType type;
     };
+
+    // For D3D12, this is the pointer to the queue. For Vulkan, this is the queue itself.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1296,6 +1305,8 @@ public:
         executeCommandBuffers(1, &commandBuffer);
     }
     virtual SLANG_NO_THROW void SLANG_MCALL wait() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -1425,7 +1436,7 @@ public:
     struct NativeHandle
     {
     public:
-        // The following functions create an ExistingDeviceHandles object containing the provided handles.
+        // The following functions return a NativeHandle object containing the provided handles.
         static NativeHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
         {
             NativeHandle handles = {};
