@@ -10,6 +10,14 @@
 #include "core/slang-secure-crt.h"
 #include "external/stb/stb_image_write.h"
 
+#if SLANG_WIN64 || SLANG_WIN64
+#define ENABLE_GL_IMPL 1
+#else
+#define ENABLE_GL_IMPL 0
+#endif
+
+#if ENABLE_GL_IMPL
+
 // TODO(tfoley): eventually we should be able to run these
 // tests on non-Windows targets to confirm that cross-compilation
 // at least *works* on those platforms...
@@ -1633,14 +1641,6 @@ public:
     SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_pixelFormatInfos) == int(GlPixelFormat::CountOf));
 }
 
-SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
-{
-    RefPtr<GLDevice> result = new GLDevice();
-    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
-    returnComPtr(outRenderer, result);
-    return SLANG_OK;
-}
-
 void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message)
 {
     DebugMessageType msgType = DebugMessageType::Info;
@@ -2894,4 +2894,24 @@ void GLDevice::bindRootShaderObject(IShaderObject* shaderObject)
     }
 }
 
-} // renderer_test
+SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
+{
+    RefPtr<GLDevice> result = new GLDevice();
+    SLANG_RETURN_ON_FAIL(result->initialize(*desc));
+    returnComPtr(outRenderer, result);
+    return SLANG_OK;
+}
+
+} // gfx
+
+#else
+
+namespace gfx
+{
+    SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outRenderer)
+    {
+        *outRenderer = nullptr;
+        return SLANG_FAIL;
+    }
+}
+#endif
