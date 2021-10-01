@@ -992,6 +992,20 @@ void DebugResourceCommandEncoder::uploadBufferData(
     baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
+void DebugResourceCommandEncoder::textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    auto textureImpl = static_cast<DebugTextureResource*>(texture);
+    baseObject->textureBarrier(textureImpl->baseObject, src, dst);
+}
+
+void DebugResourceCommandEncoder::bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    auto bufferImpl = static_cast<DebugBufferResource*>(buffer);
+    baseObject->bufferBarrier(bufferImpl->baseObject, src, dst);
+}
+
 void DebugRayTracingCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
