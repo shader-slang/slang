@@ -3429,6 +3429,14 @@ public:
                     size,
                     data);
             }
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst) override
+            {
+                assert(!"Unimplemented");
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst) override
+            {
+                assert(!"Unimplemented");
+            }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
