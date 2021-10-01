@@ -248,6 +248,16 @@ public:
         {
             m_writer->writeTimestamp(pool, index);
         }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+        {
+            assert(!"Unimplemented");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+        {
+            assert(!"Unimplemented");
+        }
     };
 
     ResourceCommandEncoderImpl m_resourceCommandEncoder;
