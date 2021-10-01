@@ -406,7 +406,7 @@ public:
 #define SLANG_UUID_ITextureResource                                                    \
     {                                                                                  \
         0xcf88a31c, 0x6187, 0x46c5, { 0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 } \
-    } 
+    }
 
 // Needed for building on cygwin with gcc
 #undef Always
@@ -1162,8 +1162,17 @@ public:
         size_t size) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+        size_t count,
+        ITextureResource* const* textures,
+        ResourceState src,
+        ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+        size_t count,
+        IBufferResource* const* buffers,
+        ResourceState src,
+        ResourceState dst) = 0;
 };
 
 enum class AccelerationStructureCopyMode

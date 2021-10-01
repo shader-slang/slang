@@ -317,8 +317,16 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+        size_t count,
+        ITextureResource* const* textures,
+        ResourceState src,
+        ResourceState dst) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+        size_t count,
+        IBufferResource* const* buffers,
+        ResourceState src,
+        ResourceState dst) override;
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
