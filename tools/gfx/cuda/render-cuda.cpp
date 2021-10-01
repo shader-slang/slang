@@ -193,6 +193,12 @@ public:
     {
         return (DeviceAddress)m_cudaMemory;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    {
+        *outHandle = getBindlessHandle();
+        return SLANG_OK;
+    }
 };
 
 class TextureCUDAResource : public TextureResource
@@ -234,6 +240,12 @@ public:
     CUmipmappedArray m_cudaMipMappedArray = CUmipmappedArray();
 
     RefPtr<CUDAContext> m_cudaContext;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    {
+        *outHandle = getBindlessHandle();
+        return SLANG_OK;
+    }
 };
 
 class CUDAResourceView : public ResourceViewBase
