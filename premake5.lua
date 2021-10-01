@@ -1462,7 +1462,7 @@ newoption {
      -- don't really care about *any* of that, but we can't remove it from the
      -- build so we need to include the appropriate platform-specific sources.
  
-     links { "slang-spirv-tools" }
+     links { "slang-spirv-tools"}
  
      filter { "system:windows" }
          -- On Windows we need to add the platform-specific sources and then
@@ -1473,9 +1473,7 @@ newoption {
  
      filter { "system:linux or macosx" }
          addSourceDir( "external/glslang/glslang/OSDependent/Unix")
-         links { "dl" }
- 
- 
+         links { "dl", "pthread" }
  
  --
  -- With glslang's build out of the way, we've now covered everything we have
