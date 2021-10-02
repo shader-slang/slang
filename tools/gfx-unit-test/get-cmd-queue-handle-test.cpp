@@ -21,15 +21,17 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(queue->getNativeHandle(&handle));
         if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
         {
-            // Check that the handle is not null, which is defined as 0.
-            SLANG_CHECK(handle != 0);
+            SLANG_CHECK(handle != NULL);
         }
 #if SLANG_WINDOWS_FAMILY
         else
         {
             auto d3d12Queue = (ID3D12CommandQueue*)handle;
-            Slang::ComPtr<IUnknown> testHandle;
-            GFX_CHECK_CALL_ABORT(d3d12Queue->QueryInterface<IUnknown>(testHandle.writeRef()));
+            Slang::ComPtr<IUnknown> testHandle1;
+            GFX_CHECK_CALL_ABORT(d3d12Queue->QueryInterface<IUnknown>(testHandle1.writeRef()));
+            Slang::ComPtr<ID3D12CommandQueue> testHandle2;
+            GFX_CHECK_CALL_ABORT(testHandle1->QueryInterface<ID3D12CommandQueue>(testHandle2.writeRef()));
+            SLANG_CHECK(d3d12Queue == testHandle2.get());
         }
 #endif
     }
