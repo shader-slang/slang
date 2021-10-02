@@ -16,6 +16,13 @@ namespace gfx_test
     void getTextureResourceHandleTestImpl(IDevice* device, UnitTestContext* context)
     {
         ITextureResource::Desc desc = {};
+        desc.type = IResource::Type::Texture2D;
+        desc.numMipLevels = 1;
+        desc.size.width = 1;
+        desc.size.height = 1;
+        desc.size.depth = 1;
+        desc.defaultState = ResourceState::UnorderedAccess;
+        desc.format = Format::RGBA_Float16;
 
         Slang::ComPtr<ITextureResource> buffer;
         buffer = device->createTextureResource(desc);

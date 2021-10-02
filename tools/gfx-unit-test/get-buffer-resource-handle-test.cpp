@@ -15,10 +15,25 @@ namespace gfx_test
 {
     void getBufferResourceHandleTestImpl(IDevice* device, UnitTestContext* context)
     {
+        const int numberCount = 1;
+        float initialData[] = { 0.0f };
         IBufferResource::Desc bufferDesc = {};
+        bufferDesc.sizeInBytes = numberCount * sizeof(float);
+        bufferDesc.format = gfx::Format::Unknown;
+        bufferDesc.elementSize = sizeof(float);
+        bufferDesc.allowedStates = ResourceStateSet(
+            ResourceState::ShaderResource,
+            ResourceState::UnorderedAccess,
+            ResourceState::CopyDestination,
+            ResourceState::CopySource);
+        bufferDesc.defaultState = ResourceState::UnorderedAccess;
+        bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
 
         ComPtr<IBufferResource> buffer;
-        buffer = device->createBufferResource(bufferDesc);
+        GFX_CHECK_CALL_ABORT(device->createBufferResource(
+            bufferDesc,
+            (void*)initialData,
+            buffer.writeRef()));
 
         IBufferResource::NativeHandle handle;
         GFX_CHECK_CALL_ABORT(buffer->getNativeHandle(&handle));

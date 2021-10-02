@@ -71,12 +71,12 @@ namespace gfx_test
         getQueueHandleTestImpl(device, context);
     }
 
-    SLANG_UNIT_TEST(getQueueHandleD3D12)
+    SLANG_UNIT_TEST(getCmdQueueHandleD3D12)
     {
         return getQueueHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(getQueueHandleVulkan)
+    SLANG_UNIT_TEST(getCmdQueueHandleVulkan)
     {
         return getQueueHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
