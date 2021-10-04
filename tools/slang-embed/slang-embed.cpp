@@ -19,6 +19,7 @@
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-io.h"
 
+
 // Utility to free pointers on scope exit
 struct ScopedMemory
 {
@@ -86,6 +87,8 @@ struct App
     bool useNewStringLit = true;
     void processInputFile(FILE* outputFile, Slang::String inputPath)
     {
+        using namespace Slang;
+
         // We open the input file in text mode because we are currently
         // embedding textual source files. If/when this utility gets
         // used for binary files another mode could be called for.
@@ -94,15 +97,22 @@ struct App
         // could lead to a difference in the embedded bytes based on
         // the line ending convention of the host platform)
         //
-        Slang::StreamReader streamReader(inputPath);
-        while (!streamReader.IsEnd())
+
+        String contents;
         {
-            auto line = streamReader.ReadLine();
-            Slang::String trimedLine = line.trimStart();
+            auto res = File::readAllText(inputPath, contents);
+            SLANG_ASSERT(SLANG_SUCCEEDED(res));
+        }
+
+        LineParser lineReader(contents.getUnownedSlice());
+
+        for (auto line : lineReader)
+        {
+            auto trimedLine = line.trimStart();
             if (trimedLine.startsWith("#include"))
             {
                 auto fileName =
-                    Slang::StringUtil::getAtInSplit(trimedLine.getUnownedSlice(), ' ', 1);
+                    Slang::StringUtil::getAtInSplit(trimedLine, ' ', 1);
                 if (fileName[0] == '<')
                     goto normalProcess;
                 fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);

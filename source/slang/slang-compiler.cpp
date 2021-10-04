@@ -2176,16 +2176,9 @@ namespace Slang
             return SLANG_OK;
         }
 
-        FileStream stream(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-        try
-        {
-            stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize());
-        }
-        catch (const IOException&)
-        {
-            // Unable to write
-            return SLANG_FAIL;
-        }
+        FileStream stream;
+        SLANG_RETURN_ON_FAIL(stream.init(fileName, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+        SLANG_RETURN_ON_FAIL(stream.write(m_containerBlob->getBufferPointer(), m_containerBlob->getBufferSize()));
         return SLANG_OK;
     }
 

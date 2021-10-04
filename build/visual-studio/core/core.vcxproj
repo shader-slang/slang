@@ -281,6 +281,7 @@
     <ClInclude Include="..\..\..\source\core\slang-basic.h" />
     <ClInclude Include="..\..\..\source\core\slang-blob.h" />
     <ClInclude Include="..\..\..\source\core\slang-byte-encode-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-char-encode.h" />
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-com-object.h" />
@@ -311,6 +312,7 @@
     <ClInclude Include="..\..\..\source\core\slang-semantic-version.h" />
     <ClInclude Include="..\..\..\source\core\slang-shared-library.h" />
     <ClInclude Include="..\..\..\source\core\slang-short-list.h" />
+    <ClInclude Include="..\..\..\source\core\slang-signal.h" />
     <ClInclude Include="..\..\..\source\core\slang-smart-pointer.h" />
     <ClInclude Include="..\..\..\source\core\slang-std-writers.h" />
     <ClInclude Include="..\..\..\source\core\slang-stream.h" />
@@ -332,6 +334,7 @@
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-blob.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-char-encode.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-file-system.cpp" />
@@ -348,6 +351,7 @@
     <ClCompile Include="..\..\..\source\core\slang-riff.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-semantic-version.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-shared-library.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-signal.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-std-writers.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-stream.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-string-escape-util.cpp" />
