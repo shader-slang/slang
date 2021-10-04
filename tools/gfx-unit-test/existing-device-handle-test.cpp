@@ -100,7 +100,7 @@ namespace gfx_test
     {
         if ((api & context->enabledApis) == 0)
         {
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
         Slang::ComPtr<IDevice> device;
         IDevice::Desc deviceDesc = {};
@@ -116,7 +116,7 @@ namespace gfx_test
             deviceDesc.deviceType = gfx::DeviceType::Vulkan;
             break;
         default:
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
         deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
         const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
@@ -125,7 +125,7 @@ namespace gfx_test
         auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
         if (SLANG_FAILED(createDeviceResult))
         {
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
 
         IDevice::NativeHandle handle = {};
@@ -136,7 +136,7 @@ namespace gfx_test
         auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
         if (SLANG_FAILED(createTestDeviceResult))
         {
-            return SLANG_IGNORE_TEST;
+            SLANG_IGNORE_TEST;
         }
 
         existingDeviceHandleTestImpl(testDevice, context);
