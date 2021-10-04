@@ -304,8 +304,13 @@ public:
         int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format = Format::Unknown;
     };
+
+    // Pointer to the buffer resource.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -401,7 +406,11 @@ public:
         int64_t     strideZ;
     };
 
+    // A pointer to the resource if D3D12.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ITextureResource                                                    \
     {                                                                                  \
