@@ -1007,18 +1007,36 @@ void DebugResourceCommandEncoder::uploadBufferData(
     baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
-void DebugResourceCommandEncoder::textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+void DebugResourceCommandEncoder::textureBarrier(
+    size_t count,
+    ITextureResource* const* textures,
+    ResourceState src,
+    ResourceState dst)
 {
     SLANG_GFX_API_FUNC;
-    auto textureImpl = static_cast<DebugTextureResource*>(texture);
-    baseObject->textureBarrier(textureImpl->baseObject, src, dst);
+
+    List<ITextureResource*> innerTextures;
+    for (size_t i = 0; i < count; i++)
+    {
+        innerTextures.add(static_cast<DebugTextureResource*>(textures[i])->baseObject.get());
+    }
+    baseObject->textureBarrier(count, innerTextures.getBuffer(), src, dst);
 }
 
-void DebugResourceCommandEncoder::bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+void DebugResourceCommandEncoder::bufferBarrier(
+    size_t count,
+    IBufferResource* const* buffers,
+    ResourceState src,
+    ResourceState dst)
 {
     SLANG_GFX_API_FUNC;
-    auto bufferImpl = static_cast<DebugBufferResource*>(buffer);
-    baseObject->bufferBarrier(bufferImpl->baseObject, src, dst);
+
+    List<IBufferResource*> innerBuffers;
+    for(size_t i = 0; i < count; i++)
+    {
+        innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
+    }
+    baseObject->bufferBarrier(count, innerBuffers.getBuffer(), src, dst);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()

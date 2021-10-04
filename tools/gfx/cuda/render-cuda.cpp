@@ -995,12 +995,20 @@ public:
                 m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+                size_t count,
+                ITextureResource* const* textures,
+                ResourceState src,
+                ResourceState dst) override
             {
                 assert(!"Unimplemented");
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+                size_t count,
+                IBufferResource* const* buffers,
+                ResourceState src,
+                ResourceState dst) override
             {
                 assert(!"Unimplemented");
             }
