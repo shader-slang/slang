@@ -219,6 +219,12 @@ public:
         {
             return (DeviceAddress)m_resource.getResource()->GetGPUVirtualAddress();
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_resource.getResource();
+            return SLANG_OK;
+        }
     };
 
     class TextureResourceImpl: public TextureResource
@@ -234,6 +240,12 @@ public:
 
         D3D12Resource m_resource;
         D3D12_RESOURCE_STATES m_defaultState;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_resource.getResource();
+            return SLANG_OK;
+        }
     };
 
     class SamplerStateImpl : public ISamplerState, public ComObject
@@ -3429,6 +3441,14 @@ public:
                     size,
                     data);
             }
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst) override
+            {
+                assert(!"Unimplemented");
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst) override
+            {
+                assert(!"Unimplemented");
+            }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
@@ -3512,6 +3532,13 @@ public:
 #endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_cmdList.get();
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -3600,6 +3627,13 @@ public:
             ResetEvent(globalWaitHandle);
             m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
             WaitForSingleObject(globalWaitHandle, INFINITE);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_d3dQueue.get();
+            return SLANG_OK;
         }
     };
 

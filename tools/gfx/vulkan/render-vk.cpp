@@ -203,6 +203,12 @@ public:
             return (DeviceAddress)m_buffer.m_api->vkGetBufferDeviceAddress(
                 m_buffer.m_api->m_device, &info);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_buffer.m_buffer;
+            return SLANG_OK;
+        }
     };
 
     class TextureResourceImpl : public TextureResource
@@ -229,6 +235,12 @@ public:
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
         bool m_isWeakImageReference = false;
         RefPtr<VKDevice> m_device;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_image;
+            return SLANG_OK;
+        }
     };
 
     class SamplerStateImpl : public ISamplerState, public ComObject
@@ -3944,6 +3956,118 @@ public:
             , public RefObject
         {
         public:
+        static VkImageLayout translateImageLayout(ResourceState state)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+                return VK_IMAGE_LAYOUT_UNDEFINED;
+            case ResourceState::PreInitialized:
+                return VK_IMAGE_LAYOUT_PREINITIALIZED;
+            case ResourceState::UnorderedAccess:
+                return VK_IMAGE_LAYOUT_GENERAL;
+            case ResourceState::RenderTarget:
+                return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            case ResourceState::DepthRead:
+                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            case ResourceState::DepthWrite:
+                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            case ResourceState::ShaderResource:
+                return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            case ResourceState::ResolveDestination:
+            case ResourceState::CopyDestination:
+                return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            case ResourceState::ResolveSource:
+            case ResourceState::CopySource:
+                return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            case ResourceState::Present:
+                return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            default:
+                assert(!"Unsupported");
+                return VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+        }
+
+        static VkAccessFlagBits calcAccessFlags(ResourceState state)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+            case ResourceState::Present:
+            case ResourceState::PreInitialized:
+                return VkAccessFlagBits(0);
+            case ResourceState::VertexBuffer:
+                return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+            case ResourceState::ConstantBuffer:
+                return VK_ACCESS_UNIFORM_READ_BIT;
+            case ResourceState::IndexBuffer:
+                return VK_ACCESS_INDEX_READ_BIT;
+            case ResourceState::RenderTarget:
+                return VkAccessFlagBits(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+            case ResourceState::ShaderResource:
+                return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+            case ResourceState::UnorderedAccess:
+                return VkAccessFlagBits(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+            case ResourceState::DepthRead:
+                return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            case ResourceState::DepthWrite:
+                return VkAccessFlagBits(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+            case ResourceState::IndirectArgument:
+                return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+            case ResourceState::ResolveDestination:
+            case ResourceState::CopyDestination:
+                return VK_ACCESS_TRANSFER_WRITE_BIT;
+            case ResourceState::ResolveSource:
+            case ResourceState::CopySource:
+                return VK_ACCESS_TRANSFER_READ_BIT;
+            case ResourceState::AccelerationStructure:
+                return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+            default:
+                assert(!"Unsupported");
+                return VkAccessFlagBits(0);
+            }
+        }
+
+        static VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+            case ResourceState::PreInitialized:
+                assert(src);
+                return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            case ResourceState::IndexBuffer:
+                return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            case ResourceState::ConstantBuffer:
+            case ResourceState::UnorderedAccess:
+                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+                    VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+                    VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            case ResourceState::ShaderResource:
+                return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            case ResourceState::RenderTarget:
+                return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            case ResourceState::DepthRead:
+            case ResourceState::DepthWrite:
+                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+            case ResourceState::IndirectArgument:
+                return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+            case ResourceState::CopySource:
+            case ResourceState::CopyDestination:
+            case ResourceState::ResolveSource:
+            case ResourceState::ResolveDestination:
+                return VK_PIPELINE_STAGE_TRANSFER_BIT;
+            case ResourceState::Present:
+                return src ? VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            default:
+                assert(!"Unsupported");
+                return VkPipelineStageFlagBits(0);
+            }
+        }
+        public:
             CommandBufferImpl* m_commandBuffer;
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
@@ -3983,6 +4107,48 @@ public:
                     offset,
                     size,
                     data);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+            {
+                auto image = static_cast<TextureResourceImpl*>(texture);
+                auto desc = image->getDesc();
+
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.image = image->m_image;
+                barrier.oldLayout = translateImageLayout(src);
+                barrier.newLayout = translateImageLayout(dst);
+                barrier.subresourceRange.aspectMask;
+                barrier.subresourceRange.baseArrayLayer = 0;
+                barrier.subresourceRange.baseMipLevel = 0;
+                barrier.subresourceRange.layerCount = desc->arraySize;
+                barrier.subresourceRange.levelCount = desc->numMipLevels;
+                barrier.srcAccessMask = calcAccessFlags(src);
+                barrier.dstAccessMask = calcAccessFlags(dst);
+
+               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+            {
+                auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+
+                VkBufferMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                barrier.srcAccessMask = calcAccessFlags(src);
+                barrier.dstAccessMask = calcAccessFlags(dst);
+                barrier.buffer = bufferImpl->m_buffer.m_buffer;
+                barrier.offset = 0;
+                barrier.size = buffer->getDesc()->sizeInBytes;
+
+               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 1, &barrier, 0, nullptr);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -4338,6 +4504,13 @@ public:
             }
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_commandBuffer;
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -4395,6 +4568,13 @@ public:
         {
             auto& vkAPI = m_renderer->m_api;
             vkAPI.vkQueueWaitIdle(m_queue);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_queue;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override

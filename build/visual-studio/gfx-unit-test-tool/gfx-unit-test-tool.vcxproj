@@ -274,6 +274,10 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>

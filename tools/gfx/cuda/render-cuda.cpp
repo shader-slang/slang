@@ -193,6 +193,12 @@ public:
     {
         return (DeviceAddress)m_cudaMemory;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    {
+        *outHandle = getBindlessHandle();
+        return SLANG_OK;
+    }
 };
 
 class TextureCUDAResource : public TextureResource
@@ -234,6 +240,12 @@ public:
     CUmipmappedArray m_cudaMipMappedArray = CUmipmappedArray();
 
     RefPtr<CUDAContext> m_cudaContext;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    {
+        *outHandle = getBindlessHandle();
+        return SLANG_OK;
+    }
 };
 
 class CUDAResourceView : public ResourceViewBase
@@ -983,6 +995,16 @@ public:
                 m_writer->copyBuffer(dst, dstOffset, src, srcOffset, size);
             }
 
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+            {
+                assert(!"Unimplemented");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+            {
+                assert(!"Unimplemented");
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL
                 uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override
             {
@@ -1011,6 +1033,13 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = 0;
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -1067,6 +1096,13 @@ public:
             auto resultCode = cuStreamSynchronize(stream);
             if (resultCode != cudaSuccess)
                 SLANG_CUDA_HANDLE_ERROR(resultCode);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)stream;
+            return SLANG_OK;
         }
 
     public:

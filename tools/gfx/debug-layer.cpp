@@ -692,6 +692,11 @@ DeviceAddress DebugBufferResource::getDeviceAddress()
     return baseObject->getDeviceAddress();
 }
 
+Result DebugBufferResource::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
+
 IResource::Type DebugTextureResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -702,6 +707,11 @@ ITextureResource::Desc* DebugTextureResource::getDesc()
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getDesc();
+}
+
+Result DebugTextureResource::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
 }
 
 DebugCommandBuffer::DebugCommandBuffer()
@@ -812,6 +822,11 @@ void DebugCommandBuffer::close()
     }
     isOpen = false;
     baseObject->close();
+}
+
+Result DebugCommandBuffer::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
 }
 
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
@@ -992,6 +1007,20 @@ void DebugResourceCommandEncoder::uploadBufferData(
     baseObject->uploadBufferData(dstImpl->baseObject, offset, size, data);
 }
 
+void DebugResourceCommandEncoder::textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    auto textureImpl = static_cast<DebugTextureResource*>(texture);
+    baseObject->textureBarrier(textureImpl->baseObject, src, dst);
+}
+
+void DebugResourceCommandEncoder::bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    auto bufferImpl = static_cast<DebugBufferResource*>(buffer);
+    baseObject->bufferBarrier(bufferImpl->baseObject, src, dst);
+}
+
 void DebugRayTracingCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
@@ -1145,6 +1174,11 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
 }
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
+
+Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
+{
+    return baseObject->getNativeHandle(outHandle);
+}
 
 Result DebugTransientResourceHeap::synchronizeAndReset()
 {
