@@ -206,7 +206,7 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = m_buffer.m_buffer;
+            *outHandle = (uint64_t)m_buffer.m_buffer;
             return SLANG_OK;
         }
     };
@@ -238,7 +238,7 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
         {
-            *outHandle = m_image;
+            *outHandle = (uint64_t)m_image;
             return SLANG_OK;
         }
     };
