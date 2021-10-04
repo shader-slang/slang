@@ -269,11 +269,14 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         {
             String fileName("stdlib-doc.md");
 
-            StreamWriter writer(new FileStream(fileName, FileMode::Create));
+            RefPtr<FileStream> stream = new FileStream;
+            SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
+            StreamWriter writer;
+            SLANG_RETURN_ON_FAIL(writer.init(stream));
 
             for (auto& docString : docStrings)
             {
-                writer.Write(docString);
+                SLANG_RETURN_ON_FAIL(writer.write(docString));
             }
         }
     }

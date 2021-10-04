@@ -203,6 +203,12 @@ public:
             return (DeviceAddress)m_buffer.m_api->vkGetBufferDeviceAddress(
                 m_buffer.m_api->m_device, &info);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_buffer.m_buffer;
+            return SLANG_OK;
+        }
     };
 
     class TextureResourceImpl : public TextureResource
@@ -229,6 +235,12 @@ public:
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
         bool m_isWeakImageReference = false;
         RefPtr<VKDevice> m_device;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_image;
+            return SLANG_OK;
+        }
     };
 
     class SamplerStateImpl : public ISamplerState, public ComObject

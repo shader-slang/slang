@@ -9,33 +9,53 @@ namespace Slang
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-FileStream::FileStream(const String& fileName, FileMode fileMode)
+SlangResult Stream::readExactly(void* buffer, size_t length)
+{
+    size_t readBytes;
+    SLANG_RETURN_ON_FAIL(read(buffer, length, readBytes));
+    return (readBytes == length) ? SLANG_OK : SLANG_FAIL;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+FileStream::FileStream() :
+    m_handle(nullptr),
+    m_fileAccess(FileAccess::None),
+    m_endReached(false)
+{
+}
+
+SlangResult FileStream::init(const String& fileName, FileMode fileMode)
 {
     const FileAccess access = (fileMode == FileMode::Open) ? FileAccess::Read : FileAccess::Write;
-    _init(fileName, fileMode, access, FileShare::None);
+    return _init(fileName, fileMode, access, FileShare::None);
 }
 
-FileStream::FileStream(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
+SlangResult FileStream::init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
 {
-    _init(fileName, fileMode, access, share);
+    return _init(fileName, fileMode, access, share);
 }
 
-void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
+SlangResult FileStream::_init(const String& fileName, FileMode fileMode, FileAccess access, FileShare share)
 {
+    // Make sure it's closed to start with
+    close();
+
     if (access == FileAccess::None)
     {
-        throw ArgumentException("FileAccess::None not valid to create a FileStream.");
+        SLANG_ASSERT(!"FileAccess::None not valid to create a FileStream.");
+        return SLANG_E_INVALID_ARG;
     }
-
-    // Default to no access, until stream is fully constructed
-    m_fileAccess = FileAccess::None;
 
     const char* mode = "rt";
     switch (fileMode)
     {
     case FileMode::Create:
         if (access == FileAccess::Read)
-            throw ArgumentException("Read-only access is incompatible with Create mode.");
+        {
+            SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
+            return SLANG_E_INVALID_ARG;
+        }
         else if (access == FileAccess::ReadWrite)
         {
             mode = "w+b";
@@ -62,10 +82,13 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
     case FileMode::CreateNew:
         if (File::exists(fileName))
         {
-            throw IOException("Failed opening '" + fileName + "', file already exists.");
+            return SLANG_E_CANNOT_OPEN;
         }
         if (access == FileAccess::Read)
-            throw ArgumentException("Read-only access is incompatible with Create mode.");
+        {
+            SLANG_ASSERT(!"Read-only access is incompatible with Create mode.");
+            return SLANG_E_INVALID_ARG;
+        }
         else if (access == FileAccess::ReadWrite)
         {
             mode = "w+b";
@@ -77,7 +100,10 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
         break;
     case FileMode::Append:
         if (access == FileAccess::Read)
-            throw ArgumentException("Read-only access is incompatible with Append mode.");
+        {
+            SLANG_ASSERT(!"Read-only access is incompatible with Append mode.");
+            return SLANG_E_INVALID_ARG;
+        }
         else if (access == FileAccess::ReadWrite)
         {
             mode = "a+b";
@@ -122,8 +148,8 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
         shFlag = _SH_DENYNO;
         break;
     default:
-        throw ArgumentException("Invalid file share mode.");
-        break;
+        SLANG_ASSERT(!"Invalid file share mode.");
+        return SLANG_FAIL;
     }
     if (share == FileShare::None)
 #pragma warning(suppress:4996)
@@ -135,11 +161,12 @@ void FileStream::_init(const String& fileName, FileMode fileMode, FileAccess acc
 #endif
     if (!m_handle)
     {
-        throw IOException("Cannot open file '" + fileName + "'");
+        return SLANG_E_CANNOT_OPEN;
     }
 
     // Just set the access specified
     m_fileAccess = access;
+    return SLANG_OK;
 }
 
 FileStream::~FileStream()
@@ -162,7 +189,7 @@ Int64 FileStream::getPosition()
 #endif
 }
 
-void FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
+SlangResult FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
 {
     int fseekOrigin;
     switch (seekOrigin)
@@ -177,8 +204,8 @@ void FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
         fseekOrigin = SEEK_CUR;
         break;
     default:
-        throw NotSupportedException("Unsupported seek origin.");
-        break;
+        SLANG_ASSERT(!"Unsupported seek origin.");
+        return SLANG_FAIL;
     }
 
     // If endReached is intended to be like feof - then doing a seek will reset it
@@ -190,34 +217,37 @@ void FileStream::seek(SeekOrigin seekOrigin, Int64 offset)
     int rs = fseek(m_handle, (long int)offset, fseekOrigin);
 #endif
 
-    if (rs != 0)
-    {
-        throw IOException("FileStream seek failed.");
-    }
+    // If rs != 0 then the the seek failed
+    SLANG_ASSERT(rs == 0);
+
+    return (rs == 0) ? SLANG_OK : SLANG_FAIL;
 }
 
-size_t FileStream::read(void* buffer, size_t length)
+SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
 {
-    auto bytes = fread_s(buffer, length, 1, length, m_handle);
-    if (bytes == 0 && length > 0)
+    auto bytesRead = fread_s(buffer, length, 1, length, m_handle);
+
+    outBytesRead = bytesRead;
+    if (bytesRead == 0 && length > 0)
     {
-        if (!feof(m_handle))
-            throw IOException("FileStream read failed.");
-        else if (m_endReached)
-            throw EndOfStreamException("End of file is reached.");
-        m_endReached = true;
+        // If we have reached the end, then reading nothing is ok.
+        if (!m_endReached)
+        {
+            // If we are not at the end of the file we should be able to read some bytes
+            if (!feof(m_handle))
+            {
+                return SLANG_FAIL;
+            }
+            m_endReached = true;
+        }
     }
-    return bytes;
+    return SLANG_OK;
 }
 
-size_t FileStream::write(const void* buffer, size_t length)
+SlangResult FileStream::write(const void* buffer, size_t length)
 {
-    auto bytes = fwrite(buffer, 1, length, m_handle);
-    if (bytes < length)
-    {
-        throw IOException("FileStream write failed.");
-    }
-    return bytes;
+    auto bytesWritten = fwrite(buffer, 1, length, m_handle);
+    return (bytesWritten == length) ? SLANG_OK : SLANG_FAIL;
 }
 
 bool FileStream::canRead()
@@ -235,7 +265,7 @@ void FileStream::close()
     if (m_handle)
     {
         fclose(m_handle);
-        m_handle = 0;
+        m_handle = nullptr;
 
         // If closed, can neither read or write
         m_fileAccess = FileAccess::None;
@@ -249,7 +279,7 @@ bool FileStream::isEnd()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MemoryStreamBase !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
+SlangResult MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
 {
     Int64 pos = 0;
     switch (origin)
@@ -264,8 +294,8 @@ void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
             pos = Int64(m_position) + offset;
             break;
         default:
-            throw NotSupportedException("Unsupported seek origin.");
-            break;
+            SLANG_ASSERT(!"Unsupported seek origin.");
+            return SLANG_E_NOT_IMPLEMENTED;
     }
 
     m_atEnd = false;
@@ -275,36 +305,43 @@ void MemoryStreamBase::seek(SeekOrigin origin, Int64 offset)
     pos = (pos > Int64(m_contentsSize)) ? Int64(m_contentsSize) : pos;
 
     m_position = ptrdiff_t(pos);
+    return SLANG_OK;
 }
 
-size_t MemoryStreamBase::read(void* buffer, size_t length)
+SlangResult MemoryStreamBase::read(void* buffer, size_t length, size_t& outReadBytes)
 {
+    outReadBytes = 0;
     if (!canRead())
     {
-        throw IOException("Cannot read this stream.");
+        SLANG_ASSERT(!"Cannot read this stream.");
+        return SLANG_FAIL;
     }
 
     const size_t maxRead = size_t(m_contentsSize - m_position);
     if (maxRead == 0 && length > 0)
     {
-        m_atEnd = true;
-        throw EndOfStreamException("End of file is reached.");
+        // At end of stream
+        m_atEnd = true;        
+        return SLANG_OK;
     }
 
     length = length > maxRead ? maxRead : length;
 
     ::memcpy(buffer, m_contents + m_position, length);
     m_position += ptrdiff_t(length);
-    return maxRead;
+    outReadBytes = length;
+
+    return SLANG_OK;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! OwnedMemoryStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-size_t OwnedMemoryStream::write(const void * buffer, size_t length)
+SlangResult OwnedMemoryStream::write(const void * buffer, size_t length)
 {
     if (!canWrite())
     {
-        throw IOException("Cannot write this stream.");
+        SLANG_ASSERT(!"Cannot write this stream.");
+        return SLANG_FAIL;
     }
 
     if (m_position == m_ownedContents.getCount())
@@ -322,7 +359,7 @@ size_t OwnedMemoryStream::write(const void * buffer, size_t length)
     m_atEnd = false;
 
     m_position += ptrdiff_t(length);
-    return length;
+    return SLANG_OK;
 }
 
 } // namespace Slang

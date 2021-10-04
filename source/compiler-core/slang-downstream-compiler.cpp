@@ -391,20 +391,14 @@ SlangResult CommandLineDownstreamCompileResult::getBinary(ComPtr<ISlangBlob>& ou
         return SLANG_OK;
     }
 
+    List<uint8_t> contents;
     // Read the binary
-    try
-    {
         // Read the contents of the binary
-        List<uint8_t> contents = File::readAllBytes(m_moduleFilePath);
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(m_moduleFilePath, contents));
 
-        m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
-        outBlob = m_binaryBlob;
-        return SLANG_OK;
-    }
-    catch (const Slang::IOException&)
-    {
-        return SLANG_FAIL;
-    }
+    m_binaryBlob = new ScopeRefObjectBlob(ListBlob::moveCreate(contents), m_temporaryFiles);
+    outBlob = m_binaryBlob;
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CommandLineDownstreamCompiler !!!!!!!!!!!!!!!!!!!!!!*/
@@ -428,14 +422,11 @@ static bool _isContentsInFile(const DownstreamCompiler::CompileOptions& options)
         // file either from some specialized ISlangFileSystem, so this is probably as good as it gets
         // until we can integrate directly to a C/C++ compiler through say a shared library where we can control
         // file system access.
-        try
+        String readContents;
+
+        if (SLANG_SUCCEEDED(File::readAllText(options.sourceContentsPath, readContents)))
         {
-            String readContents = File::readAllText(options.sourceContentsPath);
-            // We should see if they are the same
             return options.sourceContents == readContents.getUnownedSlice();
-        }
-        catch (const Slang::IOException&)
-        {
         }
     }
     return false;
@@ -484,17 +475,9 @@ SlangResult CommandLineDownstreamCompiler::compile(const CompileOptions& inOptio
             }
 
             // Write it out
-            try
-            {
-                productFileSet->add(compileSourcePath);
-
-                File::writeAllText(compileSourcePath, options.sourceContents);
-            }
-            catch (...)
-            {
-                return SLANG_FAIL;
-            }
-
+            productFileSet->add(compileSourcePath);
+            SLANG_RETURN_ON_FAIL(File::writeAllText(compileSourcePath, options.sourceContents));
+            
             // Add it as a source file
             options.sourceFiles.add(compileSourcePath);
         }
