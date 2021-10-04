@@ -2680,30 +2680,30 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
 
                                 else
                                 {
-                                    auto ptr = (const unsigned char*)blob->getBufferPointer();
+                                    // auto ptr = (const unsigned char*)blob->getBufferPointer();
 
-                                    m_writer->emit("size_t __");
-                                    m_writer->emit(entryPointName);
-                                    m_writer->emit("Size = ");
-                                    m_writer->emitInt64(blob->getBufferSize());
-                                    m_writer->emit(";\n");
+                                    // m_writer->emit("size_t __");
+                                    // m_writer->emit(entryPointName);
+                                    // m_writer->emit("Size = ");
+                                    // m_writer->emitInt64(blob->getBufferSize());
+                                    // m_writer->emit(";\n");
 
-                                    m_writer->emit("unsigned char __");
-                                    m_writer->emit(entryPointName);
-                                    m_writer->emit("[] = {");
+                                    // m_writer->emit("unsigned char __");
+                                    // m_writer->emit(entryPointName);
+                                    // m_writer->emit("[] = {");
                                     // every 20 bytes, emit a newline
-                                    size_t j = 0;
-                                    for (size_t i = 0; i < blob->getBufferSize(); i++) {
-                                        m_writer->emitUInt64(ptr[i]);
-                                        m_writer->emit(", ");
-                                        if (j == 20)
-                                        {
-                                            m_writer->emit("\n");
-                                            j = 0;
-                                        }
-                                        j++;
-                                    }
-                                    m_writer->emit("};\n");
+                                    // size_t j = 0;
+                                    // for (size_t i = 0; i < blob->getBufferSize(); i++) {
+                                    //     m_writer->emitUInt64(ptr[i]);
+                                    //   m_writer->emit(", ");
+                                    //    if (j == 20)
+                                    //    {
+                                    //        m_writer->emit("\n");
+                                    //        j = 0;
+                                    //    }
+                                    //    j++;
+                                    // }
+                                    // m_writer->emit("};\n");
                                 }
                             }
                         }
@@ -2717,7 +2717,9 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                         m_writer->emit(", __");
                         m_writer->emit(entryPointName);
                         m_writer->emit("Size);");*/
-                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device);");
+                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, \"");
+                        m_writer->emit(entryPointName);
+                        m_writer->emit("\");");
                         m_writer->emit("\n\tgfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);");
                         m_writer->emit("\n\tgfx_PipelineState_0* pipelineState = ");
                         m_writer->emit("buildPipelineState_0(device, shaderProgram);");

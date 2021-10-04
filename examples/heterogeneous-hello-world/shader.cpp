@@ -1,4 +1,4 @@
-#include "../../prelude/slang-cpp-prelude.h"
+#include "C:/Code/slang/prelude/slang-cpp-prelude.h"
 
 
 #ifdef SLANG_PRELUDE_NAMESPACE
@@ -28,52 +28,17 @@ Vector<uint32_t, 3> make_VecU3(uint32_t a, uint32_t b, uint32_t c)
     return Vector<uint32_t, 3>{ a, b, c};
 }
 
-size_t __computeMainSize = 668;
-unsigned char __computeMain[] = {68, 88, 66, 67, 87, 111, 81, 164, 2, 29, 72, 42, 151, 28, 13, 217, 55, 37, 7, 95, 1, 
-0, 0, 0, 156, 2, 0, 0, 5, 0, 0, 0, 52, 0, 0, 0, 8, 1, 0, 0, 24, 
-1, 0, 0, 40, 1, 0, 0, 32, 2, 0, 0, 82, 68, 69, 70, 204, 0, 0, 0, 1, 
-0, 0, 0, 88, 0, 0, 0, 1, 0, 0, 0, 28, 0, 0, 0, 0, 4, 83, 67, 0, 
-9, 16, 0, 164, 0, 0, 0, 60, 0, 0, 0, 6, 0, 0, 0, 6, 0, 0, 0, 1, 
-0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 101, 
-110, 116, 114, 121, 80, 111, 105, 110, 116, 80, 97, 114, 97, 109, 115, 95, 105, 111, 66, 117, 
-102, 102, 101, 114, 95, 48, 0, 60, 0, 0, 0, 1, 0, 0, 0, 112, 0, 0, 0, 4, 
-0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 136, 0, 0, 0, 0, 0, 0, 0, 4, 
-0, 0, 0, 2, 0, 0, 0, 148, 0, 0, 0, 0, 0, 0, 0, 36, 69, 108, 101, 109, 
-101, 110, 116, 0, 171, 171, 171, 0, 0, 3, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 
-0, 0, 0, 77, 105, 99, 114, 111, 115, 111, 102, 116, 32, 40, 82, 41, 32, 72, 76, 83, 
-76, 32, 83, 104, 97, 100, 101, 114, 32, 67, 111, 109, 112, 105, 108, 101, 114, 32, 49, 48, 
-46, 49, 0, 73, 83, 71, 78, 8, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 79, 
-83, 71, 78, 8, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 83, 72, 69, 88, 240, 
-0, 0, 0, 64, 0, 5, 0, 60, 0, 0, 0, 106, 8, 0, 1, 158, 0, 0, 4, 0, 
-224, 17, 0, 0, 0, 0, 0, 4, 0, 0, 0, 95, 0, 0, 2, 18, 0, 2, 0, 104, 
-0, 0, 2, 1, 0, 0, 0, 155, 0, 0, 4, 4, 0, 0, 0, 1, 0, 0, 0, 1, 
-0, 0, 0, 167, 0, 0, 8, 18, 0, 16, 0, 0, 0, 0, 0, 10, 0, 2, 0, 1, 
-64, 0, 0, 0, 0, 0, 0, 6, 224, 17, 0, 0, 0, 0, 0, 49, 0, 0, 7, 34, 
-0, 16, 0, 0, 0, 0, 0, 10, 0, 16, 0, 0, 0, 0, 0, 1, 64, 0, 0, 0, 
-0, 0, 63, 0, 0, 0, 7, 66, 0, 16, 0, 0, 0, 0, 0, 10, 0, 16, 0, 0, 
-0, 0, 0, 10, 0, 16, 0, 0, 0, 0, 0, 75, 0, 0, 5, 18, 0, 16, 0, 0, 
-0, 0, 0, 10, 0, 16, 0, 0, 0, 0, 0, 55, 0, 0, 9, 18, 0, 16, 0, 0, 
-0, 0, 0, 26, 0, 16, 0, 0, 0, 0, 0, 42, 0, 16, 0, 0, 0, 0, 0, 10, 
-0, 16, 0, 0, 0, 0, 0, 168, 0, 0, 8, 18, 224, 17, 0, 0, 0, 0, 0, 10, 
-0, 2, 0, 1, 64, 0, 0, 0, 0, 0, 0, 10, 0, 16, 0, 0, 0, 0, 0, 62, 
-0, 0, 1, 83, 84, 65, 84, 116, 0, 0, 0, 7, 0, 0, 0, 1, 0, 0, 0, 0, 
-0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 
-0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-0, 0, 0, 0, 0, 0, 0, };
 void computeMain_wrapper(gfx_Device_0* device, Vector<uint32_t, 3> gridDims, 
 	RWStructuredBuffer<float> buffer)
 {
-	gfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device);
+	gfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, "computeMain");
 	gfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);
 	gfx_PipelineState_0* pipelineState = buildPipelineState_0(device, shaderProgram);
 	gfx_ResourceView_0* bufferView = createBufferView_0(device, unconvertBuffer_0(buffer));
 	dispatchComputation_0(device, transientHeap, pipelineState, bufferView, gridDims.x, gridDims.y, gridDims.z);
 }
 
-#line 8 "../../../examples/heterogeneous-hello-world/shader.slang"
+#line 8 "C:/Code/slang/examples/heterogeneous-hello-world/shader.slang"
 struct EntryPointParams_0
 {
     RWStructuredBuffer<float> ioBuffer_0;

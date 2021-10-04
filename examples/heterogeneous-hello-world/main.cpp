@@ -62,7 +62,7 @@ gfx::IDevice* createDevice()
 
 // Loads the shader code defined in `shader.slang` for use by the `gfx` layer.
 //
-gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device)
+gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -88,9 +88,9 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device)
     if (!module)
         return NULL;
 
-    // Look up entry point (hardcoded for now)
+    // Look up entry point
     //
-    char const *computeEntryPointName = "computeMain";
+    char const *computeEntryPointName = entryPoint.getBuffer();
     ComPtr<slang::IEntryPoint> computeEntryPoint;
     SLANG_RETURN_NULL_ON_FAIL(
         module->findEntryPointByName(computeEntryPointName, computeEntryPoint.writeRef()));
@@ -270,9 +270,9 @@ gfx_BufferResource_0* createStructuredBuffer_0(gfx_Device_0* _0, FixedArray<floa
     return (gfx_BufferResource_0*)createStructuredBuffer((gfx::IDevice*)_0, (float*)&_1);
 }
 
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0)
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0, char* _1)
 {
-    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IDevice*)_0);
+    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IDevice*)_0, _1);
 }
 
 gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1)
