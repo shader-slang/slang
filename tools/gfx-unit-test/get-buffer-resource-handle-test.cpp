@@ -89,10 +89,10 @@ namespace gfx_test
         getBufferResourceHandleTestImpl(device, context);
     }
 
-//     SLANG_UNIT_TEST(getBufferResourceHandleD3D12)
-//     {
-//         return getBufferResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
-//     }
+    SLANG_UNIT_TEST(getBufferResourceHandleD3D12)
+    {
+        return getBufferResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
 // 
 //     SLANG_UNIT_TEST(getBufferResourceHandleVulkan)
 //     {
