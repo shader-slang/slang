@@ -85,10 +85,10 @@ namespace gfx_test
     {
         return getTextureResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
-// 
-//     SLANG_UNIT_TEST(getTextureResourceHandleVulkan)
-//     {
-//         return getTextureResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
-//     }
+
+    SLANG_UNIT_TEST(getTextureResourceHandleVulkan)
+    {
+        return getTextureResourceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
 
 }
