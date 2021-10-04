@@ -825,94 +825,98 @@ namespace Slang
         return _getExecutablePath();
     }
 
-    Slang::String File::readAllText(const Slang::String& fileName)
+    SlangResult File::readAllText(const Slang::String& fileName, String& outText)
     {
-        StreamReader reader(new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-        return reader.ReadToEnd();
+        RefPtr<FileStream> stream(new FileStream);
+        SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+        StreamReader reader;
+        SLANG_RETURN_ON_FAIL(reader.init(stream));
+        SLANG_RETURN_ON_FAIL(reader.readToEnd(outText));
+
+        return SLANG_OK;
     }
 
-    Slang::List<unsigned char> File::readAllBytes(const Slang::String& fileName)
+    SlangResult File::readAllBytes(const Slang::String& path, Slang::List<unsigned char>& out)
     {
-        RefPtr<FileStream> fs = new FileStream(fileName, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
-        List<unsigned char> buffer;
-        while (!fs->isEnd())
+        FileStream stream;
+        SLANG_RETURN_ON_FAIL(stream.init(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+        const Int64 start = stream.getPosition();
+        stream.seek(SeekOrigin::End, 0);
+        const Int64 end = stream.getPosition();
+        stream.seek(SeekOrigin::Start, start);
+
+        const Int64 positionSizeInBytes = end - start;
+
+        if (UInt64(positionSizeInBytes) > UInt64(kMaxIndex))
         {
-            unsigned char ch;
-            int read = (int)fs->read(&ch, 1);
-            if (read)
-                buffer.add(ch);
-            else
-                break;
+            // It's too large to fit in memory.
+            return SLANG_FAIL;
         }
-        return _Move(buffer);
+
+        const Index sizeInBytes = Index(positionSizeInBytes);
+
+        out.setCount(sizeInBytes);
+
+        size_t readSizeInBytes;
+        SLANG_RETURN_ON_FAIL(stream.read(out.getBuffer(), sizeInBytes, readSizeInBytes));
+
+        // If not all read just return an error
+        return (size_t(sizeInBytes) == readSizeInBytes) ? SLANG_OK : SLANG_FAIL;
     }
 
     SlangResult File::readAllBytes(const String& path, ScopedAllocation& out)
     {
-        try
+        FileStream stream;
+        SLANG_RETURN_ON_FAIL(stream.init(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+
+        const Int64 start = stream.getPosition();
+        stream.seek(SeekOrigin::End, 0);
+        const Int64 end = stream.getPosition();
+        stream.seek(SeekOrigin::Start, start);
+
+        const Int64 positionSizeInBytes = end - start;
+
+        if (UInt64(positionSizeInBytes) > UInt64(~size_t(0)))
         {
-            FileStream stream(path, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
-
-            const Int64 start = stream.getPosition();
-            stream.seek(SeekOrigin::End, 0);
-            const Int64 end = stream.getPosition();
-            stream.seek(SeekOrigin::Start, start);
-
-            const Int64 positionSizeInBytes = end - start;
-
-            if (UInt64(positionSizeInBytes) > UInt64(~size_t(0)))
-            {
-                // It's too large to fit in memory.
-                return SLANG_FAIL;
-            }
-
-            const size_t sizeInBytes = size_t(positionSizeInBytes);
-            void* data = out.allocate(sizeInBytes);
-            if (!data)
-            {
-                return SLANG_E_OUT_OF_MEMORY;
-            }
-
-            const size_t readSizeInBytes = stream.read(data, sizeInBytes);
-
-            // If not all read just return an error
-            if (sizeInBytes != readSizeInBytes)
-            {
-                return SLANG_FAIL;
-            }
-        }
-        catch (const IOException&)
-        {
+            // It's too large to fit in memory.
             return SLANG_FAIL;
         }
-        return SLANG_OK;
+
+        const size_t sizeInBytes = size_t(positionSizeInBytes);
+
+        void* data = out.allocate(sizeInBytes);
+        if (!data)
+        {
+            return SLANG_E_OUT_OF_MEMORY;
+        }
+
+        size_t readSizeInBytes;
+        SLANG_RETURN_ON_FAIL(stream.read(data, sizeInBytes, readSizeInBytes));
+
+        // If not all read just return an error
+        return (sizeInBytes == readSizeInBytes) ? SLANG_OK : SLANG_FAIL;
     }
 
     SlangResult File::writeAllBytes(const String& path, const void* data, size_t size)
     {
-        try
-        {
-            FileStream stream(path, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-
-            const size_t writeSizeInBytes = stream.write(data, size);
-
-            // If not all written just return an error
-            if (size != writeSizeInBytes)
-            {
-                return SLANG_FAIL;
-            }
-        }
-        catch (const IOException&)
-        {
-            return SLANG_FAIL;
-        }
+        FileStream stream;
+        SLANG_RETURN_ON_FAIL(stream.init(path, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+        SLANG_RETURN_ON_FAIL(stream.write(data, size));
         return SLANG_OK;
     }
     
-    void File::writeAllText(const Slang::String& fileName, const Slang::String& text)
+    SlangResult File::writeAllText(const Slang::String& fileName, const Slang::String& text)
     {
-        StreamWriter writer(new FileStream(fileName, FileMode::Create));
-        writer.Write(text);
+        RefPtr<FileStream> stream = new FileStream;
+        SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
+
+        StreamWriter writer;
+        SLANG_RETURN_ON_FAIL(writer.init(stream));
+        SLANG_RETURN_ON_FAIL(writer.write(text));
+
+        return SLANG_OK;
     }
 
 

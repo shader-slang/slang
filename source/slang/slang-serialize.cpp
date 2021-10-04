@@ -506,20 +506,13 @@ SlangResult SerialWriter::write(Stream* stream)
             // MAX_ALIGNMENT, and so < MAX_ALIGNMENT is the most extra bytes we can write
             SLANG_ASSERT( alignmentFixSize < SerialInfo::MAX_ALIGNMENT);
             
-            try
+            SLANG_RETURN_ON_FAIL(stream->write(entry, entrySize));
+            // If we needed to fix so that subsequent alignment is right, write out extra bytes here
+            if (alignmentFixSize)
             {
-                stream->write(entry, entrySize);
-                // If we needed to fix so that subsequent alignment is right, write out extra bytes here
-                if (alignmentFixSize)
-                {
-                    stream->write(s_fixBuffer, alignmentFixSize);
-                }
+                SLANG_RETURN_ON_FAIL(stream->write(s_fixBuffer, alignmentFixSize));
             }
-            catch (const IOException&)
-            {
-                return SLANG_FAIL;
-            }
-
+            
             // Onto next
             offset = nextOffset;
             entry = next;

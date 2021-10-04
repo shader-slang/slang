@@ -6,6 +6,13 @@
 
 namespace Slang
 {
+    // NOTE!
+    // Exceptions should not generally be used in core/compiler-core, use the 'signal' mechanism
+    // ideally using the macros in the slang-signal.h such as `SLANG_UNEXPECTED`
+    //
+    // If core/compiler-core libraries are compiled with SLANG_DISABLE_EXCEPTIONS,
+    // these classes will *never* be thrown.
+    
 	class Exception
 	{
 	public:
@@ -21,18 +28,6 @@ namespace Slang
         {}
 	};
 
-	class IndexOutofRangeException : public Exception
-	{
-	public:
-		IndexOutofRangeException()
-		{}
-		IndexOutofRangeException(const String & message)
-			: Exception(message)
-		{
-		}
-
-	};
-
 	class InvalidOperationException : public Exception
 	{
 	public:
@@ -44,73 +39,7 @@ namespace Slang
 		}
 
 	};
-		
-	class ArgumentException : public Exception
-	{
-	public:
-		ArgumentException()
-		{}
-		ArgumentException(const String & message)
-			: Exception(message)
-		{
-		}
-
-	};
-
-	class KeyNotFoundException : public Exception
-	{
-	public:
-		KeyNotFoundException()
-		{}
-		KeyNotFoundException(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-	class KeyExistsException : public Exception
-	{
-	public:
-		KeyExistsException()
-		{}
-		KeyExistsException(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-
-	class NotSupportedException : public Exception
-	{
-	public:
-		NotSupportedException()
-		{}
-		NotSupportedException(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-
-	class NotImplementedException : public Exception
-	{
-	public:
-		NotImplementedException()
-		{}
-		NotImplementedException(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-
-	class InvalidProgramException : public Exception
-	{
-	public:
-		InvalidProgramException()
-		{}
-		InvalidProgramException(const String & message)
-			: Exception(message)
-		{
-		}
-	};
-
+	
 	class InternalError : public Exception
 	{
 	public:

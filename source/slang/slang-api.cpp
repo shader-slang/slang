@@ -64,18 +64,15 @@ SlangResult trySaveStdLibToCache(
         Slang::ComPtr<ISlangBlob> stdLibBlobPtr;
         SLANG_RETURN_ON_FAIL(
             globalSession->saveStdLib(SLANG_ARCHIVE_TYPE_RIFF_LZ4, stdLibBlobPtr.writeRef()));
-        try
-        {
-            Slang::FileStream fileStream(cacheFilename, Slang::FileMode::Create);
-            fileStream.write(&dllTimestamp, sizeof(dllTimestamp));
-            fileStream.write(stdLibBlobPtr->getBufferPointer(), stdLibBlobPtr->getBufferSize());
-            return SLANG_OK;
-        }
-        catch (...)
-        {
-        }
+
+        Slang::FileStream fileStream;
+        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
+
+        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
+        SLANG_RETURN_ON_FAIL(fileStream.write(stdLibBlobPtr->getBufferPointer(), stdLibBlobPtr->getBufferSize()))
     }
-    return SLANG_FAIL;
+
+    return SLANG_OK;
 }
 
 SLANG_API SlangResult slang_createGlobalSession(
