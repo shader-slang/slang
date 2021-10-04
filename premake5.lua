@@ -670,6 +670,13 @@ example "cpu-hello-world"
 
 example "heterogeneous-hello-world"
     kind "ConsoleApp"
+    -- Additionally add slangc for compiling shader.cpp
+    links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
+    -- Generate shader.cpp from shader.slang
+    prebuildcommands {
+        "%{cfg.buildtarget.directory}slangc.exe  %{wks.location}examples/heterogeneous-hello-world/shader.slang -o %{wks.location}examples/heterogeneous-hello-world/shader.cpp -heterogeneous -target cpp -target dxbc"
+    }
+
 
 -- Most of the other projects have more interesting configuration going
 -- on, so let's walk through them in order of increasing complexity.
