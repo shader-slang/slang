@@ -23,6 +23,7 @@ DIAGNOSTIC(-1, Note, seeOpen, "see open $0")
 DIAGNOSTIC(-1, Note, commandLine, "Command line: $0")
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
+DIAGNOSTIC(1, Error, errorAccessingFile, "error accessing file '$0'.")
 
 DIAGNOSTIC(1, Error, extractorFailed, "C++ Extractor failed")
 DIAGNOSTIC(1, Error, internalError, "Unknown internal error in C++ Extractor, aborted!")

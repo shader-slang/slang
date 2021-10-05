@@ -112,7 +112,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
                 if (index >= argCount)
                 {
                     // TODO(tfoley): figure out what a good policy will be for "panic" situations like this
-                    throw InvalidOperationException("too few arguments for diagnostic message");
+                    SLANG_INVALID_OPERATION("too few arguments for diagnostic message");
                 }
                 else
                 {
@@ -123,7 +123,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
             break;
 
         default:
-            throw InvalidOperationException("invalid diagnostic message format");
+            SLANG_INVALID_OPERATION("invalid diagnostic message format");
             break;
         }
 
@@ -512,7 +512,7 @@ void DiagnosticSink::diagnoseImpl(DiagnosticInfo const& info, const UnownedStrin
     if (info.severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        throw AbortCompilationException();
+        SLANG_ABORT_COMPILATION("");
     }
 }
 
@@ -573,7 +573,7 @@ void DiagnosticSink::diagnoseRaw(
     if (severity >= Severity::Fatal)
     {
         // TODO: figure out a better policy for aborting compilation
-        throw InvalidOperationException();
+        SLANG_ABORT_COMPILATION("");
     }
 }
 
