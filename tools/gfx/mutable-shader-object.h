@@ -166,9 +166,9 @@ namespace gfx
                 return SLANG_OK;
             }
 
-            RefPtr<ShaderObjectBase> object =
+            Slang::RefPtr<ShaderObjectBase> object =
                 allocateShaderObject(static_cast<TransientResourceHeapBase*>(transientHeap));
-            SLANG_RETURN_ON_FAIL(object->setData(ShaderOffset(), m_data.getBuffer(), m_data.getCount()));
+            SLANG_RETURN_ON_FAIL(object->setData(ShaderOffset(), this->m_data.getBuffer(), this->m_data.getCount()));
             for (auto res : m_resources)
                 SLANG_RETURN_ON_FAIL(object->setResource(res.Key, res.Value));
             for (auto sampler : m_samplers)
@@ -191,7 +191,7 @@ namespace gfx
                 }
             }
             m_dirty = false;
-            m_data.m_dirty = false;
+            this->m_data.m_dirty = false;
             returnComPtr(outObject, object);
             return SLANG_OK;
         }
