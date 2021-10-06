@@ -3,6 +3,14 @@
 
 #include <slang-com-ptr.h>
 
+#define ENABLE_RENDERDOC_INTEGRATION 0
+
+#if ENABLE_RENDERDOC_INTEGRATION
+#    include "external/renderdoc_app.h"
+#    define WIN32_LEAN_AND_MEAN
+#    include <Windows.h>
+#endif
+
 using Slang::ComPtr;
 
 namespace gfx_test
@@ -72,7 +80,7 @@ namespace gfx_test
 
         // Compare results.
         auto result = reinterpret_cast<const uint8_t*>(resultBlob->getBufferPointer());
-        for (int i = 0; i < expectedBufferSize; i++)
+        for (size_t i = 0; i < expectedBufferSize; i++)
         {
             if (expectedResult[i] != result[i])
             {
@@ -83,4 +91,72 @@ namespace gfx_test
         }
         getTestReporter()->addResult(TestResult::Pass);
     }
+
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    {
+        Slang::ComPtr<gfx::IDevice> device;
+        gfx::IDevice::Desc deviceDesc = {};
+        switch (api)
+        {
+        case Slang::RenderApiFlag::D3D11:
+            deviceDesc.deviceType = gfx::DeviceType::DirectX11;
+            break;
+        case Slang::RenderApiFlag::D3D12:
+            deviceDesc.deviceType = gfx::DeviceType::DirectX12;
+            break;
+        case Slang::RenderApiFlag::Vulkan:
+            deviceDesc.deviceType = gfx::DeviceType::Vulkan;
+            break;
+        case Slang::RenderApiFlag::CPU:
+            deviceDesc.deviceType = gfx::DeviceType::CPU;
+            break;
+        case Slang::RenderApiFlag::CUDA:
+            deviceDesc.deviceType = gfx::DeviceType::CUDA;
+            break;
+        case Slang::RenderApiFlag::OpenGl:
+            deviceDesc.deviceType = gfx::DeviceType::OpenGl;
+            break;
+        default:
+            SLANG_IGNORE_TEST
+        }
+        deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
+        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
+        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
+        deviceDesc.slang.searchPaths = searchPaths;
+        auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
+        if (SLANG_FAILED(createDeviceResult))
+        {
+            SLANG_IGNORE_TEST
+        }
+        return device;
+    }
+
+#if ENABLE_RENDERDOC_INTEGRATION
+    RENDERDOC_API_1_1_2* rdoc_api = NULL;
+    void initializeRenderDoc()
+    {
+        if (HMODULE mod = GetModuleHandleA("renderdoc.dll"))
+        {
+            pRENDERDOC_GetAPI RENDERDOC_GetAPI =
+                (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
+            int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
+            assert(ret == 1);
+        }
+    }
+    void renderDocBeginFrame()
+    {
+        if (!rdoc_api) initializeRenderDoc();
+        if (rdoc_api) rdoc_api->StartFrameCapture(nullptr, nullptr);
+    }
+    void renderDocEndFrame()
+    {
+        if (rdoc_api)
+            rdoc_api->EndFrameCapture(nullptr, nullptr);
+        _fgetchar();
+    }
+#else
+    void initializeRenderDoc() {}
+    void renderDocBeginFrame() {}
+    void renderDocEndFrame() {}
+#endif
 }

@@ -12,32 +12,44 @@ namespace gfx
 
 struct GfxGUID
 {
-    static const Slang::Guid IID_ISlangUnknown;
-    static const Slang::Guid IID_IShaderProgram;
-    static const Slang::Guid IID_ITransientResourceHeap;
-    static const Slang::Guid IID_IPipelineState;
-    static const Slang::Guid IID_IResourceView;
-    static const Slang::Guid IID_IFramebuffer;
-    static const Slang::Guid IID_IFramebufferLayout;
-    static const Slang::Guid IID_ISwapchain;
-    static const Slang::Guid IID_ISamplerState;
-    static const Slang::Guid IID_IResource;
-    static const Slang::Guid IID_IBufferResource;
-    static const Slang::Guid IID_ITextureResource;
-    static const Slang::Guid IID_IInputLayout;
-    static const Slang::Guid IID_IDevice;
-    static const Slang::Guid IID_IShaderObjectLayout;
-    static const Slang::Guid IID_IShaderObject;
-    static const Slang::Guid IID_IRenderPassLayout;
-    static const Slang::Guid IID_ICommandEncoder;
-    static const Slang::Guid IID_IRenderCommandEncoder;
-    static const Slang::Guid IID_IComputeCommandEncoder;
-    static const Slang::Guid IID_IResourceCommandEncoder;
-    static const Slang::Guid IID_IRayTracingCommandEncoder;
-    static const Slang::Guid IID_ICommandBuffer;
-    static const Slang::Guid IID_ICommandQueue;
-    static const Slang::Guid IID_IQueryPool;
-    static const Slang::Guid IID_IAccelerationStructure;
+    template<typename T>
+    static Slang::Guid get()
+    {
+        static_assert(false, "Unimplemented GfxGUID::get()");
+    }
+
+#define GUID_ENTRY(T) \
+    static const Slang::Guid IID_##T;\
+    template<> static Slang::Guid get<T>() \
+    { \
+        return IID_##T; \
+    }
+    GUID_ENTRY(ISlangUnknown)
+    GUID_ENTRY(IShaderProgram)
+    GUID_ENTRY(ITransientResourceHeap)
+    GUID_ENTRY(IPipelineState)
+    GUID_ENTRY(IResourceView)
+    GUID_ENTRY(IFramebuffer)
+    GUID_ENTRY(IFramebufferLayout)
+    GUID_ENTRY(ISwapchain)
+    GUID_ENTRY(ISamplerState)
+    GUID_ENTRY(IResource)
+    GUID_ENTRY(IBufferResource)
+    GUID_ENTRY(ITextureResource)
+    GUID_ENTRY(IInputLayout)
+    GUID_ENTRY(IDevice)
+    GUID_ENTRY(IShaderObject)
+    GUID_ENTRY(IRenderPassLayout)
+    GUID_ENTRY(ICommandEncoder)
+    GUID_ENTRY(IRenderCommandEncoder)
+    GUID_ENTRY(IComputeCommandEncoder)
+    GUID_ENTRY(IResourceCommandEncoder)
+    GUID_ENTRY(IRayTracingCommandEncoder)
+    GUID_ENTRY(ICommandBuffer)
+    GUID_ENTRY(ICommandQueue)
+    GUID_ENTRY(IQueryPool)
+    GUID_ENTRY(IAccelerationStructure)
+#undef GUID_ENTRY
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -261,6 +273,13 @@ public:
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
 };
 
+class SamplerStateBase : public ISamplerState, public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    ISamplerState* getInterface(const Slang::Guid& guid);
+};
+
 class AccelerationStructureBase
     : public IAccelerationStructure
     , public ResourceViewInternalBase
@@ -423,7 +442,11 @@ public:
         slang::BindingType bindingType);
 };
 
-class ShaderObjectBase : public IShaderObject, public Slang::ComObject
+bool _doesValueFitInExistentialPayload(
+    slang::TypeLayoutReflection*    concreteTypeLayout,
+    slang::TypeLayoutReflection*    existentialFieldLayout);
+
+class ShaderObjectSharedBase : public Slang::ComObject
 {
 protected:
     // A strong reference to `IDevice` to make sure the weak device reference in
@@ -436,17 +459,15 @@ protected:
     // The specialized shader object type.
     ExtendedShaderObjectType shaderObjectType = { nullptr, kInvalidComponentID };
 
-    static bool _doesValueFitInExistentialPayload(
-        slang::TypeLayoutReflection*    concreteTypeLayout,
-        slang::TypeLayoutReflection*    existentialFieldLayout);
 
     Result _getSpecializedShaderObjectType(ExtendedShaderObjectType* outType);
-
+    slang::TypeLayoutReflection* _getElementTypeLayout()
+    {
+        return m_layout->getElementTypeLayout();
+    }
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
-    IShaderObject* getInterface(const Slang::Guid& guid);
     void breakStrongReferenceToDevice() { m_device.breakStrongReference(); }
-
+    virtual Result _setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
 public:
     ShaderComponentID getComponentID()
     {
@@ -461,6 +482,26 @@ public:
 
     RendererBase* getRenderer() { return m_layout->getDevice(); }
 
+    ShaderObjectLayoutBase* getLayoutBase() { return m_layout; }
+
+        /// Sets the RTTI ID and RTTI witness table fields of an existential value.
+    Result setExistentialHeader(
+        slang::TypeReflection* existentialType,
+        slang::TypeReflection* concreteType,
+        ShaderOffset offset);
+};
+
+class ShaderObjectBase : public IShaderObject, public ShaderObjectSharedBase
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IShaderObject* getInterface(const Slang::Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::get<IShaderObject>())
+            return static_cast<IShaderObject *>(this);
+        return nullptr;
+    }
+
     SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
     SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
@@ -469,8 +510,6 @@ public:
         *outEntryPoint = nullptr;
         return SLANG_OK;
     }
-
-    ShaderObjectLayoutBase* getLayoutBase() { return m_layout; }
 
     SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getElementTypeLayout() SLANG_OVERRIDE
     {
@@ -482,11 +521,17 @@ public:
         return m_layout->getContainerType();
     }
 
-        /// Sets the RTTI ID and RTTI witness table fields of an existential value.
-    Result setExistentialHeader(
-        slang::TypeReflection* existentialType,
-        slang::TypeReflection* concreteType,
-        ShaderOffset offset);
+    virtual Result _setData(ShaderOffset const& offset, void const* data, size_t size) override
+    {
+        return setData(offset, data, size);
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
+        ITransientResourceHeap* transientHeap, IShaderObject** outObject) override
+    {
+        SLANG_UNUSED(outObject);
+        return SLANG_E_NOT_AVAILABLE;
+    }
 };
 
 template<typename TShaderObjectImpl, typename TShaderObjectLayoutImpl, typename TShaderObjectData>
@@ -707,12 +752,12 @@ public:
             {
                 // If we are setting into a `StructuredBuffer` field, make sure we create and set
                 // the StructuredBuffer resource as well.
-                setResource(
-                    offset,
-                    subObject->m_data.getResourceView(
-                        getRenderer(),
-                        subObject->getElementTypeLayout(),
-                        bindingRange.bindingType));
+                auto resourceView = subObject->m_data.getResourceView(
+                    getRenderer(),
+                    subObject->getElementTypeLayout(),
+                    bindingRange.bindingType);
+                if (resourceView)
+                    setResource(offset, resourceView);
             }
             break;
         }
@@ -1073,11 +1118,31 @@ protected:
     Slang::OrderedDictionary<PipelineKey, Slang::RefPtr<PipelineStateBase>> specializedPipelines;
 };
 
+class TransientResourceHeapBase : public ITransientResourceHeap, public Slang::ComObject
+{
+public:
+    uint64_t m_version;
+    uint64_t getVersion() { return m_version; }
+    uint64_t& getVersionCounter()
+    {
+        static uint64_t version = 1;
+        return version;
+    }
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+        ITransientResourceHeap* getInterface(const Slang::Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
+            return static_cast<ITransientResourceHeap*>(this);
+        return nullptr;
+    }
+};
+
 // Renderer implementation shared by all platforms.
 // Responsible for shader compilation, specialization and caching.
 class RendererBase : public IDevice, public Slang::ComObject
 {
-    friend class ShaderObjectBase;
+    friend class ShaderObjectSharedBase;
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
@@ -1089,6 +1154,11 @@ public:
     IDevice* getInterface(const Slang::Guid& guid);
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType containerType,
+        IShaderObject** outObject) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject(
         slang::TypeReflection* type,
         ShaderObjectContainerType containerType,
         IShaderObject** outObject) SLANG_OVERRIDE;
@@ -1122,7 +1192,7 @@ public:
     // need to maintain its lifespan.
     Result maybeSpecializePipeline(
         PipelineStateBase* currentPipeline,
-        ShaderObjectBase* rootObject,
+        ShaderObjectSharedBase* rootObject,
         Slang::RefPtr<PipelineStateBase>& outNewPipeline);
 
 
@@ -1134,6 +1204,9 @@ public:
         ShaderObjectLayoutBase* layout,
         IShaderObject**         outObject) = 0;
 
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject** outObject) = 0;
 
 protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);

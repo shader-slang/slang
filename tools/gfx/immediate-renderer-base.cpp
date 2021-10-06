@@ -255,7 +255,6 @@ public:
             ResourceState src,
             ResourceState dst) override
         {
-            assert(!"Unimplemented");
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
@@ -264,7 +263,6 @@ public:
             ResourceState src,
             ResourceState dst) override
         {
-            assert(!"Unimplemented");
         }
     };
 

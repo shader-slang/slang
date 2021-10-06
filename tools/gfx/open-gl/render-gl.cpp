@@ -4,6 +4,7 @@
 #include "../nvapi/nvapi-util.h"
 
 #include "../immediate-renderer-base.h"
+#include "../mutable-shader-object.h"
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -140,6 +141,7 @@ public:
         slang::TypeLayoutReflection* typeLayout,
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
+    virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
     virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject) override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
@@ -283,16 +285,8 @@ public:
         GLuint m_handle;
     };
 
-    class SamplerStateImpl : public ISamplerState, public ComObject
+    class SamplerStateImpl : public SamplerStateBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ISamplerState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
-                return static_cast<ISamplerState*>(this);
-            return nullptr;
-        }
     public:
         GLuint m_samplerID;
     };
@@ -1394,15 +1388,12 @@ public:
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
 
+    class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
+    {};
+
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
         typedef ShaderObjectImpl Super;
-
-    public:
-        // Override default reference counting behavior to disable lifetime management via ComPtr.
-        // Root objects are managed by command buffer and does not need to be freed by the user.
-        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-        SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
     public:
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
@@ -2842,6 +2833,17 @@ Result GLDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObjec
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
         static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
+}
+
+Result GLDevice::createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+{
+    auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
+
+    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
+    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    returnComPtr(outObject, result);
+
     return SLANG_OK;
 }
 

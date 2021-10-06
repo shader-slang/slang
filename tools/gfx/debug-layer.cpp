@@ -563,6 +563,26 @@ Result DebugDevice::createShaderObject(
     return result;
 }
 
+Result DebugDevice::createMutableShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto typeName = type->getName();
+    auto result =
+        baseObject->createMutableShaderObject(type, containerType, outObject->baseObject.writeRef());
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
 Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     SLANG_GFX_API_FUNC;
@@ -1393,8 +1413,19 @@ Result DebugShaderObject::setSpecializationArgs(
     const slang::SpecializationArg* args,
     uint32_t count)
 {
-
     return baseObject->setSpecializationArgs(offset, args, count);
+}
+
+Result DebugShaderObject::getCurrentVersion(
+    ITransientResourceHeap* transientHeap, IShaderObject** outObject)
+{
+    ComPtr<IShaderObject> innerObject;
+    SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
+    RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
+    debugShaderObject->baseObject = innerObject;
+    debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
+    returnComPtr(outObject, debugShaderObject);
+    return SLANG_OK;
 }
 
 DebugObjectBase::DebugObjectBase()

@@ -12,6 +12,7 @@
 #include "slang-com-helper.h"
 #include "../command-writer.h"
 #include "../renderer-shared.h"
+#include "../mutable-shader-object.h"
 #include "../simple-transient-resource-heap.h"
 #include "../slang-context.h"
 
@@ -659,6 +660,9 @@ public:
     }
 };
 
+class CUDAMutableShaderObject : public MutableShaderObject< CUDAMutableShaderObject, CUDAShaderObjectLayout>
+{};
+
 class CUDAEntryPointShaderObject : public CUDAShaderObject
 {
 public:
@@ -667,12 +671,6 @@ public:
 
 class CUDARootShaderObject : public CUDAShaderObject
 {
-public:
-    // Override default reference counting behavior to disable lifetime management.
-    // Root objects are managed by command buffer and does not need to be freed by the user.
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-
 public:
     List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -1001,7 +999,6 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                assert(!"Unimplemented");
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
@@ -1010,7 +1007,6 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                assert(!"Unimplemented");
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1811,6 +1807,16 @@ public:
         IShaderObject**         outObject) override
     {
         RefPtr<CUDAShaderObject> result = new CUDAShaderObject();
+        SLANG_RETURN_ON_FAIL(result->init(this, dynamic_cast<CUDAShaderObjectLayout*>(layout)));
+        returnComPtr(outObject, result);
+        return SLANG_OK;
+    }
+
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject** outObject) override
+    {
+        RefPtr<CUDAMutableShaderObject> result = new CUDAMutableShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, dynamic_cast<CUDAShaderObjectLayout*>(layout)));
         returnComPtr(outObject, result);
         return SLANG_OK;

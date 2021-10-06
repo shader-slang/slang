@@ -897,6 +897,11 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
             // See if it's possible the api is available
             if (RenderApiUtil::calcHasApi(apiType))
             {
+                if (context->options.skipApiDetection)
+                {
+                    availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    continue;
+                }
                 // Try starting up the device
                 CommandLine cmdLine;
                 cmdLine.setExecutablePath(Path::combine(context->options.binDir,  String("render-test") + ProcessUtil::getExecutableSuffix()));
@@ -908,7 +913,6 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 StringBuilder builder;
                 builder << "-" << RenderApiUtil::getApiName(apiType);
                 cmdLine.addArg(builder);
-
                 // Run the render-test tool and see if the device could startup
                 ExecuteResult exeRes;
                 if (SLANG_SUCCEEDED(spawnAndWaitSharedLibrary(context, "device-startup", cmdLine, exeRes))

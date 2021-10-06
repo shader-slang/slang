@@ -8,6 +8,7 @@
 #include "../transient-resource-heap-base.h"
 #include "../simple-render-pass-layout.h"
 #include "../d3d/d3d-swapchain.h"
+#include "../mutable-shader-object.h"
 #include "core/slang-blob.h"
 #include "core/slang-basic.h"
 #include "core/slang-chunked-list.h"
@@ -117,6 +118,8 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -248,17 +251,8 @@ public:
         }
     };
 
-    class SamplerStateImpl : public ISamplerState, public ComObject
+    class SamplerStateImpl : public SamplerStateBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-
-        ISamplerState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
-                return static_cast<ISamplerState*>(this);
-            return nullptr;
-        }
     public:
         D3D12Descriptor m_descriptor;
         Slang::RefPtr<D3D12GeneralDescriptorHeap> m_allocator;
@@ -604,10 +598,10 @@ public:
     }
     
     class TransientResourceHeapImpl
-        : public TransientResourceHeapBase<D3D12Device, BufferResourceImpl>
+        : public TransientResourceHeapBaseImpl<D3D12Device, BufferResourceImpl>
     {
     private:
-        typedef TransientResourceHeapBase<D3D12Device, BufferResourceImpl> Super;
+        typedef TransientResourceHeapBaseImpl<D3D12Device, BufferResourceImpl> Super;
     public:
         ComPtr<ID3D12CommandAllocator> m_commandAllocator;
         List<ComPtr<ID3D12GraphicsCommandList>> m_d3dCommandListPool;
@@ -1280,6 +1274,7 @@ public:
         uint32_t getResourceSlotCount() { return m_ownCounts.resource; }
         uint32_t getSamplerSlotCount() { return m_ownCounts.sampler; }
         Index getSubObjectSlotCount() { return m_subObjectCount; }
+        Index getSubObjectCount() { return m_subObjectCount; }
 
         uint32_t getTotalResourceDescriptorCount() { return m_totalCounts.resource; }
         uint32_t getTotalSamplerDescriptorCount() { return m_totalCounts.sampler; }
@@ -2012,9 +2007,9 @@ public:
 
     class ShaderObjectImpl
         : public ShaderObjectBaseImpl<
-              ShaderObjectImpl,
-              ShaderObjectLayoutImpl,
-              SimpleShaderObjectData>
+        ShaderObjectImpl,
+        ShaderObjectLayoutImpl,
+        SimpleShaderObjectData>
     {
     public:
         static Result create(
@@ -2069,6 +2064,8 @@ public:
             }
 
             memcpy(dest + offset, data, size);
+
+            m_isConstantBufferDirty = true;
 
             return SLANG_OK;
         }
@@ -2145,7 +2142,9 @@ public:
 
             m_layout = layout;
 
-            m_upToDateConstantBufferHeapVersion = 0;
+            m_constantBufferTransientHeap = nullptr;
+            m_constantBufferTransientHeapVersion = 0;
+            m_isConstantBufferDirty = true;
 
             // If the layout tells us that there is any uniform data,
             // then we will allocate a CPU memory buffer to hold that data
@@ -2172,7 +2171,7 @@ public:
             // but does *not* include any descriptors that are managed
             // as part of sub-objects.
             //
-            if(auto resourceCount = layout->getResourceSlotCount())
+            if (auto resourceCount = layout->getResourceSlotCount())
             {
                 m_descriptorSet.resourceTable.allocate(viewHeap, resourceCount);
 
@@ -2182,7 +2181,7 @@ public:
                 //
                 m_boundResources.setCount(resourceCount);
             }
-            if(auto samplerCount = layout->getSamplerSlotCount())
+            if (auto samplerCount = layout->getSamplerSlotCount())
             {
                 m_descriptorSet.samplerTable.allocate(samplerHeap, samplerCount);
             }
@@ -2331,24 +2330,27 @@ public:
             return SLANG_OK;
         }
 
+        bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap)
+        {
+            return m_isConstantBufferDirty || m_constantBufferTransientHeap != transientHeap ||
+                m_constantBufferTransientHeapVersion != transientHeap->getVersion();
+        }
+
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
         Result _ensureOrdinaryDataBufferCreatedIfNeeded(
             PipelineCommandEncoder* encoder,
             ShaderObjectLayoutImpl* specializedLayout)
         {
-            // If we have already created a buffer to hold ordinary data, then we should
-            // simply re-use that buffer rather than re-create it.
+            // If data has been changed since last allocation/filling of constant buffer,
+            // we will need to allocate a new one.
             //
-            // TODO: Simply re-using the buffer without any kind of validation checks
-            // means that we are assuming that users cannot or will not perform any `set`
-            // operations on a shader object once an operation has requested this buffer
-            // be created. We need to enforce that rule if we want to rely on it.
-            //
-            if (m_upToDateConstantBufferHeapVersion ==
-                encoder->m_commandBuffer->m_transientHeap->getVersion())
+            if (!shouldAllocateConstantBuffer(encoder->m_transientHeap))
             {
                 return SLANG_OK;
             }
+            m_isConstantBufferDirty = false;
+            m_constantBufferTransientHeap = encoder->m_transientHeap;
+            m_constantBufferTransientHeapVersion = encoder->m_transientHeap->getVersion();
 
             // Computing the size of the ordinary data buffer is *not* just as simple
             // as using the size of the `m_ordinayData` array that we store. The reason
@@ -2360,8 +2362,6 @@ public:
             m_constantBufferSize = specializedLayout->getTotalOrdinaryDataSize();
             if (m_constantBufferSize == 0)
             {
-                m_upToDateConstantBufferHeapVersion =
-                    encoder->m_commandBuffer->m_transientHeap->getVersion();
                 return SLANG_OK;
             }
 
@@ -2384,11 +2384,6 @@ public:
                 m_constantBufferOffset,
                 m_constantBufferSize,
                 specializedLayout));
-
-            // Update version tracker so that we don't redundantly alloc and fill in
-            // constant buffers for the same transient heap.
-            m_upToDateConstantBufferHeapVersion =
-                encoder->m_commandBuffer->m_transientHeap->getVersion();
 
             {
                 // We also create and store a descriptor for our root constant buffer
@@ -2689,12 +2684,12 @@ public:
         size_t m_constantBufferOffset = 0;
         size_t m_constantBufferSize = 0;
 
-        /// The version number of the transient resource heap that contains up-to-date
-        /// constant buffer content for this shader object. If this is equal to the version number
-        /// of currently active transient heap, then the current set-up of constant buffer contents
-        /// as defined by the above `m_constantBuffer*` fields is valid and up-to-date so we can
-        /// use them directly.
-        uint64_t m_upToDateConstantBufferHeapVersion;
+        /// Dirty bit tracking whether the constant buffer needs to be updated.
+        bool m_isConstantBufferDirty = true;
+        /// The transient heap from which the constant buffer is allocated.
+        TransientResourceHeapImpl* m_constantBufferTransientHeap;
+        /// The version of the transient heap when the constant buffer is allocated.
+        uint64_t m_constantBufferTransientHeapVersion;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///
@@ -2733,6 +2728,9 @@ public:
 
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
+
+    class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
+    {};
 
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
@@ -3455,7 +3453,6 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                assert(!"Unimplemented");
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
@@ -5377,6 +5374,19 @@ Result D3D12Device::createShaderObject(
         this, reinterpret_cast<ShaderObjectLayoutImpl*>(layout),
         shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
+}
+
+Result D3D12Device::createMutableShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
+{
+    auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
+
+    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
+    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    returnComPtr(outObject, result);
+
     return SLANG_OK;
 }
 

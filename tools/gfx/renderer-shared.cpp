@@ -1,4 +1,5 @@
 #include "renderer-shared.h"
+#include "mutable-shader-object.h"
 #include "core/slang-io.h"
 #include "core/slang-token-reader.h"
 
@@ -128,6 +129,13 @@ IResourceView* ResourceViewBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+ISamplerState* SamplerStateBase::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
+        return static_cast<ISamplerState*>(this);
+    return nullptr;
+}
+
 IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView ||
@@ -136,14 +144,7 @@ IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Gui
     return nullptr;
 }
 
-IShaderObject* ShaderObjectBase::getInterface(const Guid& guid)
-{
-    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
-        return static_cast<IShaderObject*>(this);
-    return nullptr;
-}
-
-bool ShaderObjectBase::_doesValueFitInExistentialPayload(
+bool _doesValueFitInExistentialPayload(
     slang::TypeLayoutReflection*    concreteTypeLayout,
     slang::TypeLayoutReflection*    existentialTypeLayout)
 {
@@ -298,8 +299,18 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(
     IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, containerType, shaderObjectLayout.writeRef()));
+    return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
 Result RendererBase::getAccelerationStructurePrebuildInfo(
@@ -433,12 +444,12 @@ void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutR
 
 // Get the final type this shader object represents. If the shader object's type has existential fields,
 // this function will return a specialized type using the bound sub-objects' type as specialization argument.
-Result ShaderObjectBase::getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
+Result ShaderObjectSharedBase::getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
 {
     return _getSpecializedShaderObjectType(outType);
 }
 
-Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
+Result ShaderObjectSharedBase::_getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
 {
     if (shaderObjectType.slangType)
         *outType = shaderObjectType;
@@ -452,7 +463,7 @@ Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectTyp
     else
     {
         shaderObjectType.slangType = getRenderer()->slangContext.session->specializeType(
-            getElementTypeLayout()->getType(),
+            _getElementTypeLayout()->getType(),
             specializationArgs.components.getArrayView().getBuffer(), specializationArgs.getCount());
         shaderObjectType.componentID = getRenderer()->shaderCache.getComponentId(shaderObjectType.slangType);
     }
@@ -460,7 +471,7 @@ Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectTyp
     return SLANG_OK;
 }
 
-Result ShaderObjectBase::setExistentialHeader(
+Result ShaderObjectSharedBase::setExistentialHeader(
     slang::TypeReflection* existentialType,
     slang::TypeReflection* concreteType,
     ShaderOffset offset)
@@ -495,7 +506,7 @@ Result ShaderObjectBase::setExistentialHeader(
     // Once we have the conformance ID, then we can write it into the object
     // at the required offset.
     //
-    SLANG_RETURN_ON_FAIL(setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
+    SLANG_RETURN_ON_FAIL(_setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
 
     return SLANG_OK;
 }
@@ -550,7 +561,7 @@ ResourceViewBase* SimpleShaderObjectData::getResourceView(
 
 Result RendererBase::maybeSpecializePipeline(
     PipelineStateBase* currentPipeline,
-    ShaderObjectBase* rootObject,
+    ShaderObjectSharedBase* rootObject,
     RefPtr<PipelineStateBase>& outNewPipeline)
 {
     outNewPipeline = static_cast<PipelineStateBase*>(currentPipeline);

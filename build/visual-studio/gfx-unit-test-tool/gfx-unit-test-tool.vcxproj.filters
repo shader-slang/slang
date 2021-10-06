@@ -41,6 +41,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -50,6 +53,9 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
