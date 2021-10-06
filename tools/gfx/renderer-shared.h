@@ -12,44 +12,32 @@ namespace gfx
 
 struct GfxGUID
 {
-    template<typename T>
-    static Slang::Guid get()
-    {
-        static_assert(false, "Unimplemented GfxGUID::get()");
-    }
-
-#define GUID_ENTRY(T) \
-    static const Slang::Guid IID_##T;\
-    template<> static Slang::Guid get<T>() \
-    { \
-        return IID_##T; \
-    }
-    GUID_ENTRY(ISlangUnknown)
-    GUID_ENTRY(IShaderProgram)
-    GUID_ENTRY(ITransientResourceHeap)
-    GUID_ENTRY(IPipelineState)
-    GUID_ENTRY(IResourceView)
-    GUID_ENTRY(IFramebuffer)
-    GUID_ENTRY(IFramebufferLayout)
-    GUID_ENTRY(ISwapchain)
-    GUID_ENTRY(ISamplerState)
-    GUID_ENTRY(IResource)
-    GUID_ENTRY(IBufferResource)
-    GUID_ENTRY(ITextureResource)
-    GUID_ENTRY(IInputLayout)
-    GUID_ENTRY(IDevice)
-    GUID_ENTRY(IShaderObject)
-    GUID_ENTRY(IRenderPassLayout)
-    GUID_ENTRY(ICommandEncoder)
-    GUID_ENTRY(IRenderCommandEncoder)
-    GUID_ENTRY(IComputeCommandEncoder)
-    GUID_ENTRY(IResourceCommandEncoder)
-    GUID_ENTRY(IRayTracingCommandEncoder)
-    GUID_ENTRY(ICommandBuffer)
-    GUID_ENTRY(ICommandQueue)
-    GUID_ENTRY(IQueryPool)
-    GUID_ENTRY(IAccelerationStructure)
-#undef GUID_ENTRY
+    static const Slang::Guid IID_ISlangUnknown;
+    static const Slang::Guid IID_IShaderProgram;
+    static const Slang::Guid IID_ITransientResourceHeap;
+    static const Slang::Guid IID_IPipelineState;
+    static const Slang::Guid IID_IResourceView;
+    static const Slang::Guid IID_IFramebuffer;
+    static const Slang::Guid IID_IFramebufferLayout;
+    static const Slang::Guid IID_ISwapchain;
+    static const Slang::Guid IID_ISamplerState;
+    static const Slang::Guid IID_IResource;
+    static const Slang::Guid IID_IBufferResource;
+    static const Slang::Guid IID_ITextureResource;
+    static const Slang::Guid IID_IInputLayout;
+    static const Slang::Guid IID_IDevice;
+    static const Slang::Guid IID_IShaderObjectLayout;
+    static const Slang::Guid IID_IShaderObject;
+    static const Slang::Guid IID_IRenderPassLayout;
+    static const Slang::Guid IID_ICommandEncoder;
+    static const Slang::Guid IID_IRenderCommandEncoder;
+    static const Slang::Guid IID_IComputeCommandEncoder;
+    static const Slang::Guid IID_IResourceCommandEncoder;
+    static const Slang::Guid IID_IRayTracingCommandEncoder;
+    static const Slang::Guid IID_ICommandBuffer;
+    static const Slang::Guid IID_ICommandQueue;
+    static const Slang::Guid IID_IQueryPool;
+    static const Slang::Guid IID_IAccelerationStructure;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -497,7 +485,7 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IShaderObject* getInterface(const Slang::Guid& guid)
     {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::get<IShaderObject>())
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
             return static_cast<IShaderObject *>(this);
         return nullptr;
     }
