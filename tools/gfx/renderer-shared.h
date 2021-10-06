@@ -434,8 +434,16 @@ bool _doesValueFitInExistentialPayload(
     slang::TypeLayoutReflection*    concreteTypeLayout,
     slang::TypeLayoutReflection*    existentialFieldLayout);
 
-class ShaderObjectSharedBase : public Slang::ComObject
+class ShaderObjectBase : public IShaderObject, public Slang::ComObject
 {
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IShaderObject* getInterface(const Slang::Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
+            return static_cast<IShaderObject *>(this);
+        return nullptr;
+    }
 protected:
     // A strong reference to `IDevice` to make sure the weak device reference in
     // `ShaderObjectLayout`s are valid whenever they might be used.
@@ -455,7 +463,6 @@ protected:
     }
 public:
     void breakStrongReferenceToDevice() { m_device.breakStrongReference(); }
-    virtual Result _setData(ShaderOffset const& offset, void const* data, size_t size) = 0;
 public:
     ShaderComponentID getComponentID()
     {
@@ -472,24 +479,13 @@ public:
 
     ShaderObjectLayoutBase* getLayoutBase() { return m_layout; }
 
-        /// Sets the RTTI ID and RTTI witness table fields of an existential value.
+    /// Sets the RTTI ID and RTTI witness table fields of an existential value.
     Result setExistentialHeader(
         slang::TypeReflection* existentialType,
         slang::TypeReflection* concreteType,
         ShaderOffset offset);
-};
 
-class ShaderObjectBase : public IShaderObject, public ShaderObjectSharedBase
-{
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
-    IShaderObject* getInterface(const Slang::Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
-            return static_cast<IShaderObject *>(this);
-        return nullptr;
-    }
-
     SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE { return 0; }
 
     SLANG_NO_THROW Result SLANG_MCALL getEntryPoint(UInt index, IShaderObject** outEntryPoint)
@@ -507,11 +503,6 @@ public:
     virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() SLANG_OVERRIDE
     {
         return m_layout->getContainerType();
-    }
-
-    virtual Result _setData(ShaderOffset const& offset, void const* data, size_t size) override
-    {
-        return setData(offset, data, size);
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
@@ -1130,7 +1121,7 @@ public:
 // Responsible for shader compilation, specialization and caching.
 class RendererBase : public IDevice, public Slang::ComObject
 {
-    friend class ShaderObjectSharedBase;
+    friend class ShaderObjectBase;
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
 
@@ -1180,7 +1171,7 @@ public:
     // need to maintain its lifespan.
     Result maybeSpecializePipeline(
         PipelineStateBase* currentPipeline,
-        ShaderObjectSharedBase* rootObject,
+        ShaderObjectBase* rootObject,
         Slang::RefPtr<PipelineStateBase>& outNewPipeline);
 
 

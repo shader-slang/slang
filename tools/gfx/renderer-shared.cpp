@@ -444,12 +444,12 @@ void ShaderObjectLayoutBase::initBase(RendererBase* renderer, slang::TypeLayoutR
 
 // Get the final type this shader object represents. If the shader object's type has existential fields,
 // this function will return a specialized type using the bound sub-objects' type as specialization argument.
-Result ShaderObjectSharedBase::getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
+Result ShaderObjectBase::getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
 {
     return _getSpecializedShaderObjectType(outType);
 }
 
-Result ShaderObjectSharedBase::_getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
+Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectType* outType)
 {
     if (shaderObjectType.slangType)
         *outType = shaderObjectType;
@@ -471,7 +471,7 @@ Result ShaderObjectSharedBase::_getSpecializedShaderObjectType(ExtendedShaderObj
     return SLANG_OK;
 }
 
-Result ShaderObjectSharedBase::setExistentialHeader(
+Result ShaderObjectBase::setExistentialHeader(
     slang::TypeReflection* existentialType,
     slang::TypeReflection* concreteType,
     ShaderOffset offset)
@@ -506,7 +506,7 @@ Result ShaderObjectSharedBase::setExistentialHeader(
     // Once we have the conformance ID, then we can write it into the object
     // at the required offset.
     //
-    SLANG_RETURN_ON_FAIL(_setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
+    SLANG_RETURN_ON_FAIL(setData(witnessTableOffset, &conformanceID, sizeof(conformanceID)));
 
     return SLANG_OK;
 }
@@ -561,7 +561,7 @@ ResourceViewBase* SimpleShaderObjectData::getResourceView(
 
 Result RendererBase::maybeSpecializePipeline(
     PipelineStateBase* currentPipeline,
-    ShaderObjectSharedBase* rootObject,
+    ShaderObjectBase* rootObject,
     RefPtr<PipelineStateBase>& outNewPipeline)
 {
     outNewPipeline = static_cast<PipelineStateBase*>(currentPipeline);
