@@ -3,8 +3,7 @@
 #include "slang-gfx.h"
 #include "source/core/slang-basic.h"
 #include "source/core/slang-render-api-util.h"
-
-struct UnitTestContext;
+#include "tools/unit-test/slang-unit-test.h"
 
 namespace gfx_test
 {
