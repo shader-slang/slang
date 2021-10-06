@@ -91,7 +91,8 @@ namespace gfx
         bool isDirty()
         {
             if (m_dirty) return true;
-            for (auto& object : m_objects)
+            if (this->m_data.m_dirty) return true;
+            for (auto& object : this->m_objects)
             {
                 if (object && object->isDirty())
                     return true;
@@ -106,21 +107,21 @@ namespace gfx
     public:
         Result init(RendererBase* device, ShaderObjectLayoutBase* layout)
         {
-            m_device = device;
+            this->m_device = device;
             auto layoutImpl = static_cast<TShaderObjectLayoutImpl*>(layout);
-            m_layout = layoutImpl;
-            Index subObjectCount = layoutImpl->getSubObjectCount();
-            m_objects.setCount(subObjectCount);
+            this->m_layout = layoutImpl;
+            Slang::Index subObjectCount = layoutImpl->getSubObjectCount();
+            this->m_objects.setCount(subObjectCount);
             return SLANG_OK;
         }
     public:
         virtual SLANG_NO_THROW Result SLANG_MCALL setData(ShaderOffset const& offset, void const* data, size_t size) override
         {
             if (!size) return SLANG_OK;
-            if (SlangInt(offset.uniformOffset + size) > m_data.getCount())
-                m_data.setCount(offset.uniformOffset + size);
-            memcpy(m_data.getBuffer() + offset.uniformOffset, data, size);
-            m_data.markDirty();
+            if (SlangInt(offset.uniformOffset + size) > this->m_data.getCount())
+                this->m_data.setCount(offset.uniformOffset + size);
+            memcpy(this->m_data.getBuffer() + offset.uniformOffset, data, size);
+            this->m_data.markDirty();
             markDirty();
             return SLANG_OK;
         }
@@ -176,12 +177,12 @@ namespace gfx
             {
                 if (offset.bindingRangeIndex < 0)
                     return SLANG_E_INVALID_ARG;
-                auto layout = getLayout();
+                auto layout = this->getLayout();
                 if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
                     return SLANG_E_INVALID_ARG;
                 auto bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
-                auto subObject = m_objects[bindingRange.subObjectIndex + offset.bindingArrayIndex];
+                auto subObject = this->m_objects[bindingRange.subObjectIndex + offset.bindingArrayIndex];
                 if (subObject)
                 {
                     ComPtr<IShaderObject> subObjectVersion;
@@ -201,7 +202,7 @@ namespace gfx
             if (!version.object)
             {
                 ComPtr<IShaderObject> shaderObject;
-                SLANG_RETURN_NULL_ON_FAIL(m_device->createShaderObject(m_layout, shaderObject.writeRef()));
+                SLANG_RETURN_NULL_ON_FAIL(this->m_device->createShaderObject(this->m_layout, shaderObject.writeRef()));
                 version.object = static_cast<ShaderObjectBase*>(shaderObject.get());
             }
             return version.object;
