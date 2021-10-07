@@ -70,13 +70,13 @@ namespace gfx {
         case Format::R_Unorm_UInt8:         return VK_FORMAT_R8_UNORM;
         case Format::BGRA_Unorm_UInt8:      return VK_FORMAT_B8G8R8A8_UNORM;
 
-        case Format::RGBA_Snorm_UInt16:     return VK_FORMAT_R16G16B16A16_SNORM;
-        case Format::RG_Snorm_UInt16:       return VK_FORMAT_R16G16_SNORM;
-        case Format::R_Snorm_UInt16:        return VK_FORMAT_R16_SNORM;
+        case Format::RGBA_Snorm_Int16:     return VK_FORMAT_R16G16B16A16_SNORM;
+        case Format::RG_Snorm_Int16:       return VK_FORMAT_R16G16_SNORM;
+        case Format::R_Snorm_Int16:        return VK_FORMAT_R16_SNORM;
 
-        case Format::RGBA_Snorm_UInt8:      return VK_FORMAT_R8G8B8A8_SNORM;
-        case Format::RG_Snorm_UInt8:        return VK_FORMAT_R8G8_SNORM;
-        case Format::R_Snorm_UInt8:         return VK_FORMAT_R8_SNORM;
+        case Format::RGBA_Snorm_Int8:      return VK_FORMAT_R8G8B8A8_SNORM;
+        case Format::RG_Snorm_Int8:        return VK_FORMAT_R8G8_SNORM;
+        case Format::R_Snorm_Int8:         return VK_FORMAT_R8_SNORM;
 
         case Format::D_Float32:             return VK_FORMAT_D32_SFLOAT;
         case Format::D_Unorm24_S8:          return VK_FORMAT_D24_UNORM_S8_UINT;
@@ -86,8 +86,8 @@ namespace gfx {
         case Format::B5G6R5_Unorm:          return VK_FORMAT_B5G6R5_UNORM_PACK16;
         case Format::B5G5R5A1_Unorm:        return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
 
-        case Format::BC1_Unorm:             return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-        case Format::BC1_Unorm_Srgb:        return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+        case Format::BC1_Unorm:             return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+        case Format::BC1_Unorm_Srgb:        return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
         case Format::BC2_Unorm:             return VK_FORMAT_BC2_UNORM_BLOCK;
         case Format::BC2_Unorm_Srgb:        return VK_FORMAT_BC2_SRGB_BLOCK;
         case Format::BC3_Unorm:             return VK_FORMAT_BC3_UNORM_BLOCK;

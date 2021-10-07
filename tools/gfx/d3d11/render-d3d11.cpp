@@ -2951,7 +2951,8 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             }
             else
             {
-                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / gfxGetFormatSize(desc.format));
+                FormatPixelSize sizeInfo = gfxGetFormatSize(desc.format);
+                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
             }
 
             ComPtr<ID3D11UnorderedAccessView> uav;
@@ -2998,7 +2999,8 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             }
             else
             {
-                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / gfxGetFormatSize(desc.format));
+                FormatPixelSize sizeInfo = gfxGetFormatSize(desc.format);
+                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
             }
 
             ComPtr<ID3D11ShaderResourceView> srv;

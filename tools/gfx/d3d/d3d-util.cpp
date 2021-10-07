@@ -167,13 +167,13 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R_Unorm_UInt8:         return DXGI_FORMAT_R8_UNORM;
         case Format::BGRA_Unorm_UInt8:      return DXGI_FORMAT_B8G8R8A8_UNORM;
 
-        case Format::RGBA_Snorm_UInt16:     return DXGI_FORMAT_R16G16B16A16_SNORM;
-        case Format::RG_Snorm_UInt16:       return DXGI_FORMAT_R16G16_SNORM;
-        case Format::R_Snorm_UInt16:        return DXGI_FORMAT_R16_SNORM;
+        case Format::RGBA_Snorm_Int16:     return DXGI_FORMAT_R16G16B16A16_SNORM;
+        case Format::RG_Snorm_Int16:       return DXGI_FORMAT_R16G16_SNORM;
+        case Format::R_Snorm_Int16:        return DXGI_FORMAT_R16_SNORM;
 
-        case Format::RGBA_Snorm_UInt8:      return DXGI_FORMAT_R8G8B8A8_SNORM;
-        case Format::RG_Snorm_UInt8:        return DXGI_FORMAT_R8G8_SNORM;
-        case Format::R_Snorm_UInt8:         return DXGI_FORMAT_R8_SNORM;
+        case Format::RGBA_Snorm_Int8:      return DXGI_FORMAT_R8G8B8A8_SNORM;
+        case Format::RG_Snorm_Int8:        return DXGI_FORMAT_R8G8_SNORM;
+        case Format::R_Snorm_Int8:         return DXGI_FORMAT_R8_SNORM;
 
         case Format::D_Float32:             return DXGI_FORMAT_D32_FLOAT;
         case Format::D_Unorm24_S8:          return DXGI_FORMAT_D24_UNORM_S8_UINT;

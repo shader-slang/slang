@@ -209,14 +209,14 @@ void validateAccelerationStructureBuildInputs(
                 case Format::RG_Float32:
                 case Format::RGBA_Float16:
                 case Format::RG_Float16:
-                case Format::RGBA_Snorm_UInt16:
-                case Format::RG_Snorm_UInt16:
+                case Format::RGBA_Snorm_Int16:
+                case Format::RG_Snorm_Int16:
                     break;
                 default:
                     GFX_DIAGNOSE_ERROR(
                         "Unsupported IAccelerationStructure::TriangleDesc::vertexFormat. Valid "
                         "values are RGB_Float32, RG_Float32, RGBA_Float16, RG_Float16, "
-                        "RGBA_Snorm_UInt16 or RG_Snorm_UInt16.");
+                        "RGBA_Snorm_Int16 or RG_Snorm_Int16.");
                 }
                 if (buildInputs.geometryDescs[i].content.triangles.indexCount)
                 {

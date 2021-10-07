@@ -234,7 +234,7 @@ public:
         //
         auto format = desc.format;
         auto texelSize = gfxGetFormatSize(format);
-        m_texelSize = (int32_t) texelSize;
+        m_texelSize = texelSize;
 
         int32_t formatBlockSize[kMaxRank] = { 1, 1, 1 };
 
@@ -353,7 +353,7 @@ public:
     CPUTextureBaseShapeInfo const* m_baseShape;
     CPUTextureFormatInfo const* m_formatInfo;
     int32_t m_effectiveArrayElementCount = 0;
-    int32_t m_texelSize = 0;
+    FormatPixelSize m_texelSize = {};
 
     struct MipLevel
     {

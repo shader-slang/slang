@@ -19,9 +19,9 @@ static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-#define GFX_FORMAT_SIZE(name, size) uint8_t(size),
+#define GFX_FORMAT_SIZE(name, blockSizeInBytes, pixelsPerBlock) FormatPixelSize(blockSizeInBytes, pixelsPerBlock),
 
-static const uint8_t s_formatSize[] =
+static const FormatPixelSize s_formatSize[] =
 {
     GFX_FORMAT(GFX_FORMAT_SIZE)
 };
@@ -32,7 +32,7 @@ static bool _checkFormat()
     Index count = 0;
 
     // Check the values are in the same order
-#define GFX_FORMAT_CHECK(name, size) count += Index(Index(Format::name) == value++);
+#define GFX_FORMAT_CHECK(name, blockSizeInBytes, pixelsPerblock) count += Index(Index(Format::name) == value++);
     GFX_FORMAT(GFX_FORMAT_CHECK)
 
     const bool r = (count == Index(Format::CountOf));
@@ -54,19 +54,95 @@ struct FormatInfoMap
             info.channelType = SLANG_SCALAR_TYPE_NONE;
         }
 
-        set(Format::RGBA_Float16, SLANG_SCALAR_TYPE_FLOAT16, 4);
-        set(Format::RG_Float16, SLANG_SCALAR_TYPE_FLOAT16, 2);
-        set(Format::R_Float16, SLANG_SCALAR_TYPE_FLOAT16, 1);
+        set(Format::RGBA_Typeless32, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::RGB_Typeless32, SLANG_SCALAR_TYPE_UINT32, 3);
+        set(Format::RG_Typeless32, SLANG_SCALAR_TYPE_UINT32, 2);
+        set(Format::R_Typeless32, SLANG_SCALAR_TYPE_UINT32, 1);
+
+        set(Format::RGBA_Typeless16, SLANG_SCALAR_TYPE_UINT16, 4);
+        set(Format::RG_Typeless16, SLANG_SCALAR_TYPE_UINT16, 2);
+        set(Format::R_Typeless16, SLANG_SCALAR_TYPE_UINT16, 1);
+
+        set(Format::RGBA_Typeless8, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::RG_Typeless8, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::R_Typeless8, SLANG_SCALAR_TYPE_UINT8, 1);
+        set(Format::BGRA_Typeless8, SLANG_SCALAR_TYPE_UINT8, 4);
 
         set(Format::RGBA_Float32, SLANG_SCALAR_TYPE_FLOAT32, 4);
         set(Format::RGB_Float32, SLANG_SCALAR_TYPE_FLOAT32, 3);
         set(Format::RG_Float32, SLANG_SCALAR_TYPE_FLOAT32, 2);
         set(Format::R_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
 
-        set(Format::R_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
+        set(Format::RGBA_Float16, SLANG_SCALAR_TYPE_FLOAT16, 4);
+        set(Format::RG_Float16, SLANG_SCALAR_TYPE_FLOAT16, 2);
+        set(Format::R_Float16, SLANG_SCALAR_TYPE_FLOAT16, 1);
+
+        set(Format::RGBA_UInt32, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::RGB_UInt32, SLANG_SCALAR_TYPE_UINT32, 3);
+        set(Format::RG_UInt32, SLANG_SCALAR_TYPE_UINT32, 2);
         set(Format::R_UInt32, SLANG_SCALAR_TYPE_UINT32, 1);
 
+        set(Format::RGBA_UInt16, SLANG_SCALAR_TYPE_UINT16, 4);
+        set(Format::RG_UInt16, SLANG_SCALAR_TYPE_UINT16, 2);
+        set(Format::R_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
+
+        set(Format::RGBA_UInt8, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::RG_UInt8, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::R_UInt8, SLANG_SCALAR_TYPE_UINT8, 1);
+
+        set(Format::RGBA_SInt32, SLANG_SCALAR_TYPE_INT32, 4);
+        set(Format::RGB_SInt32, SLANG_SCALAR_TYPE_INT32, 3);
+        set(Format::RG_SInt32, SLANG_SCALAR_TYPE_INT32, 2);
+        set(Format::R_SInt32, SLANG_SCALAR_TYPE_INT32, 1);
+
+        set(Format::RGBA_SInt16, SLANG_SCALAR_TYPE_INT16, 4);
+        set(Format::RG_SInt16, SLANG_SCALAR_TYPE_INT16, 2);
+        set(Format::R_SInt16, SLANG_SCALAR_TYPE_INT16, 1);
+
+        set(Format::RGBA_SInt8, SLANG_SCALAR_TYPE_INT8, 4);
+        set(Format::RG_SInt8, SLANG_SCALAR_TYPE_INT8, 2);
+        set(Format::R_SInt8, SLANG_SCALAR_TYPE_INT8, 1);
+
+        set(Format::RGBA_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 4);
+        set(Format::RG_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 2);
+        set(Format::R_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
+
+        set(Format::RGBA_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::RGBA_Unorm_UInt8_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::RG_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::R_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 1);
+        set(Format::BGRA_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 4);
+
+        set(Format::RGBA_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 4);
+        set(Format::RG_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 2);
+        set(Format::R_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 1);
+
+        set(Format::RGBA_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 4);
+        set(Format::RG_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 2);
+        set(Format::R_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 1);
+
         set(Format::D_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::D_Unorm24_S8, SLANG_SCALAR_TYPE_UINT32, 2);
+        set(Format::D_Unorm16, SLANG_SCALAR_TYPE_UINT16, 1);
+
+        set(Format::BGRA_Unorm4, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::B5G6R5_Unorm, SLANG_SCALAR_TYPE_UINT8, 3);
+        set(Format::B5G5R5A1_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+
+        set(Format::BC1_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC1_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC2_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC2_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC3_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC3_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC4_Unorm, SLANG_SCALAR_TYPE_UINT8, 1);
+        set(Format::BC4_Snorm, SLANG_SCALAR_TYPE_INT8, 1);
+        set(Format::BC5_Unorm, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::BC5_Snorm, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::BC6_Unsigned, SLANG_SCALAR_TYPE_FLOAT16, 3);
+        set(Format::BC6_Signed, SLANG_SCALAR_TYPE_FLOAT16, 3);
+        set(Format::BC7_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BC7_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
     }
 
     void set(Format format, SlangScalarType type, Index channelCount)
@@ -90,7 +166,7 @@ static void _compileTimeAsserts()
 
 extern "C"
 {
-    size_t SLANG_MCALL gfxGetFormatSize(Format format)
+    FormatPixelSize SLANG_MCALL gfxGetFormatSize(Format format)
     {
         return s_formatSize[int(format)];
     }

@@ -126,97 +126,97 @@ public:
 
 // Dont' change without keeping in sync with Format
 #define GFX_FORMAT(x) \
-    x( Unknown, 0) \
+    x( Unknown, 0, 0) \
     \
-    x(RGBA_Typeless32, 16) \
-    x(RGB_Typeless32, 12) \
-    x(RG_Typeless32, 8) \
-    x(R_Typeless32, 4) \
+    x(RGBA_Typeless32, 16, 1) \
+    x(RGB_Typeless32, 12, 1) \
+    x(RG_Typeless32, 8, 1) \
+    x(R_Typeless32, 4, 1) \
     \
-    x(RGBA_Typeless16, 8) \
-    x(RG_Typeless16, 4) \
-    x(R_Typeless16, 2) \
+    x(RGBA_Typeless16, 8, 1) \
+    x(RG_Typeless16, 4, 1) \
+    x(R_Typeless16, 2, 1) \
     \
-    x(RGBA_Typeless8, 4) \
-    x(RG_Typeless8, 2) \
-    x(R_Typeless8, 1) \
-    x(BGRA_Typeless8, 4) \
+    x(RGBA_Typeless8, 4, 1) \
+    x(RG_Typeless8, 2, 1) \
+    x(R_Typeless8, 1, 1) \
+    x(BGRA_Typeless8, 4, 1) \
     \
-    x(RGBA_Float32, sizeof(float) * 4) \
-    x(RGB_Float32, sizeof(float) * 3) \
-    x(RG_Float32, sizeof(float) * 2) \
-    x(R_Float32, sizeof(float)) \
+    x(RGBA_Float32, sizeof(float) * 4, 1) \
+    x(RGB_Float32, sizeof(float) * 3, 1) \
+    x(RG_Float32, sizeof(float) * 2, 1) \
+    x(R_Float32, sizeof(float), 1) \
     \
-    x(RGBA_Float16, sizeof(float) * 4) \
-    x(RG_Float16, sizeof(float) * 2) \
-    x(R_Float16, sizeof(float)) \
+    x(RGBA_Float16, sizeof(float) * 4, 1) \
+    x(RG_Float16, sizeof(float) * 2, 1) \
+    x(R_Float16, sizeof(float), 1) \
     \
-    x(RGBA_UInt32, sizeof(uint32_t) * 4) \
-    x(RGB_UInt32, sizeof(uint32_t) * 3) \
-    x(RG_UInt32, sizeof(uint32_t) * 2) \
-    x(R_UInt32, sizeof(uint32_t)) \
+    x(RGBA_UInt32, sizeof(uint32_t) * 4, 1) \
+    x(RGB_UInt32, sizeof(uint32_t) * 3, 1) \
+    x(RG_UInt32, sizeof(uint32_t) * 2, 1) \
+    x(R_UInt32, sizeof(uint32_t), 1) \
     \
-    x(RGBA_UInt16, sizeof(uint32_t) * 2) \
-    x(RG_UInt16, sizeof(uint32_t)) \
-    x(R_UInt16, sizeof(uint16_t)) \
+    x(RGBA_UInt16, sizeof(uint32_t) * 2, 1) \
+    x(RG_UInt16, sizeof(uint32_t), 1) \
+    x(R_UInt16, sizeof(uint16_t), 1) \
     \
-    x(RGBA_UInt8, sizeof(uint32_t)) \
-    x(RG_UInt8, sizeof(uint16_t)) \
-    x(R_UInt8, sizeof(uint8_t)) \
+    x(RGBA_UInt8, sizeof(uint32_t), 1) \
+    x(RG_UInt8, sizeof(uint16_t), 1) \
+    x(R_UInt8, sizeof(uint8_t), 1) \
     \
-    x(RGBA_SInt32, sizeof(int32_t) * 4) \
-    x(RGB_SInt32, sizeof(int32_t) * 3) \
-    x(RG_SInt32, sizeof(int32_t) * 2) \
-    x(R_SInt32, sizeof(int32_t) * 1) \
+    x(RGBA_SInt32, sizeof(int32_t) * 4, 1) \
+    x(RGB_SInt32, sizeof(int32_t) * 3, 1) \
+    x(RG_SInt32, sizeof(int32_t) * 2, 1) \
+    x(R_SInt32, sizeof(int32_t) * 1, 1) \
     \
-    x(RGBA_SInt16, sizeof(int32_t) * 2) \
-    x(RG_SInt16, sizeof(int32_t)) \
-    x(R_SInt16, sizeof(int16_t)) \
+    x(RGBA_SInt16, sizeof(int32_t) * 2, 1) \
+    x(RG_SInt16, sizeof(int32_t), 1) \
+    x(R_SInt16, sizeof(int16_t), 1) \
     \
-    x(RGBA_SInt8, sizeof(int32_t)) \
-    x(RG_SInt8, sizeof(int16_t)) \
-    x(R_SInt8, sizeof(int8_t)) \
+    x(RGBA_SInt8, sizeof(int32_t), 1) \
+    x(RG_SInt8, sizeof(int16_t), 1) \
+    x(R_SInt8, sizeof(int8_t), 1) \
     \
-    x(RGBA_Unorm_UInt16, sizeof(uint32_t) * 2) \
-    x(RG_Unorm_UInt16, sizeof(uint32_t)) \
-    x(R_Unorm_UInt16, sizeof(uint16_t)) \
+    x(RGBA_Unorm_UInt16, sizeof(uint32_t) * 2, 1) \
+    x(RG_Unorm_UInt16, sizeof(uint32_t), 1) \
+    x(R_Unorm_UInt16, sizeof(uint16_t), 1) \
     \
-    x(RGBA_Unorm_UInt8, sizeof(uint32_t)) \
-    x(RGBA_Unorm_UInt8_Srgb, sizeof(uint32_t)) \
-    x(RG_Unorm_UInt8, sizeof(uint16_t)) \
-    x(R_Unorm_UInt8, sizeof(uint8_t)) \
-    x(BGRA_Unorm_UInt8, sizeof(uint32_t)) \
+    x(RGBA_Unorm_UInt8, sizeof(uint32_t), 1) \
+    x(RGBA_Unorm_UInt8_Srgb, sizeof(uint32_t), 1) \
+    x(RG_Unorm_UInt8, sizeof(uint16_t), 1) \
+    x(R_Unorm_UInt8, sizeof(uint8_t), 1) \
+    x(BGRA_Unorm_UInt8, sizeof(uint32_t), 1) \
     \
-    x(RGBA_Snorm_UInt16, sizeof(uint32_t) * 2) \
-    x(RG_Snorm_UInt16, sizeof(uint32_t)) \
-    x(R_Snorm_UInt16, sizeof(uint16_t)) \
+    x(RGBA_Snorm_Int16, sizeof(int32_t) * 2, 1) \
+    x(RG_Snorm_Int16, sizeof(int32_t), 1) \
+    x(R_Snorm_Int16, sizeof(int16_t), 1) \
     \
-    x(RGBA_Snorm_UInt8, sizeof(uint32_t)) \
-    x(RG_Snorm_UInt8, sizeof(uint16_t)) \
-    x(R_Snorm_UInt8, sizeof(uint8_t)) \
+    x(RGBA_Snorm_Int8, sizeof(int32_t), 1) \
+    x(RG_Snorm_Int8, sizeof(int16_t), 1) \
+    x(R_Snorm_Int8, sizeof(int8_t), 1) \
     \
-    x(D_Float32, sizeof(float)) \
-    x(D_Unorm24_S8, sizeof(uint32_t))
-    x(D_Unorm16, sizeof(uint16_t)) \
+    x(D_Float32, sizeof(float), 1) \
+    x(D_Unorm24_S8, sizeof(uint32_t), 1) \
+    x(D_Unorm16, sizeof(uint16_t), 1) \
     \
-    x(BGRA_Unorm4, sizeof(uint16_t)) \
-    x(B5G6R5_Unorm, sizeof(uint16_t)) \
-    x(B5G5R5A1_Unorm, sizeof(uint16_t)) \
+    x(BGRA_Unorm4, sizeof(uint16_t), 1) \
+    x(B5G6R5_Unorm, sizeof(uint16_t), 1) \
+    x(B5G5R5A1_Unorm, sizeof(uint16_t), 1) \
     \
-    x(BC1_Unorm, ) \
-    x(BC1_Unorm_Srgb, ) \
-    x(BC2_Unorm, ) \
-    x(BC2_Unorm_Srgb, ) \
-    x(BC3_Unorm, ) \
-    x(BC3_Unorm_Srgb, ) \
-    x(BC4_Unorm, ) \
-    x(BC4_Snorm, ) \
-    x(BC5_Unorm, ) \
-    x(BC5_Snorm, ) \
-    x(BC6_Unsigned, ) \
-    x(BC6_Signed, ) \
-    x(BC7_Unorm, ) \
-    x(BC7_Unorm_Srgb, )
+    x(BC1_Unorm, 8, 16) \
+    x(BC1_Unorm_Srgb, 8, 16) \
+    x(BC2_Unorm, 16, 16) \
+    x(BC2_Unorm_Srgb, 16, 16) \
+    x(BC3_Unorm, 16, 16) \
+    x(BC3_Unorm_Srgb, 16, 16) \
+    x(BC4_Unorm, 8, 16) \
+    x(BC4_Snorm, 8, 16) \
+    x(BC5_Unorm, 16, 16) \
+    x(BC5_Snorm, 16, 16) \
+    x(BC6_Unsigned, 16, 16) \
+    x(BC6_Signed, 16, 16) \
+    x(BC7_Unorm, 16, 16) \
+    x(BC7_Unorm_Srgb, 16, 16)
 
 /// Different formats of things like pixels or elements of vertices
 /// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
@@ -284,13 +284,13 @@ enum class Format
     R_Unorm_UInt8,
     BGRA_Unorm_UInt8,
 
-    RGBA_Snorm_UInt16,
-    RG_Snorm_UInt16,
-    R_Snorm_UInt16,
+    RGBA_Snorm_Int16,
+    RG_Snorm_Int16,
+    R_Snorm_Int16,
 
-    RGBA_Snorm_UInt8,
-    RG_Snorm_UInt8,
-    R_Snorm_UInt8,
+    RGBA_Snorm_Int8,
+    RG_Snorm_Int8,
+    R_Snorm_Int8,
 
     D_Float32,
     D_Unorm24_S8,
@@ -1881,7 +1881,7 @@ public:
 extern "C"
 {
     /// Gets the size in bytes of a Format type. Returns 0 if a size is not defined/invalid
-    SLANG_GFX_API size_t SLANG_MCALL gfxGetFormatSize(Format format);
+    SLANG_GFX_API FormatPixelSize SLANG_MCALL gfxGetFormatSize(Format format);
 
     /// Gets information about the format 
     SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format);

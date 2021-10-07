@@ -40,6 +40,15 @@ struct GfxGUID
     static const Slang::Guid IID_IAccelerationStructure;
 };
 
+struct FormatPixelSize
+{
+    uint32_t blockSizeInBytes = 0;
+    uint32_t pixelsPerBlock = 0;
+
+    FormatPixelSize() = default;
+    FormatPixelSize(uint32_t blockSize, uint32_t pixelCount) : blockSizeInBytes(blockSize), pixelsPerBlock(pixelCount) {}
+};
+
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
 // It is a common scenario where objects created from an `IDevice` implementation needs to hold
 // a strong reference to the device object that creates them. For example, a `Buffer` or a
