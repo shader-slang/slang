@@ -4108,47 +4108,70 @@ public:
                     size,
                     data);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+                size_t count,
+                ITextureResource* const* textures,
+                ResourceState src,
+                ResourceState dst)
             {
-                auto image = static_cast<TextureResourceImpl*>(texture);
-                auto desc = image->getDesc();
+                List<VkImageMemoryBarrier> barriers;
+                barriers.setCount(count);
 
-                VkImageMemoryBarrier barrier = {};
-                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-                barrier.image = image->m_image;
-                barrier.oldLayout = translateImageLayout(src);
-                barrier.newLayout = translateImageLayout(dst);
-                barrier.subresourceRange.aspectMask;
-                barrier.subresourceRange.baseArrayLayer = 0;
-                barrier.subresourceRange.baseMipLevel = 0;
-                barrier.subresourceRange.layerCount = desc->arraySize;
-                barrier.subresourceRange.levelCount = desc->numMipLevels;
-                barrier.srcAccessMask = calcAccessFlags(src);
-                barrier.dstAccessMask = calcAccessFlags(dst);
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto image = static_cast<TextureResourceImpl*>(textures[i]);
+                    auto desc = image->getDesc();
 
-               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
-               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+                    VkImageMemoryBarrier barrier = {};
+                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.image = image->m_image;
+                    barrier.oldLayout = translateImageLayout(src);
+                    barrier.newLayout = translateImageLayout(dst);
+                    barrier.subresourceRange.aspectMask;
+                    barrier.subresourceRange.baseArrayLayer = 0;
+                    barrier.subresourceRange.baseMipLevel = 0;
+                    barrier.subresourceRange.layerCount = desc->arraySize;
+                    barrier.subresourceRange.levelCount = desc->numMipLevels;
+                    barrier.srcAccessMask = calcAccessFlags(src);
+                    barrier.dstAccessMask = calcAccessFlags(dst);
+                    barriers.add(barrier);
+                }
+
+                VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+                VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, count, barriers.getBuffer());
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+                size_t count,
+                IBufferResource* const* buffers,
+                ResourceState src,
+                ResourceState dst)
             {
-                auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+                List<VkBufferMemoryBarrier> barriers;
+                barriers.setCount(count);
 
-                VkBufferMemoryBarrier barrier = {};
-                barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-                barrier.srcAccessMask = calcAccessFlags(src);
-                barrier.dstAccessMask = calcAccessFlags(dst);
-                barrier.buffer = bufferImpl->m_buffer.m_buffer;
-                barrier.offset = 0;
-                barrier.size = buffer->getDesc()->sizeInBytes;
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
 
-               VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
-               VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+                    VkBufferMemoryBarrier barrier = {};
+                    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                    barrier.srcAccessMask = calcAccessFlags(src);
+                    barrier.dstAccessMask = calcAccessFlags(dst);
+                    barrier.buffer = bufferImpl->m_buffer.m_buffer;
+                    barrier.offset = 0;
+                    barrier.size = bufferImpl->getDesc()->sizeInBytes;
+
+                    barriers.add(barrier);
+                }
+
+                VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+                VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, count, barriers.getBuffer(), 0, nullptr);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
