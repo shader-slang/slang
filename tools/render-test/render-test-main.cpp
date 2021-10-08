@@ -675,6 +675,7 @@ void RenderTestApp::_initializeAccelerationStructure()
     vertexBufferDesc.type = IResource::Type::Buffer;
     vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
     vertexBufferDesc.defaultState = ResourceState::ShaderResource;
+    vertexBufferDesc.isForAccelerationStructure = true;
     ComPtr<IBufferResource> vertexBuffer =
         m_device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
 
@@ -684,6 +685,7 @@ void RenderTestApp::_initializeAccelerationStructure()
     transformBufferDesc.defaultState = ResourceState::ShaderResource;
     float transformData[12] = {
         1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+    transformBufferDesc.isForAccelerationStructure = true;
     ComPtr<IBufferResource> transformBuffer =
         m_device->createBufferResource(transformBufferDesc, &transformData);
 
@@ -716,11 +718,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         asDraftBufferDesc.type = IResource::Type::Buffer;
         asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
         asDraftBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        //asDraftBufferDesc.isForAccelerationStructure = true;
         ComPtr<IBufferResource> draftBuffer = m_device->createBufferResource(asDraftBufferDesc);
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
         scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        //scratchBufferDesc.isForAccelerationStructure = true;
         ComPtr<IBufferResource> scratchBuffer = m_device->createBufferResource(scratchBufferDesc);
 
         // Build acceleration structure.
@@ -797,6 +801,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         instanceBufferDesc.sizeInBytes =
             instanceDescs.getCount() * sizeof(IAccelerationStructure::InstanceDesc);
         instanceBufferDesc.defaultState = ResourceState::ShaderResource;
+        instanceBufferDesc.isForAccelerationStructure = true;
         ComPtr<IBufferResource> instanceBuffer =
             m_device->createBufferResource(instanceBufferDesc, instanceDescs.getBuffer());
 

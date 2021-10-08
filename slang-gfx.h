@@ -303,6 +303,7 @@ public:
         size_t sizeInBytes = 0;     ///< Total size in bytes
         int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format = Format::Unknown;
+        bool isForAccelerationStructure = false;
     };
 
     // Pointer to the buffer resource.

@@ -6659,6 +6659,11 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
 
+    if (descIn.isForAccelerationStructure)
+    {
+        usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
+
     if (initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
