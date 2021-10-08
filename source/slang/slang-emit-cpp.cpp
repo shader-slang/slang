@@ -2642,6 +2642,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
             if (auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>())
             {
                 String entryPointName  = entryPointDecoration->getName()->getStringSlice();
+                String moduleName = entryPointDecoration->getModuleName()->getStringSlice();
                 for (int index = 0; index < program->getEntryPointCount(); index++)
                 {
                     auto entryPoint = program->getEntryPoint(index);
@@ -2719,6 +2720,8 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                         m_writer->emit("Size);");*/
                         m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, \"");
                         m_writer->emit(entryPointName);
+                        m_writer->emit("\", \"");
+                        m_writer->emit(moduleName);
                         m_writer->emit("\");");
                         m_writer->emit("\n\tgfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);");
                         m_writer->emit("\n\tgfx_PipelineState_0* pipelineState = ");

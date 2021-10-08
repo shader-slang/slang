@@ -29,7 +29,7 @@ namespace gfx {
 // Forward declarations of cpp functions
 //
 Ptr<gfx::Device> createDevice();
-Ptr<gfx::ShaderProgram> loadShaderProgram(Ptr<gfx::Device> device, String entryPoint);
+Ptr<gfx::ShaderProgram> loadShaderProgram(Ptr<gfx::Device> device, String entryPoint, String module);
 Ptr<gfx::BufferResource> createStructuredBuffer(
     Ptr<gfx::Device> device,
     float[4] initialData);

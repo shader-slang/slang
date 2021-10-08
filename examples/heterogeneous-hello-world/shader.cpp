@@ -1,4 +1,4 @@
-#include "C:/Code/slang/prelude/slang-cpp-prelude.h"
+#include "../../prelude/slang-cpp-prelude.h"
 
 
 #ifdef SLANG_PRELUDE_NAMESPACE
@@ -31,7 +31,7 @@ Vector<uint32_t, 3> make_VecU3(uint32_t a, uint32_t b, uint32_t c)
 void computeMain_wrapper(gfx_Device_0* device, Vector<uint32_t, 3> gridDims, 
 	RWStructuredBuffer<float> buffer)
 {
-	gfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, "computeMain");
+	gfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, "computeMain", "shader");
 	gfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);
 	gfx_PipelineState_0* pipelineState = buildPipelineState_0(device, shaderProgram);
 	gfx_ResourceView_0* bufferView = createBufferView_0(device, unconvertBuffer_0(buffer));

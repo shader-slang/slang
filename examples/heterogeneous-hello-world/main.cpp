@@ -62,7 +62,7 @@ gfx::IDevice* createDevice()
 
 // Loads the shader code defined in `shader.slang` for use by the `gfx` layer.
 //
-gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint)
+gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint, String moduleName)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -83,7 +83,7 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint)
     // already been loaded previously, that would be used directly.
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule *module = slangSession->loadModule("shader", diagnosticsBlob.writeRef());
+    slang::IModule *module = slangSession->loadModule(moduleName.getBuffer(), diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if (!module)
         return NULL;
@@ -270,9 +270,9 @@ gfx_BufferResource_0* createStructuredBuffer_0(gfx_Device_0* _0, FixedArray<floa
     return (gfx_BufferResource_0*)createStructuredBuffer((gfx::IDevice*)_0, (float*)&_1);
 }
 
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0, char* _1)
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0, char* _1, char* _2)
 {
-    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IDevice*)_0, _1);
+    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IDevice*)_0, _1, _2);
 }
 
 gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1)

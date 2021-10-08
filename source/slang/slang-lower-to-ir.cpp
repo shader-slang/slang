@@ -7806,7 +7806,8 @@ LoweredValInfo emitDeclRef(
 
 static void lowerFrontEndEntryPointToIR(
     IRGenContext*   context,
-    EntryPoint*     entryPoint)
+    EntryPoint*     entryPoint,
+    String moduleName)
 {
     // TODO: We should emit an entry point as a dedicated IR function
     // (distinct from the IR function used if it were called normally),
@@ -7837,7 +7838,7 @@ static void lowerFrontEndEntryPointToIR(
 
     {
         Name* entryPointName = entryPoint->getFuncDecl()->getName();
-        builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile(), entryPointName->text.getUnownedSlice());
+        builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile(), entryPointName->text.getUnownedSlice(), moduleName.getUnownedSlice());
     }
 
     // Go through the entry point parameters creating decorations from layout as appropriate
@@ -8000,7 +8001,11 @@ IRModule* generateIRForTranslationUnit(
     // in case they require special handling.
     for (auto entryPoint : translationUnit->getEntryPoints())
     {
-        lowerFrontEndEntryPointToIR(context, entryPoint);
+        List<SourceFile*> sources = translationUnit->getSourceFiles();
+        SourceFile* source = sources.getFirst();
+        PathInfo pInfo = source->getPathInfo();
+        String path = pInfo.getMostUniqueIdentity();
+        lowerFrontEndEntryPointToIR(context, entryPoint, path.subString(path.lastIndexOf('\\') + 1, path.lastIndexOf('.') - path.lastIndexOf('\\') - 1));
     }
 
     //
