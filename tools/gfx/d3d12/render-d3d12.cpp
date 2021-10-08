@@ -5084,7 +5084,8 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             }
             else
             {
-                FormatPixelSize sizeInfo = gfxGetFormatSize(desc.format);
+                FormatInfo sizeInfo;
+                gfxGetFormatInfo(desc.format, &sizeInfo);
                 uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
             }
 
@@ -5119,7 +5120,8 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             }
             else
             {
-                FormatPixelSize sizeInfo = gfxGetFormatSize(desc.format);
+                FormatInfo sizeInfo;
+                gfxGetFormatInfo(desc.format, &sizeInfo);
                 srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
             }
 

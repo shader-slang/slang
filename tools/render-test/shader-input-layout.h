@@ -111,7 +111,9 @@ struct TextureData
     {
         clearSlices();
 
-        m_formatSize = uint8_t(gfxGetFormatSize(format));
+        FormatInfo formatSizeInfo;
+        gfxGetFormatInfo(format, &formatSizeInfo);
+        m_formatSize = uint8_t(formatSizeInfo.blockSizeInBytes / formatSizeInfo.pixelsPerBlock);
         m_format = format;
     }
 

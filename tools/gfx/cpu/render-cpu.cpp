@@ -233,7 +233,9 @@ public:
         // the block extents would be 1 along each axis.
         //
         auto format = desc.format;
-        auto texelSize = gfxGetFormatSize(format);
+        FormatInfo texelInfo;
+        gfxGetFormatInfo(format, &texelInfo);
+        uint32_t texelSize = uint32_t(texelInfo.blockSizeInBytes / texelInfo.pixelsPerBlock);
         m_texelSize = texelSize;
 
         int32_t formatBlockSize[kMaxRank] = { 1, 1, 1 };
@@ -353,7 +355,7 @@ public:
     CPUTextureBaseShapeInfo const* m_baseShape;
     CPUTextureFormatInfo const* m_formatInfo;
     int32_t m_effectiveArrayElementCount = 0;
-    FormatPixelSize m_texelSize = {};
+    uint32_t m_texelSize = 0;
 
     struct MipLevel
     {

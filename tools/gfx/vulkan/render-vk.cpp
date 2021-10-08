@@ -6368,7 +6368,8 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
 
 size_t calcRowSize(Format format, int width)
 {
-    FormatPixelSize sizeInfo = gfxGetFormatSize(format);
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
     size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     if (pixelSize == 0)
     {
@@ -7005,7 +7006,8 @@ Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numEle
 
         dstDesc.offset = uint32_t(srcDesc.offset);
 
-        FormatPixelSize sizeInfo = gfxGetFormatSize(srcDesc.format);
+        FormatInfo sizeInfo;
+        gfxGetFormatInfo(srcDesc.format, &sizeInfo);
         const size_t elementSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
         assert(elementSize > 0);
         const size_t endElement = srcDesc.offset + elementSize;

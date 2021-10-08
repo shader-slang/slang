@@ -19,7 +19,7 @@ namespace renderer_test
 
     Format _getFormatFromName(const UnownedStringSlice& slice)
     {
-#define SLANG_FORMAT_CASE(name, size) if (slice == #name) return Format::name; else 
+#define SLANG_FORMAT_CASE(name, blockSizeInBytes, pixelsPerBlock) if (slice == #name) return Format::name; else 
 
         GFX_FORMAT(SLANG_FORMAT_CASE)
         return Format::Unknown;
@@ -1091,8 +1091,8 @@ namespace renderer_test
 
     void generateTextureData(TextureData& output, const InputTextureDesc& desc)
     {
-        const gfx::FormatInfo formatInfo = gfxGetFormatInfo(desc.format);
-
+        gfx::FormatInfo formatInfo;
+        gfxGetFormatInfo(desc.format, &formatInfo);
 
         switch (desc.format)
         {

@@ -19,9 +19,9 @@ static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-#define GFX_FORMAT_SIZE(name, blockSizeInBytes, pixelsPerBlock) FormatPixelSize(blockSizeInBytes, pixelsPerBlock),
+#define GFX_FORMAT_SIZE(name, blockSizeInBytes, pixelsPerBlock) {blockSizeInBytes, pixelsPerBlock},
 
-static const FormatPixelSize s_formatSize[] =
+static const uint32_t s_formatSizeInfo[][2] =
 {
     GFX_FORMAT(GFX_FORMAT_SIZE)
 };
@@ -150,6 +150,10 @@ struct FormatInfoMap
         FormatInfo& info = m_infos[Index(format)];
         info.channelCount = uint8_t(channelCount);
         info.channelType = uint8_t(type);
+
+        auto sizeInfo = s_formatSizeInfo[Index(format)];
+        info.blockSizeInBytes = sizeInfo[0];
+        info.pixelsPerBlock = sizeInfo[1];
     }
 
     const FormatInfo& get(Format format) const { return m_infos[Index(format)]; }
@@ -161,19 +165,15 @@ static const FormatInfoMap s_formatInfoMap;
 
 static void _compileTimeAsserts()
 {
-    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSizeInfo) == int(Format::CountOf));
 }
 
 extern "C"
 {
-    FormatPixelSize SLANG_MCALL gfxGetFormatSize(Format format)
+    SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo)
     {
-        return s_formatSize[int(format)];
-    }
-
-    SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format)
-    {
-        return s_formatInfoMap.get(format);
+        *outInfo = s_formatInfoMap.get(format);
+        return SLANG_OK;
     }
 
     SlangResult _createDevice(const IDevice::Desc* desc, IDevice** outDevice)
