@@ -17,6 +17,8 @@
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-render-api-util.h"
 
+#include "tools/unit-test/slang-unit-test.h"
+#undef SLANG_UNIT_TEST
 
 #include "directory-util.h"
 #include "test-context.h"
@@ -38,6 +40,7 @@
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
+
 
 using namespace Slang;
 
@@ -433,14 +436,8 @@ static SlangResult _gatherTestsForFile(
     outTestList->tests.clear();
 
     String fileContents;
-    try
-    {
-        fileContents = Slang::File::readAllText(filePath);
-    }
-    catch (const Slang::IOException&)
-    {
-        return SLANG_FAIL;
-    }
+
+    SLANG_RETURN_ON_FAIL(Slang::File::readAllText(filePath, fileContents));
 
     // Walk through the lines of the file, looking for test commands
     char const* cursor = fileContents.begin();
@@ -1165,13 +1162,9 @@ TestResult runDocTest(TestContext* context, TestInput& input)
 
     String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
+
+    // TODO(JS): Might want to check the result code..
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
 
     // If no expected output file was found, then we
     // expect everything to be empty
@@ -1255,14 +1248,9 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
     String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
-
+    
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
+    
     // If no expected output file was found, then we
     // expect everything to be empty
     if (expectedOutput.getLength() == 0)
@@ -1295,15 +1283,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
 
 SlangResult _readText(const UnownedStringSlice& path, String& out)
 {
-    try
-    {
-        out = Slang::File::readAllText(path);
-    }
-    catch (const Slang::IOException&)
-    {
-        return SLANG_FAIL;
-    }
-    return SLANG_OK;
+    return Slang::File::readAllText(path, out);
 }
 
 static SlangResult _readExpected(const UnownedStringSlice& stem, String& out)
@@ -1537,13 +1517,8 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
+    
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
 
     // If no expected output file was found, then we
     // expect everything to be empty
@@ -1578,14 +1553,9 @@ String getExpectedOutput(String const& outputStem)
 {
     String expectedOutputPath = outputStem + ".expected";
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
-
+    
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
+    
     // If no expected output file was found, then we
     // expect everything to be empty
     if (expectedOutput.getLength() == 0)
@@ -1724,15 +1694,10 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         {
             // Read the expected
             String expectedOutput;
-            try
-            {
-                String expectedOutputPath = outputStem + ".expected";
-                expectedOutput = Slang::File::readAllText(expectedOutputPath);
-            }
-            catch (const Slang::IOException&)
-            {
-            }
-
+            
+            String expectedOutputPath = outputStem + ".expected";
+            Slang::File::readAllText(expectedOutputPath, expectedOutput);
+            
             // Compare if they are the same 
             if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
             {
@@ -1864,15 +1829,10 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     {
         // Read the expected
         String expectedOutput;
-        try
-        {
-            String expectedOutputPath = outputStem + ".expected";
-            expectedOutput = Slang::File::readAllText(expectedOutputPath);
-        }
-        catch (const Slang::IOException&)
-        {
-        }
-
+        
+        String expectedOutputPath = outputStem + ".expected";
+        Slang::File::readAllText(expectedOutputPath, expectedOutput);
+        
         // Compare if they are the same 
         if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
         {
@@ -1957,11 +1917,8 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     {
         expectedOutput = getOutput(expectedExeRes);
         String expectedOutputPath = outputStem + ".expected";
-        try
-        {
-            Slang::File::writeAllText(expectedOutputPath, expectedOutput);
-        }
-        catch (const Slang::IOException&)
+        
+        if (SLANG_FAILED(Slang::File::writeAllText(expectedOutputPath, expectedOutput)))
         {
             return TestResult::Fail;
         }
@@ -2042,14 +1999,12 @@ TestResult generateHLSLBaseline(
 
     String expectedOutput = getOutput(exeRes);
     String expectedOutputPath = outputStem + ".expected";
-    try
-    {
-        Slang::File::writeAllText(expectedOutputPath, expectedOutput);
-    }
-    catch (const Slang::IOException&)
+    
+    if (SLANG_FAILED(Slang::File::writeAllText(expectedOutputPath, expectedOutput)))
     {
         return TestResult::Fail;
     }
+
     return TestResult::Pass;
 }
 
@@ -2123,14 +2078,8 @@ static TestResult _runHLSLComparisonTest(
     String actualOutput = actualOutputBuilder.ProduceString();
 
     String expectedOutput;
-    try
-    {
-        expectedOutput = Slang::File::readAllText(expectedOutputPath);
-    }
-    catch (const Slang::IOException&)
-    {
-    }
-
+    Slang::File::readAllText(expectedOutputPath, expectedOutput);
+    
     TestResult result = TestResult::Pass;
 
     // If no expected output file was found, then we
@@ -2540,8 +2489,10 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
         printf("referenceOutput %s not found.\n", referenceOutputFile.getBuffer());
 		return TestResult::Fail;
     }
-    auto actualOutputContent = File::readAllText(actualOutputFile);
-    auto referenceOutputContent = File::readAllText(referenceOutputFile);
+    String actualOutputContent, referenceOutputContent;
+
+    File::readAllText(actualOutputFile, actualOutputContent);
+    File::readAllText(referenceOutputFile, referenceOutputContent);
 
     if (SLANG_FAILED(_compareWithType(actualOutputContent.getUnownedSlice(), referenceOutputContent.getUnownedSlice())))
     {
@@ -3389,6 +3340,51 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+    /// Loads a DLL containing unit test functions and run them one by one.
+static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, const char* moduleName)
+{
+    SharedLibrary::Handle moduleHandle;
+    SLANG_RETURN_ON_FAIL(SharedLibrary::load(
+        Path::combine(context->exeDirectoryPath, moduleName).getBuffer(),
+        moduleHandle));
+    UnitTestGetModuleFunc getModuleFunc =
+        (UnitTestGetModuleFunc) SharedLibrary::findSymbolAddressByName(
+            moduleHandle, "slangUnitTestGetModule");
+    if (!getModuleFunc)
+        return SLANG_FAIL;
+
+    IUnitTestModule* testModule = getModuleFunc();
+    if (!testModule)
+        return SLANG_FAIL;
+    testModule->setTestReporter(TestReporter::get());
+    UnitTestContext unitTestContext;
+    unitTestContext.slangGlobalSession = context->getSession();
+    unitTestContext.workDirectory = "";
+    unitTestContext.enabledApis = context->options.enabledApis;
+    auto testCount = testModule->getTestCount();
+    for (SlangInt i = 0; i < testCount; i++)
+    {
+        auto testFunc = testModule->getTestFunc(i);
+        auto testName = testModule->getTestName(i);
+
+        StringBuilder filePath;
+        filePath << moduleName << "/" << testName << ".internal";
+
+        testOptions.command = filePath;
+
+        if (shouldRunTest(context, testOptions.command))
+        {
+            if (testPassesCategoryMask(context, testOptions))
+            {
+                TestReporter::get()->startTest(testOptions.command.getBuffer());
+                testFunc(&unitTestContext);
+                TestReporter::get()->endTest();
+            }
+        }
+    }
+    testModule->destroy();
+    return SLANG_OK;
+}
 
 SlangResult innerMain(int argc, char** argv)
 {
@@ -3564,36 +3560,17 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::set(&reporter);
 
             // Run the unit tests
-            TestRegister* cur = TestRegister::s_first;
-            while (cur)
             {
-                StringBuilder filePath;
-                filePath << "unit-tests/" << cur->m_name << ".internal";
-
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                testOptions.command = filePath;
-
-                if (shouldRunTest(&context, testOptions.command))
-                {
-                    if (testPassesCategoryMask(&context, testOptions))
-                    {
-                        reporter.startTest(testOptions.command);
-                        // Run the test function
-                        cur->m_func();
-                        reporter.endTest();
-                    }
-                    else
-                    {
-                        reporter.addTest(testOptions.command, TestResult::Ignored);
-                    }
-                }
-
-                // Next
-                cur = cur->m_next;
+                runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
             }
-
+            {
+                TestOptions testOptions;
+                testOptions.categories.add(unitTestCategory);
+                runUnitTestModule(&context, testOptions, "gfx-unit-test-tool");
+            }
             TestReporter::set(nullptr);
         }
 

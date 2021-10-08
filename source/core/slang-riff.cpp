@@ -22,26 +22,17 @@ namespace Slang
     }
 
     // Skip the payload (we don't need to skip the Chunk because that was already read
-    stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffHeader));
+    SLANG_RETURN_ON_FAIL(stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffHeader)));
     return SLANG_OK;
 }
 
 /* static */SlangResult RiffUtil::readChunk(Stream* stream, RiffHeader& outChunk)
 {
-    try
-    {
-        stream->read(&outChunk, sizeof(RiffHeader));
-    }
-    catch (const IOException&)
-    {
-    	return SLANG_FAIL;
-    }
-
+    size_t readBytes;
+    SLANG_RETURN_ON_FAIL(stream->read(&outChunk, sizeof(RiffHeader), readBytes));
     // TODO(JS): Could handle endianness issues here...
-
-    return SLANG_OK;
+    return (readBytes == sizeof(RiffHeader)) ? SLANG_OK : SLANG_FAIL;
 }
-
 
 /* static */SlangResult RiffUtil::writeData(const RiffHeader* header, size_t headerSize, const void* payload, size_t payloadSize, Stream* out)
 {
@@ -54,56 +45,43 @@ namespace Slang
     chunk.type = header->type;
     chunk.size = uint32_t(headerSize - sizeof(RiffHeader) + payloadSize);
 
-    try
+    // The chunk
+    SLANG_RETURN_ON_FAIL(out->write(&chunk, sizeof(RiffHeader)));
+
+    // Remainder of header
+    if (headerSize > sizeof(RiffHeader))
     {
-        // The chunk
-        out->write(&chunk, sizeof(RiffHeader));
-
-        // Remainder of header
-        if (headerSize > sizeof(RiffHeader))
-        {
-            // The rest of the header
-            out->write(header + 1, headerSize - sizeof(RiffHeader));
-        }
-
-        // Write the payload
-        out->write(payload, payloadSize);
-
-        // The riff spec requires all chunks are 4 byte aligned (even if size is not)
-        size_t padSize = getPadSize(payloadSize);
-        if (padSize - payloadSize)
-        {
-            uint8_t end[kRiffPadSize] = { 0 };
-            out->write(end, padSize - payloadSize);
-        }
-    }
-    catch (const IOException&)
-    {
-        return SLANG_FAIL;
+        // The rest of the header
+        SLANG_RETURN_ON_FAIL(out->write(header + 1, headerSize - sizeof(RiffHeader)));
     }
 
+    // Write the payload
+    SLANG_RETURN_ON_FAIL(out->write(payload, payloadSize));
+
+    // The riff spec requires all chunks are 4 byte aligned (even if size is not)
+    size_t padSize = getPadSize(payloadSize);
+    if (padSize - payloadSize)
+    {
+        uint8_t end[kRiffPadSize] = { 0 };
+        SLANG_RETURN_ON_FAIL(out->write(end, padSize - payloadSize));
+    }
+    
     return SLANG_OK;
 }
 
 /* static */SlangResult RiffUtil::readPayload(Stream* stream, size_t size, void* outData, size_t& outReadSize)
 {
     outReadSize = 0;
-    try
-    {
-        stream->read(outData, size);
-        const size_t alignedSize = getPadSize(size);
-        // Skip to the alignment
-        if (alignedSize > size)
-        {
-            stream->seek(SeekOrigin::Current, alignedSize - size);
-        }
-        outReadSize = alignedSize;
-    }
-    catch (const IOException&)
-    {
-        return SLANG_FAIL;
-    }
 
+    SLANG_RETURN_ON_FAIL(stream->readExactly(outData, size));
+
+    const size_t alignedSize = getPadSize(size);
+    // Skip to the alignment
+    if (alignedSize > size)
+    {
+        SLANG_RETURN_ON_FAIL(stream->seek(SeekOrigin::Current, alignedSize - size));
+    }
+    outReadSize = alignedSize;
     return SLANG_OK;
 }
 
@@ -118,19 +96,12 @@ namespace Slang
 
     *outHeader = chunk;
 
-    try
+    // Read the header
+    if (headerSize > sizeof(RiffHeader))
     {
-        // Read the header
-        if (headerSize > sizeof(RiffHeader))
-        {
-            stream->read(outHeader + 1, headerSize - sizeof(RiffHeader));
-        }
+        SLANG_RETURN_ON_FAIL(stream->readExactly(outHeader + 1, headerSize - sizeof(RiffHeader)));
     }
-    catch (const IOException&)
-    {
-        return SLANG_FAIL;
-    }
-
+ 
     const size_t payloadSize = chunk.size - (headerSize - sizeof(RiffHeader));
     size_t readSize;
     data.setCount(payloadSize);
@@ -146,14 +117,7 @@ namespace Slang
     if (isListType(outHeader.chunk.type))
     {
         // Read the sub type
-        try
-        {
-            stream->read(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader));
-        }
-        catch (const IOException&)
-        {
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(stream->readExactly(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader)));
     }
 
     return SLANG_OK;
@@ -251,65 +215,58 @@ struct DumpVisitor : public RiffContainer::Visitor
     listHeader.chunk.size = uint32_t(list->m_payloadSize);
     listHeader.subType = list->getSubType();
 
-    try
-    {
-        // Write the header
-        stream->write(&listHeader, sizeof(listHeader));
+    // Write the header
+    SLANG_RETURN_ON_FAIL(stream->write(&listHeader, sizeof(listHeader)));
 
         // Write the contained chunks
-        Chunk* chunk = list->m_containedChunks;
-        while (chunk)
-        {
-            switch (chunk->m_kind)
-            {
-                case Chunk::Kind::List:
-                {
-                    auto listChunk = static_cast<ListChunk*>(chunk);
-                    // It's a container
-                    SLANG_RETURN_ON_FAIL(write(listChunk, false, stream));
-                    break;
-                }
-                case Chunk::Kind::Data:
-                {
-                    auto dataChunk = static_cast<DataChunk*>(chunk);
-
-                    // Must be a regular chunk with data
-                    RiffHeader chunkHeader;
-                    chunkHeader.type = dataChunk->m_fourCC;
-                    chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
-
-                    stream->write(&chunkHeader, sizeof(chunkHeader));
-
-                    RiffContainer::Data* data = dataChunk->m_dataList;
-                    while (data)
-                    {
-                        stream->write(data->getPayload(), data->getSize());
-
-                        // Next but of data
-                        data = data->m_next;
-                    }
-
-                    // Need to write for alignment
-                    const size_t remainingSize = getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
-
-                    if (remainingSize)
-                    {
-                        static const uint8_t trailing[kRiffPadSize] = { 0 };
-                        stream->write(trailing, remainingSize);
-                    }
-                }
-                default: break;
-            }
-
-            // Next
-            chunk = chunk->m_next;
-        }
-    }
-    catch (const IOException&)
+    Chunk* chunk = list->m_containedChunks;
+    while (chunk)
     {
-        return SLANG_FAIL;
-    }
+        switch (chunk->m_kind)
+        {
+            case Chunk::Kind::List:
+            {
+                auto listChunk = static_cast<ListChunk*>(chunk);
+                // It's a container
+                SLANG_RETURN_ON_FAIL(write(listChunk, false, stream));
+                break;
+            }
+            case Chunk::Kind::Data:
+            {
+                auto dataChunk = static_cast<DataChunk*>(chunk);
 
+                // Must be a regular chunk with data
+                RiffHeader chunkHeader;
+                chunkHeader.type = dataChunk->m_fourCC;
+                chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
+
+                SLANG_RETURN_ON_FAIL(stream->write(&chunkHeader, sizeof(chunkHeader)));
+
+                RiffContainer::Data* data = dataChunk->m_dataList;
+                while (data)
+                {
+                    SLANG_RETURN_ON_FAIL(stream->write(data->getPayload(), data->getSize()));
+
+                    // Next but of data
+                    data = data->m_next;
+                }
+
+                // Need to write for alignment
+                const size_t remainingSize = getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
+
+                if (remainingSize)
+                {
+                    static const uint8_t trailing[kRiffPadSize] = { 0 };
+                    SLANG_RETURN_ON_FAIL(stream->write(trailing, remainingSize));
+                }
+            }
+            default: break;
+        }
+
+        // Next
+        chunk = chunk->m_next;
+    }
+    
     return SLANG_OK;
 }
 

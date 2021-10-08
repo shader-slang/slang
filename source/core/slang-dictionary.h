@@ -171,7 +171,7 @@ namespace Slang
 			}
 			if (insertPos != -1)
 				return FindPositionResult(-1, insertPos);
-			throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::getHashCode.");
+			SLANG_ASSERT_FAILURE("Hash map is full. This indicates an error in Key::Equal or Key::getHashCode.");
 		}
 		TValue & _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
 		{
@@ -217,12 +217,12 @@ namespace Slang
 				return true;
 			}
 			else
-				throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+				SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 		}
 		void Add(KeyValuePair<TKey, TValue>&& kvPair)
 		{
 			if (!AddIfNotExists(_Move(kvPair)))
-				throw KeyExistsException("The key already exists in Dictionary.");
+                SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
 		}
 		TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
 		{
@@ -236,7 +236,7 @@ namespace Slang
 				return _Insert(_Move(kvPair), pos.InsertionPosition);
 			}
 			else
-				throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+                SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 		}
 	public:
 		class Iterator
@@ -358,7 +358,7 @@ namespace Slang
                 return nullptr;
             }
             else
-                throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+                SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
             /// This differs from TryGetValueOrAdd, in that it always returns the Value held in the Dictionary.
@@ -379,7 +379,7 @@ namespace Slang
                 return _Insert(_Move(kvPair), pos.InsertionPosition);
             }
             else
-                throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
+                SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
         template<typename KeyType>
@@ -440,7 +440,7 @@ namespace Slang
 					return dict->hashMap[pos.ObjectPosition].Value;
 				}
 				else
-					throw KeyNotFoundException("The key does not exists in dictionary.");
+                    SLANG_ASSERT_FAILURE("The key does not exists in dictionary.");
 			}
 			inline TValue & operator()() const
 			{
@@ -742,8 +742,7 @@ namespace Slang
             }
             if (insertPos != -1)
                 return FindPositionResult(-1, insertPos);
-            throw InvalidOperationException(
-                "Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+            SLANG_ASSERT_FAILURE("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
         }
         TValue& _Insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
         {
@@ -791,13 +790,12 @@ namespace Slang
                 return true;
             }
             else
-                throw InvalidOperationException("Inconsistent find result returned. This is a "
-                                                "bug in Dictionary implementation.");
+                SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
         void Add(KeyValuePair<TKey, TValue>&& kvPair)
         {
             if (!AddIfNotExists(_Move(kvPair)))
-                throw KeyExistsException("The key already exists in Dictionary.");
+                SLANG_ASSERT_FAILURE("The key already exists in Dictionary.");
         }
         TValue& Set(KeyValuePair<TKey, TValue>&& kvPair)
         {
@@ -814,8 +812,7 @@ namespace Slang
                 return _Insert(_Move(kvPair), pos.InsertionPosition);
             }
             else
-                throw InvalidOperationException("Inconsistent find result returned. This is a "
-                                                "bug in Dictionary implementation.");
+                SLANG_ASSERT_FAILURE("Inconsistent find result returned. This is a bug in Dictionary implementation.");
         }
 
     public:
@@ -923,7 +920,7 @@ namespace Slang
                 }
                 else
                 {
-                    throw KeyNotFoundException("The key does not exists in dictionary.");
+                    SLANG_ASSERT_FAILURE("The key does not exists in dictionary.");
                 }
             }
             inline TValue& operator()() const { return GetValue(); }

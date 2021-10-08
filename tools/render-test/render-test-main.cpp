@@ -1264,6 +1264,13 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
     StdWritersDebugCallback debugCallback;
     debugCallback.writers = stdWriters;
     gfxSetDebugCallback(&debugCallback);
+    struct ResetDebugCallbackRAII
+    {
+        ~ResetDebugCallbackRAII()
+        {
+            gfxSetDebugCallback(nullptr);
+        }
+    } resetDebugCallbackRAII;
 
     // Use the profile name set on options if set
     input.profile = options.profileName.getLength() ? options.profileName : input.profile;

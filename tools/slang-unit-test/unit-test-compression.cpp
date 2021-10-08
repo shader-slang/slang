@@ -1,7 +1,8 @@
 // unit-compression.cpp
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
+#include "source/core/slang-io.h"
 #include "../../source/core/slang-zip-file-system.h"
 
 #include "../../source/core/slang-lz4-compression-system.h"
@@ -32,7 +33,7 @@ static List<String> _getContents(ISlangFileSystemExt* fileSystem, const char* pa
     return objs;
 }
 
-static void compressionUnitTest()
+SLANG_UNIT_TEST(compression)
 {
     const SlangArchiveType archiveTypes[] =
     {
@@ -186,5 +187,3 @@ static void compressionUnitTest()
         SLANG_CHECK(memcmp(src, decompressedData.getBuffer(), srcSize) == 0);
     }
 }
-
-SLANG_UNIT_TEST("Compression", compressionUnitTest);

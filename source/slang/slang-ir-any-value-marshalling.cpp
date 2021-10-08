@@ -284,9 +284,6 @@ namespace Slang
                         auto dstVal = builder->emitLoad(dstAddr);
                         if (intraFieldOffset == 0)
                         {
-                            srcVal = builder->emitBitAnd(
-                                srcVal->getFullType(), srcVal,
-                                builder->getIntValue(builder->getUIntType(), 0xFFFF));
                             dstVal = builder->emitBitAnd(
                                 dstVal->getFullType(), dstVal,
                                 builder->getIntValue(builder->getUIntType(), 0xFFFF0000));
