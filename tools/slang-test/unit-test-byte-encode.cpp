@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "tools/unit-test/slang-unit-test.h"
+#include "test-context.h"
 
 #include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-list.h"
@@ -25,7 +25,7 @@ static void checkUInt32(uint32_t value)
     SLANG_CHECK(readLen == writeLen && decode == value);
 }
 
-SLANG_UNIT_TEST(byteEncode)
+static void byteEncodeUnitTest()
 {
     DefaultRandomGenerator randGen(0x5346536a);
 
@@ -137,3 +137,5 @@ SLANG_UNIT_TEST(byteEncode)
     } 
 
 }
+
+SLANG_UNIT_TEST("ByteEncode", byteEncodeUnitTest);

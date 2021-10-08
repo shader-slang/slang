@@ -276,16 +276,6 @@ convention for interface methods.
 /// SLANG_INLINE exists to have a way to inline consistent with SLANG_ALWAYS_INLINE
 #define SLANG_INLINE inline
 
-// If explicilty disabled and not set, set to not available
-#if !defined(SLANG_HAS_EXCEPTIONS) && defined(SLANG_DISABLE_EXCEPTIONS)
-#   define SLANG_HAS_EXCEPTIONS 0
-#endif
-
-// If not set, the default is exceptions are available
-#ifndef SLANG_HAS_EXCEPTIONS
-#   define SLANG_HAS_EXCEPTIONS 1
-#endif
-
 // Other defines
 #define SLANG_STRINGIZE_HELPER(X) #X
 #define SLANG_STRINGIZE(X) SLANG_STRINGIZE_HELPER(X)
@@ -321,7 +311,6 @@ convention for interface methods.
 #       define SLANG_HAS_ENUM_CLASS 1
 #       define SLANG_OVERRIDE override
 #    endif
-
 // Gcc
 #elif SLANG_GCC_FAMILY
 // Check for C++11
@@ -336,12 +325,6 @@ convention for interface methods.
 #				define SLANG_OVERRIDE override
 #			endif
 #		endif
-
-// TODO(JS): Not used in previous code. Left here as may be useful on some other version. 
-// #define SLANG_RETURN_NEVER __attribute__((__noreturn__))
-
-#       define SLANG_RETURN_NEVER [[noreturn]]
-
 #	endif // SLANG_GCC_FAMILY
 
 // Visual Studio
@@ -359,8 +342,6 @@ convention for interface methods.
 #		    define SLANG_HAS_ENUM_CLASS 1
 #       endif
 
-#   define SLANG_RETURN_NEVER __declspec(noreturn)
-
 #   endif // SLANG_VC
 
 // Set non set
@@ -375,10 +356,6 @@ convention for interface methods.
 #   endif
 
 #endif // __cplusplus
-
-#ifndef SLANG_RETURN_NEVER
-#   define SLANG_RETURN_NEVER /* empty */
-#endif // SLANG_RETURN_NEVER
 
 /* Macros for detecting processor */
 #if defined(_M_ARM) || defined(__ARM_EABI__)
@@ -396,7 +373,7 @@ convention for interface methods.
 #   endif
 #elif defined(__arm__)
 #   define SLANG_PROCESSOR_ARM 1
-#elif defined(_M_ARM64) || defined(__aarch64__)
+#elif defined(__aarch64__)
 #   define SLANG_PROCESSOR_ARM_64 1
 #endif 
 
@@ -3953,13 +3930,6 @@ namespace slang
         virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             IBlob**     outDiagnostics = nullptr) = 0;
-
-            /** Load a module from Slang source code.
-            */
-        virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSource(
-            const char* moduleName,
-            slang::IBlob* source,
-            slang::IBlob** outDiagnostics = nullptr) = 0;
 
             /** Combine multiple component types to create a composite component type.
 

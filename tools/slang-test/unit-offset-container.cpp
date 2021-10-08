@@ -2,7 +2,7 @@
 
 #include "../../source/core/slang-offset-container.h"
 
-#include "tools/unit-test/slang-unit-test.h"
+#include "test-context.h"
 
 using namespace Slang;
 
@@ -30,7 +30,7 @@ struct Root
 
 } // anonymous
 
-SLANG_UNIT_TEST(offsetContainer)
+static void offsetContainerUnitTest()
 {
     _checkEncodeDecode(253);
 
@@ -115,3 +115,5 @@ SLANG_UNIT_TEST(offsetContainer)
         }
     }
 }
+
+SLANG_UNIT_TEST("OffsetContainer", offsetContainerUnitTest);

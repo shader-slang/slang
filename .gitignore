@@ -57,4 +57,3 @@ prelude/*.h.cpp
 /docs/_site
 /docs/Gemfile.lock
 /docs/Gemfile
-/source/slang/slang-stdlib-generated.h

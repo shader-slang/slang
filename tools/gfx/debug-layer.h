@@ -40,7 +40,6 @@ public:
 public:
     DebugDevice();
     IDevice* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) override;
@@ -144,7 +143,6 @@ public:
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>
@@ -156,7 +154,6 @@ public:
     ITextureResource* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };
 
 class DebugResourceView : public DebugObject<IResourceView>
@@ -319,16 +316,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-        size_t count,
-        ITextureResource* const* textures,
-        ResourceState src,
-        ResourceState dst) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-        size_t count,
-        IBufferResource* const* buffers,
-        ResourceState src,
-        ResourceState dst) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
@@ -406,7 +394,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         encodeRayTracingCommands(IRayTracingCommandEncoder** outEncoder) override;
     virtual SLANG_NO_THROW void SLANG_MCALL close() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 
 private:
     void checkEncodersClosedBeforeNewEncoder();
@@ -427,7 +414,6 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override;
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };
 
 class DebugFramebuffer

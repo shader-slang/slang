@@ -146,8 +146,6 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
-
     ~D3D12Device();
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -219,12 +217,6 @@ public:
         {
             return (DeviceAddress)m_resource.getResource()->GetGPUVirtualAddress();
         }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_resource.getResource();
-            return SLANG_OK;
-        }
     };
 
     class TextureResourceImpl: public TextureResource
@@ -240,12 +232,6 @@ public:
 
         D3D12Resource m_resource;
         D3D12_RESOURCE_STATES m_defaultState;
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_resource.getResource();
-            return SLANG_OK;
-        }
     };
 
     class SamplerStateImpl : public ISamplerState, public ComObject
@@ -3441,22 +3427,6 @@ public:
                     size,
                     data);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
-                size_t count,
-                ITextureResource* const* textures,
-                ResourceState src,
-                ResourceState dst) override
-            {
-                assert(!"Unimplemented");
-            }
-            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
-                size_t count,
-                IBufferResource* const* buffers,
-                ResourceState src,
-                ResourceState dst) override
-            {
-                assert(!"Unimplemented");
-            }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
@@ -3540,13 +3510,6 @@ public:
 #endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_cmdList.get();
-            return SLANG_OK;
-        }
     };
 
     class CommandQueueImpl
@@ -3635,13 +3598,6 @@ public:
             ResetEvent(globalWaitHandle);
             m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
             WaitForSingleObject(globalWaitHandle, INFINITE);
-        }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_d3dQueue.get();
-            return SLANG_OK;
         }
     };
 
@@ -4159,12 +4115,6 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
-{
-    *outHandle = NativeHandle::fromD3D12Handle(m_device);
-    return SLANG_OK;
-}
-
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
     outDeviceInfo.clear();
@@ -4337,40 +4287,32 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles.getD3D12Device() == 0)
-    {
-        FlagCombiner combiner;
-        // TODO: we should probably provide a command-line option
-        // to override UseDebug of default rather than leave it
-        // up to each back-end to specify.
+    FlagCombiner combiner;
+    // TODO: we should probably provide a command-line option
+    // to override UseDebug of default rather than leave it
+    // up to each back-end to specify.
 #if ENABLE_DEBUG_LAYER
-        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
+    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::OnOff);                 ///< First try debug then non debug
 #else
-        combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
+    combiner.add(DeviceCheckFlag::UseDebug, ChangeType::Off);                   ///< Don't bother with debug
 #endif
-        combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+    combiner.add(DeviceCheckFlag::UseHardwareDevice, ChangeType::OnOff);        ///< First try hardware, then reference
+    
+    const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
 
-        const D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-
-        const int numCombinations = combiner.getNumCombinations();
-        for (int i = 0; i < numCombinations; ++i)
+    const int numCombinations = combiner.getNumCombinations();
+    for (int i = 0; i < numCombinations; ++i)
+    {
+        if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
         {
-            if (SLANG_SUCCEEDED(_createDevice(combiner.getCombination(i), UnownedStringSlice(desc.adapter), featureLevel, m_deviceInfo)))
-            {
-                break;
-            }
-        }
-
-        if (!m_deviceInfo.m_adapter)
-        {
-            // Couldn't find an adapter
-            return SLANG_FAIL;
+            break;
         }
     }
-    else
+
+    if (!m_deviceInfo.m_adapter)
     {
-        // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
+        // Couldn't find an adapter
+        return SLANG_FAIL;
     }
 
     // Set the device

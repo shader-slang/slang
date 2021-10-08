@@ -1415,10 +1415,6 @@ namespace Slang
         SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModule(
             const char* moduleName,
             slang::IBlob**     outDiagnostics = nullptr) override;
-        SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
-            const char* moduleName,
-            slang::IBlob* source,
-            slang::IBlob** outDiagnostics = nullptr) override;
         SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
             slang::IComponentType* const*   componentTypes,
             SlangInt                        componentTypeCount,

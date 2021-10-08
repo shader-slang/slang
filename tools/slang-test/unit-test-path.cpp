@@ -2,11 +2,12 @@
 
 #include "../../source/core/slang-io.h"
 
-#include "tools/unit-test/slang-unit-test.h"
+
+#include "test-context.h"
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(path)
+static void pathUnitTest()
 {
 #if SLANG_WINDOWS_FAMILY
     // Disable for now on non windows has some problems on *some* Linux based CI.
@@ -60,3 +61,4 @@ SLANG_UNIT_TEST(path)
     }
 }
 
+SLANG_UNIT_TEST("Path", pathUnitTest);

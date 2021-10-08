@@ -4,7 +4,7 @@
 
 #include "../../source/core/slang-random-generator.h"
 
-#include "tools/unit-test/slang-unit-test.h"
+#include "test-context.h"
 
 using namespace Slang;
 
@@ -33,7 +33,7 @@ static void _writeRandom(RandomGenerator* rand, size_t maxSize, RiffContainer& i
     SLANG_ASSERT(dataChunk);
 }
 
-SLANG_UNIT_TEST(riff)
+static void riffUnitTest()
 {
     typedef RiffContainer::ScopeChunk ScopeChunk;
     typedef RiffContainer::Chunk::Kind Kind;
@@ -177,3 +177,4 @@ SLANG_UNIT_TEST(riff)
 #endif
 }
 
+SLANG_UNIT_TEST("Riff", riffUnitTest);

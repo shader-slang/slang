@@ -14,12 +14,12 @@ namespace Slang
     public:
         static bool exists(const String& fileName);
 
-        static SlangResult readAllText(const String& fileName, String& outString);
+        static String readAllText(const String& fileName);
 
-        static SlangResult readAllBytes(const String& fileName, List<unsigned char>& out);
+        static List<unsigned char> readAllBytes(const String& fileName);
         static SlangResult readAllBytes(const String& fileName, ScopedAllocation& out);
 
-        static SlangResult writeAllText(const String& fileName, const String& text);
+        static void writeAllText(const String& fileName, const String& text);
 
         static SlangResult writeAllBytes(const String& fileName, const void* data, size_t size);
         

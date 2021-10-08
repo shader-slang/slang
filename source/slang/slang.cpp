@@ -269,14 +269,11 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         {
             String fileName("stdlib-doc.md");
 
-            RefPtr<FileStream> stream = new FileStream;
-            SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
-            StreamWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.init(stream));
+            StreamWriter writer(new FileStream(fileName, FileMode::Create));
 
             for (auto& docString : docStrings)
             {
-                SLANG_RETURN_ON_FAIL(writer.write(docString));
+                writer.Write(docString);
             }
         }
     }
@@ -825,52 +822,13 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     const char*     moduleName,
     slang::IBlob**  outDiagnostics)
 {
+    auto name = getNamePool()->getName(moduleName);
+
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    try
-    {
-        auto name = getNamePool()->getName(moduleName);
+    auto module = findOrImportModule(name, SourceLoc(), &sink);
+    sink.getBlobIfNeeded(outDiagnostics);
 
-        auto module = findOrImportModule(name, SourceLoc(), &sink);
-        sink.getBlobIfNeeded(outDiagnostics);
-
-        return asExternal(module);
-
-    }
-    catch (const AbortCompilationException&)
-    {
-        sink.getBlobIfNeeded(outDiagnostics);
-        return nullptr;
-    }
-}
-
-SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModuleFromSource(
-    const char* moduleName,
-    slang::IBlob* source,
-    slang::IBlob** outDiagnostics)
-{
-    try
-    {
-        auto name = getNamePool()->getName(moduleName);
-        RefPtr<LoadedModule> loadedModule;
-        if (mapNameToLoadedModules.TryGetValue(name, loadedModule))
-        {
-            return loadedModule;
-        }
-        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-        auto module = loadModule(
-            name,
-            PathInfo::makeFromString(moduleName),
-            source,
-            SourceLoc(),
-            &sink);
-        sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module);
-
-    }
-    catch (const AbortCompilationException&)
-    {
-        return nullptr;
-    }
+    return asExternal(module);
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
@@ -2496,7 +2454,7 @@ void Linkage::_diagnoseErrorInImportedModule(
 {
     for(auto info = m_modulesBeingImported; info; info = info->next)
     {
-            sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
     sink->diagnose(SourceLoc(), Diagnostics::complationCeased);
 }

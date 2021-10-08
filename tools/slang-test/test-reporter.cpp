@@ -10,6 +10,7 @@
 using namespace Slang;
 
 /* static */TestReporter* TestReporter::s_reporter = nullptr;
+/* static */TestRegister* TestRegister::s_first;
 
 static void appendXmlEncode(char c, StringBuilder& out)
 {
@@ -105,7 +106,7 @@ bool TestReporter::canWriteStdError() const
     }
 }
 
-void TestReporter::startTest(const char* testName)
+void TestReporter::startTest(const String& testName)
 {
     // Must be in a suite
     assert(m_suiteStack.getCount());
@@ -535,12 +536,6 @@ void TestReporter::messageFormat(TestMessageType type, char const* format, ...)
 
     message(type, builder);
 }
-
-void TestReporter::message(TestMessageType type, const char* messageContent)
-{
-    message(type, String(messageContent));
-}
-
 
 bool TestReporter::didAllSucceed() const
 {

@@ -5,11 +5,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "tools/unit-test/slang-unit-test.h"
+#include "test-context.h"
 
 using namespace Slang;
 
-SLANG_UNIT_TEST(findTypeByName)
+static void findTypeByNameTest()
 {
     const char* testSource =
         "struct TestStruct {"
@@ -53,3 +53,4 @@ SLANG_UNIT_TEST(findTypeByName)
     spDestroySession(session);
 }
 
+SLANG_UNIT_TEST("findTypeByName", findTypeByNameTest);

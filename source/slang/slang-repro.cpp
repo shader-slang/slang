@@ -1082,15 +1082,22 @@ struct LoadContext
 
 /* static */SlangResult ReproUtil::saveState(EndToEndCompileRequest* request, const String& filename)
 {
-    RefPtr<FileStream> stream(new FileStream);
-    SLANG_RETURN_ON_FAIL(stream->init(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+    RefPtr<Stream> stream(new FileStream(filename, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
     return saveState(request, stream);
 }
 
 /* static */ SlangResult ReproUtil::loadState(const String& filename, List<uint8_t>& outBuffer)
 {
-    RefPtr<FileStream> stream = new FileStream;
-    SLANG_RETURN_ON_FAIL(stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
+    RefPtr<Stream> stream;
+    try
+    {
+        stream = new FileStream(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite);
+    }
+    catch (const IOException&)
+    {
+    	return SLANG_FAIL;
+    }
+
     return loadState(stream, outBuffer);
 }
 
@@ -1557,8 +1564,6 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
     String sourceFileName = Path::getFileName(sourcePath);
     String sourceBaseName = Path::getFileNameWithoutExt(sourceFileName);
 
-    RefPtr<FileStream> stream = new FileStream;
-
     // Okay we need a unique number to make sure the name is unique
     const int maxTries = 100;
     for (int triesCount = 0; triesCount < maxTries; ++triesCount)
@@ -1573,12 +1578,15 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
         outFileName = builder;
 
         // We could have clashes, as we use ticks, we should get to a point where the clashes stop
-        if (SLANG_SUCCEEDED(stream->init(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly)))
+        try
         {
-            outStream = stream;
+            outStream = new FileStream(builder, FileMode::CreateNew, FileAccess::Write, FileShare::WriteOnly);
             return SLANG_OK;
         }
-        
+        catch (const IOException&)
+        {
+        }
+
         // TODO(JS): 
         // Might make sense to sleep here - but don't seem to have cross platform func for that yet.
     }

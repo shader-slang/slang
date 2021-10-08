@@ -168,9 +168,6 @@ namespace Slang
             /// Trims any 'c' from the start or the end, and returns as a substring
         UnownedStringSlice trim(char c) const;
 
-            /// Trims any horizonatl whitespace from start and returns as a substring
-        UnownedStringSlice trimStart() const;
-
         HashCode getHashCode() const
         {
             return Slang::getHashCode(m_begin, size_t(m_end - m_begin)); 
@@ -412,7 +409,7 @@ namespace Slang
         static String fromWString(const wchar_t * wstr);
         static String fromWString(const wchar_t * wstr, const wchar_t * wend);
         static String fromWChar(const wchar_t ch);
-        static String fromUnicodePoint(Char32 codePoint);
+        static String fromUnicodePoint(unsigned int codePoint);
         String()
         {
         }
@@ -622,9 +619,9 @@ namespace Slang
                 len = getLength() - id;
 #if _DEBUG
             if (id < 0 || id >= getLength() || (id + len) > getLength())
-                SLANG_ASSERT_FAILURE("SubString: index out of range.");
+                throw "SubString: index out of range.";
             if (len < 0)
-                SLANG_ASSERT_FAILURE("SubString: length less than zero.");
+                throw "SubString: length less than zero.";
 #endif
             return StringSlice(m_buffer, id, id + len);
         }
@@ -1000,9 +997,9 @@ namespace Slang
         {
 #if _DEBUG
             if (id >= length || id < 0)
-                SLANG_ASSERT_FAILURE("Remove: Index out of range.");
+                throw "Remove: Index out of range.";
             if (len < 0)
-                SLANG_ASSERT_FAILURE("Remove: remove length smaller than zero.");
+                throw "Remove: remove length smaller than zero.";
 #endif
             int actualDelLength = ((id + len) >= length) ? (length - id) : len;
             for (int i = id + actualDelLength; i <= length; i++)

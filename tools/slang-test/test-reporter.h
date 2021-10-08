@@ -7,7 +7,36 @@
 #include "../../source/core/slang-platform.h"
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-dictionary.h"
-#include "tools/unit-test/slang-unit-test.h"
+
+
+#define SLANG_CHECK(x) TestReporter::get()->addResultWithLocation((x), #x, __FILE__, __LINE__);
+#define SLANG_CHECK_ABORT(x)                                                                     \
+    {                                                                                            \
+        bool _slang_check_result = (x);                                                          \
+        TestReporter::get()->addResultWithLocation(_slang_check_result, #x, __FILE__, __LINE__); \
+        if (!_slang_check_result) return;                                                        \
+    }
+
+struct TestRegister
+{
+    typedef void (*TestFunc)();
+
+    TestRegister(const char* name, TestFunc func):
+        m_next(s_first),
+        m_name(name),
+        m_func(func)
+    {
+        s_first = this;
+    }
+
+    TestFunc m_func;
+    const char* m_name;
+    TestRegister* m_next;
+
+    static TestRegister* s_first;
+};
+
+#define SLANG_UNIT_TEST(name, func) static TestRegister s_unitTest##__LINE__(name, func)
 
 enum class TestOutputMode
 {
@@ -19,7 +48,23 @@ enum class TestOutputMode
     TeamCity,      ///< Output suitable for teamcity
 };
 
-class TestReporter : public ITestReporter
+enum class TestResult
+{
+    // NOTE! Must keep in order such that combine is meaningful. That is larger values are higher precident - and a series of tests that has lots of passes
+    // and a fail, is still a fail overall. 
+    Ignored,
+    Pass,
+    Fail,
+};
+
+enum class TestMessageType
+{
+    Info,                   ///< General info (may not be shown depending on verbosity setting)
+    TestFailure,           ///< Describes how a test failure took place
+    RunError,              ///< Describes an error that caused a test not to actually correctly run
+};
+
+class TestReporter
 {
     public:
 
@@ -37,7 +82,7 @@ class TestReporter : public ITestReporter
         TestScope(TestReporter* reporter, const Slang::String& testName) :
             m_reporter(reporter)
         {
-            reporter->startTest(testName.getBuffer());
+            reporter->startTest(testName);
         }
         ~TestScope()
         {
@@ -68,12 +113,12 @@ class TestReporter : public ITestReporter
     void startSuite(const Slang::String& name);
     void endSuite();
 
-    virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(TestResult result, const char* testText, const char* file, int line) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL addExecutionTime(double time) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL endTest() override;
+    void startTest(const Slang::String& testName);
+    void addResult(TestResult result);
+    void addResultWithLocation(TestResult result, const char* testText, const char* file, int line);
+    void addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line);
+    void addExecutionTime(double time);
+    void endTest();
     
         /// Runs start/endTest and outputs the result
     TestResult addTest(const Slang::String& testName, bool isPass);
@@ -83,7 +128,6 @@ class TestReporter : public ITestReporter
         // Called for an error in the test-runner (not for an error involving a test itself).
     void message(TestMessageType type, const Slang::String& errorText);
     void messageFormat(TestMessageType type, char const* message, ...);
-    virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, char const* message) override;
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
 

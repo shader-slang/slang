@@ -14,10 +14,10 @@ namespace Slang {
 
 namespace { // anonymous
 
-struct ByteReader
+struct CharReader
 {
-    Byte operator()() const { return Byte(*m_pos++); }
-    ByteReader(const char* pos) :m_pos(pos) {}
+    char operator()(int pos) const { SLANG_UNUSED(pos); return *m_pos++; }
+    CharReader(const char* pos) :m_pos(pos) {}
     mutable const char* m_pos;
 };
 
@@ -37,15 +37,11 @@ struct ByteReader
     stringTable.clear();
     for (const auto& slice : slices)
     {
-        // TODO(JS):
-        // This is a bit of a hack. We need to store the string length, along with the string contents. We don't want to write
-        // the size as (say) uint32, because most strings are short. So we just save off the length as a utf8 encoding.
-        // As it stands this *does* have an arguable problem because encoding isn't of the full 32 bits. 
         const int len = int(slice.getLength());
         
         // We need to write into the the string array
         char prefixBytes[6];
-        const int numPrefixBytes = encodeUnicodePointToUTF8(len, prefixBytes);
+        const int numPrefixBytes = EncodeUnicodePointToUTF8(prefixBytes, len);
         const Index baseIndex = stringTable.getCount();
 
         stringTable.setCount(baseIndex + numPrefixBytes + len);
@@ -65,8 +61,8 @@ struct ByteReader
 
     while (cur < end)
     {
-        ByteReader reader(cur);
-        const int len = getUnicodePointFromUTF8(reader);
+        CharReader reader(cur);
+        const int len = GetUnicodePointFromUTF8(reader);
         slicesOut.add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
     }
@@ -91,8 +87,8 @@ struct ByteReader
 
     while (cur < end)
     {
-        ByteReader reader(cur);
-        const int len = getUnicodePointFromUTF8(reader);
+        CharReader reader(cur);
+        const int len = GetUnicodePointFromUTF8(reader);
         outPool.add(UnownedStringSlice(reader.m_pos, len));
         cur = reader.m_pos + len;
     }
