@@ -205,6 +205,7 @@ enum class PrimitiveTopology
 enum class ResourceState
 {
     Undefined,
+    PreInitialized,
     VertexBuffer,
     IndexBuffer,
     ConstantBuffer,
@@ -215,6 +216,7 @@ enum class ResourceState
     DepthRead,
     DepthWrite,
     Present,
+    IndirectArgument,
     CopySource,
     CopyDestination,
     ResolveSource,
@@ -302,8 +304,13 @@ public:
         int elementSize = 0;        ///< Get the element stride. If > 0, this is a structured buffer
         Format format = Format::Unknown;
     };
+
+    // Pointer to the buffer resource.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -399,12 +406,16 @@ public:
         int64_t     strideZ;
     };
 
+    // A pointer to the resource if D3D12.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ITextureResource                                                    \
     {                                                                                  \
         0xcf88a31c, 0x6187, 0x46c5, { 0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 } \
-    } 
+    }
 
 // Needed for building on cygwin with gcc
 #undef Always
@@ -1160,6 +1171,17 @@ public:
         size_t size) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
         uploadBufferData(IBufferResource* dst, size_t offset, size_t size, void* data) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+        size_t count,
+        ITextureResource* const* textures,
+        ResourceState src,
+        ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+        size_t count,
+        IBufferResource* const* buffers,
+        ResourceState src,
+        ResourceState dst) = 0;
 };
 
 enum class AccelerationStructureCopyMode
@@ -1221,6 +1243,9 @@ public:
 class ICommandBuffer : public ISlangUnknown
 {
 public:
+    // For D3D12, this is the pointer to the buffer. For Vulkan, this is the buffer itself.
+    typedef uint64_t NativeHandle;
+
     // Only one encoder may be open at a time. User must call `ICommandEncoder::endEncoding`
     // before calling other `encode*Commands` methods.
     // Once `endEncoding` is called, the `ICommandEncoder` object becomes obsolete and is
@@ -1266,6 +1291,8 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1283,6 +1310,10 @@ public:
     {
         QueueType type;
     };
+
+    // For D3D12, this is the pointer to the queue. For Vulkan, this is the queue itself.
+    typedef uint64_t NativeHandle;
+
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1292,6 +1323,8 @@ public:
         executeCommandBuffers(1, &commandBuffer);
     }
     virtual SLANG_NO_THROW void SLANG_MCALL wait() = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -1418,10 +1451,45 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
+    struct NativeHandle
+    {
+    public:
+        // The following functions return a NativeHandle object containing the provided handles.
+        static NativeHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
+        {
+            NativeHandle handles = {};
+            handles.values[0] = instance;
+            handles.values[1] = physicalDevice;
+            handles.values[2] = device;
+            return handles;
+        }
+
+        static NativeHandle fromD3D12Handle(void* device)
+        {
+            NativeHandle handles = {};
+            handles.values[0] = (uint64_t)device;
+            return handles;
+        }
+
+        // The following functions provide a way of getting handles from values.
+        uint64_t getD3D12Device() const { return values[0]; }
+
+        uint64_t getVkInstance() const { return values[0]; }
+        uint64_t getVkPhysicalDevice() const { return values[1]; }
+        uint64_t getVkDevice() const { return values[2]; }
+
+    private:
+        // For D3D12, this only contains a single value for the ID3D12Device.
+        // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
+        uint64_t values[3] = { 0 };
+    };
+
     struct Desc
     {
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
+        // The device's handles (if they exist).
+        NativeHandle existingDeviceHandles = {};
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
@@ -1436,6 +1504,8 @@ public:
         // Configurations for Slang compiler.
         SlangDesc slang = {};
     };
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 

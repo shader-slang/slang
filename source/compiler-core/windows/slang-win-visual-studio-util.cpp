@@ -14,7 +14,8 @@
 #   undef NOMINMAX
 
 #   include <Shlobj.h>
-
+#pragma comment(lib, "advapi32")
+#pragma comment(lib, "Shell32")
 #endif
 
 // The method used to invoke VS was originally inspired by some ideas in

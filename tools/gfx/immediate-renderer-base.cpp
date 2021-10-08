@@ -248,6 +248,24 @@ public:
         {
             m_writer->writeTimestamp(pool, index);
         }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+            size_t count,
+            ITextureResource* const* textures,
+            ResourceState src,
+            ResourceState dst) override
+        {
+            assert(!"Unimplemented");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+            size_t count,
+            IBufferResource* const* buffers,
+            ResourceState src,
+            ResourceState dst) override
+        {
+            assert(!"Unimplemented");
+        }
     };
 
     ResourceCommandEncoderImpl m_resourceCommandEncoder;
@@ -266,6 +284,13 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() override { }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(NativeHandle* outHandle)
+    {
+        *outHandle = 0;
+        return SLANG_OK;
+    }
 
     void execute()
     {
@@ -402,6 +427,12 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(NativeHandle* outHandle) override
+    {
+        return getRenderer()->m_queue->getNativeHandle(outHandle);
+    }
 };
 
 using TransientResourceHeapImpl =

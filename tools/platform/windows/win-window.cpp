@@ -7,6 +7,8 @@
 #include <windowsx.h>
 using namespace Slang;
 
+#pragma comment(lib, "Gdi32")
+
 namespace platform
 {
 

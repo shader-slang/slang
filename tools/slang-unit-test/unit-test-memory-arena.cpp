@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "test-context.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 #include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-list.h"
@@ -105,7 +105,7 @@ static bool hasValue(const uint8_t* data, size_t size, uint8_t value)
     return hasValueShort(data + sizeof(size_t) * numWords, size & alignMask, value);
 }
 
-static void memoryArenaUnitTest()
+SLANG_UNIT_TEST(memoryArena)
 {
     DefaultRandomGenerator randGen(0x5346536a);
 
@@ -269,5 +269,3 @@ static void memoryArenaUnitTest()
 
     }
 }
-
-SLANG_UNIT_TEST("MemoryArena", memoryArenaUnitTest);

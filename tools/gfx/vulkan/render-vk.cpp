@@ -53,7 +53,7 @@ public:
         kMaxDescriptorSets = 8,
     };
     // Renderer    implementation
-    Result initVulkanInstanceAndDevice(bool useValidationLayer);
+    Result initVulkanInstanceAndDevice(NativeHandle handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
@@ -134,6 +134,8 @@ public:
     {
         return m_info;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
         /// Dtor
     ~VKDevice();
 
@@ -201,6 +203,12 @@ public:
             return (DeviceAddress)m_buffer.m_api->vkGetBufferDeviceAddress(
                 m_buffer.m_api->m_device, &info);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_buffer.m_buffer;
+            return SLANG_OK;
+        }
     };
 
     class TextureResourceImpl : public TextureResource
@@ -227,6 +235,12 @@ public:
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
         bool m_isWeakImageReference = false;
         RefPtr<VKDevice> m_device;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_image;
+            return SLANG_OK;
+        }
     };
 
     class SamplerStateImpl : public ISamplerState, public ComObject
@@ -3942,6 +3956,118 @@ public:
             , public RefObject
         {
         public:
+        static VkImageLayout translateImageLayout(ResourceState state)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+                return VK_IMAGE_LAYOUT_UNDEFINED;
+            case ResourceState::PreInitialized:
+                return VK_IMAGE_LAYOUT_PREINITIALIZED;
+            case ResourceState::UnorderedAccess:
+                return VK_IMAGE_LAYOUT_GENERAL;
+            case ResourceState::RenderTarget:
+                return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            case ResourceState::DepthRead:
+                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            case ResourceState::DepthWrite:
+                return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            case ResourceState::ShaderResource:
+                return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            case ResourceState::ResolveDestination:
+            case ResourceState::CopyDestination:
+                return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            case ResourceState::ResolveSource:
+            case ResourceState::CopySource:
+                return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            case ResourceState::Present:
+                return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            default:
+                assert(!"Unsupported");
+                return VK_IMAGE_LAYOUT_UNDEFINED;
+            }
+        }
+
+        static VkAccessFlagBits calcAccessFlags(ResourceState state)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+            case ResourceState::Present:
+            case ResourceState::PreInitialized:
+                return VkAccessFlagBits(0);
+            case ResourceState::VertexBuffer:
+                return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+            case ResourceState::ConstantBuffer:
+                return VK_ACCESS_UNIFORM_READ_BIT;
+            case ResourceState::IndexBuffer:
+                return VK_ACCESS_INDEX_READ_BIT;
+            case ResourceState::RenderTarget:
+                return VkAccessFlagBits(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+            case ResourceState::ShaderResource:
+                return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+            case ResourceState::UnorderedAccess:
+                return VkAccessFlagBits(VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+            case ResourceState::DepthRead:
+                return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+            case ResourceState::DepthWrite:
+                return VkAccessFlagBits(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+            case ResourceState::IndirectArgument:
+                return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+            case ResourceState::ResolveDestination:
+            case ResourceState::CopyDestination:
+                return VK_ACCESS_TRANSFER_WRITE_BIT;
+            case ResourceState::ResolveSource:
+            case ResourceState::CopySource:
+                return VK_ACCESS_TRANSFER_READ_BIT;
+            case ResourceState::AccelerationStructure:
+                return VkAccessFlagBits(VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+            default:
+                assert(!"Unsupported");
+                return VkAccessFlagBits(0);
+            }
+        }
+
+        static VkPipelineStageFlagBits calcPipelineStageFlags(ResourceState state, bool src)
+        {
+            switch (state)
+            {
+            case ResourceState::Undefined:
+            case ResourceState::PreInitialized:
+                assert(src);
+                return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            case ResourceState::IndexBuffer:
+                return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            case ResourceState::ConstantBuffer:
+            case ResourceState::UnorderedAccess:
+                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                    VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT |
+                    VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT |
+                    VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT |
+                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+            case ResourceState::ShaderResource:
+                return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            case ResourceState::RenderTarget:
+                return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            case ResourceState::DepthRead:
+            case ResourceState::DepthWrite:
+                return VkPipelineStageFlagBits(VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+            case ResourceState::IndirectArgument:
+                return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+            case ResourceState::CopySource:
+            case ResourceState::CopyDestination:
+            case ResourceState::ResolveSource:
+            case ResourceState::ResolveDestination:
+                return VK_PIPELINE_STAGE_TRANSFER_BIT;
+            case ResourceState::Present:
+                return src ? VkPipelineStageFlagBits(VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT) : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            default:
+                assert(!"Unsupported");
+                return VkPipelineStageFlagBits(0);
+            }
+        }
+        public:
             CommandBufferImpl* m_commandBuffer;
         public:
             virtual SLANG_NO_THROW void SLANG_MCALL copyBuffer(
@@ -3981,6 +4107,71 @@ public:
                     offset,
                     size,
                     data);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
+                size_t count,
+                ITextureResource* const* textures,
+                ResourceState src,
+                ResourceState dst)
+            {
+                List<VkImageMemoryBarrier> barriers;
+                barriers.setCount(count);
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto image = static_cast<TextureResourceImpl*>(textures[i]);
+                    auto desc = image->getDesc();
+
+                    VkImageMemoryBarrier barrier = {};
+                    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                    barrier.image = image->m_image;
+                    barrier.oldLayout = translateImageLayout(src);
+                    barrier.newLayout = translateImageLayout(dst);
+                    barrier.subresourceRange.aspectMask;
+                    barrier.subresourceRange.baseArrayLayer = 0;
+                    barrier.subresourceRange.baseMipLevel = 0;
+                    barrier.subresourceRange.layerCount = desc->arraySize;
+                    barrier.subresourceRange.levelCount = desc->numMipLevels;
+                    barrier.srcAccessMask = calcAccessFlags(src);
+                    barrier.dstAccessMask = calcAccessFlags(dst);
+                    barriers.add(barrier);
+                }
+
+                VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+                VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, count, barriers.getBuffer());
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
+                size_t count,
+                IBufferResource* const* buffers,
+                ResourceState src,
+                ResourceState dst)
+            {
+                List<VkBufferMemoryBarrier> barriers;
+                barriers.setCount(count);
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
+
+                    VkBufferMemoryBarrier barrier = {};
+                    barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+                    barrier.srcAccessMask = calcAccessFlags(src);
+                    barrier.dstAccessMask = calcAccessFlags(dst);
+                    barrier.buffer = bufferImpl->m_buffer.m_buffer;
+                    barrier.offset = 0;
+                    barrier.size = bufferImpl->getDesc()->sizeInBytes;
+
+                    barriers.add(barrier);
+                }
+
+                VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+                VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, count, barriers.getBuffer(), 0, nullptr);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -4336,6 +4527,13 @@ public:
             }
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_commandBuffer;
+            return SLANG_OK;
+        }
     };
 
     class CommandQueueImpl
@@ -4393,6 +4591,13 @@ public:
         {
             auto& vkAPI = m_renderer->m_api;
             vkAPI.vkQueueWaitIdle(m_queue);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(NativeHandle* outHandle) override
+        {
+            *outHandle = (uint64_t)m_queue;
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override
@@ -5135,14 +5340,15 @@ VKDevice::~VKDevice()
     m_deviceQueue.destroy();
 
     descriptorSetAllocator.close();
-
+    
     if (m_device != VK_NULL_HANDLE)
     {
-        m_api.vkDestroyDevice(m_device, nullptr);
+        if (m_desc.existingDeviceHandles.getVkDevice() == 0)
+            m_api.vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
         if (m_debugReportCallback != VK_NULL_HANDLE)
             m_api.vkDestroyDebugReportCallbackEXT(m_api.m_instance, m_debugReportCallback, nullptr);
-        if (m_api.m_instance != VK_NULL_HANDLE)
+        if (m_api.m_instance != VK_NULL_HANDLE && m_desc.existingDeviceHandles.getVkInstance() == 0)
             m_api.vkDestroyInstance(m_api.m_instance, nullptr);
     }
 }
@@ -5221,101 +5427,114 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
+Result VKDevice::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NativeHandle::fromVulkanHandles((uint64_t)m_api.m_instance, (uint64_t)m_api.m_physicalDevice, (uint64_t)m_api.m_device);
+    return SLANG_OK;
+}
+
+Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool useValidationLayer)
 {
     m_features.clear();
 
     m_queueAllocCount = 0;
 
     VkInstance instance = VK_NULL_HANDLE;
-    VkApplicationInfo applicationInfo = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
-    applicationInfo.pApplicationName = "slang-gfx";
-    applicationInfo.pEngineName = "slang-gfx";
-    applicationInfo.apiVersion = VK_API_VERSION_1_1;
-    applicationInfo.engineVersion = 1;
-    applicationInfo.applicationVersion = 1;
-
-    Array<const char*, 4> instanceExtensions;
-
-    instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-
-    // Software (swiftshader) implementation currently does not support surface extension,
-    // so only use it with a hardware implementation.
-    if (!m_api.m_module->isSoftware())
+    if (handles.getVkInstance() == 0)
     {
-        instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
+        VkApplicationInfo applicationInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
+        applicationInfo.pApplicationName = "slang-gfx";
+        applicationInfo.pEngineName = "slang-gfx";
+        applicationInfo.apiVersion = VK_API_VERSION_1_1;
+        applicationInfo.engineVersion = 1;
+        applicationInfo.applicationVersion = 1;
+
+        Array<const char*, 4> instanceExtensions;
+
+        instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+        // Software (swiftshader) implementation currently does not support surface extension,
+        // so only use it with a hardware implementation.
+        if (!m_api.m_module->isSoftware())
+        {
+            instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
 #if SLANG_WINDOWS_FAMILY
-        instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+            instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
-        instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+            instanceExtensions.add(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
 #if ENABLE_VALIDATION_LAYER
-        instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+            instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 #endif
-    }
-
-    VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
-    instanceCreateInfo.pApplicationInfo = &applicationInfo;
-    instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
-    instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
-
-    if (useValidationLayer)
-    {
-        // Depending on driver version, validation layer may or may not exist.
-        // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
-        // drivers provide only the deprecated
-        // "VK_LAYER_LUNARG_standard_validation" layer.
-        // We will check what layers are available, and use the newer
-        // "VK_LAYER_KHRONOS_validation" layer when possible.
-        uint32_t layerCount;
-        m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-        List<VkLayerProperties> availableLayers;
-        availableLayers.setCount(layerCount);
-        m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
-
-        const char* layerNames[] = {nullptr};
-        for (auto& layer : availableLayers)
-        {
-            if (strncmp(
-                    layer.layerName,
-                    "VK_LAYER_KHRONOS_validation",
-                    sizeof("VK_LAYER_KHRONOS_validation")) == 0)
-            {
-                layerNames[0] = "VK_LAYER_KHRONOS_validation";
-                break;
-            }
         }
-        // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
-        // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
-        if (!layerNames[0])
+
+        VkInstanceCreateInfo instanceCreateInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
+        instanceCreateInfo.pApplicationInfo = &applicationInfo;
+        instanceCreateInfo.enabledExtensionCount = (uint32_t)instanceExtensions.getCount();
+        instanceCreateInfo.ppEnabledExtensionNames = &instanceExtensions[0];
+
+        if (useValidationLayer)
         {
+            // Depending on driver version, validation layer may or may not exist.
+            // Newer drivers comes with "VK_LAYER_KHRONOS_validation", while older
+            // drivers provide only the deprecated
+            // "VK_LAYER_LUNARG_standard_validation" layer.
+            // We will check what layers are available, and use the newer
+            // "VK_LAYER_KHRONOS_validation" layer when possible.
+            uint32_t layerCount;
+            m_api.vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+            List<VkLayerProperties> availableLayers;
+            availableLayers.setCount(layerCount);
+            m_api.vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.getBuffer());
+
+            const char* layerNames[] = { nullptr };
             for (auto& layer : availableLayers)
             {
                 if (strncmp(
-                        layer.layerName,
-                        "VK_LAYER_LUNARG_standard_validation",
-                        sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                    layer.layerName,
+                    "VK_LAYER_KHRONOS_validation",
+                    sizeof("VK_LAYER_KHRONOS_validation")) == 0)
                 {
-                    layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                    layerNames[0] = "VK_LAYER_KHRONOS_validation";
                     break;
                 }
             }
+            // On older drivers, only "VK_LAYER_LUNARG_standard_validation" exists,
+            // so we try to use it if we can't find "VK_LAYER_KHRONOS_validation".
+            if (!layerNames[0])
+            {
+                for (auto& layer : availableLayers)
+                {
+                    if (strncmp(
+                        layer.layerName,
+                        "VK_LAYER_LUNARG_standard_validation",
+                        sizeof("VK_LAYER_LUNARG_standard_validation")) == 0)
+                    {
+                        layerNames[0] = "VK_LAYER_LUNARG_standard_validation";
+                        break;
+                    }
+                }
+            }
+            if (layerNames[0])
+            {
+                instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
+                instanceCreateInfo.ppEnabledLayerNames = layerNames;
+            }
         }
-        if (layerNames[0])
+        uint32_t apiVersionsToTry[] = { VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0 };
+        for (auto apiVersion : apiVersionsToTry)
         {
-            instanceCreateInfo.enabledLayerCount = SLANG_COUNT_OF(layerNames);
-            instanceCreateInfo.ppEnabledLayerNames = layerNames;
+            applicationInfo.apiVersion = apiVersion;
+            if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
+            {
+                break;
+            }
         }
     }
-    uint32_t apiVersionsToTry[] = {VK_API_VERSION_1_2, VK_API_VERSION_1_1, VK_API_VERSION_1_0};
-    for (auto apiVersion : apiVersionsToTry)
+    else
     {
-        applicationInfo.apiVersion = apiVersion;
-        if (m_api.vkCreateInstance(&instanceCreateInfo, nullptr, &instance) == VK_SUCCESS)
-        {
-            break;
-        }
+        instance = (VkInstance)handles.getVkInstance();
     }
     if (!instance)
         return SLANG_FAIL;
@@ -5332,49 +5551,59 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
         SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateDebugReportCallbackEXT(instance, &debugCreateInfo, nullptr, &m_debugReportCallback));
     }
 
-    uint32_t numPhysicalDevices = 0;
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
-
-    List<VkPhysicalDevice> physicalDevices;
-    physicalDevices.setCount(numPhysicalDevices);
-    SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
-
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     Index selectedDeviceIndex = 0;
-
-    if (m_desc.adapter)
+    if (handles.getVkPhysicalDevice() == 0)
     {
-        selectedDeviceIndex = -1;
+        uint32_t numPhysicalDevices = 0;
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, nullptr));
 
-        String lowerAdapter = String(m_desc.adapter).toLower();
+        List<VkPhysicalDevice> physicalDevices;
+        physicalDevices.setCount(numPhysicalDevices);
+        SLANG_VK_RETURN_ON_FAIL(m_api.vkEnumeratePhysicalDevices(instance, &numPhysicalDevices, physicalDevices.getBuffer()));
 
-        for (Index i = 0; i < physicalDevices.getCount(); ++i)
+
+        if (m_desc.adapter)
         {
-            auto physicalDevice = physicalDevices[i];
+            selectedDeviceIndex = -1;
 
-            VkPhysicalDeviceProperties basicProps = {};
-            m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
+            String lowerAdapter = String(m_desc.adapter).toLower();
 
-            String lowerName = String(basicProps.deviceName).toLower();
-
-            if (lowerName.indexOf(lowerAdapter) != Index(-1))
+            for (Index i = 0; i < physicalDevices.getCount(); ++i)
             {
-                selectedDeviceIndex = i;
-                break;
+                auto physicalDevice = physicalDevices[i];
+
+                VkPhysicalDeviceProperties basicProps = {};
+                m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
+
+                String lowerName = String(basicProps.deviceName).toLower();
+
+                if (lowerName.indexOf(lowerAdapter) != Index(-1))
+                {
+                    selectedDeviceIndex = i;
+                    break;
+                }
+            }
+            if (selectedDeviceIndex < 0)
+            {
+                // Device not found
+                return SLANG_FAIL;
             }
         }
-        if (selectedDeviceIndex < 0)
-        {
-            // Device not found
-            return SLANG_FAIL;
-        }
+
+        physicalDevice = physicalDevices[selectedDeviceIndex];
+    }
+    else
+    {
+        physicalDevice = (VkPhysicalDevice)handles.getVkPhysicalDevice();
     }
 
-    SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevices[selectedDeviceIndex]));
+    SLANG_RETURN_ON_FAIL(m_api.initPhysicalDevice(physicalDevice));
 
     // Obtain the name of the selected adapter.
     {
         VkPhysicalDeviceProperties basicProps = {};
-        m_api.vkGetPhysicalDeviceProperties(physicalDevices[selectedDeviceIndex], &basicProps);
+        m_api.vkGetPhysicalDeviceProperties(physicalDevice, &basicProps);
         m_adapterName = basicProps.deviceName;
         m_info.adapterName = m_adapterName.begin();
     }
@@ -5601,19 +5830,27 @@ Result VKDevice::initVulkanInstanceAndDevice(bool useValidationLayer)
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
     assert(m_queueFamilyIndex >= 0);
 
-    float queuePriority = 0.0f;
-    VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    if (handles.getVkDevice() == 0)
+    {
+        float queuePriority = 0.0f;
+        VkDeviceQueueCreateInfo queueCreateInfo = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+        queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
 
-    deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+        deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
 
-    deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
-    deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
+        deviceCreateInfo.enabledExtensionCount = uint32_t(deviceExtensions.getCount());
+        deviceCreateInfo.ppEnabledExtensionNames = deviceExtensions.getBuffer();
 
-    if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
-        return SLANG_FAIL;
+        if (m_api.vkCreateDevice(m_api.m_physicalDevice, &deviceCreateInfo, nullptr, &m_device) != VK_SUCCESS)
+            return SLANG_FAIL;
+    }
+    else
+    {
+        m_device = (VkDevice)handles.getVkDevice();
+    }
+
     SLANG_RETURN_ON_FAIL(m_api.initDeviceProcs(m_device));
 
     return SLANG_OK;
@@ -5644,7 +5881,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
         if (initDeviceResult != SLANG_OK)
             continue;
         descriptorSetAllocator.m_api = &m_api;
-        initDeviceResult = initVulkanInstanceAndDevice(ENABLE_VALIDATION_LAYER != 0);
+        initDeviceResult = initVulkanInstanceAndDevice(desc.existingDeviceHandles, ENABLE_VALIDATION_LAYER != 0);
         if (initDeviceResult == SLANG_OK)
             break;
     }

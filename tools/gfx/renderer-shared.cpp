@@ -74,6 +74,11 @@ IResource* BufferResource::getInterface(const Slang::Guid& guid)
 SLANG_NO_THROW IResource::Type SLANG_MCALL BufferResource::getType() { return m_type; }
 SLANG_NO_THROW IBufferResource::Desc* SLANG_MCALL BufferResource::getDesc() { return &m_desc; }
 
+Result BufferResource::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NULL;
+    return SLANG_OK;
+}
 
 IResource* TextureResource::getInterface(const Slang::Guid& guid)
 {
@@ -85,6 +90,12 @@ IResource* TextureResource::getInterface(const Slang::Guid& guid)
 
 SLANG_NO_THROW IResource::Type SLANG_MCALL TextureResource::getType() { return m_type; }
 SLANG_NO_THROW ITextureResource::Desc* SLANG_MCALL TextureResource::getDesc() { return &m_desc; }
+
+Result TextureResource::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = NULL;
+    return SLANG_OK;
+}
 
 StageType mapStage(SlangStage stage)
 {
@@ -245,6 +256,12 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(NativeHandle* outHandle)
+{
+    *outHandle = {};
     return SLANG_OK;
 }
 
