@@ -825,11 +825,11 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     const char*     moduleName,
     slang::IBlob**  outDiagnostics)
 {
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     try
     {
         auto name = getNamePool()->getName(moduleName);
 
-        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
         auto module = findOrImportModule(name, SourceLoc(), &sink);
         sink.getBlobIfNeeded(outDiagnostics);
 
@@ -838,6 +838,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     }
     catch (const AbortCompilationException&)
     {
+        sink.getBlobIfNeeded(outDiagnostics);
         return nullptr;
     }
 }
