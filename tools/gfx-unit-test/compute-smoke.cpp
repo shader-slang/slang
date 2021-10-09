@@ -19,7 +19,7 @@ namespace gfx_test
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        GFX_CHECK_CALL_ABORT(loadShaderProgram(device, shaderProgram, "compute-smoke", slangReflection));
+        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "compute-smoke", "computeMain", slangReflection));
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
