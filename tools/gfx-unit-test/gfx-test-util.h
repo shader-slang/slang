@@ -9,10 +9,11 @@ namespace gfx_test
     void diagnoseIfNeeded(ISlangWriter* diagnosticWriter, slang::IBlob* diagnosticsBlob);
 
         /// Loads a compute shader module and produces a `gfx::IShaderProgram`.
-    Slang::Result loadShaderProgram(
+    Slang::Result loadComputeProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
         const char* shaderModuleName,
+        const char* entryPointName,
         slang::ProgramLayout*& slangReflection);
 
         /// Reads back the content of `buffer` and compares it against `expectedResult`.
