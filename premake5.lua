@@ -681,7 +681,7 @@ newoption {
      -- Generate shader.cpp from shader.slang
      prebuildmessage ("Generating shader.cpp from shader.slang")
      prebuildcommands {
-         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc.exe\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target dxbc"
+         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target dxbc"
      }
  
  -- Most of the other projects have more interesting configuration going
