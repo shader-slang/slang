@@ -129,9 +129,4 @@ namespace gfx_test
     {
         runTestImpl(mutableShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-
-    SLANG_UNIT_TEST(mutableShaderObjectGL)
-    {
-        runTestImpl(mutableShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::OpenGl);
-    }
 }
