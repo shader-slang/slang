@@ -37,7 +37,6 @@ Get the value of the mathematical constant pi in this type.
 __BuiltinFloatingPointType.This __BuiltinFloatingPointType.getPi();
 ```
 
-
 --------------------------------------------------------------------------------
 # `struct ConstantBuffer<T>`
 
@@ -66,7 +65,6 @@ __BuiltinFloatingPointType.This __BuiltinFloatingPointType.getPi();
 
 Sampling state for filtered texture fetches.
 
-
 --------------------------------------------------------------------------------
 # `struct SamplerComparisonState`
 
@@ -74,1285 +72,13 @@ Sampling state for filtered texture fetches.
 
 Sampling state for filtered texture fetches that include a comparison operation before filtering.
 
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture1D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture1D<T>.init`
-
-## Signature 
-
-```
-SamplerTexture1D<T>.init(
-    Texture1D            t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture1D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture1D<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture1D<T>.init(
-    RWTexture1D          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture1D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture1D<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture1D<T>.init(
-    RasterizerOrderedTexture1D t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture1DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture1DMS<T>.init`
-
-## Signature 
-
-```
-SamplerTexture1DMS<T>.init(
-    Texture1DMS          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture1DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture1DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture1DMS<T>.init(
-    RWTexture1DMS        t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture1DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture1DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture1DMS<T>.init(
-    RasterizerOrderedTexture1DMS t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture1DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture1DArray<T>.init`
-
-## Signature 
-
-```
-SamplerTexture1DArray<T>.init(
-    Texture1DArray       t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture1DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture1DArray<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture1DArray<T>.init(
-    RWTexture1DArray     t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture1DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture1DArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture1DArray<T>.init(
-    RasterizerOrderedTexture1DArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture1DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture1DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerTexture1DMSArray<T>.init(
-    Texture1DMSArray     t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture1DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture1DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture1DMSArray<T>.init(
-    RWTexture1DMSArray   t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture1DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture1DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture1DMSArray<T>.init(
-    RasterizerOrderedTexture1DMSArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture2D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture2D<T>.init`
-
-## Signature 
-
-```
-SamplerTexture2D<T>.init(
-    Texture2D            t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture2D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture2D<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture2D<T>.init(
-    RWTexture2D          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture2D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture2D<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture2D<T>.init(
-    RasterizerOrderedTexture2D t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture2DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture2DMS<T>.init`
-
-## Signature 
-
-```
-SamplerTexture2DMS<T>.init(
-    Texture2DMS          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture2DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture2DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture2DMS<T>.init(
-    RWTexture2DMS        t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture2DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture2DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture2DMS<T>.init(
-    RasterizerOrderedTexture2DMS t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture2DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture2DArray<T>.init`
-
-## Signature 
-
-```
-SamplerTexture2DArray<T>.init(
-    Texture2DArray       t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture2DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture2DArray<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture2DArray<T>.init(
-    RWTexture2DArray     t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture2DArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture2DArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture2DArray<T>.init(
-    RasterizerOrderedTexture2DArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture2DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture2DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerTexture2DMSArray<T>.init(
-    Texture2DMSArray     t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture2DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture2DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture2DMSArray<T>.init(
-    RWTexture2DMSArray   t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture2DMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture2DMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture2DMSArray<T>.init(
-    RasterizerOrderedTexture2DMSArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture3D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture3D<T>.init`
-
-## Signature 
-
-```
-SamplerTexture3D<T>.init(
-    Texture3D            t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture3D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture3D<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture3D<T>.init(
-    RWTexture3D          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture3D<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture3D<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture3D<T>.init(
-    RasterizerOrderedTexture3D t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTexture3DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTexture3DMS<T>.init`
-
-## Signature 
-
-```
-SamplerTexture3DMS<T>.init(
-    Texture3DMS          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRWTexture3DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRWTexture3DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRWTexture3DMS<T>.init(
-    RWTexture3DMS        t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTexture3DMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTexture3DMS<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTexture3DMS<T>.init(
-    RasterizerOrderedTexture3DMS t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTextureCube<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTextureCube<T>.init`
-
-## Signature 
-
-```
-SamplerTextureCube<T>.init(
-    TextureCube          t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTextureCube<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTextureCube<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTextureCube<T>.init(
-    RasterizerOrderedTextureCube t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTextureCubeMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTextureCubeMS<T>.init`
-
-## Signature 
-
-```
-SamplerTextureCubeMS<T>.init(
-    TextureCubeMS        t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTextureCubeMS<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTextureCubeMS<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTextureCubeMS<T>.init(
-    RasterizerOrderedTextureCubeMS t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTextureCubeArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTextureCubeArray<T>.init`
-
-## Signature 
-
-```
-SamplerTextureCubeArray<T>.init(
-    TextureCubeArray     t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTextureCubeArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTextureCubeArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTextureCubeArray<T>.init(
-    RasterizerOrderedTextureCubeArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerTextureCubeMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerTextureCubeMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerTextureCubeMSArray<T>.init(
-    TextureCubeMSArray   t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `struct SamplerRasterizerOrderedTextureCubeMSArray<T>`
-
-## Generic Parameters
-
-* `T`
-## Methods
-
-* `init`
-
---------------------------------------------------------------------------------
-# `SamplerRasterizerOrderedTextureCubeMSArray<T>.init`
-
-## Signature 
-
-```
-SamplerRasterizerOrderedTextureCubeMSArray<T>.init(
-    RasterizerOrderedTextureCubeMSArray t,
-    SamplerState         s);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `t`
-* `s`
-
---------------------------------------------------------------------------------
-# `texture`
-
-## Signature 
-
-```
-T texture<T>(
-    SamplerTexture1D     t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerRWTexture1D   t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture1D t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerTexture1DMS   t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerRWTexture1DMS t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DMS t,
-    vector<float,1>      location);
-T texture<T>(
-    SamplerTexture1DArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRWTexture1DArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerTexture1DMSArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRWTexture1DMSArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture1DMSArray t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerTexture2D     t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRWTexture2D   t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture2D t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerTexture2DMS   t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRWTexture2DMS t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DMS t,
-    vector<float,2>      location);
-T texture<T>(
-    SamplerTexture2DArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRWTexture2DArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTexture2DMSArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRWTexture2DMSArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture2DMSArray t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTexture3D     t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRWTexture3D   t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture3D t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTexture3DMS   t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRWTexture3DMS t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTexture3DMS t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTextureCube   t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTextureCube t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTextureCubeMS t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTextureCubeMS t,
-    vector<float,3>      location);
-T texture<T>(
-    SamplerTextureCubeArray t,
-    vector<float,4>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTextureCubeArray t,
-    vector<float,4>      location);
-T texture<T>(
-    SamplerTextureCubeMSArray t,
-    vector<float,4>      location);
-T texture<T>(
-    SamplerRasterizerOrderedTextureCubeMSArray t,
-    vector<float,4>      location);
-```
-
-## Availability
-
-**GLSL** **HLSL** 
-
-## Parameters
-
-* `T`
-* `t`
-* `location`
-
 --------------------------------------------------------------------------------
 # `struct Texture1D<T>`
 
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -1681,6 +407,7 @@ T Texture1D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -2828,6 +1555,7 @@ vector<uint,4> Texture1D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -3156,6 +1884,7 @@ T RWTexture1D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -4303,6 +3032,7 @@ vector<uint,4> RWTexture1D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -4629,6 +3359,7 @@ T RasterizerOrderedTexture1D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -5776,6 +4507,7 @@ vector<uint,4> RasterizerOrderedTexture1D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -5884,6 +4616,7 @@ T Texture1DMS<T>.subscript(uint location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -5992,6 +4725,7 @@ T RWTexture1DMS<T>.subscript(uint location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -6100,6 +4834,7 @@ T RasterizerOrderedTexture1DMS<T>.subscript(uint location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -6433,6 +5168,7 @@ T Texture1DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -7580,6 +6316,7 @@ vector<uint,4> Texture1DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -7915,6 +6652,7 @@ T RWTexture1DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -9062,6 +7800,7 @@ vector<uint,4> RWTexture1DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -9395,6 +8134,7 @@ T RasterizerOrderedTexture1DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -10542,6 +9282,7 @@ vector<uint,4> RasterizerOrderedTexture1DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -10655,6 +9396,7 @@ T Texture1DMSArray<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -10768,6 +9510,7 @@ T RWTexture1DMSArray<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -10881,6 +9624,7 @@ T RasterizerOrderedTexture1DMSArray<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -11214,6 +9958,7 @@ T Texture2D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -12401,6 +11146,7 @@ vector<uint,4> Texture2D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -12736,6 +11482,7 @@ T RWTexture2D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -13923,6 +12670,7 @@ vector<uint,4> RWTexture2D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -14256,6 +13004,7 @@ T RasterizerOrderedTexture2D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -15443,6 +14192,7 @@ vector<uint,4> RasterizerOrderedTexture2D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -15556,6 +14306,7 @@ T Texture2DMS<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -15669,6 +14420,7 @@ T RWTexture2DMS<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -15782,6 +14534,7 @@ T RasterizerOrderedTexture2DMS<T>.subscript(vector<uint,2> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -16120,6 +14873,7 @@ T Texture2DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -17307,6 +16061,7 @@ vector<uint,4> Texture2DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -17647,6 +16402,7 @@ T RWTexture2DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -18834,6 +17590,7 @@ vector<uint,4> RWTexture2DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -19172,6 +17929,7 @@ T RasterizerOrderedTexture2DArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -20359,6 +19117,7 @@ vector<uint,4> RasterizerOrderedTexture2DArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -20477,6 +19236,7 @@ T Texture2DMSArray<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -20595,6 +19355,7 @@ T RWTexture2DMSArray<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -20713,6 +19474,7 @@ T RasterizerOrderedTexture2DMSArray<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -21051,6 +19813,7 @@ T Texture3D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -22198,6 +20961,7 @@ vector<uint,4> Texture3D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -22538,6 +21302,7 @@ T RWTexture3D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -23685,6 +22450,7 @@ vector<uint,4> RWTexture3D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -24023,6 +22789,7 @@ T RasterizerOrderedTexture3D<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -25170,6 +23937,7 @@ vector<uint,4> RasterizerOrderedTexture3D.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -25288,6 +24056,7 @@ T Texture3DMS<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -25406,6 +24175,7 @@ T RWTexture3DMS<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -25524,6 +24294,7 @@ T RasterizerOrderedTexture3DMS<T>.subscript(vector<uint,3> location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -25786,6 +24557,7 @@ T TextureCube<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -26933,6 +25705,7 @@ vector<uint,4> TextureCube.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -27195,6 +25968,7 @@ T RasterizerOrderedTextureCube<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -28342,6 +27116,7 @@ vector<uint,4> RasterizerOrderedTextureCube.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -28441,6 +27216,7 @@ T TextureCubeMS<T>.Load(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -28540,6 +27316,7 @@ T RasterizerOrderedTextureCubeMS<T>.Load(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -28731,6 +27508,7 @@ T TextureCubeArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -29878,6 +28656,7 @@ vector<uint,4> TextureCubeArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `CalculateLevelOfDetail`
@@ -30069,6 +28848,7 @@ T RasterizerOrderedTextureCubeArray<T>.SampleLevel(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `Gather`
@@ -31216,6 +29996,7 @@ vector<uint,4> RasterizerOrderedTextureCubeArray.GatherAlpha(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -31285,6 +30066,7 @@ vector<float,2> TextureCubeMSArray<T>.GetSamplePosition(int s);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -31349,12 +30131,27045 @@ vector<float,2> RasterizerOrderedTextureCubeMSArray<T>.GetSamplePosition(int s);
 * `s`
 
 --------------------------------------------------------------------------------
+# `struct Sampler1D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float Sampler1D<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float Sampler1D<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler1D<T>.GetDimensions(out uint width);
+void Sampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             numberOfLevels);
+void Sampler1D<T>.GetDimensions(out float width);
+void Sampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1D<T>.Load(vector<int,2> location);
+/// See Availability 2
+T Sampler1D<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset);
+/// See Availability 3
+T Sampler1D<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.subscript`
+
+## Signature 
+
+```
+T Sampler1D<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1D<T>.Sample(vector<float,1> location);
+/// See Availability 2
+T Sampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T Sampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T Sampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.SampleBias`
+
+## Signature 
+
+```
+T Sampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias);
+T Sampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.SampleCmp`
+
+## Signature 
+
+```
+float Sampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+float Sampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float Sampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+/// See Availability 2
+float Sampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T Sampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T Sampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `Sampler1D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level);
+/// See Availability 2
+T Sampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1D.Gather(vector<float,1> location);
+vector<T,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1D.GatherRed(vector<float,1> location);
+vector<T,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1D.GatherGreen(vector<float,1> location);
+vector<T,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1D.GatherBlue(vector<float,1> location);
+vector<T,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1D.GatherAlpha(vector<float,1> location);
+vector<T,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1D.Gather(vector<float,1> location);
+vector<float,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1D.GatherRed(vector<float,1> location);
+vector<float,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1D.GatherGreen(vector<float,1> location);
+vector<float,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1D.GatherBlue(vector<float,1> location);
+vector<float,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1D.GatherAlpha(vector<float,1> location);
+vector<float,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1D.Gather(vector<float,1> location);
+vector<int,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1D.GatherRed(vector<float,1> location);
+vector<int,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1D.GatherGreen(vector<float,1> location);
+vector<int,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1D.GatherBlue(vector<float,1> location);
+vector<int,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1D.GatherAlpha(vector<float,1> location);
+vector<int,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1D.Gather(vector<float,1> location);
+vector<uint,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherRed(vector<float,1> location);
+vector<uint,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherGreen(vector<float,1> location);
+vector<uint,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherBlue(vector<float,1> location);
+vector<uint,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherAlpha(vector<float,1> location);
+vector<uint,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler1D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RWSampler1D<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RWSampler1D<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler1D<T>.GetDimensions(out uint width);
+void RWSampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             numberOfLevels);
+void RWSampler1D<T>.GetDimensions(out float width);
+void RWSampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1D<T>.Load(vector<int,1> location);
+/// See Availability 2
+T RWSampler1D<T>.Load(
+    vector<int,1>        location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RWSampler1D<T>.Load(
+    vector<int,1>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler1D<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1D<T>.Sample(vector<float,1> location);
+/// See Availability 2
+T RWSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RWSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T RWSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.SampleBias`
+
+## Signature 
+
+```
+T RWSampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias);
+T RWSampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RWSampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+float RWSampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RWSampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+/// See Availability 2
+float RWSampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T RWSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T RWSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level);
+/// See Availability 2
+T RWSampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1D.Gather(vector<float,1> location);
+vector<T,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherRed(vector<float,1> location);
+vector<T,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherGreen(vector<float,1> location);
+vector<T,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherBlue(vector<float,1> location);
+vector<T,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherAlpha(vector<float,1> location);
+vector<T,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1D.Gather(vector<float,1> location);
+vector<float,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherRed(vector<float,1> location);
+vector<float,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherGreen(vector<float,1> location);
+vector<float,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherBlue(vector<float,1> location);
+vector<float,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherAlpha(vector<float,1> location);
+vector<float,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1D.Gather(vector<float,1> location);
+vector<int,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherRed(vector<float,1> location);
+vector<int,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherGreen(vector<float,1> location);
+vector<int,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherBlue(vector<float,1> location);
+vector<int,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherAlpha(vector<float,1> location);
+vector<int,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1D.Gather(vector<float,1> location);
+vector<uint,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherRed(vector<float,1> location);
+vector<uint,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherGreen(vector<float,1> location);
+vector<uint,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherBlue(vector<float,1> location);
+vector<uint,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherAlpha(vector<float,1> location);
+vector<uint,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler1D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1D<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1D<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler1D<T>.GetDimensions(out uint width);
+void RasterizerOrderedSampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler1D<T>.GetDimensions(out float width);
+void RasterizerOrderedSampler1D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1D<T>.Load(vector<int,1> location);
+T RasterizerOrderedSampler1D<T>.Load(
+    vector<int,1>        location,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1D<T>.Load(
+    vector<int,1>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1D<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1D<T>.Sample(vector<float,1> location);
+/// See Availability 2
+T RasterizerOrderedSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RasterizerOrderedSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T RasterizerOrderedSampler1D<T>.Sample(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias);
+T RasterizerOrderedSampler1D<T>.SampleBias(
+    vector<float,1>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+float RasterizerOrderedSampler1D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RasterizerOrderedSampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue);
+/// See Availability 2
+float RasterizerOrderedSampler1D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,1>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T RasterizerOrderedSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1D<T>.SampleGrad(
+    vector<float,1>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level);
+/// See Availability 2
+T RasterizerOrderedSampler1D<T>.SampleLevel(
+    vector<float,1>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.Gather(vector<float,1> location);
+vector<T,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherRed(vector<float,1> location);
+vector<T,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherGreen(vector<float,1> location);
+vector<T,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherBlue(vector<float,1> location);
+vector<T,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherAlpha(vector<float,1> location);
+vector<T,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.Gather(vector<float,1> location);
+vector<float,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherRed(vector<float,1> location);
+vector<float,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherGreen(vector<float,1> location);
+vector<float,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherBlue(vector<float,1> location);
+vector<float,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherAlpha(vector<float,1> location);
+vector<float,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.Gather(vector<float,1> location);
+vector<int,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherRed(vector<float,1> location);
+vector<int,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherGreen(vector<float,1> location);
+vector<int,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherBlue(vector<float,1> location);
+vector<int,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherAlpha(vector<float,1> location);
+vector<int,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.Gather(vector<float,1> location);
+vector<uint,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.Gather(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherRed(vector<float,1> location);
+vector<uint,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherRed(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherGreen(vector<float,1> location);
+vector<uint,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherGreen(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherBlue(vector<float,1> location);
+vector<uint,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherBlue(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherAlpha(vector<float,1> location);
+vector<uint,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1D.GatherAlpha(
+    vector<float,1>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct Sampler1DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler1DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             sampleCount);
+void Sampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void Sampler1DMS<T>.GetDimensions(
+    out float            width,
+    out float            sampleCount);
+void Sampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> Sampler1DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex);
+T Sampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T Sampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMS<T>.subscript`
+
+## Signature 
+
+```
+T Sampler1DMS<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler1DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler1DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             sampleCount);
+void RWSampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RWSampler1DMS<T>.GetDimensions(
+    out float            width,
+    out float            sampleCount);
+void RWSampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RWSampler1DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex);
+T RWSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T RWSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMS<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler1DMS<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler1DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler1DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             sampleCount);
+void RasterizerOrderedSampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler1DMS<T>.GetDimensions(
+    out float            width,
+    out float            sampleCount);
+void RasterizerOrderedSampler1DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSampler1DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1DMS<T>.Load(
+    vector<int,1>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMS<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1DMS<T>.subscript(uint location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct Sampler1DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float Sampler1DArray<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float Sampler1DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler1DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements);
+void Sampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             numberOfLevels);
+void Sampler1DArray<T>.GetDimensions(
+    out float            width,
+    out float            elements);
+void Sampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DArray<T>.Load(vector<int,3> location);
+T Sampler1DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,1>        offset);
+/// See Availability 2
+T Sampler1DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.subscript`
+
+## Signature 
+
+```
+T Sampler1DArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DArray<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T Sampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T Sampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T Sampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T Sampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T Sampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float Sampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float Sampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float Sampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float Sampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T Sampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T Sampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T Sampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1DArray.Gather(vector<float,2> location);
+vector<T,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherRed(vector<float,2> location);
+vector<T,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherGreen(vector<float,2> location);
+vector<T,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherBlue(vector<float,2> location);
+vector<T,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherAlpha(vector<float,2> location);
+vector<T,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1DArray.Gather(vector<float,2> location);
+vector<float,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherRed(vector<float,2> location);
+vector<float,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherGreen(vector<float,2> location);
+vector<float,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherBlue(vector<float,2> location);
+vector<float,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherAlpha(vector<float,2> location);
+vector<float,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1DArray.Gather(vector<float,2> location);
+vector<int,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherRed(vector<float,2> location);
+vector<int,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherGreen(vector<float,2> location);
+vector<int,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherBlue(vector<float,2> location);
+vector<int,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherAlpha(vector<float,2> location);
+vector<int,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1DArray.Gather(vector<float,2> location);
+vector<uint,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherRed(vector<float,2> location);
+vector<uint,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherGreen(vector<float,2> location);
+vector<uint,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherBlue(vector<float,2> location);
+vector<uint,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherAlpha(vector<float,2> location);
+vector<uint,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler1DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RWSampler1DArray<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RWSampler1DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler1DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements);
+void RWSampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             numberOfLevels);
+void RWSampler1DArray<T>.GetDimensions(
+    out float            width,
+    out float            elements);
+void RWSampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DArray<T>.Load(vector<int,2> location);
+/// See Availability 2
+T RWSampler1DArray<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RWSampler1DArray<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler1DArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DArray<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T RWSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RWSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T RWSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T RWSampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T RWSampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float RWSampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float RWSampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RWSampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float RWSampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T RWSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T RWSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T RWSampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1DArray.Gather(vector<float,2> location);
+vector<T,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherRed(vector<float,2> location);
+vector<T,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherGreen(vector<float,2> location);
+vector<T,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherBlue(vector<float,2> location);
+vector<T,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<T,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1DArray.Gather(vector<float,2> location);
+vector<float,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherRed(vector<float,2> location);
+vector<float,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherGreen(vector<float,2> location);
+vector<float,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherBlue(vector<float,2> location);
+vector<float,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<float,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1DArray.Gather(vector<float,2> location);
+vector<int,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherRed(vector<float,2> location);
+vector<int,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherGreen(vector<float,2> location);
+vector<int,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherBlue(vector<float,2> location);
+vector<int,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<int,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.Gather(vector<float,2> location);
+vector<uint,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherRed(vector<float,2> location);
+vector<uint,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherGreen(vector<float,2> location);
+vector<uint,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherBlue(vector<float,2> location);
+vector<uint,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<uint,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler1DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1DArray<T>.CalculateLevelOfDetail(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,1> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler1DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements);
+void RasterizerOrderedSampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler1DArray<T>.GetDimensions(
+    out float            width,
+    out float            elements);
+void RasterizerOrderedSampler1DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DArray<T>.Load(vector<int,2> location);
+T RasterizerOrderedSampler1DArray<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1DArray<T>.Load(
+    vector<int,2>        location,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1DArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DArray<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T RasterizerOrderedSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 3
+T RasterizerOrderedSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp);
+T RasterizerOrderedSampler1DArray<T>.Sample(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T RasterizerOrderedSampler1DArray<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float RasterizerOrderedSampler1DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RasterizerOrderedSampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float RasterizerOrderedSampler1DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY);
+T RasterizerOrderedSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1DArray<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,1>      gradX,
+    vector<float,1>      gradY,
+    vector<int,1>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T RasterizerOrderedSampler1DArray<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,1>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.Gather(vector<float,2> location);
+vector<T,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherRed(vector<float,2> location);
+vector<T,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherGreen(vector<float,2> location);
+vector<T,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherBlue(vector<float,2> location);
+vector<T,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<T,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.Gather(vector<float,2> location);
+vector<float,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherRed(vector<float,2> location);
+vector<float,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherGreen(vector<float,2> location);
+vector<float,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherBlue(vector<float,2> location);
+vector<float,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<float,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.Gather(vector<float,2> location);
+vector<int,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherRed(vector<float,2> location);
+vector<int,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherGreen(vector<float,2> location);
+vector<int,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherBlue(vector<float,2> location);
+vector<int,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<int,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler1DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.Gather(vector<float,2> location);
+vector<uint,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.Gather(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherRed(vector<float,2> location);
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherRed(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherGreen(vector<float,2> location);
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherGreen(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherBlue(vector<float,2> location);
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherBlue(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherAlpha(vector<float,2> location);
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler1DArray.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,1>        offset1,
+    vector<int,1>        offset2,
+    vector<int,1>        offset3,
+    vector<int,1>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct Sampler1DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler1DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount);
+void Sampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void Sampler1DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            elements,
+    out float            sampleCount);
+void Sampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> Sampler1DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T Sampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T Sampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler1DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T Sampler1DMSArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler1DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler1DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount);
+void RWSampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RWSampler1DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            elements,
+    out float            sampleCount);
+void RWSampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RWSampler1DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T RWSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T RWSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler1DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler1DMSArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler1DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler1DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount);
+void RasterizerOrderedSampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler1DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            elements,
+    out float            sampleCount);
+void RasterizerOrderedSampler1DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSampler1DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler1DMSArray<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,1>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler1DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler1DMSArray<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct Sampler2D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float Sampler2D<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float Sampler2D<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler2D<T>.GetDimensions(
+    out uint             width,
+    out uint             height);
+void Sampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             numberOfLevels);
+void Sampler2D<T>.GetDimensions(
+    out float            width,
+    out float            height);
+void Sampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2D<T>.Load(vector<int,3> location);
+T Sampler2D<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2D<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.subscript`
+
+## Signature 
+
+```
+T Sampler2D<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2D<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T Sampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T Sampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T Sampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.SampleBias`
+
+## Signature 
+
+```
+T Sampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T Sampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.SampleCmp`
+
+## Signature 
+
+```
+float Sampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float Sampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float Sampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float Sampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T Sampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `Sampler2D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T Sampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<T,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<float,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<int,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler2D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RWSampler2D<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RWSampler2D<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler2D<T>.GetDimensions(
+    out uint             width,
+    out uint             height);
+void RWSampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             numberOfLevels);
+void RWSampler2D<T>.GetDimensions(
+    out float            width,
+    out float            height);
+void RWSampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2D<T>.Load(vector<int,2> location);
+/// See Availability 2
+T RWSampler2D<T>.Load(
+    vector<int,2>        location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RWSampler2D<T>.Load(
+    vector<int,2>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler2D<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2D<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T RWSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RWSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T RWSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.SampleBias`
+
+## Signature 
+
+```
+T RWSampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T RWSampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RWSampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float RWSampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RWSampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float RWSampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T RWSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T RWSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T RWSampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler2D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2D<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2D<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler2D<T>.GetDimensions(
+    out uint             width,
+    out uint             height);
+void RasterizerOrderedSampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler2D<T>.GetDimensions(
+    out float            width,
+    out float            height);
+void RasterizerOrderedSampler2D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2D<T>.Load(vector<int,2> location);
+T RasterizerOrderedSampler2D<T>.Load(
+    vector<int,2>        location,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2D<T>.Load(
+    vector<int,2>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2D<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2D<T>.Sample(vector<float,2> location);
+/// See Availability 2
+T RasterizerOrderedSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RasterizerOrderedSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T RasterizerOrderedSampler2D<T>.Sample(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias);
+T RasterizerOrderedSampler2D<T>.SampleBias(
+    vector<float,2>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+float RasterizerOrderedSampler2D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RasterizerOrderedSampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue);
+/// See Availability 2
+float RasterizerOrderedSampler2D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,2>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T RasterizerOrderedSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2D<T>.SampleGrad(
+    vector<float,2>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level);
+/// See Availability 2
+T RasterizerOrderedSampler2D<T>.SampleLevel(
+    vector<float,2>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2D.Gather(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.Gather(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2D.GatherRed(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherRed(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2D.GatherGreen(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherGreen(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2D.GatherBlue(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherBlue(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2D.GatherAlpha(vector<float,2> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2D.GatherAlpha(
+    vector<float,2>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct Sampler2DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler2DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount);
+void Sampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void Sampler2DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            sampleCount);
+void Sampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> Sampler2DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T Sampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMS<T>.subscript`
+
+## Signature 
+
+```
+T Sampler2DMS<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler2DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler2DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount);
+void RWSampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RWSampler2DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            sampleCount);
+void RWSampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RWSampler2DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T RWSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T RWSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMS<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler2DMS<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler2DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler2DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount);
+void RasterizerOrderedSampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler2DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            sampleCount);
+void RasterizerOrderedSampler2DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSampler2DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2DMS<T>.Load(
+    vector<int,2>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMS<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2DMS<T>.subscript(vector<uint,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct Sampler2DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float Sampler2DArray<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float Sampler2DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler2DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements);
+void Sampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             numberOfLevels);
+void Sampler2DArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements);
+void Sampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DArray<T>.Load(vector<int,4> location);
+T Sampler2DArray<T>.Load(
+    vector<int,4>        location,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2DArray<T>.Load(
+    vector<int,4>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.subscript`
+
+## Signature 
+
+```
+T Sampler2DArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DArray<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T Sampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T Sampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T Sampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T Sampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T Sampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float Sampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float Sampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float Sampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float Sampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T Sampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T Sampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<T,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<float,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<int,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> Sampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler2DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RWSampler2DArray<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RWSampler2DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler2DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements);
+void RWSampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             numberOfLevels);
+void RWSampler2DArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements);
+void RWSampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DArray<T>.Load(vector<int,3> location);
+/// See Availability 2
+T RWSampler2DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RWSampler2DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler2DArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DArray<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T RWSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RWSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T RWSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T RWSampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T RWSampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float RWSampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float RWSampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RWSampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float RWSampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T RWSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T RWSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T RWSampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RWSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler2DArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2DArray<T>.CalculateLevelOfDetail(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2DArray<T>.CalculateLevelOfDetailUnclamped(vector<float,2> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler2DArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements);
+void RasterizerOrderedSampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler2DArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements);
+void RasterizerOrderedSampler2DArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DArray<T>.Load(vector<int,3> location);
+T RasterizerOrderedSampler2DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2DArray<T>.Load(
+    vector<int,3>        location,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2DArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DArray<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T RasterizerOrderedSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+T RasterizerOrderedSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp);
+T RasterizerOrderedSampler2DArray<T>.Sample(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T RasterizerOrderedSampler2DArray<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float RasterizerOrderedSampler2DArray<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RasterizerOrderedSampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float RasterizerOrderedSampler2DArray<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY);
+T RasterizerOrderedSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2DArray<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,2>      gradX,
+    vector<float,2>      gradY,
+    vector<int,2>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T RasterizerOrderedSampler2DArray<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,2>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2DArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<T,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<float,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<int,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler2DArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2DArray.Gather(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.Gather(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherRed(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherRed(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherGreen(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherGreen(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherBlue(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherBlue(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherAlpha(vector<float,3> location);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset,
+    out uint             status);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4);
+/// See Availability 3
+vector<uint,4> RasterizerOrderedSampler2DArray.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,2>        offset1,
+    vector<int,2>        offset2,
+    vector<int,2>        offset3,
+    vector<int,2>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct Sampler2DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler2DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount);
+void Sampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void Sampler2DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount);
+void Sampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> Sampler2DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T Sampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T Sampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler2DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T Sampler2DMSArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler2DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler2DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount);
+void RWSampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RWSampler2DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount);
+void RWSampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RWSampler2DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T RWSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T RWSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler2DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler2DMSArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler2DMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler2DMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount);
+void RasterizerOrderedSampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler2DMSArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount);
+void RasterizerOrderedSampler2DMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSampler2DMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMSArray<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler2DMSArray<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,2>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler2DMSArray<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler2DMSArray<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct Sampler3D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float Sampler3D<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float Sampler3D<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler3D<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth);
+void Sampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             numberOfLevels);
+void Sampler3D<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth);
+void Sampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler3D<T>.Load(vector<int,4> location);
+T Sampler3D<T>.Load(
+    vector<int,4>        location,
+    vector<int,3>        offset);
+/// See Availability 2
+T Sampler3D<T>.Load(
+    vector<int,4>        location,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.subscript`
+
+## Signature 
+
+```
+T Sampler3D<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler3D<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T Sampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 3
+T Sampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp);
+T Sampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.SampleBias`
+
+## Signature 
+
+```
+T Sampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T Sampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.SampleCmp`
+
+## Signature 
+
+```
+float Sampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float Sampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float Sampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float Sampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+T Sampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset);
+/// See Availability 2
+T Sampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `Sampler3D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T Sampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension Sampler3D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler3D.Gather(vector<float,3> location);
+vector<T,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler3D.GatherRed(vector<float,3> location);
+vector<T,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler3D.GatherGreen(vector<float,3> location);
+vector<T,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler3D.GatherBlue(vector<float,3> location);
+vector<T,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> Sampler3D.GatherAlpha(vector<float,3> location);
+vector<T,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler3D.Gather(vector<float,3> location);
+vector<float,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler3D.GatherRed(vector<float,3> location);
+vector<float,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler3D.GatherGreen(vector<float,3> location);
+vector<float,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler3D.GatherBlue(vector<float,3> location);
+vector<float,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> Sampler3D.GatherAlpha(vector<float,3> location);
+vector<float,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler3D.Gather(vector<float,3> location);
+vector<int,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler3D.GatherRed(vector<float,3> location);
+vector<int,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler3D.GatherGreen(vector<float,3> location);
+vector<int,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler3D.GatherBlue(vector<float,3> location);
+vector<int,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> Sampler3D.GatherAlpha(vector<float,3> location);
+vector<int,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension Sampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler3D.Gather(vector<float,3> location);
+vector<uint,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherRed(vector<float,3> location);
+vector<uint,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherGreen(vector<float,3> location);
+vector<uint,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherBlue(vector<float,3> location);
+vector<uint,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `Sampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherAlpha(vector<float,3> location);
+vector<uint,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> Sampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler3D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RWSampler3D<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RWSampler3D<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler3D<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth);
+void RWSampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             numberOfLevels);
+void RWSampler3D<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth);
+void RWSampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler3D<T>.Load(vector<int,3> location);
+/// See Availability 2
+T RWSampler3D<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset);
+/// See Availability 3
+T RWSampler3D<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** **CUDA** 
+2. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler3D<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler3D<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T RWSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 3
+T RWSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp);
+T RWSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.SampleBias`
+
+## Signature 
+
+```
+T RWSampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T RWSampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RWSampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float RWSampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RWSampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float RWSampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+T RWSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset);
+/// See Availability 2
+T RWSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T RWSampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler3D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler3D.Gather(vector<float,3> location);
+vector<T,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherRed(vector<float,3> location);
+vector<T,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherGreen(vector<float,3> location);
+vector<T,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherBlue(vector<float,3> location);
+vector<T,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherAlpha(vector<float,3> location);
+vector<T,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler3D.Gather(vector<float,3> location);
+vector<float,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherRed(vector<float,3> location);
+vector<float,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherGreen(vector<float,3> location);
+vector<float,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherBlue(vector<float,3> location);
+vector<float,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherAlpha(vector<float,3> location);
+vector<float,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler3D.Gather(vector<float,3> location);
+vector<int,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherRed(vector<float,3> location);
+vector<int,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherGreen(vector<float,3> location);
+vector<int,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherBlue(vector<float,3> location);
+vector<int,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherAlpha(vector<float,3> location);
+vector<int,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RWSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler3D.Gather(vector<float,3> location);
+vector<uint,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherRed(vector<float,3> location);
+vector<uint,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherGreen(vector<float,3> location);
+vector<uint,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherBlue(vector<float,3> location);
+vector<uint,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RWSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherAlpha(vector<float,3> location);
+vector<uint,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RWSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler3D<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `subscript`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler3D<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler3D<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler3D<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth);
+void RasterizerOrderedSampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler3D<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth);
+void RasterizerOrderedSampler3D<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler3D<T>.Load(vector<int,3> location);
+T RasterizerOrderedSampler3D<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler3D<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler3D<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler3D<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T RasterizerOrderedSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 3
+T RasterizerOrderedSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp);
+T RasterizerOrderedSampler3D<T>.Sample(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+3. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+T RasterizerOrderedSampler3D<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+float RasterizerOrderedSampler3D<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+/// See Availability 1
+float RasterizerOrderedSampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+/// See Availability 2
+float RasterizerOrderedSampler3D<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.SampleGrad`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+T RasterizerOrderedSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler3D<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY,
+    vector<int,3>        offset,
+    float                lodClamp);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **GLSL** `GL_ARB_sparse_texture_clamp` **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+* `offset`
+* `lodClamp`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D<T>.SampleLevel`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+/// See Availability 2
+T RasterizerOrderedSampler3D<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level,
+    vector<int,3>        offset);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `level`
+* `offset`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler3D`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.Gather(vector<float,3> location);
+vector<T,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherRed(vector<float,3> location);
+vector<T,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherGreen(vector<float,3> location);
+vector<T,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherBlue(vector<float,3> location);
+vector<T,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherAlpha(vector<float,3> location);
+vector<T,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.Gather(vector<float,3> location);
+vector<float,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherRed(vector<float,3> location);
+vector<float,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherGreen(vector<float,3> location);
+vector<float,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherBlue(vector<float,3> location);
+vector<float,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherAlpha(vector<float,3> location);
+vector<float,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.Gather(vector<float,3> location);
+vector<int,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherRed(vector<float,3> location);
+vector<int,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherGreen(vector<float,3> location);
+vector<int,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherBlue(vector<float,3> location);
+vector<int,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherAlpha(vector<float,3> location);
+vector<int,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSampler3D`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.Gather(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherRed(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherGreen(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherBlue(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3D.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherAlpha(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSampler3D.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct Sampler3DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `Sampler3DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void Sampler3DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount);
+void Sampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void Sampler3DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount);
+void Sampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `Sampler3DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> Sampler3DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `Sampler3DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T Sampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T Sampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset);
+/// See Availability 2
+T Sampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `Sampler3DMS<T>.subscript`
+
+## Signature 
+
+```
+T Sampler3DMS<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RWSampler3DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RWSampler3DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RWSampler3DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount);
+void RWSampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RWSampler3DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount);
+void RWSampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RWSampler3DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RWSampler3DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RWSampler3DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RWSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T RWSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset);
+/// See Availability 2
+T RWSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RWSampler3DMS<T>.subscript`
+
+## Signature 
+
+```
+T RWSampler3DMS<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSampler3DMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+* `subscript`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3DMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSampler3DMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount);
+void RasterizerOrderedSampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             depth,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSampler3DMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount);
+void RasterizerOrderedSampler3DMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            depth,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `depth`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3DMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSampler3DMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3DMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset);
+/// See Availability 2
+T RasterizerOrderedSampler3DMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSampler3DMS<T>.subscript`
+
+## Signature 
+
+```
+T RasterizerOrderedSampler3DMS<T>.subscript(vector<uint,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `struct SamplerCube<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float SamplerCube<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float SamplerCube<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.GetDimensions`
+
+## Signature 
+
+```
+void SamplerCube<T>.GetDimensions(
+    out uint             width,
+    out uint             height);
+void SamplerCube<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             numberOfLevels);
+void SamplerCube<T>.GetDimensions(
+    out float            width,
+    out float            height);
+void SamplerCube<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T SamplerCube<T>.Load(vector<int,4> location);
+T SamplerCube<T>.Load(
+    vector<int,4>        location,
+    vector<int,3>        offset);
+/// See Availability 2
+T SamplerCube<T>.Load(
+    vector<int,4>        location,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T SamplerCube<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T SamplerCube<T>.Sample(
+    vector<float,3>      location,
+    float                clamp);
+T SamplerCube<T>.Sample(
+    vector<float,3>      location,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.SampleBias`
+
+## Signature 
+
+```
+T SamplerCube<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.SampleCmp`
+
+## Signature 
+
+```
+float SamplerCube<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+float SamplerCube<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.SampleGrad`
+
+## Signature 
+
+```
+T SamplerCube<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+
+--------------------------------------------------------------------------------
+# `SamplerCube<T>.SampleLevel`
+
+## Signature 
+
+```
+T SamplerCube<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+```
+
+## Availability
+
+**GLSL** **HLSL** **CUDA** 
+
+## Parameters
+
+* `location`
+* `level`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCube`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCube.Gather(vector<float,3> location);
+vector<T,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCube.GatherRed(vector<float,3> location);
+vector<T,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCube.GatherGreen(vector<float,3> location);
+vector<T,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCube.GatherBlue(vector<float,3> location);
+vector<T,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCube.GatherAlpha(vector<float,3> location);
+vector<T,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCube.Gather(vector<float,3> location);
+vector<float,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCube.GatherRed(vector<float,3> location);
+vector<float,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCube.GatherGreen(vector<float,3> location);
+vector<float,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCube.GatherBlue(vector<float,3> location);
+vector<float,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCube.GatherAlpha(vector<float,3> location);
+vector<float,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCube.Gather(vector<float,3> location);
+vector<int,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCube.GatherRed(vector<float,3> location);
+vector<int,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCube.GatherGreen(vector<float,3> location);
+vector<int,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCube.GatherBlue(vector<float,3> location);
+vector<int,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCube.GatherAlpha(vector<float,3> location);
+vector<int,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCube.Gather(vector<float,3> location);
+vector<uint,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherRed(vector<float,3> location);
+vector<uint,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherGreen(vector<float,3> location);
+vector<uint,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherBlue(vector<float,3> location);
+vector<uint,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherAlpha(vector<float,3> location);
+vector<uint,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSamplerCube<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Load`
+* `Sample`
+* `SampleBias`
+* `SampleCmp`
+* `SampleCmpLevelZero`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCube<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCube<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSamplerCube<T>.GetDimensions(
+    out uint             width,
+    out uint             height);
+void RasterizerOrderedSamplerCube<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             numberOfLevels);
+void RasterizerOrderedSamplerCube<T>.GetDimensions(
+    out float            width,
+    out float            height);
+void RasterizerOrderedSamplerCube<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSamplerCube<T>.Load(vector<int,3> location);
+T RasterizerOrderedSamplerCube<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset);
+/// See Availability 2
+T RasterizerOrderedSamplerCube<T>.Load(
+    vector<int,3>        location,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSamplerCube<T>.Sample(vector<float,3> location);
+/// See Availability 2
+T RasterizerOrderedSamplerCube<T>.Sample(
+    vector<float,3>      location,
+    float                clamp);
+T RasterizerOrderedSamplerCube<T>.Sample(
+    vector<float,3>      location,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCube<T>.SampleBias(
+    vector<float,3>      location,
+    float                bias);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.SampleCmp`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCube<T>.SampleCmp(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.SampleCmpLevelZero`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCube<T>.SampleCmpLevelZero(
+    SamplerComparisonState s,
+    vector<float,3>      location,
+    float                compareValue);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `s`
+* `location`
+* `compareValue`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.SampleGrad`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCube<T>.SampleGrad(
+    vector<float,3>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube<T>.SampleLevel`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCube<T>.SampleLevel(
+    vector<float,3>      location,
+    float                level);
+```
+
+## Availability
+
+**GLSL** **HLSL** **CUDA** 
+
+## Parameters
+
+* `location`
+* `level`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCube`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.Gather(vector<float,3> location);
+vector<T,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherRed(vector<float,3> location);
+vector<T,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherGreen(vector<float,3> location);
+vector<T,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherBlue(vector<float,3> location);
+vector<T,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherAlpha(vector<float,3> location);
+vector<T,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.Gather(vector<float,3> location);
+vector<float,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherRed(vector<float,3> location);
+vector<float,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherGreen(vector<float,3> location);
+vector<float,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherBlue(vector<float,3> location);
+vector<float,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherAlpha(vector<float,3> location);
+vector<float,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.Gather(vector<float,3> location);
+vector<int,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherRed(vector<float,3> location);
+vector<int,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherGreen(vector<float,3> location);
+vector<int,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherBlue(vector<float,3> location);
+vector<int,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherAlpha(vector<float,3> location);
+vector<int,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCube`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.Gather(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.Gather(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherRed(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherRed(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherGreen(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherGreen(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherBlue(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherBlue(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCube.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherAlpha(vector<float,3> location);
+vector<uint,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCube.GatherAlpha(
+    vector<float,3>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct SamplerCubeMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void SamplerCubeMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount);
+void SamplerCubeMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void SamplerCubeMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            sampleCount);
+void SamplerCubeMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> SamplerCubeMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T SamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T SamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset);
+/// See Availability 2
+T SamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSamplerCubeMS<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+* `Load`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeMS<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSamplerCubeMS<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount);
+void RasterizerOrderedSamplerCubeMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSamplerCubeMS<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            sampleCount);
+void RasterizerOrderedSamplerCubeMS<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeMS<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSamplerCubeMS<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeMS<T>.Load`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex);
+T RasterizerOrderedSamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset);
+/// See Availability 2
+T RasterizerOrderedSamplerCubeMS<T>.Load(
+    vector<int,3>        location,
+    int                  sampleIndex,
+    vector<int,3>        offset,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** `GL_EXT_samplerless_texture_functions` **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `sampleIndex`
+* `offset`
+* `status`
+
+--------------------------------------------------------------------------------
+# `struct SamplerCubeArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Sample`
+* `SampleBias`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float SamplerCubeArray<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float SamplerCubeArray<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void SamplerCubeArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements);
+void SamplerCubeArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             numberOfLevels);
+void SamplerCubeArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements);
+void SamplerCubeArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T SamplerCubeArray<T>.Sample(vector<float,4> location);
+/// See Availability 2
+T SamplerCubeArray<T>.Sample(
+    vector<float,4>      location,
+    float                clamp);
+T SamplerCubeArray<T>.Sample(
+    vector<float,4>      location,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.SampleBias`
+
+## Signature 
+
+```
+T SamplerCubeArray<T>.SampleBias(
+    vector<float,4>      location,
+    float                bias);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.SampleGrad`
+
+## Signature 
+
+```
+T SamplerCubeArray<T>.SampleGrad(
+    vector<float,4>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray<T>.SampleLevel`
+
+## Signature 
+
+```
+T SamplerCubeArray<T>.SampleLevel(
+    vector<float,4>      location,
+    float                level);
+```
+
+## Availability
+
+**GLSL** **HLSL** **CUDA** 
+
+## Parameters
+
+* `location`
+* `level`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCubeArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCubeArray.Gather(vector<float,4> location);
+vector<T,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherRed(vector<float,4> location);
+vector<T,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<T,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<T,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<T,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCubeArray.Gather(vector<float,4> location);
+vector<float,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherRed(vector<float,4> location);
+vector<float,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<float,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<float,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<float,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCubeArray.Gather(vector<float,4> location);
+vector<int,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherRed(vector<float,4> location);
+vector<int,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<int,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<int,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<int,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension SamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.Gather(vector<float,4> location);
+vector<uint,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherRed(vector<float,4> location);
+vector<uint,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<uint,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<uint,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<uint,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> SamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSamplerCubeArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `CalculateLevelOfDetail`
+* `CalculateLevelOfDetailUnclamped`
+* `GetDimensions`
+* `Sample`
+* `SampleBias`
+* `SampleGrad`
+* `SampleLevel`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.CalculateLevelOfDetail`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCubeArray<T>.CalculateLevelOfDetail(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.CalculateLevelOfDetailUnclamped`
+
+## Signature 
+
+```
+float RasterizerOrderedSamplerCubeArray<T>.CalculateLevelOfDetailUnclamped(vector<float,3> location);
+```
+
+## Parameters
+
+* `location`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSamplerCubeArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements);
+void RasterizerOrderedSamplerCubeArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             numberOfLevels);
+void RasterizerOrderedSamplerCubeArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements);
+void RasterizerOrderedSamplerCubeArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.Sample`
+
+## Signature 
+
+```
+/// See Availability 1
+T RasterizerOrderedSamplerCubeArray<T>.Sample(vector<float,4> location);
+/// See Availability 2
+T RasterizerOrderedSamplerCubeArray<T>.Sample(
+    vector<float,4>      location,
+    float                clamp);
+T RasterizerOrderedSamplerCubeArray<T>.Sample(
+    vector<float,4>      location,
+    float                clamp,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** **CUDA** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `clamp`
+* `status`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.SampleBias`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCubeArray<T>.SampleBias(
+    vector<float,4>      location,
+    float                bias);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `bias`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.SampleGrad`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCubeArray<T>.SampleGrad(
+    vector<float,4>      location,
+    vector<float,3>      gradX,
+    vector<float,3>      gradY);
+```
+
+## Availability
+
+**GLSL** **HLSL** 
+
+## Parameters
+
+* `location`
+* `gradX`
+* `gradY`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray<T>.SampleLevel`
+
+## Signature 
+
+```
+T RasterizerOrderedSamplerCubeArray<T>.SampleLevel(
+    vector<float,4>      location,
+    float                level);
+```
+
+## Availability
+
+**GLSL** **HLSL** **CUDA** 
+
+## Parameters
+
+* `location`
+* `level`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCubeArray`
+
+## Generic Parameters
+
+* `T`
+* `N`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.Gather(vector<float,4> location);
+vector<T,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherRed(vector<float,4> location);
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<T,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.Gather(vector<float,4> location);
+vector<float,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherRed(vector<float,4> location);
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<float,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.Gather(vector<float,4> location);
+vector<int,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherRed(vector<float,4> location);
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<int,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `extension RasterizerOrderedSamplerCubeArray`
+
+## Methods
+
+* `Gather`
+* `GatherRed`
+* `GatherGreen`
+* `GatherBlue`
+* `GatherAlpha`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.Gather`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.Gather(vector<float,4> location);
+vector<uint,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.Gather(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherRed`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherRed(vector<float,4> location);
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherRed(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherGreen`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherGreen(vector<float,4> location);
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherGreen(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherBlue`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherBlue(vector<float,4> location);
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherBlue(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeArray.GatherAlpha`
+
+## Signature 
+
+```
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(vector<float,4> location);
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset,
+    out uint             status);
+/// See Availability 1
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4);
+/// See Availability 2
+vector<uint,4> RasterizerOrderedSamplerCubeArray.GatherAlpha(
+    vector<float,4>      location,
+    vector<int,3>        offset1,
+    vector<int,3>        offset2,
+    vector<int,3>        offset3,
+    vector<int,3>        offset4,
+    out uint             status);
+```
+
+## Availability
+
+1. **GLSL** **HLSL** 
+2. **HLSL** 
+
+## Parameters
+
+* `location`
+* `offset`
+* `status`
+* `offset1`
+* `offset2`
+* `offset3`
+* `offset4`
+
+--------------------------------------------------------------------------------
+# `struct SamplerCubeMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void SamplerCubeMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount);
+void SamplerCubeMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void SamplerCubeMSArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount);
+void SamplerCubeMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `SamplerCubeMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> SamplerCubeMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
+# `struct RasterizerOrderedSamplerCubeMSArray<T>`
+
+## Generic Parameters
+
+* `T`
+
+## Methods
+
+* `GetDimensions`
+* `GetSamplePosition`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeMSArray<T>.GetDimensions`
+
+## Signature 
+
+```
+void RasterizerOrderedSamplerCubeMSArray<T>.GetDimensions(
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount);
+void RasterizerOrderedSamplerCubeMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out uint             width,
+    out uint             height,
+    out uint             elements,
+    out uint             sampleCount,
+    out uint             numberOfLevels);
+void RasterizerOrderedSamplerCubeMSArray<T>.GetDimensions(
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount);
+void RasterizerOrderedSamplerCubeMSArray<T>.GetDimensions(
+    uint                 mipLevel,
+    out float            width,
+    out float            height,
+    out float            elements,
+    out float            sampleCount,
+    out float            numberOfLevels);
+```
+
+## Availability
+
+**GLSL** `GLSL450`, `GL_EXT_samplerless_texture_functions` **HLSL** 
+
+## Parameters
+
+* `width`
+* `height`
+* `elements`
+* `sampleCount`
+* `mipLevel`
+* `numberOfLevels`
+
+--------------------------------------------------------------------------------
+# `RasterizerOrderedSamplerCubeMSArray<T>.GetSamplePosition`
+
+## Signature 
+
+```
+vector<float,2> RasterizerOrderedSamplerCubeMSArray<T>.GetSamplePosition(int s);
+```
+
+## Parameters
+
+* `s`
+
+--------------------------------------------------------------------------------
 # `bit_cast`
 
 ## Signature 
 
 ```
 T bit_cast<T, U>(U value);
+```
+
+## Parameters
+
+* `T`
+* `U`
+* `value`
+
+--------------------------------------------------------------------------------
+# `createDynamicObject`
+
+## Signature 
+
+```
+T createDynamicObject<T, U>(
+    uint                 typeId,
+    U                    value);
+```
+
+## Parameters
+
+* `T`
+* `U`
+* `typeId`
+* `value`
+
+--------------------------------------------------------------------------------
+# `reinterpret`
+
+## Signature 
+
+```
+T reinterpret<T, U>(U value);
 ```
 
 ## Parameters
@@ -31397,7 +57212,6 @@ void beginInvocationInterlock();
 
 **GLSL** `GLSL420`, `GL_ARB_fragment_shader_interlock` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `endInvocationInterlock`
 
@@ -31415,7 +57229,6 @@ void endInvocationInterlock();
 
 **GLSL** `GLSL420`, `GL_ARB_fragment_shader_interlock` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # enum _AttributeTargets
 
@@ -31430,6 +57243,7 @@ void endInvocationInterlock();
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `Append`
@@ -31595,6 +57409,7 @@ T ByteAddressBuffer.Load<T>(int location);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -31637,7 +57452,7 @@ T StructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -31664,6 +57479,7 @@ T StructuredBuffer<T>.subscript(uint index);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `Consume`
@@ -31677,7 +57493,6 @@ T StructuredBuffer<T>.subscript(uint index);
 ```
 T ConsumeStructuredBuffer<T>.Consume();
 ```
-
 
 --------------------------------------------------------------------------------
 # `ConsumeStructuredBuffer<T>.GetDimensions`
@@ -31702,6 +57517,7 @@ void ConsumeStructuredBuffer<T>.GetDimensions(
 
 * `T`
 * `N`
+
 ## Methods
 
 * `subscript`
@@ -31726,6 +57542,7 @@ T InputPatch<T, N:int>.subscript(uint index);
 
 * `T`
 * `N`
+
 ## Methods
 
 * `subscript`
@@ -32838,6 +58655,7 @@ void RasterizerOrderedByteAddressBuffer.Store<T>(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `DecrementCounter`
@@ -32854,7 +58672,6 @@ void RasterizerOrderedByteAddressBuffer.Store<T>(
 ```
 uint RWStructuredBuffer<T>.DecrementCounter();
 ```
-
 
 --------------------------------------------------------------------------------
 # `RWStructuredBuffer<T>.GetDimensions`
@@ -32885,7 +58702,6 @@ void RWStructuredBuffer<T>.GetDimensions(
 uint RWStructuredBuffer<T>.IncrementCounter();
 ```
 
-
 --------------------------------------------------------------------------------
 # `RWStructuredBuffer<T>.Load`
 
@@ -32902,7 +58718,7 @@ T RWStructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -32929,6 +58745,7 @@ T RWStructuredBuffer<T>.subscript(uint index);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `DecrementCounter`
@@ -32945,7 +58762,6 @@ T RWStructuredBuffer<T>.subscript(uint index);
 ```
 uint RasterizerOrderedStructuredBuffer<T>.DecrementCounter();
 ```
-
 
 --------------------------------------------------------------------------------
 # `RasterizerOrderedStructuredBuffer<T>.GetDimensions`
@@ -32976,7 +58792,6 @@ void RasterizerOrderedStructuredBuffer<T>.GetDimensions(
 uint RasterizerOrderedStructuredBuffer<T>.IncrementCounter();
 ```
 
-
 --------------------------------------------------------------------------------
 # `RasterizerOrderedStructuredBuffer<T>.Load`
 
@@ -32993,7 +58808,7 @@ T RasterizerOrderedStructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -33020,6 +58835,7 @@ T RasterizerOrderedStructuredBuffer<T>.subscript(uint index);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `Append`
@@ -33055,13 +58871,13 @@ void PointStream<T>.RestartStrip();
 
 **GLSL** **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `struct LineStream<T>`
 
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `Append`
@@ -33097,13 +58913,13 @@ void LineStream<T>.RestartStrip();
 
 **GLSL** **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `struct TriangleStream<T>`
 
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `Append`
@@ -33139,7 +58955,6 @@ void TriangleStream<T>.RestartStrip();
 
 **GLSL** **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `abort`
 
@@ -33148,7 +58963,6 @@ void TriangleStream<T>.RestartStrip();
 ```
 void abort();
 ```
-
 
 --------------------------------------------------------------------------------
 # `abs`
@@ -33166,8 +58980,8 @@ matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33193,8 +59007,8 @@ matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33242,7 +59056,6 @@ void AllMemoryBarrier();
 
 **GLSL** **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `AllMemoryBarrierWithGroupSync`
 
@@ -33255,7 +59068,6 @@ void AllMemoryBarrierWithGroupSync();
 ## Availability
 
 **GLSL** **HLSL** **CUDA** 
-
 
 --------------------------------------------------------------------------------
 # `any`
@@ -33295,7 +59107,7 @@ double asdouble(
 
 ## Availability
 
-**GLSL** `GL_ARB_gpu_shader5` **HLSL** 
+**GLSL** `GL_ARB_gpu_shader5` **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -33323,7 +59135,7 @@ matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -33348,8 +59160,8 @@ matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33380,7 +59192,7 @@ matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -33416,7 +59228,7 @@ matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 ## Availability
 
 1. **GLSL** `GL_ARB_gpu_shader5` **HLSL** 
-2. **GLSL** **HLSL** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33451,7 +59263,7 @@ matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<half,R,C> value);
 ## Availability
 
 1. **HLSL** 
-2. **GLSL** **HLSL** 
+2. **GLSL** **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -33466,16 +59278,24 @@ matrix<uint16_t,R,C> asuint16<R:int, C:int>(matrix<half,R,C> value);
 ## Signature 
 
 ```
+/// See Availability 1
 int16_t asint16(int16_t value);
 vector<int16_t,N> asint16<N:int>(vector<int16_t,N> value);
 matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<int16_t,R,C> value);
 int16_t asint16(uint16_t value);
 vector<int16_t,N> asint16<N:int>(vector<uint16_t,N> value);
 matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<uint16_t,R,C> value);
+/// See Availability 2
 int16_t asint16(half value);
+/// See Availability 1
 vector<int16_t,N> asint16<N:int>(vector<half,N> value);
 matrix<int16_t,R,C> asint16<R:int, C:int>(matrix<half,R,C> value);
 ```
+
+## Availability
+
+1. **HLSL** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -33499,7 +59319,9 @@ half asfloat16(uint16_t value);
 /// See Availability 1
 vector<half,N> asfloat16<N:int>(vector<uint16_t,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<uint16_t,R,C> value);
+/// See Availability 3
 half asfloat16(int16_t value);
+/// See Availability 1
 vector<half,N> asfloat16<N:int>(vector<int16_t,N> value);
 matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 ```
@@ -33507,7 +59329,8 @@ matrix<half,R,C> asfloat16<R:int, C:int>(matrix<int16_t,R,C> value);
 ## Availability
 
 1. **HLSL** 
-2. **GLSL** **HLSL** 
+2. **GLSL** **HLSL** **CUDA** 
+3. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -33532,8 +59355,8 @@ matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33565,8 +59388,8 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33593,8 +59416,8 @@ matrix<T,N,M> ceil<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33641,7 +59464,7 @@ matrix<T,N,M> clamp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -33687,8 +59510,8 @@ matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33714,8 +59537,8 @@ matrix<T,N,M> cosh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -33755,7 +59578,7 @@ vector<T,3> cross<T>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -33941,7 +59764,7 @@ matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -33959,6 +59782,10 @@ matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 T determinant<T, N:int>(matrix<T,N,N> m);
 ```
+
+## Availability
+
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -33979,7 +59806,6 @@ void DeviceMemoryBarrier();
 
 **GLSL** **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `DeviceMemoryBarrierWithGroupSync`
 
@@ -33992,7 +59818,6 @@ void DeviceMemoryBarrierWithGroupSync();
 ## Availability
 
 **GLSL** **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `distance`
@@ -34007,7 +59832,7 @@ T distance<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -34061,14 +59886,17 @@ vector<T,4> dst<T>(
 ## Signature 
 
 ```
+/// See Availability 1
 T EvaluateAttributeAtCentroid<T>(T x);
 vector<T,N> EvaluateAttributeAtCentroid<T, N:int>(vector<T,N> x);
+/// See Availability 2
 matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 ```
 
 ## Availability
 
-**GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34083,12 +59911,14 @@ matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
+/// See Availability 1
 T EvaluateAttributeAtSample<T>(
     T                    x,
     uint                 sampleindex);
 vector<T,N> EvaluateAttributeAtSample<T, N:int>(
     vector<T,N>          x,
     uint                 sampleindex);
+/// See Availability 2
 matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
     matrix<T,N,M>        x,
     uint                 sampleindex);
@@ -34096,7 +59926,8 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34112,12 +59943,14 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 ## Signature 
 
 ```
+/// See Availability 1
 T EvaluateAttributeSnapped<T>(
     T                    x,
     vector<int,2>        offset);
 vector<T,N> EvaluateAttributeSnapped<T, N:int>(
     vector<T,N>          x,
     vector<int,2>        offset);
+/// See Availability 2
 matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
     matrix<T,N,M>        x,
     vector<int,2>        offset);
@@ -34125,7 +59958,8 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+2. **GLSL** **HLSL** 
 
 ## Parameters
 
@@ -34151,8 +59985,8 @@ matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -34178,8 +60012,8 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -34188,28 +60022,6 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 * `N`
 * `M`
 * `x`
-
---------------------------------------------------------------------------------
-# `f16tof32`
-
-## Signature 
-
-```
-/// See Availability 1
-float f16tof32(uint value);
-/// See Availability 2
-vector<float,N> f16tof32<N:int>(vector<uint,N> value);
-```
-
-## Availability
-
-1. **GLSL** `GLSL420` **HLSL** 
-2. **HLSL** 
-
-## Parameters
-
-* `N`
-* `value`
 
 --------------------------------------------------------------------------------
 # `f32tof16`
@@ -34227,6 +60039,56 @@ vector<uint,N> f32tof16<N:int>(vector<float,N> value);
 
 1. **GLSL** `GLSL420` **HLSL** 
 2. **HLSL** 
+
+## Parameters
+
+* `N`
+* `value`
+
+--------------------------------------------------------------------------------
+# `f16tof32`
+
+## Signature 
+
+```
+/// See Availability 1
+float f16tof32(uint value);
+/// See Availability 2
+vector<float,N> f16tof32<N:int>(vector<uint,N> value);
+/// See Availability 3
+float f16tof32(half value);
+/// See Availability 4
+vector<float,N> f16tof32<N:int>(vector<half,N> value);
+```
+
+## Availability
+
+1. **GLSL** `GLSL420` **HLSL** 
+2. **HLSL** 
+3. **GLSL** `GLSL420` **HLSL** **CUDA** 
+4. **HLSL** **CUDA** 
+
+## Parameters
+
+* `N`
+* `value`
+
+--------------------------------------------------------------------------------
+# `f32tof16_`
+
+## Signature 
+
+```
+/// See Availability 1
+half f32tof16_(float value);
+/// See Availability 2
+vector<half,N> f32tof16_<N:int>(vector<float,N> value);
+```
+
+## Availability
+
+1. **GLSL** `GLSL420` **HLSL** **CUDA** 
+2. **HLSL** **CUDA** 
 
 ## Parameters
 
@@ -34275,8 +60137,8 @@ vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -34301,8 +60163,8 @@ vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -34325,8 +60187,8 @@ matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -34361,8 +60223,8 @@ matrix<double,N,M> fma<N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -34421,8 +60283,8 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -34453,7 +60315,7 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -34544,7 +60406,6 @@ matrix<T,N,M> GetAttributeAtVertex<T, N:int, M:int>(
 uint GetRenderTargetSampleCount();
 ```
 
-
 --------------------------------------------------------------------------------
 # `GetRenderTargetSamplePosition`
 
@@ -34571,7 +60432,6 @@ void GroupMemoryBarrier();
 
 **GLSL** **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `GroupMemoryBarrierWithGroupSync`
 
@@ -34584,7 +60444,6 @@ void GroupMemoryBarrierWithGroupSync();
 ## Availability
 
 **GLSL** **HLSL** **CUDA** 
-
 
 --------------------------------------------------------------------------------
 # `InterlockedAdd`
@@ -34944,16 +60803,23 @@ matrix<bool,N,M> isnan<T, N:int, M:int>(matrix<T,N,M> x);
 ## Signature 
 
 ```
+/// See Availability 1
 T ldexp<T>(
     T                    x,
     T                    exp);
 vector<T,N> ldexp<T, N:int>(
     vector<T,N>          x,
     vector<T,N>          exp);
+/// See Availability 2
 matrix<T,N,M> ldexp<T, N:int, M:int>(
     matrix<T,N,M>        x,
     matrix<T,N,M>        exp);
 ```
+
+## Availability
+
+1. **HLSL** **SPIRV** `spirv_direct` 
+2. **HLSL** 
 
 ## Parameters
 
@@ -34974,7 +60840,7 @@ T length<T, N:int>(vector<T,N> x);
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -35006,7 +60872,7 @@ matrix<T,N,M> lerp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -35052,8 +60918,8 @@ matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35079,8 +60945,8 @@ matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35106,8 +60972,8 @@ matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35142,8 +61008,8 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35177,8 +61043,8 @@ matrix<T,N,M> max<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35211,8 +61077,8 @@ matrix<T,N,M> min<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35372,7 +61238,7 @@ vector<T,N> normalize<T, N:int>(vector<T,N> x);
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -35402,8 +61268,8 @@ matrix<T,N,M> pow<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35647,7 +61513,7 @@ matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -35688,7 +61554,7 @@ vector<T,N> reflect<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -35711,7 +61577,7 @@ vector<T,N> refract<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** 
+**GLSL** **HLSL** **SPIRV** `spirv_direct` 
 
 ## Parameters
 
@@ -35759,8 +61625,8 @@ matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35786,8 +61652,8 @@ matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35831,8 +61697,8 @@ matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35858,8 +61724,8 @@ matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35921,8 +61787,8 @@ matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -35956,7 +61822,7 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -35984,8 +61850,8 @@ matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -36016,7 +61882,7 @@ matrix<T,N,M> step<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 2. **HLSL** 
 
 ## Parameters
@@ -36043,8 +61909,8 @@ matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -36070,8 +61936,8 @@ matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -36117,8 +61983,8 @@ matrix<T,N,M> trunc<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **CPP** **CUDA** 
-2. **GLSL** **HLSL** 
+1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
 3. **HLSL** 
 
 ## Parameters
@@ -36141,7 +62007,6 @@ uint WaveGetConvergedMask();
 
 **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `WaveGetActiveMask`
 
@@ -36154,7 +62019,6 @@ uint WaveGetActiveMask();
 ## Availability
 
 **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `WaveMaskIsFirstLane`
@@ -36300,7 +62164,6 @@ void AllMemoryBarrierWithWaveSync();
 
 **GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `GroupMemoryBarrierWithWaveSync`
 
@@ -36313,7 +62176,6 @@ void GroupMemoryBarrierWithWaveSync();
 ## Availability
 
 **GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
-
 
 --------------------------------------------------------------------------------
 # `WaveMaskBroadcastLaneAt`
@@ -37278,7 +63140,6 @@ uint WaveGetLaneCount();
 
 **GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `WaveGetLaneIndex`
 
@@ -37292,7 +63153,6 @@ uint WaveGetLaneIndex();
 
 **GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `WaveIsFirstLane`
 
@@ -37305,7 +63165,6 @@ bool WaveIsFirstLane();
 ## Availability
 
 **GLSL** `GL_KHR_shader_subgroup_basic`, `SPIR-V 1.3` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `_WaveCountBits`
@@ -37521,7 +63380,6 @@ vector<uint,4> WaveGetConvergedMulti();
 
 **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `WaveGetActiveMulti`
 
@@ -37534,7 +63392,6 @@ vector<uint,4> WaveGetActiveMulti();
 ## Availability
 
 **GLSL** `GL_KHR_shader_subgroup_ballot`, `SPIR-V 1.3` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `WaveMatch`
@@ -37734,6 +63591,7 @@ matrix<T,N,M> WaveMultiPrefixSum<T, N:int, M:int>(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -37796,6 +63654,7 @@ T Buffer<T>.subscript(uint index);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -37858,6 +63717,7 @@ T RWBuffer<T>.subscript(uint index);
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -37921,14 +63781,12 @@ T RasterizerOrderedBuffer<T>.subscript(uint index);
 uint RAY_FLAG_NONE
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_FORCE_OPAQUE
 
 ```
 uint RAY_FLAG_FORCE_OPAQUE
 ```
-
 
 --------------------------------------------------------------------------------
 # RAY_FLAG_FORCE_NON_OPAQUE
@@ -37937,14 +63795,12 @@ uint RAY_FLAG_FORCE_OPAQUE
 uint RAY_FLAG_FORCE_NON_OPAQUE
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
 
 ```
 uint RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
 ```
-
 
 --------------------------------------------------------------------------------
 # RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
@@ -37953,14 +63809,12 @@ uint RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
 uint RAY_FLAG_SKIP_CLOSEST_HIT_SHADER
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_CULL_BACK_FACING_TRIANGLES
 
 ```
 uint RAY_FLAG_CULL_BACK_FACING_TRIANGLES
 ```
-
 
 --------------------------------------------------------------------------------
 # RAY_FLAG_CULL_FRONT_FACING_TRIANGLES
@@ -37969,14 +63823,12 @@ uint RAY_FLAG_CULL_BACK_FACING_TRIANGLES
 uint RAY_FLAG_CULL_FRONT_FACING_TRIANGLES
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_CULL_OPAQUE
 
 ```
 uint RAY_FLAG_CULL_OPAQUE
 ```
-
 
 --------------------------------------------------------------------------------
 # RAY_FLAG_CULL_NON_OPAQUE
@@ -37985,7 +63837,6 @@ uint RAY_FLAG_CULL_OPAQUE
 uint RAY_FLAG_CULL_NON_OPAQUE
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_SKIP_TRIANGLES
 
@@ -37993,14 +63844,12 @@ uint RAY_FLAG_CULL_NON_OPAQUE
 uint RAY_FLAG_SKIP_TRIANGLES
 ```
 
-
 --------------------------------------------------------------------------------
 # RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES
 
 ```
 uint RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES
 ```
-
 
 --------------------------------------------------------------------------------
 # `struct RayDesc`
@@ -38014,7 +63863,6 @@ uint RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES
 
 --------------------------------------------------------------------------------
 # `struct RaytracingAccelerationStructure`
-
 
 --------------------------------------------------------------------------------
 # `struct BuiltInTriangleIntersectionAttributes`
@@ -38057,6 +63905,10 @@ void TraceRay<payload_t>(
     inout payload_t      Payload);
 ```
 
+## Availability
+
+**HLSL** **CUDA** 
+
 ## Parameters
 
 * `payload_t`
@@ -38067,6 +63919,37 @@ void TraceRay<payload_t>(
 * `MultiplierForGeometryContributionToHitGroupIndex`
 * `MissShaderIndex`
 * `Ray`
+* `Payload`
+
+--------------------------------------------------------------------------------
+# `TraceMotionRay`
+
+## Signature 
+
+```
+void TraceMotionRay<payload_t>(
+    RaytracingAccelerationStructure AccelerationStructure,
+    uint                 RayFlags,
+    uint                 InstanceInclusionMask,
+    uint                 RayContributionToHitGroupIndex,
+    uint                 MultiplierForGeometryContributionToHitGroupIndex,
+    uint                 MissShaderIndex,
+    RayDesc              Ray,
+    float                CurrentTime,
+    inout payload_t      Payload);
+```
+
+## Parameters
+
+* `payload_t`
+* `AccelerationStructure`
+* `RayFlags`
+* `InstanceInclusionMask`
+* `RayContributionToHitGroupIndex`
+* `MultiplierForGeometryContributionToHitGroupIndex`
+* `MissShaderIndex`
+* `Ray`
+* `CurrentTime`
 * `Payload`
 
 --------------------------------------------------------------------------------
@@ -38099,8 +63982,7 @@ void IgnoreHit();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `AcceptHitAndEndSearch`
@@ -38113,8 +63995,7 @@ void AcceptHitAndEndSearch();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `DispatchRaysIndex`
@@ -38129,7 +64010,6 @@ vector<uint,3> DispatchRaysIndex();
 
 **GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
-
 --------------------------------------------------------------------------------
 # `DispatchRaysDimensions`
 
@@ -38141,8 +64021,7 @@ vector<uint,3> DispatchRaysDimensions();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `WorldRayOrigin`
@@ -38155,8 +64034,7 @@ vector<float,3> WorldRayOrigin();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `WorldRayDirection`
@@ -38169,8 +64047,7 @@ vector<float,3> WorldRayDirection();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `RayTMin`
@@ -38183,8 +64060,7 @@ float RayTMin();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `RayTCurrent`
@@ -38197,8 +64073,7 @@ float RayTCurrent();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `RayFlags`
@@ -38211,8 +64086,7 @@ uint RayFlags();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `InstanceIndex`
@@ -38225,8 +64099,7 @@ uint InstanceIndex();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `InstanceID`
@@ -38239,8 +64112,7 @@ uint InstanceID();
 
 ## Availability
 
-**GLSL** `__glslRayTracing` **HLSL** 
-
+**GLSL** `__glslRayTracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `PrimitiveIndex`
@@ -38253,8 +64125,7 @@ uint PrimitiveIndex();
 
 ## Availability
 
-**GLSL** `__glslRayTracing` **HLSL** 
-
+**GLSL** `__glslRayTracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `ObjectRayOrigin`
@@ -38267,8 +64138,7 @@ vector<float,3> ObjectRayOrigin();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `ObjectRayDirection`
@@ -38281,8 +64151,7 @@ vector<float,3> ObjectRayDirection();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # `ObjectToWorld3x4`
@@ -38297,7 +64166,6 @@ matrix<float,3,4> ObjectToWorld3x4();
 
 **GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `WorldToObject3x4`
 
@@ -38310,7 +64178,6 @@ matrix<float,3,4> WorldToObject3x4();
 ## Availability
 
 **GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `ObjectToWorld4x3`
@@ -38325,7 +64192,6 @@ matrix<float,4,3> ObjectToWorld4x3();
 
 **GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `WorldToObject4x3`
 
@@ -38339,6 +64205,18 @@ matrix<float,4,3> WorldToObject4x3();
 
 **GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
 
+--------------------------------------------------------------------------------
+# `RayCurrentTime`
+
+## Signature 
+
+```
+float RayCurrentTime();
+```
+
+## Availability
+
+**GLSL** `GLSL460`, `GL_NV_ray_tracing_motion_blur` **HLSL** 
 
 --------------------------------------------------------------------------------
 # `ObjectToWorld`
@@ -38349,7 +64227,6 @@ matrix<float,4,3> WorldToObject4x3();
 matrix<float,3,4> ObjectToWorld();
 ```
 
-
 --------------------------------------------------------------------------------
 # `WorldToObject`
 
@@ -38358,7 +64235,6 @@ matrix<float,3,4> ObjectToWorld();
 ```
 matrix<float,3,4> WorldToObject();
 ```
-
 
 --------------------------------------------------------------------------------
 # `HitKind`
@@ -38371,8 +64247,7 @@ uint HitKind();
 
 ## Availability
 
-**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** 
-
+**GLSL** `GL_EXT_ray_tracing`, `GL_NV_ray_tracing` **HLSL** **CUDA** 
 
 --------------------------------------------------------------------------------
 # HIT_KIND_TRIANGLE_FRONT_FACE
@@ -38381,14 +64256,12 @@ uint HitKind();
 uint HIT_KIND_TRIANGLE_FRONT_FACE
 ```
 
-
 --------------------------------------------------------------------------------
 # HIT_KIND_TRIANGLE_BACK_FACE
 
 ```
 uint HIT_KIND_TRIANGLE_BACK_FACE
 ```
-
 
 --------------------------------------------------------------------------------
 # `dot4add_u8packed`
@@ -38486,12 +64359,10 @@ void DispatchMesh<P>(
 
 *Implements:* `__BuiltinSamplerFeedbackType`
 
-
 --------------------------------------------------------------------------------
 # `struct SAMPLER_FEEDBACK_MIP_REGION_USED`
 
 *Implements:* `__BuiltinSamplerFeedbackType`
-
 
 --------------------------------------------------------------------------------
 # `struct FeedbackTexture2D<T>`
@@ -38499,6 +64370,7 @@ void DispatchMesh<P>(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -38661,6 +64533,7 @@ void FeedbackTexture2D<T>.WriteSamplerFeedbackGrad<S>(
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `GetDimensions`
@@ -38835,14 +64708,12 @@ uint GeometryIndex();
 
 **GLSL** `GL_EXT_ray_tracing` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # COMMITTED_NOTHING
 
 ```
 uint COMMITTED_NOTHING
 ```
-
 
 --------------------------------------------------------------------------------
 # COMMITTED_TRIANGLE_HIT
@@ -38851,14 +64722,12 @@ uint COMMITTED_NOTHING
 uint COMMITTED_TRIANGLE_HIT
 ```
 
-
 --------------------------------------------------------------------------------
 # COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 
 ```
 uint COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 ```
-
 
 --------------------------------------------------------------------------------
 # CANDIDATE_NON_OPAQUE_TRIANGLE
@@ -38867,7 +64736,6 @@ uint COMMITTED_PROCEDURAL_PRIMITIVE_HIT
 uint CANDIDATE_NON_OPAQUE_TRIANGLE
 ```
 
-
 --------------------------------------------------------------------------------
 # CANDIDATE_PROCEDURAL_PRIMITIVE
 
@@ -38875,13 +64743,13 @@ uint CANDIDATE_NON_OPAQUE_TRIANGLE
 uint CANDIDATE_PROCEDURAL_PRIMITIVE
 ```
 
-
 --------------------------------------------------------------------------------
 # `struct RayQuery<rayFlags:uint>`
 
 ## Generic Parameters
 
 * `rayFlags`
+
 ## Methods
 
 * `init`
@@ -38935,7 +64803,6 @@ uint CANDIDATE_PROCEDURAL_PRIMITIVE
 RayQuery<rayFlags:uint>.init();
 ```
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.TraceRayInline`
 
@@ -38969,7 +64836,6 @@ bool RayQuery<rayFlags:uint>.Proceed();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.Abort`
 
@@ -38982,7 +64848,6 @@ void RayQuery<rayFlags:uint>.Abort();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateType`
@@ -38997,7 +64862,6 @@ uint RayQuery<rayFlags:uint>.CandidateType();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateObjectToWorld3x4`
 
@@ -39010,7 +64874,6 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateObjectToWorld3x4();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateObjectToWorld4x3`
@@ -39025,7 +64888,6 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateObjectToWorld4x3();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateWorldToObject3x4`
 
@@ -39038,7 +64900,6 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CandidateWorldToObject3x4();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateWorldToObject4x3`
@@ -39053,7 +64914,6 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CandidateWorldToObject4x3();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateInstanceIndex`
 
@@ -39066,7 +64926,6 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceIndex();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateInstanceID`
@@ -39081,7 +64940,6 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceID();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateGeometryIndex`
 
@@ -39094,7 +64952,6 @@ uint RayQuery<rayFlags:uint>.CandidateGeometryIndex();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidatePrimitiveIndex`
@@ -39109,7 +64966,6 @@ uint RayQuery<rayFlags:uint>.CandidatePrimitiveIndex();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateInstanceContributionToHitGroupIndex`
 
@@ -39122,7 +64978,6 @@ uint RayQuery<rayFlags:uint>.CandidateInstanceContributionToHitGroupIndex();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateObjectRayOrigin`
@@ -39137,7 +64992,6 @@ vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayOrigin();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateObjectRayDirection`
 
@@ -39150,7 +65004,6 @@ vector<float,3> RayQuery<rayFlags:uint>.CandidateObjectRayDirection();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateProceduralPrimitiveNonOpaque`
@@ -39165,7 +65018,6 @@ bool RayQuery<rayFlags:uint>.CandidateProceduralPrimitiveNonOpaque();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateTriangleFrontFace`
 
@@ -39178,7 +65030,6 @@ bool RayQuery<rayFlags:uint>.CandidateTriangleFrontFace();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateTriangleBarycentrics`
@@ -39193,7 +65044,6 @@ vector<float,2> RayQuery<rayFlags:uint>.CandidateTriangleBarycentrics();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CandidateTriangleRayT`
 
@@ -39207,7 +65057,6 @@ float RayQuery<rayFlags:uint>.CandidateTriangleRayT();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommitNonOpaqueTriangleHit`
 
@@ -39220,7 +65069,6 @@ void RayQuery<rayFlags:uint>.CommitNonOpaqueTriangleHit();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommitProceduralPrimitiveHit`
@@ -39252,7 +65100,6 @@ uint RayQuery<rayFlags:uint>.CommittedStatus();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedObjectToWorld3x4`
 
@@ -39265,7 +65112,6 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedObjectToWorld3x4();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedObjectToWorld4x3`
@@ -39280,7 +65126,6 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedObjectToWorld4x3();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedWorldToObject3x4`
 
@@ -39293,7 +65138,6 @@ matrix<float,3,4> RayQuery<rayFlags:uint>.CommittedWorldToObject3x4();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedWorldToObject4x3`
@@ -39308,7 +65152,6 @@ matrix<float,4,3> RayQuery<rayFlags:uint>.CommittedWorldToObject4x3();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedRayT`
 
@@ -39321,7 +65164,6 @@ float RayQuery<rayFlags:uint>.CommittedRayT();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedInstanceIndex`
@@ -39336,7 +65178,6 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceIndex();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedInstanceID`
 
@@ -39349,7 +65190,6 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceID();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedGeometryIndex`
@@ -39364,7 +65204,6 @@ uint RayQuery<rayFlags:uint>.CommittedGeometryIndex();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedPrimitiveIndex`
 
@@ -39377,7 +65216,6 @@ uint RayQuery<rayFlags:uint>.CommittedPrimitiveIndex();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedInstanceContributionToHitGroupIndex`
@@ -39392,7 +65230,6 @@ uint RayQuery<rayFlags:uint>.CommittedInstanceContributionToHitGroupIndex();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedObjectRayOrigin`
 
@@ -39405,7 +65242,6 @@ vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayOrigin();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedObjectRayDirection`
@@ -39420,7 +65256,6 @@ vector<float,3> RayQuery<rayFlags:uint>.CommittedObjectRayDirection();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedTriangleFrontFace`
 
@@ -39433,7 +65268,6 @@ bool RayQuery<rayFlags:uint>.CommittedTriangleFrontFace();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.CommittedTriangleBarycentrics`
@@ -39448,7 +65282,6 @@ vector<float,2> RayQuery<rayFlags:uint>.CommittedTriangleBarycentrics();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.RayFlags`
 
@@ -39461,7 +65294,6 @@ uint RayQuery<rayFlags:uint>.RayFlags();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.WorldRayOrigin`
@@ -39476,7 +65308,6 @@ vector<float,3> RayQuery<rayFlags:uint>.WorldRayOrigin();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.WorldRayDirection`
 
@@ -39489,7 +65320,6 @@ vector<float,3> RayQuery<rayFlags:uint>.WorldRayDirection();
 ## Availability
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
-
 
 --------------------------------------------------------------------------------
 # `RayQuery<rayFlags:uint>.RayTMin`
@@ -39504,13 +65334,13 @@ float RayQuery<rayFlags:uint>.RayTMin();
 
 **GLSL** `GLSL460`, `GL_EXT_ray_query` **HLSL** 
 
-
 --------------------------------------------------------------------------------
 # `struct VkSubpassInput<T>`
 
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `SubpassLoad`
@@ -39524,13 +65354,13 @@ float RayQuery<rayFlags:uint>.RayTMin();
 T VkSubpassInput<T>.SubpassLoad();
 ```
 
-
 --------------------------------------------------------------------------------
 # `struct VkSubpassInputMS<T>`
 
 ## Generic Parameters
 
 * `T`
+
 ## Methods
 
 * `SubpassLoad`
@@ -39547,3 +65377,4 @@ T VkSubpassInputMS<T>.SubpassLoad(int sampleIndex);
 ## Parameters
 
 * `sampleIndex`
+
