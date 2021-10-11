@@ -57452,7 +57452,7 @@ T StructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -58718,7 +58718,7 @@ T RWStructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -58808,7 +58808,7 @@ T RasterizerOrderedStructuredBuffer<T>.Load(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -58980,8 +58980,8 @@ matrix<T,N,M> abs<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59007,8 +59007,8 @@ matrix<T,N,M> acos<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59107,7 +59107,7 @@ double asdouble(
 
 ## Availability
 
-**GLSL** `GL_ARB_gpu_shader5` **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** `GL_ARB_gpu_shader5` **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -59135,7 +59135,7 @@ matrix<float,N,M> asfloat<N:int, M:int>(matrix<float,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -59160,8 +59160,8 @@ matrix<T,N,M> asin<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59192,7 +59192,7 @@ matrix<int,N,M> asint<N:int, M:int>(matrix<int,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -59228,7 +59228,7 @@ matrix<uint,N,M> asuint<N:int, M:int>(matrix<uint,N,M> x);
 ## Availability
 
 1. **GLSL** `GL_ARB_gpu_shader5` **HLSL** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59355,8 +59355,8 @@ matrix<T,N,M> atan<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59388,8 +59388,8 @@ matrix<T,N,M> atan2<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59416,8 +59416,8 @@ matrix<T,N,M> ceil<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59464,7 +59464,7 @@ matrix<T,N,M> clamp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -59510,8 +59510,8 @@ matrix<T,N,M> cos<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59537,8 +59537,8 @@ matrix<T,N,M> cosh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -59578,7 +59578,7 @@ vector<T,3> cross<T>(
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -59764,7 +59764,7 @@ matrix<T,N,M> degrees<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -59785,7 +59785,7 @@ T determinant<T, N:int>(matrix<T,N,N> m);
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -59832,7 +59832,7 @@ T distance<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -59895,7 +59895,7 @@ matrix<T,N,M> EvaluateAttributeAtCentroid<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **GLSL** **HLSL** 
 
 ## Parameters
@@ -59926,7 +59926,7 @@ matrix<T,N,M> EvaluateAttributeAtSample<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **GLSL** **HLSL** 
 
 ## Parameters
@@ -59958,7 +59958,7 @@ matrix<T,N,M> EvaluateAttributeSnapped<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **GLSL** **HLSL** 
 
 ## Parameters
@@ -59985,8 +59985,8 @@ matrix<T,N,M> exp<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60012,8 +60012,8 @@ matrix<T,N,M> exp2<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60137,8 +60137,8 @@ vector<uint,N> firstbithigh<N:int>(vector<uint,N> value);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -60163,8 +60163,8 @@ vector<uint,N> firstbitlow<N:int>(vector<uint,N> value);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -60187,8 +60187,8 @@ matrix<T,N,M> floor<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60223,8 +60223,8 @@ matrix<double,N,M> fma<N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60283,8 +60283,8 @@ matrix<T,N,M> frac<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60315,7 +60315,7 @@ matrix<T,N,M> frexp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -60818,7 +60818,7 @@ matrix<T,N,M> ldexp<T, N:int, M:int>(
 
 ## Availability
 
-1. **HLSL** **SPIRV** `spirv_direct` 
+1. **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -60840,7 +60840,7 @@ T length<T, N:int>(vector<T,N> x);
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -60872,7 +60872,7 @@ matrix<T,N,M> lerp<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -60918,8 +60918,8 @@ matrix<T,N,M> log<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60945,8 +60945,8 @@ matrix<T,N,M> log10<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -60972,8 +60972,8 @@ matrix<T,N,M> log2<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61008,8 +61008,8 @@ matrix<T,N,M> mad<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61043,8 +61043,8 @@ matrix<T,N,M> max<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61077,8 +61077,8 @@ matrix<T,N,M> min<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61238,7 +61238,7 @@ vector<T,N> normalize<T, N:int>(vector<T,N> x);
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -61268,8 +61268,8 @@ matrix<T,N,M> pow<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61513,7 +61513,7 @@ matrix<T,N,M> radians<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -61554,7 +61554,7 @@ vector<T,N> reflect<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -61577,7 +61577,7 @@ vector<T,N> refract<T, N:int>(
 
 ## Availability
 
-**GLSL** **HLSL** **SPIRV** `spirv_direct` 
+**GLSL** **HLSL** **SPIRV** 
 
 ## Parameters
 
@@ -61625,8 +61625,8 @@ matrix<T,N,M> round<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61652,8 +61652,8 @@ matrix<T,N,M> rsqrt<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61697,8 +61697,8 @@ matrix<int,N,M> sign<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61724,8 +61724,8 @@ matrix<T,N,M> sin<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61787,8 +61787,8 @@ matrix<T,N,M> sinh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61822,7 +61822,7 @@ matrix<T,N,M> smoothstep<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -61850,8 +61850,8 @@ matrix<T,N,M> sqrt<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61882,7 +61882,7 @@ matrix<T,N,M> step<T, N:int, M:int>(
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** 
 2. **HLSL** 
 
 ## Parameters
@@ -61909,8 +61909,8 @@ matrix<T,N,M> tan<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61936,8 +61936,8 @@ matrix<T,N,M> tanh<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
@@ -61983,8 +61983,8 @@ matrix<T,N,M> trunc<T, N:int, M:int>(matrix<T,N,M> x);
 
 ## Availability
 
-1. **GLSL** **HLSL** **SPIRV** `spirv_direct` **CPP** **CUDA** 
-2. **GLSL** **HLSL** **SPIRV** `spirv_direct` 
+1. **GLSL** **HLSL** **SPIRV** **CPP** **CUDA** 
+2. **GLSL** **HLSL** **SPIRV** 
 3. **HLSL** 
 
 ## Parameters
