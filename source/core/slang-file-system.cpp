@@ -201,26 +201,10 @@ SlangResult OSFileSystem::enumeratePathContents(const char* path, FileSystemCont
 SlangResult OSFileSystem::saveFile(const char* pathIn, const void* data, size_t size)
 {
     SLANG_RETURN_ON_FAIL(_checkMutable(m_style));
-
     const String path = _fixPathDelimiters(pathIn);
-
-    try
-    {
-        FileStream stream(pathIn, FileMode::Create, FileAccess::Write, FileShare::ReadWrite);
-
-        int64_t numWritten = stream.write(data, size);
-
-        if (numWritten != int64_t(size))
-        {
-            return SLANG_FAIL;
-        }
-
-    }
-    catch (const IOException&)
-    {
-    	return SLANG_E_CANNOT_OPEN;
-    }
-
+    FileStream stream;
+    SLANG_RETURN_ON_FAIL(stream.init(pathIn, FileMode::Create, FileAccess::Write, FileShare::ReadWrite));
+    SLANG_RETURN_ON_FAIL(stream.write(data, size));
     return SLANG_OK;
 }
 

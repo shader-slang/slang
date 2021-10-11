@@ -17,6 +17,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -46,6 +49,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang">
       <Filter>Source Files</Filter>
     </None>

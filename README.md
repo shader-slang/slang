@@ -75,8 +75,6 @@ Builds of the core Slang tools depend on the following projects, either automati
 * [`spirv-headers`](https://github.com/KhronosGroup/SPIRV-Headers) (Modified MIT)
 * [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
 
-The Slang tests (which are not distributed with source/binary releases) include example HLSL shaders extracted from the Microsoft DirectX SDK, which has its own license
-
 Some of the tests and example programs that build with Slang use the following projets, which may have their own licenses:
 
 * [`glm`](https://github.com/g-truc/glm) (MIT)

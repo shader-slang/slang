@@ -272,9 +272,7 @@
     <ClInclude Include="..\..\..\tools\unit-test\slang-unit-test.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\tools\gfx-unit-test\compute-smoke-uint.slang">
-      <FileType>Document</FileType>
-    </None>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba-uint32-test.cpp" />
@@ -286,7 +284,9 @@
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\compute-smoke-uint.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

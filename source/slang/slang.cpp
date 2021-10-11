@@ -269,11 +269,14 @@ SlangResult Session::compileStdLib(slang::CompileStdLibFlags compileFlags)
         {
             String fileName("stdlib-doc.md");
 
-            StreamWriter writer(new FileStream(fileName, FileMode::Create));
+            RefPtr<FileStream> stream = new FileStream;
+            SLANG_RETURN_ON_FAIL(stream->init(fileName, FileMode::Create));
+            StreamWriter writer;
+            SLANG_RETURN_ON_FAIL(writer.init(stream));
 
             for (auto& docString : docStrings)
             {
-                writer.Write(docString);
+                SLANG_RETURN_ON_FAIL(writer.write(docString));
             }
         }
     }
@@ -822,11 +825,11 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     const char*     moduleName,
     slang::IBlob**  outDiagnostics)
 {
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     try
     {
         auto name = getNamePool()->getName(moduleName);
 
-        DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
         auto module = findOrImportModule(name, SourceLoc(), &sink);
         sink.getBlobIfNeeded(outDiagnostics);
 
@@ -835,6 +838,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::loadModule(
     }
     catch (const AbortCompilationException&)
     {
+        sink.getBlobIfNeeded(outDiagnostics);
         return nullptr;
     }
 }
