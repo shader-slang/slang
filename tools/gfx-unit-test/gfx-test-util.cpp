@@ -15,10 +15,11 @@ namespace gfx_test
         }
     }
 
-    Slang::Result loadShaderProgram(
+    Slang::Result loadComputeProgram(
         gfx::IDevice* device,
         Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
         const char* shaderModuleName,
+        const char* entryPointName,
         slang::ProgramLayout*& slangReflection)
     {
         Slang::ComPtr<slang::ISession> slangSession;
@@ -29,10 +30,9 @@ namespace gfx_test
         if (!module)
             return SLANG_FAIL;
 
-        char const* computeEntryPointName = "computeMain";
         ComPtr<slang::IEntryPoint> computeEntryPoint;
         SLANG_RETURN_ON_FAIL(
-            module->findEntryPointByName(computeEntryPointName, computeEntryPoint.writeRef()));
+            module->findEntryPointByName(entryPointName, computeEntryPoint.writeRef()));
 
         Slang::List<slang::IComponentType*> componentTypes;
         componentTypes.add(module);
