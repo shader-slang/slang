@@ -422,6 +422,11 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
     }
 
     auto targetName = tok.getContent();
+    if (targetName == "spirv_direct")
+    {
+        return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
+    }
+
     const CapabilityAtom targetCap = findCapabilityAtom(targetName);
 
     if (targetCap == CapabilityAtom::Invalid)
@@ -543,6 +548,7 @@ void DocMarkdownWriter::_writeTargetRequirements(const Requirement* reqs, Index 
 
     // Okay we need the name of the CodeGen target
     UnownedStringSlice name = TypeTextUtil::getCompileTargetName(SlangCompileTarget(reqs->target));
+
     out << toSlice("**") << String(name).toUpper() << toSlice("**");
 
     if (!(reqsCount == 1 && reqs[0].value.getLength() == 0))
