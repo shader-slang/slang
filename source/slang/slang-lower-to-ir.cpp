@@ -8005,14 +8005,7 @@ IRModule* generateIRForTranslationUnit(
         SourceFile* source = sources.getFirst();
         PathInfo pInfo = source->getPathInfo();
         String path = pInfo.getMostUniqueIdentity();
-        if (path.lastIndexOf('.') == -1)
-        {
-            lowerFrontEndEntryPointToIR(context, entryPoint, path.subString(path.lastIndexOf('\\') + 1, path.getLength() - path.lastIndexOf('\\') - 1));
-        }
-        else
-        {
-            lowerFrontEndEntryPointToIR(context, entryPoint, path.subString(path.lastIndexOf('\\') + 1, path.lastIndexOf('.') - path.lastIndexOf('\\') - 1));
-        }
+        lowerFrontEndEntryPointToIR(context, entryPoint, Path::getFileNameWithoutExt(path));
     }
 
     //
