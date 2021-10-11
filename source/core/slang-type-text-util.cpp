@@ -64,7 +64,7 @@ static const CompileTargetInfo s_compileTargetInfos[] =
     { SLANG_GLSL,           "glsl,vert,frag,geom,tesc,tese,comp",               "glsl" },
     { SLANG_GLSL_VULKAN,    "",                                                 "glsl-vulkan" },
     { SLANG_GLSL_VULKAN_ONE_DESC, "",                                           "glsl-vulkan-one-desc" },
-    { SLANG_SPIRV,          "spv",                                              "spirv,spirv_direct"},
+    { SLANG_SPIRV,          "spv",                                              "spirv"},
     { SLANG_SPIRV_ASM,      "spv.asm",                                          "spirv-asm,spirv-assembly" },
     { SLANG_C_SOURCE,       "c",                                                "c" },
     { SLANG_CPP_SOURCE,     "cpp,c++,cxx",                                      "cpp,c++,cxx" },
