@@ -424,7 +424,7 @@ static DocMarkdownWriter::Requirement _getRequirementFromTargetToken(const Token
     auto targetName = tok.getContent();
     if (targetName == "spirv_direct")
     {
-        return Requirement{CodeGenTarget::SPIRV, targetName};
+        return Requirement{CodeGenTarget::SPIRV, UnownedStringSlice("")};
     }
 
     const CapabilityAtom targetCap = findCapabilityAtom(targetName);
