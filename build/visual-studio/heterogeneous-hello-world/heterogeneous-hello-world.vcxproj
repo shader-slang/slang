@@ -174,7 +174,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-x86/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-x86/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -193,7 +193,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-x64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-x64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -212,7 +212,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-aarch64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-aarch64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -235,7 +235,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-x86/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-x86/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -258,7 +258,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-x64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-x64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -281,7 +281,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <PreBuildEvent>
-      <Command>"../../../bin/windows-aarch64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target dxbc</Command>
+      <Command>"../../../bin/windows-aarch64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
       <Message>Generating shader.cpp from shader.slang</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
