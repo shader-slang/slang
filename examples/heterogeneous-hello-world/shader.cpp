@@ -38,7 +38,7 @@ void computeMain_wrapper(gfx_Device_0* device, Vector<uint32_t, 3> gridDims,
 	dispatchComputation_0(device, transientHeap, pipelineState, bufferView, gridDims.x, gridDims.y, gridDims.z);
 }
 
-#line 8 "C:/Code/slang/examples/heterogeneous-hello-world/shader.slang"
+#line 8 "../../../examples/heterogeneous-hello-world/shader.slang"
 struct EntryPointParams_0
 {
     RWStructuredBuffer<float> ioBuffer_0;
