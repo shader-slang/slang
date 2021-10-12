@@ -6179,9 +6179,9 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
             return VkBufferUsageFlagBits(0);
         }
     case ResourceState::UnorderedAccess:
-        return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::ShaderResource:
-        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::CopySource:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
@@ -6304,7 +6304,7 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = desc.numMipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
@@ -6427,7 +6427,6 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     // Create the image
     {
         VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-
         switch (desc.type)
         {
             case IResource::Type::Texture1D:
@@ -6446,6 +6445,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
             {
                 imageInfo.imageType = VK_IMAGE_TYPE_2D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
                 break;
             }
             case IResource::Type::Texture3D:
@@ -6472,9 +6472,8 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
+        
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.flags = 0; // Optional
 
         SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
     }
@@ -6663,7 +6662,11 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
-
+    if (desc.allowedStates.contains(ResourceState::ShaderResource) &&
+        m_api.m_extendedFeatures.accelerationStructureFeatures.accelerationStructure)
+    {
+        usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
     if (initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -6863,19 +6866,20 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     createInfo.format = resourceImpl->m_vkformat;
     createInfo.image = resourceImpl->m_image;
     createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
+    bool isArray = resourceImpl->getDesc()->arraySize != 0;
     switch (resourceImpl->getType())
     {
     case IResource::Type::Texture1D:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_1D;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
         break;
     case IResource::Type::Texture2D:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
         break;
     case IResource::Type::Texture3D:
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
         break;
     case IResource::Type::TextureCube:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
         break;
     default:
         SLANG_UNIMPLEMENTED_X("Unknown Texture type.");
