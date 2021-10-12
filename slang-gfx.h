@@ -687,15 +687,19 @@ struct ShaderOffset
     SlangInt uniformOffset = 0;
     SlangInt bindingRangeIndex = 0;
     SlangInt bindingArrayIndex = 0;
-    uint32_t getHashCode()
+    uint32_t getHashCode() const
     {
         return (uint32_t)(((bindingRangeIndex << 20) + bindingArrayIndex) ^ uniformOffset);
     }
-    bool operator==(const ShaderOffset& other)
+    bool operator==(const ShaderOffset& other) const
     {
         return uniformOffset == other.uniformOffset
             && bindingRangeIndex == other.bindingRangeIndex
             && bindingArrayIndex == other.bindingArrayIndex;
+    }
+    bool operator!=(const ShaderOffset& other) const
+    {
+        return !this->operator==(other);
     }
 };
 

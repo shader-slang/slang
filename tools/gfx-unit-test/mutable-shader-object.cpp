@@ -27,10 +27,10 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(
             device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
-        const int numberCount = 4;
         float initialData[] = { 0.0f, 1.0f, 2.0f, 3.0f };
+        const int numberCount = SLANG_COUNT_OF(initialData);
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.sizeInBytes = numberCount * sizeof(float);
+        bufferDesc.sizeInBytes = sizeof(initialData);
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(float);
         bufferDesc.allowedStates = ResourceStateSet(

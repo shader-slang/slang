@@ -3,9 +3,9 @@
 
 #include <slang-com-ptr.h>
 
-#define ENABLE_RENDERDOC_INTEGRATION 0
+#define GFX_ENABLE_RENDERDOC_INTEGRATION 0
 
-#if ENABLE_RENDERDOC_INTEGRATION
+#if GFX_ENABLE_RENDERDOC_INTEGRATION
 #    include "external/renderdoc_app.h"
 #    define WIN32_LEAN_AND_MEAN
 #    include <Windows.h>
@@ -72,24 +72,9 @@ namespace gfx_test
         ComPtr<ISlangBlob> resultBlob;
         GFX_CHECK_CALL_ABORT(device->readBufferResource(
             buffer, 0, expectedBufferSize, resultBlob.writeRef()));
-        if (resultBlob->getBufferSize() < expectedBufferSize)
-        {
-            getTestReporter()->addResult(TestResult::Fail);
-            return;
-        }
-
+        SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
         // Compare results.
-        auto result = reinterpret_cast<const uint8_t*>(resultBlob->getBufferPointer());
-        for (size_t i = 0; i < expectedBufferSize; i++)
-        {
-            if (expectedResult[i] != result[i])
-            {
-                getTestReporter()->addResult(TestResult::Fail);
-                return;
-            }
-
-        }
-        getTestReporter()->addResult(TestResult::Pass);
+        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
     }
 
     Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
@@ -131,7 +116,7 @@ namespace gfx_test
         return device;
     }
 
-#if ENABLE_RENDERDOC_INTEGRATION
+#if GFX_ENABLE_RENDERDOC_INTEGRATION
     RENDERDOC_API_1_1_2* rdoc_api = NULL;
     void initializeRenderDoc()
     {
