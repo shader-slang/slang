@@ -167,6 +167,12 @@ newoption {
 
  targetInfo = slangUtil.getTargetInfo()
  
+ --
+ -- Update the dependencies for the target
+ --
+
+ deps:update(targetInfo.name)
+ 
  -- Get the target name that can be used as paths that generate for different configurations (ie contains premake Tokens)
  
  targetName = targetInfo.tokenName

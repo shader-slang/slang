@@ -5,11 +5,12 @@
             {
                 "name" : "slang-llvm",
                 "baseUrl" : "https://github.com/shader-slang/slang-llvm/releases/download/v13.x-18/",
+                "optional" : true,
                 "packages" : 
                 {
-                    "windows-x86_64" : "slang-llvm-13.x-18-win64.zip",
-                    "windows-x86" : "slang-llvm-13.x-18-win32.zip",
-                    "linux-x86_64" : "slang-llvm-v13.x-18-linux-x86_64-release.zip"
+                    "windows-x86_64" : { "type" : "unavailable", "path" : "slang-llvm-13.x-18-win64.zip" },
+                    "windows-x86" : { "type": "unavailable", "path" : "slang-llvm-13.x-18-win32.zip" },
+                    "linux-x86_64" : { "type": "unavailable", "path" : "slang-llvm-v13.x-18-linux-x86_64-release.zip" }
                 }
             },
             {
