@@ -23,6 +23,7 @@ jobs:
       run: 
         CC=${{matrix.compiler}}
         CONFIGURATION=${{matrix.configuration}}
+        export ARCH=x64
         source ./github_build.sh
     - name: test
       run: 

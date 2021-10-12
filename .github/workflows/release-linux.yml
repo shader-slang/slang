@@ -22,6 +22,7 @@ jobs:
           echo "starting to build..."
           export CC=gcc
           export CONFIGURATION=release
+          export ARCH=x64
           echo "building..."
           source ./github_build.sh
           echo "creating binary archieves..."
