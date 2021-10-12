@@ -8,9 +8,9 @@
                 "optional" : true,
                 "packages" : 
                 {
-                    "windows-x86_64" : { "type" : "unavailable", "path" : "slang-llvm-13.x-18-win64.zip" },
-                    "windows-x86" : { "type": "unavailable", "path" : "slang-llvm-13.x-18-win32.zip" },
-                    "linux-x86_64" : { "type": "unavailable", "path" : "slang-llvm-v13.x-18-linux-x86_64-release.zip" }
+                    "windows-x86_64" : { "type" : "url", "path" : "slang-llvm-13.x-18-win64.zip" },
+                    "windows-x86" : { "type": "url", "path" : "slang-llvm-13.x-18-win32.zip" },
+                    "linux-x86_64" : { "type": "url", "path" : "slang-llvm-v13.x-18-linux-x86_64-release.zip" }
                 }
             },
             {
