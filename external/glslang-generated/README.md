@@ -1,19 +1,19 @@
-Slang Glslang
-=============
+Slang Glslang Generated
+=======================
 
 This directory holds files that are generated that are needed to build glslang. The github repository that holds slangs current version of glslang is 
 
 https://github.com/shader-slang/glslang
 
-Building glslang depends on 
+Building glslang depends on the submodules
 
 * external/spirv-headers
 * external/spirv-tools
 
-These are not external projects but files produces elsewhere and placed in the slang project.
+The following are not submodules files, and are produces elsewhere and placed in the slang project.
 
 * external/spirv-tools-generated
-* external/glslang-external
+* external/glslang-generated
 
 To get the latest version of one of the submodules you can use
 
