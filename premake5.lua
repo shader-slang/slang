@@ -209,7 +209,7 @@ newoption {
  
  -- This is needed for gcc, for the 'fileno' functions on cygwin
  -- _GNU_SOURCE makes realpath available in gcc
- if targetInfo.targetDetail == "cygwin" then
+ if targetInfo.os == "cygwin" then
      buildoptions { "-D_POSIX_SOURCE" }
      filter { "toolset:gcc*" }
          buildoptions { "-D_GNU_SOURCE" }
@@ -852,7 +852,7 @@ newoption {
          addSourceDir "tools/gfx/d3d"
          addSourceDir "tools/gfx/d3d11"
          addSourceDir "tools/gfx/d3d12"
-     elseif targetInfo.targetDetail == "mingw" or targetInfo.targetDetail == "cygwin" then
+     elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
          -- Don't support any render techs...
      elseif os.target() == "macosx" then
          --addSourceDir "tools/gfx/open-gl"
