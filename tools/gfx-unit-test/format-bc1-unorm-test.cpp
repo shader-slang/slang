@@ -9,7 +9,12 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    void FormatRGBAUInt32TestImpl(IDevice* device, UnitTestContext* context)
+    void setUpAndRunTest()
+    {
+
+    }
+
+    void FormatBC1UnormTestImpl(IDevice* device, UnitTestContext* context)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -19,7 +24,7 @@ namespace gfx_test
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "compute-smoke-uint", "computeMain", slangReflection));
+        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "format-test-shaders", "sampleTexFloat", slangReflection));
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
@@ -27,48 +32,48 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(
             device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
-        uint32_t texData[] = { 244u, 0u, 0u, 244u, 0u, 244u, 0u, 244u, 0u, 0u, 244u, 244u, 244u, 244u, 244u, 244u,
-                               184u, 0u, 0u, 244u, 0u, 184u, 0u, 244u, 0u, 0u, 184u, 244u, 184u, 184u, 184u, 244u,
-                               124u, 0u, 0u, 244u, 0u, 124u, 0u, 244u, 0u, 0u, 124u, 244u, 124u, 124u, 124u, 244u,
-                               64u, 0u, 0u, 244u, 0u, 64u, 0u, 244u, 0u, 0u, 64u, 244u, 64u, 64u, 64u, 244u };
+        uint8_t texData[] = { 31, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0,
+                              31, 0, 0, 0, 0, 0, 0, 0, 31, 0, 0, 0, 0, 0, 0, 0,
+                              255, 255, 255, 255, 0, 0, 0, 0 };
         ITextureResource::Desc texDesc = {};
         texDesc.type = IResource::Type::Texture2D;
-        texDesc.numMipLevels = 1;
+        texDesc.numMipLevels = 2;
         texDesc.arraySize = 1;
-        texDesc.size.width = 4;
-        texDesc.size.height = 4;
+        texDesc.size.width = 8;
+        texDesc.size.height = 8;
         texDesc.size.depth = 1;
         texDesc.defaultState = ResourceState::ShaderResource;
-        texDesc.format = Format::RGBA_UInt32;
+        texDesc.format = Format::BC1_Unorm;
 
-        ITextureResource::SubresourceData subData = {};
-        subData.data = (void*)texData;
-        subData.strideY = texDesc.size.width * 4 * sizeof(uint32_t);
+        ITextureResource::SubresourceData subData[] = {
+            ITextureResource::SubresourceData {(void*)texData, 16, 0},
+            ITextureResource::SubresourceData {(void*)(texData + 32), 8, 0}
+        };
 
         ComPtr<ITextureResource> inTex;
         GFX_CHECK_CALL_ABORT(device->createTextureResource(
             texDesc,
-            &subData,
+            subData,
             inTex.writeRef()));
 
         ComPtr<IResourceView> texView;
         IResourceView::Desc texViewDesc = {};
         texViewDesc.type = IResourceView::Type::ShaderResource;
-        texViewDesc.format = Format::RGBA_UInt32;
+        texViewDesc.format = Format::BC1_Unorm;
         GFX_CHECK_CALL_ABORT(device->createTextureView(inTex, texViewDesc, texView.writeRef()));
 
         const int numberCount = 64;
-        uint32_t initialData[numberCount] = { 0u };
+        float initialData[numberCount] = { 0.0f };
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.sizeInBytes = numberCount * sizeof(uint32_t);
+        bufferDesc.sizeInBytes = numberCount * sizeof(float);
         bufferDesc.format = gfx::Format::Unknown;
-        bufferDesc.elementSize = sizeof(uint32_t);
+        bufferDesc.elementSize = sizeof(float);
         bufferDesc.allowedStates = ResourceStateSet(
             ResourceState::ShaderResource,
             ResourceState::UnorderedAccess,
             ResourceState::CopyDestination,
             ResourceState::CopySource);
-        bufferDesc.defaultState = ResourceState::ShaderResource;
+        bufferDesc.defaultState = ResourceState::UnorderedAccess;
         bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
 
         ComPtr<IBufferResource> outBuffer;
@@ -79,9 +84,12 @@ namespace gfx_test
 
         ComPtr<IResourceView> bufferView;
         IResourceView::Desc viewDesc = {};
-        viewDesc.type = IResourceView::Type::ShaderResource;
+        viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
         GFX_CHECK_CALL_ABORT(device->createBufferView(outBuffer, viewDesc, bufferView.writeRef()));
+
+        ISamplerState::Desc samplerDesc;
+        auto sampler = device->createSamplerState(samplerDesc);
 
         // We have done all the set up work, now it is time to start recording a command buffer for
         // GPU execution.
@@ -100,6 +108,8 @@ namespace gfx_test
             // Bind texture view to the entry point
             entryPointCursor.getPath("tex").setResource(texView);
 
+            entryPointCursor.getPath("sampler").setSampler(sampler);
+
             // Bind buffer view to the entry point.
             entryPointCursor.getPath("buffer").setResource(bufferView);
 
@@ -113,13 +123,10 @@ namespace gfx_test
         compareComputeResult(
             device,
             outBuffer,
-            Slang::makeArray<uint32_t>(244u, 0u, 0u, 244u, 0u, 244u, 0u, 244u, 0u, 0u, 244u, 244u, 244u, 244u, 244u, 244u,
-                                       184u, 0u, 0u, 244u, 0u, 184u, 0u, 244u, 0u, 0u, 184u, 244u, 184u, 184u, 184u, 244u,
-                                       124u, 0u, 0u, 244u, 0u, 124u, 0u, 244u, 0u, 0u, 124u, 244u, 124u, 124u, 124u, 244u,
-                                       64u, 0u, 0u, 244u, 0u, 64u, 0u, 244u, 0u, 0u, 64u, 244u, 64u, 64u, 64u, 244u));
+            Slang::makeArray<float>(0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f));
     }
 
-    void FormatRGBAUInt32TestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    void FormatBC1UnormTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
         if ((api & context->enabledApis) == 0)
         {
@@ -151,17 +158,17 @@ namespace gfx_test
             SLANG_IGNORE_TEST
         }
 
-        FormatRGBAUInt32TestImpl(device, context);
+        FormatBC1UnormTestImpl(device, context);
     }
 
-    SLANG_UNIT_TEST(FormatRGBAUInt32D3D12)
+    SLANG_UNIT_TEST(FormatBC1UnormD3D12)
     {
-        FormatRGBAUInt32TestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
+        FormatBC1UnormTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(FormatRGBAUInt32Vulkan)
+    SLANG_UNIT_TEST(FormatBC1UnormVulkan)
     {
-        FormatRGBAUInt32TestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
+        FormatBC1UnormTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
 }

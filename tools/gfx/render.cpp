@@ -170,6 +170,30 @@ static void _compileTimeAsserts()
 
 extern "C"
 {
+    SLANG_GFX_API bool gfxIsCompressedFormat(Format format)
+    {
+        switch (format)
+        {
+        case Format::BC1_Unorm:
+        case Format::BC1_Unorm_Srgb:
+        case Format::BC2_Unorm:
+        case Format::BC2_Unorm_Srgb:
+        case Format::BC3_Unorm:
+        case Format::BC3_Unorm_Srgb:
+        case Format::BC4_Unorm:
+        case Format::BC4_Snorm:
+        case Format::BC5_Unorm:
+        case Format::BC5_Snorm:
+        case Format::BC6_Unsigned:
+        case Format::BC6_Signed:
+        case Format::BC7_Unorm:
+        case Format::BC7_Unorm_Srgb:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo)
     {
         *outInfo = s_formatInfoMap.get(format);

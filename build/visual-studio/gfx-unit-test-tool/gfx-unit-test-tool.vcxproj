@@ -275,7 +275,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\format-bc1-unorm-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba-uint32-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba8-unorm-srgb.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
@@ -286,7 +288,7 @@
   <ItemGroup>
     <None Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang" />
-    <None Include="..\..\..\tools\gfx-unit-test\compute-smoke-uint.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

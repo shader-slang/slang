@@ -4733,7 +4733,12 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
                 const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
                 const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;
 
-                const TextureResource::Size mipSize = calcMipSize(srcDesc.size, j);
+                TextureResource::Size mipSize = calcMipSize(srcDesc.size, j);
+                if (gfxIsCompressedFormat(descIn.format))
+                {
+                    mipSize.width = D3DUtil::calcAligned(mipSize.width, 4);
+                    mipSize.height = D3DUtil::calcAligned(mipSize.height, 4);
+                }
 
                 assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);
 
@@ -4755,7 +4760,8 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
                     //
                     const uint8_t* srcRow = srcLayer;
                     uint8_t* dstRow = dstLayer;
-                    for (int k = 0; k < mipSize.height; ++k)
+                    int j = gfxIsCompressedFormat(descIn.format) ? 4 : 1; // BC compressed formats are organized into 4x4 blocks
+                    for (int k = 0; k < mipSize.height; k += j)
                     {
                         ::memcpy(dstRow, srcRow, (size_t)mipRowSize);
 

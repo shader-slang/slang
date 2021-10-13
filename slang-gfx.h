@@ -1892,6 +1892,8 @@ public:
 
 extern "C"
 {
+    SLANG_GFX_API bool gfxIsCompressedFormat(Format format);
+
     /// Gets information about the format 
     SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo);
 
