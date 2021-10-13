@@ -3360,14 +3360,16 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
         return SLANG_FAIL;
-    testModule->setTestReporter(TestReporter::get());
+
+    auto reporter = TestReporter::get();
+
+    testModule->setTestReporter(reporter);
+
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     auto testCount = testModule->getTestCount();
-
-    auto reporter = TestReporter::get();
 
     for (SlangInt i = 0; i < testCount; i++)
     {
@@ -3400,6 +3402,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
             }
         }
     }
+
     testModule->destroy();
     return SLANG_OK;
 }
