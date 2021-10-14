@@ -705,20 +705,6 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         case SLANG_SOURCE_LANGUAGE_CPP:
         case SLANG_SOURCE_LANGUAGE_C:
         {
-
-#if 0
-            // TODO(JS): We can't just enable this because we can currently only use slang-llvm, if we want to 'host-callable'
-            // It *can't* handle pass through (the includes are not available with just the dll),
-            // As it stands it doesn't support ext/obj/shared library output
-
-            // If we have LLVM, lets use that as the default
-            {
-                DownstreamCompiler::Desc desc;
-                desc.type = SLANG_PASS_THROUGH_LLVM;
-                compiler = findCompiler(set, MatchType::Newest, desc);
-            }
-#endif
-
             // Find the compiler closest to the compiler this was compiled with
             if (!compiler)
             {
