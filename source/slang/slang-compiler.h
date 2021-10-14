@@ -2378,6 +2378,10 @@ namespace Slang
             CodeGenTarget target;
         };
 
+        void removeTransition(CodeGenTarget source, CodeGenTarget target)
+        {
+            m_map.Remove(Pair{ source, target });
+        }
         void addTransition(CodeGenTarget source, CodeGenTarget target, PassThroughMode compiler)
         {
             SLANG_ASSERT(source != target);
@@ -2434,9 +2438,6 @@ namespace Slang
 
         SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) override;
         SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) override;
-
-            /// Get the default compiler for a language
-        DownstreamCompiler* getDownstreamCompilerForSourceLanguage(SourceLanguage sourceLanguage);
 
             /// Get the downstream compiler for a transition
         DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);

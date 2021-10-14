@@ -645,14 +645,17 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-DownstreamCompiler* Session::getDownstreamCompilerForSourceLanguage(SourceLanguage sourceLanguage)
-{
-    return getOrLoadDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)], nullptr);
-}
-
 void Session::setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler)
 {
-    m_codeGenTransitionMap.addTransition(CodeGenTarget(source), CodeGenTarget(target), PassThroughMode(compiler));
+    if (compiler == SLANG_PASS_THROUGH_NONE)
+    {
+        // Removing the transition means a default can be used
+        m_codeGenTransitionMap.removeTransition(CodeGenTarget(source), CodeGenTarget(target));
+    }
+    else
+    {
+        m_codeGenTransitionMap.addTransition(CodeGenTarget(source), CodeGenTarget(target), PassThroughMode(compiler));
+    }
 }
 
 SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget inSource, SlangCompileTarget inTarget)
