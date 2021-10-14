@@ -3341,6 +3341,8 @@ static void _disableCPPBackends(TestContext* context)
     for (auto passThru : cppPassThrus)
     {
         context->availableBackendFlags &= ~(PassThroughFlags(1) << int(passThru));
+        context->availableRenderApiFlags &= ~(RenderApiFlag::CPU);
+        context->options.enabledApis &= ~(RenderApiFlag::CPU);
     }
 }
 
