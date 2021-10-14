@@ -278,6 +278,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-bc1-unorm-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba-uint32-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba8-unorm-srgb.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\format-unit-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />

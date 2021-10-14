@@ -53,6 +53,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-rgba8-unorm-srgb.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\format-unit-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.slang">

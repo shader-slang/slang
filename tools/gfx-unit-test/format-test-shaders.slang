@@ -8,7 +8,10 @@ void copyTexUint(
     uniform Texture2D<uint4> tex,
     uniform RWStructuredBuffer<uint4> buffer)
 {
-    buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % 4, sv_dispatchThreadID.x / 4)];
+    uint width;
+    uint height;
+    tex.GetDimensions(width, height);
+    buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / height)];
 }
 
 [shader("compute")]

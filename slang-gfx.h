@@ -147,9 +147,9 @@ public:
     x(RG_Float32, sizeof(float) * 2, 1) \
     x(R_Float32, sizeof(float), 1) \
     \
-    x(RGBA_Float16, sizeof(float) * 4, 1) \
-    x(RG_Float16, sizeof(float) * 2, 1) \
-    x(R_Float16, sizeof(float), 1) \
+    x(RGBA_Float16, sizeof(float) * 2, 1) \
+    x(RG_Float16, sizeof(float), 1) \
+    x(R_Float16, sizeof(uint16_t), 1) \
     \
     x(RGBA_UInt32, sizeof(uint32_t) * 4, 1) \
     x(RGB_UInt32, sizeof(uint32_t) * 3, 1) \
