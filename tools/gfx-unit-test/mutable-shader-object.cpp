@@ -115,6 +115,11 @@ namespace gfx_test
             Slang::makeArray<float>(3.0f, 4.0f, 5.0f, 6.0f));
     }
 
+    SLANG_UNIT_TEST(mutableShaderObjectCPU)
+    {
+        runTestImpl(mutableShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::CPU);
+    }
+
     SLANG_UNIT_TEST(mutableShaderObjectD3D11)
     {
         runTestImpl(mutableShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::D3D11);

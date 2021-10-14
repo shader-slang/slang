@@ -97,7 +97,7 @@ public:
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
                 stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
-            *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
+            returnComPtr(outRootObject, m_commandBuffer->m_rootShaderObject);
             return SLANG_OK;
         }
 
