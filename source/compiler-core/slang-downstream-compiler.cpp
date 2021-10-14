@@ -185,20 +185,6 @@ SlangResult DownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget,
     return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
 }
 
-/* static */SlangCompileTarget DownstreamCompiler::getCompileTarget(SlangSourceLanguage sourceLanguage)
-{
-    switch (sourceLanguage)
-    {
-        case SLANG_SOURCE_LANGUAGE_HLSL:    return SLANG_HLSL;
-        case SLANG_SOURCE_LANGUAGE_GLSL:    return SLANG_GLSL;
-        case SLANG_SOURCE_LANGUAGE_C:       return SLANG_C_SOURCE;
-        case SLANG_SOURCE_LANGUAGE_CPP:     return SLANG_CPP_SOURCE;
-        case SLANG_SOURCE_LANGUAGE_CUDA:    return SLANG_CUDA_SOURCE;
-        
-        default:                            return SLANG_TARGET_UNKNOWN;
-    }
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
 
 Index DownstreamDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) const

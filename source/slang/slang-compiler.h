@@ -2363,6 +2363,41 @@ namespace Slang
         static const BaseTypeInfo s_info[Index(BaseType::CountOf)];
     };
 
+    class CodeGenTransitionMap
+    {
+    public:
+        struct Pair
+        {
+            typedef Pair ThisType;
+            SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return source == rhs.source && target == rhs.target; }
+            SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+            SLANG_FORCE_INLINE HashCode getHashCode() const { return combineHash(HashCode(source), HashCode(target)); }
+
+            CodeGenTarget source;
+            CodeGenTarget target;
+        };
+
+        void addTransition(CodeGenTarget source, CodeGenTarget target, PassThroughMode compiler)
+        {
+            SLANG_ASSERT(source != target);
+            m_map.Add(Pair{ source, target }, compiler);
+        }
+        bool hasTransition(CodeGenTarget source, CodeGenTarget target) const
+        {
+            return m_map.ContainsKey(Pair{ source, target });
+        }
+        PassThroughMode getTransition(CodeGenTarget source, CodeGenTarget target) const
+        {
+            const Pair pair{ source, target };
+            auto value = m_map.TryGetValue(pair);
+            return value ? *value : PassThroughMode::None;
+        }
+
+    protected:
+        Dictionary<Pair, PassThroughMode> m_map;
+    };
+
     class Session : public RefObject, public slang::IGlobalSession
     {
     public:
@@ -2397,9 +2432,15 @@ namespace Slang
 
         SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
-            /// Get the default compiler for a language
-        DownstreamCompiler* getDefaultDownstreamCompiler(SourceLanguage sourceLanguage);
+        SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) override;
+        SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) override;
 
+            /// Get the default compiler for a language
+        DownstreamCompiler* getDownstreamCompilerForSourceLanguage(SourceLanguage sourceLanguage);
+
+            /// Get the downstream compiler for a transition
+        DownstreamCompiler* getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target);
+        
         Scope* baseLanguageScope = nullptr;
         Scope* coreLanguageScope = nullptr;
         Scope* hlslLanguageScope = nullptr;
@@ -2477,6 +2518,8 @@ namespace Slang
 
     private:
 
+        void _initCodeGenTransitionMap();
+
         SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
 
         SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
@@ -2487,6 +2530,9 @@ namespace Slang
         String m_downstreamCompilerPaths[int(PassThroughMode::CountOf)];         ///< Paths for each pass through
         String m_languagePreludes[int(SourceLanguage::CountOf)];                  ///< Prelude for each source language
         PassThroughMode m_defaultDownstreamCompilers[int(SourceLanguage::CountOf)];
+
+        // Describes a conversion from one code gen target (source) to another (target)
+        CodeGenTransitionMap m_codeGenTransitionMap;
     };
 
 
