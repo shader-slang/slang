@@ -635,7 +635,7 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     // Make the first arg the name of the tool to invoke
     cmdLine.m_args.insert(0, exeName);
 
-    auto exePath = Path::combine(Path::getParentDirectory(inCmdLine.m_executable), "test-proxy" + ProcessUtil::getExecutableSuffix());
+    auto exePath = Path::combine(Path::getParentDirectory(inCmdLine.m_executable), String("test-proxy") + ProcessUtil::getExecutableSuffix());
     cmdLine.setExecutablePath(exePath);
 
     const auto& options = context->options;

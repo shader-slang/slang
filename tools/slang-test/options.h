@@ -74,7 +74,9 @@ struct Options
     bool dumpOutputOnFailure = false;
 
     // Set the default spawn type to use
-    SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
+    //SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
+    // HACK(JS): Use proxy mechanism to test CI for now.
+    SpawnType defaultSpawnType = SpawnType::UseProxy;
 
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;
