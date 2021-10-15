@@ -97,11 +97,6 @@ struct FileTestList
     List<TestDetails> tests;
 };
 
-enum class SpawnType
-{
-    UseExe,
-    UseSharedLibrary,
-};
 
 struct TestInput
 {
@@ -531,6 +526,8 @@ static SlangResult _gatherTestsForFile(
     return SLANG_OK;
 }
 
+
+
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
@@ -549,6 +546,7 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
     }
     return res;
 }
+
 
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
@@ -619,6 +617,44 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
     return SLANG_FAIL;
 }
 
+
+Result spawnAndWaitProxy(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    // Get the name of the thing to execute
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+
+    if (exeName == "slangc")
+    {
+        // If the test is slangc there is a command line version we can just directly use
+        //return spawnAndWaitExe(context, testPath, inCmdLine, outRes);
+        return spawnAndWaitSharedLibrary(context, testPath, inCmdLine, outRes);
+    }
+
+    CommandLine cmdLine(inCmdLine);
+
+    // Make the first arg the name of the tool to invoke
+    cmdLine.m_args.insert(0, exeName);
+
+    auto exePath = Path::combine(Path::getParentDirectory(inCmdLine.m_executable), "test-proxy" + ProcessUtil::getExecutableSuffix());
+    cmdLine.setExecutablePath(exePath);
+
+    const auto& options = context->options;
+    if (options.shouldBeVerbose)
+    {
+        String commandLine = ProcessUtil::getCommandLineString(cmdLine);
+        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
+    }
+
+    // Execute
+    Result res = ProcessUtil::execute(cmdLine, outRes);
+    if (SLANG_FAILED(res))
+    {
+        //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
+        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
+    }
+
+    return res;
+}
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
 {
@@ -966,6 +1002,11 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         case SpawnType::UseSharedLibrary:
         {
             spawnResult = spawnAndWaitSharedLibrary(context, testPath, cmdLine, outExeRes);
+            break;
+        }
+        case SpawnType::UseProxy:
+        {
+            spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -2876,8 +2917,6 @@ TestResult runTest(
         return TestResult::Pass;
     }
 
-    const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
-
     auto testInfo = _findTestCommandInfoByCommand(testOptions.command.getUnownedSlice());
 
     if (testInfo)
@@ -2886,7 +2925,7 @@ TestResult runTest(
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
-        testInput.spawnType = defaultSpawnType;
+        testInput.spawnType = context->options.defaultSpawnType;
 
         return testInfo->callback(context, testInput);
     }
