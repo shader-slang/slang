@@ -1227,11 +1227,11 @@ public:
                 switch (cmd.name)
                 {
                 case CommandName::SetPipelineState:
-                    setPipelineState(commandBuffer->getObject<IPipelineState>(cmd.operands[0]));
+                    setPipelineState(commandBuffer->getObject<PipelineStateBase>(cmd.operands[0]));
                     break;
                 case CommandName::BindRootShaderObject:
                     bindRootShaderObject(
-                        commandBuffer->getObject<IShaderObject>(cmd.operands[0]));
+                        commandBuffer->getObject<ShaderObjectBase>(cmd.operands[0]));
                     break;
                 case CommandName::DispatchCompute:
                     dispatchCompute(
@@ -1239,22 +1239,22 @@ public:
                     break;
                 case CommandName::CopyBuffer:
                     copyBuffer(
-                        commandBuffer->getObject<IBufferResource>(cmd.operands[0]),
+                        commandBuffer->getObject<BufferResource>(cmd.operands[0]),
                         cmd.operands[1],
-                        commandBuffer->getObject<IBufferResource>(cmd.operands[2]),
+                        commandBuffer->getObject<BufferResource>(cmd.operands[2]),
                         cmd.operands[3],
                         cmd.operands[4]);
                     break;
                 case CommandName::UploadBufferData:
                     uploadBufferData(
-                        commandBuffer->getObject<IBufferResource>(cmd.operands[0]),
+                        commandBuffer->getObject<BufferResource>(cmd.operands[0]),
                         cmd.operands[1],
                         cmd.operands[2],
                         commandBuffer->getData<uint8_t>(cmd.operands[3]));
                     break;
                 case CommandName::WriteTimestamp:
                     writeTimestamp(
-                        commandBuffer->getObject<IQueryPool>(cmd.operands[0]),
+                        commandBuffer->getObject<QueryPoolBase>(cmd.operands[0]),
                         (SlangInt)cmd.operands[1]);
                 }
             }
