@@ -97,7 +97,7 @@ public:
             auto stateImpl = static_cast<PipelineStateBase*>(state);
             SLANG_RETURN_ON_FAIL(m_commandBuffer->m_renderer->createRootShaderObject(
                 stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
-            returnComPtr(outRootObject, m_commandBuffer->m_rootShaderObject);
+            *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
             return SLANG_OK;
         }
 
@@ -298,13 +298,13 @@ public:
             switch (name)
             {
             case CommandName::SetPipelineState:
-                m_renderer->setPipelineState(m_writer.getObject<IPipelineState>(cmd.operands[0]));
+                m_renderer->setPipelineState(m_writer.getObject<PipelineStateBase>(cmd.operands[0]));
                 break;
             case CommandName::BindRootShaderObject:
-                m_renderer->bindRootShaderObject(m_writer.getObject<IShaderObject>(cmd.operands[0]));
+                m_renderer->bindRootShaderObject(m_writer.getObject<ShaderObjectBase>(cmd.operands[0]));
                 break;
             case CommandName::SetFramebuffer:
-                m_renderer->setFramebuffer(m_writer.getObject<IFramebuffer>(cmd.operands[0]));
+                m_renderer->setFramebuffer(m_writer.getObject<FramebufferBase>(cmd.operands[0]));
                 break;
             case CommandName::ClearFrame:
                 m_renderer->clearFrame(
@@ -327,7 +327,7 @@ public:
                     for (uint32_t i = 0; i < cmd.operands[1]; i++)
                     {
                         bufferResources.add(
-                            m_writer.getObject<IBufferResource>(cmd.operands[2] + i));
+                            m_writer.getObject<BufferResource>(cmd.operands[2] + i));
                     }
                     m_renderer->setVertexBuffers(
                         (UInt)cmd.operands[0],
@@ -339,7 +339,7 @@ public:
                 break;
             case CommandName::SetIndexBuffer:
                 m_renderer->setIndexBuffer(
-                    m_writer.getObject<IBufferResource>(cmd.operands[0]),
+                    m_writer.getObject<BufferResource>(cmd.operands[0]),
                     (Format)cmd.operands[1],
                     (UInt)cmd.operands[2]);
                 break;
@@ -359,21 +359,21 @@ public:
                 break;
             case CommandName::UploadBufferData:
                 m_renderer->uploadBufferData(
-                    m_writer.getObject<IBufferResource>(cmd.operands[0]),
+                    m_writer.getObject<BufferResource>(cmd.operands[0]),
                     cmd.operands[1],
                     cmd.operands[2],
                     m_writer.getData<uint8_t>(cmd.operands[3]));
                 break;
             case CommandName::CopyBuffer:
                 m_renderer->copyBuffer(
-                    m_writer.getObject<IBufferResource>(cmd.operands[0]),
+                    m_writer.getObject<BufferResource>(cmd.operands[0]),
                     cmd.operands[1],
-                    m_writer.getObject<IBufferResource>(cmd.operands[2]),
+                    m_writer.getObject<BufferResource>(cmd.operands[2]),
                     cmd.operands[3],
                     cmd.operands[4]);
                 break;
             case CommandName::WriteTimestamp:
-                m_renderer->writeTimestamp(m_writer.getObject<IQueryPool>(cmd.operands[0]), (SlangInt)cmd.operands[1]);
+                m_renderer->writeTimestamp(m_writer.getObject<QueryPoolBase>(cmd.operands[0]), (SlangInt)cmd.operands[1]);
                 break;
             default:
                 assert(!"unknown command");

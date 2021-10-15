@@ -72,8 +72,7 @@ namespace gfx_test
 
             auto rootObject = encoder->bindPipeline(pipelineState);
 
-            auto entryPointCursor = ShaderCursor(
-                rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
+            auto entryPointCursor = ShaderCursor(rootObject->getEntryPoint(0));
 
             entryPointCursor.getPath("buffer").setResource(bufferView);
 
@@ -92,8 +91,7 @@ namespace gfx_test
             encoder = commandBuffer->encodeComputeCommands();
 
             rootObject = encoder->bindPipeline(pipelineState);
-            entryPointCursor = ShaderCursor(
-                rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
+            entryPointCursor = ShaderCursor(rootObject->getEntryPoint(0));
 
             // Mutate `transformer` object and run again.
             c = 2.0f;

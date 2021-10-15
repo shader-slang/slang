@@ -954,6 +954,9 @@ public:
 class CPURootShaderObject : public CPUShaderObject
 {
 public:
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
     SlangResult init(IDevice* device, CPUProgramLayout* programLayout);
 
     CPUProgramLayout* getLayout() { return static_cast<CPUProgramLayout*>(m_layout.Ptr()); }
@@ -1004,16 +1007,8 @@ public:
     }
 };
 
-class CPUQueryPool : public IQueryPool, public ComObject
+class CPUQueryPool : public QueryPoolBase
 {
-public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL;
-    IQueryPool* getInterface(const Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-            return static_cast<IQueryPool*>(this);
-        return nullptr;
-    }
 public:
     List<uint64_t> m_queries;
     Result init(const IQueryPool::Desc& desc)

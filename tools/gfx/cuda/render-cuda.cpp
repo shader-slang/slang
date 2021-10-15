@@ -672,6 +672,9 @@ public:
 class CUDARootShaderObject : public CUDAShaderObject
 {
 public:
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+public:
     List<RefPtr<CUDAEntryPointShaderObject>> entryPointObjects;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         init(IDevice* device, CUDAShaderObjectLayout* typeLayout) override;
@@ -721,16 +724,8 @@ public:
     }
 };
 
-class CUDAQueryPool : public IQueryPool, public ComObject
+class CUDAQueryPool : public QueryPoolBase
 {
-public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL;
-    IQueryPool* getInterface(const Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-            return static_cast<IQueryPool*>(this);
-        return nullptr;
-    }
 public:
     // The event object for each query. Owned by the pool.
     List<CUevent> m_events;

@@ -285,19 +285,8 @@ protected:
         IFramebufferLayout::AttachmentLayout m_depthStencil;
     };
 
-    class FramebufferImpl
-        : public IFramebuffer
-        , public ComObject
+    class FramebufferImpl : public FramebufferBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebuffer* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
-                return static_cast<IFramebuffer*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<RefPtr<RenderTargetViewImpl>, kMaxRTVs> renderTargetViews;
         ShortList<ID3D11RenderTargetView*, kMaxRTVs> d3dRenderTargetViews;
@@ -361,16 +350,8 @@ protected:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
 
-    class QueryPoolImpl : public IQueryPool, public ComObject
+    class QueryPoolImpl : public QueryPoolBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL;
-        IQueryPool* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-                return static_cast<IQueryPool*>(this);
-            return nullptr;
-        }
     public:
         List<ComPtr<ID3D11Query>> m_queries;
         RefPtr<D3D11Device> m_device;
@@ -1817,6 +1798,9 @@ protected:
         typedef ShaderObjectImpl Super;
 
     public:
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
         {
             RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();

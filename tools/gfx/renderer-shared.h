@@ -945,6 +945,24 @@ public:
     IFramebufferLayout* getInterface(const Slang::Guid& guid);
 };
 
+class FramebufferBase
+    : public IFramebuffer
+    , public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IFramebuffer* getInterface(const Slang::Guid& guid);
+};
+
+class QueryPoolBase
+    : public IQueryPool
+    , public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IQueryPool* getInterface(const Slang::Guid& guid);
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject
@@ -1100,12 +1118,16 @@ protected:
 class TransientResourceHeapBase : public ITransientResourceHeap, public Slang::ComObject
 {
 public:
-    uint64_t m_version;
+    uint64_t m_version = 0;
     uint64_t getVersion() { return m_version; }
     uint64_t& getVersionCounter()
     {
         static uint64_t version = 1;
         return version;
+    }
+    TransientResourceHeapBase()
+    {
+        m_version = getVersionCounter()++;
     }
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL

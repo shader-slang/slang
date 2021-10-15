@@ -334,19 +334,8 @@ public:
         IFramebufferLayout::AttachmentLayout m_depthStencil;
     };
 
-    class FramebufferImpl
-        : public IFramebuffer
-        , public ComObject
+    class FramebufferImpl : public FramebufferBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebuffer* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
-                return static_cast<IFramebuffer*>(this);
-            return nullptr;
-        }
-
     public:
         GLuint m_framebuffer;
         ShortList<GLenum> m_drawBuffers;
@@ -1394,7 +1383,9 @@ public:
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
         typedef ShaderObjectImpl Super;
-
+    public:
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
     public:
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
         {

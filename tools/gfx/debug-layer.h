@@ -265,6 +265,7 @@ public:
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
         uint32_t count) override;
+    void reset();
 };
 
 class DebugCommandBuffer;

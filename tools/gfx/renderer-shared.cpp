@@ -224,6 +224,20 @@ IFramebufferLayout* FramebufferLayoutBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+IFramebuffer* FramebufferBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
+        return static_cast<IFramebuffer*>(this);
+    return nullptr;
+}
+
+IQueryPool* QueryPoolBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+        return static_cast<IQueryPool*>(this);
+    return nullptr;
+}
+
 IPipelineState* gfx::PipelineStateBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)

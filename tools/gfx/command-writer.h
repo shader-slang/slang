@@ -3,6 +3,7 @@
 #include "slang-gfx.h"
 #include "slang-com-ptr.h"
 #include "core/slang-basic.h"
+#include "renderer-shared.h"
 
 namespace gfx
 {
@@ -81,7 +82,7 @@ class CommandWriter
 {
 public:
     Slang::List<Command> m_commands;
-    Slang::List<Slang::ComPtr<ISlangUnknown>> m_objects;
+    Slang::List<Slang::RefPtr<Slang::RefObject>> m_objects;
     Slang::List<uint8_t> m_data;
     bool m_hasWriteTimestamps = false;
 
@@ -105,18 +106,16 @@ public:
         return offset;
     }
 
-    uint32_t encodeObject(ISlangUnknown* obj)
+    uint32_t encodeObject(Slang::RefObject* obj)
     {
         uint32_t offset = (uint32_t)m_objects.getCount();
-        ComPtr<ISlangUnknown> ptr;
-        ptr = obj;
-        m_objects.add(ptr);
+        m_objects.add(obj);
         return offset;
     }
 
     template <typename T> T* getObject(uint32_t offset)
     {
-        return static_cast<T*>(m_objects[offset].get());
+        return static_cast<T*>(m_objects[offset].Ptr());
     }
 
     template <typename T> T* getData(uint32_t offset)
@@ -126,19 +125,19 @@ public:
 
     void setPipelineState(IPipelineState* state)
     {
-        auto offset = encodeObject(state);
+        auto offset = encodeObject(static_cast<PipelineStateBase*>(state));
         m_commands.add(Command(CommandName::SetPipelineState, offset));
     }
 
     void bindRootShaderObject(IShaderObject* object)
     {
-        auto rootOffset = encodeObject(object);
+        auto rootOffset = encodeObject(static_cast<ShaderObjectBase*>(object));
         m_commands.add(Command(CommandName::BindRootShaderObject, rootOffset));
     }
 
     void uploadBufferData(IBufferResource* buffer, size_t offset, size_t size, void* data)
     {
-        auto bufferOffset = encodeObject(buffer);
+        auto bufferOffset = encodeObject(static_cast<BufferResource*>(buffer));
         auto dataOffset = encodeData(data, size);
         m_commands.add(Command(
             CommandName::UploadBufferData,
@@ -155,8 +154,8 @@ public:
         size_t srcOffset,
         size_t size)
     {
-        auto dstBuffer = encodeObject(dst);
-        auto srcBuffer = encodeObject(src);
+        auto dstBuffer = encodeObject(static_cast<BufferResource*>(dst));
+        auto srcBuffer = encodeObject(static_cast<BufferResource*>(src));
         m_commands.add(Command(
             CommandName::CopyBuffer,
             dstBuffer,
@@ -168,7 +167,7 @@ public:
 
     void setFramebuffer(IFramebuffer* frameBuffer)
     {
-        uint32_t framebufferOffset = encodeObject(frameBuffer);
+        uint32_t framebufferOffset = encodeObject(static_cast<FramebufferBase*>(frameBuffer));
         m_commands.add(Command(CommandName::SetFramebuffer, framebufferOffset));
     }
 
@@ -205,7 +204,7 @@ public:
         uint32_t bufferOffset = 0;
         for (UInt i = 0; i < slotCount; i++)
         {
-            auto offset = encodeObject(buffers[i]);
+            auto offset = encodeObject(static_cast<BufferResource*>(buffers[i]));
             if (i == 0)
                 bufferOffset = offset;
         }
@@ -222,7 +221,7 @@ public:
 
     void setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
     {
-        auto bufferOffset = encodeObject(buffer);
+        auto bufferOffset = encodeObject(static_cast<BufferResource*>(buffer));
         m_commands.add(Command(
             CommandName::SetIndexBuffer, bufferOffset, (uint32_t)indexFormat, (uint32_t)offset));
     }
@@ -254,7 +253,7 @@ public:
 
     void writeTimestamp(IQueryPool* pool, SlangInt index)
     {
-        auto poolOffset = encodeObject(pool);
+        auto poolOffset = encodeObject(static_cast<QueryPoolBase*>(pool));
         m_commands.add(
             Command(CommandName::WriteTimestamp, poolOffset, (uint32_t)index));
         m_hasWriteTimestamps = true;

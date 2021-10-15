@@ -558,19 +558,8 @@ public:
         }
     };
 
-    class FramebufferImpl
-        : public IFramebuffer
-        , public ComObject
+    class FramebufferImpl : public FramebufferBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebuffer* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
-                return static_cast<IFramebuffer*>(this);
-            return nullptr;
-        }
-
     public:
         VkFramebuffer m_handle;
         ShortList<ComPtr<IResourceView>> renderTargetViews;
@@ -4710,18 +4699,8 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
     };
 
-    class QueryPoolImpl
-        : public IQueryPool
-        , public ComObject
+    class QueryPoolImpl : public QueryPoolBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IQueryPool* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-                return static_cast<IQueryPool*>(this);
-            return nullptr;
-        }
     public:
         Result init(const IQueryPool::Desc& desc, VKDevice* device)
         {
