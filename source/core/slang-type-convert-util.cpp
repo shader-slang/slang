@@ -23,7 +23,7 @@ namespace Slang
     return SLANG_SOURCE_LANGUAGE_UNKNOWN;
 }
 
-/* static */SlangCompileTarget TypeConvertUtil::getCompileTargetForSourceLanguage(SlangSourceLanguage lang)
+/* static */SlangCompileTarget TypeConvertUtil::getCompileTargetFromSourceLanguage(SlangSourceLanguage lang)
 {
     switch (lang)
     {

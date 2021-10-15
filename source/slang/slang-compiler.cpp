@@ -1075,7 +1075,7 @@ namespace Slang
             // That if a pass-through is being performed and the source language is Slang
             // no downstream compiler knows how to deal with that, so probably means 'HLSL'
             sourceLanguage = (sourceLanguage == SourceLanguage::Slang) ? SourceLanguage::HLSL : sourceLanguage;
-            sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetForSourceLanguage((SlangSourceLanguage)sourceLanguage));
+            sourceTarget = CodeGenTarget(TypeConvertUtil::getCompileTargetFromSourceLanguage((SlangSourceLanguage)sourceLanguage));
 
             // If it's pass through we accumulate the preprocessor definitions. 
             for (auto& define : translationUnit->compileRequest->preprocessorDefinitions)

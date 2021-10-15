@@ -13,7 +13,7 @@ struct TypeConvertUtil
     static SlangSourceLanguage getSourceLanguageFromTarget(SlangCompileTarget target);
 
         /// Convert a language into the equivalent target. If not available returns SLANG_TARGET_UNKNOWN
-    static SlangCompileTarget getCompileTargetForSourceLanguage(SlangSourceLanguage lang);
+    static SlangCompileTarget getCompileTargetFromSourceLanguage(SlangSourceLanguage lang);
 };
 
 }
