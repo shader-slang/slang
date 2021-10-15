@@ -5,6 +5,7 @@
 #include "../core/slang-shared-library.h"
 #include "../core/slang-archive-file-system.h"
 #include "../core/slang-type-text-util.h"
+#include "../core/slang-type-convert-util.h"
 
 #include "slang-check.h"
 #include "slang-parameter-binding.h"
@@ -119,6 +120,8 @@ void Session::init()
 {
     SLANG_ASSERT(BaseTypeInfo::check());
 
+    _initCodeGenTransitionMap();
+
     ::memset(m_downstreamCompilerLocators, 0, sizeof(m_downstreamCompilerLocators));
     DownstreamCompilerUtil::setDefaultLocators(m_downstreamCompilerLocators);
     m_downstreamCompilerSet = new DownstreamCompilerSet;
@@ -189,6 +192,46 @@ void Session::init()
     m_languagePreludes[Index(SourceLanguage::CUDA)] = get_slang_cuda_prelude();
     m_languagePreludes[Index(SourceLanguage::CPP)] = get_slang_cpp_prelude();
     m_languagePreludes[Index(SourceLanguage::HLSL)] = get_slang_hlsl_prelude();
+}
+
+void Session::_initCodeGenTransitionMap()
+{
+    // TODO(JS): Might want to do something about these in the future...
+
+    //PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
+    //SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler);
+
+    // Set up the default ways to do compilations between code gen targets
+    auto& map = m_codeGenTransitionMap;
+    
+    // TODO(JS): There currently isn't a 'downstream compiler' for direct spirv output. If we did
+    // it would presumably a transition from SlangIR to SPIRV.
+
+    // For C and C++ we default to use the 'genericCCpp' compiler 
+    {
+        const CodeGenTarget sources[] = { CodeGenTarget::CSource, CodeGenTarget::CPPSource };
+        for (auto source : sources)
+        {
+            // We *don't* add a default for host callable, as we will determine what is suitable depending on what
+            // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
+
+            map.addTransition(source, CodeGenTarget::SharedLibrary, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::Executable, PassThroughMode::GenericCCpp);
+            map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
+        }
+    }
+
+    
+    // Add all the straightforward transitions
+    map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
+    map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
+    map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
+
+    // To assembly
+    map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);
+    map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
+    map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, PassThroughMode::Fxc);
 }
 
 void Session::addBuiltins(
@@ -599,9 +642,60 @@ SlangPassThrough SLANG_MCALL Session::getDefaultDownstreamCompiler(SlangSourceLa
     return SlangPassThrough(m_defaultDownstreamCompilers[int(sourceLanguage)]);
 }
 
-DownstreamCompiler* Session::getDefaultDownstreamCompiler(SourceLanguage sourceLanguage)
+void Session::setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler)
 {
-    return getOrLoadDownstreamCompiler(m_defaultDownstreamCompilers[int(sourceLanguage)], nullptr);
+    if (compiler == SLANG_PASS_THROUGH_NONE)
+    {
+        // Removing the transition means a default can be used
+        m_codeGenTransitionMap.removeTransition(CodeGenTarget(source), CodeGenTarget(target));
+    }
+    else
+    {
+        m_codeGenTransitionMap.addTransition(CodeGenTarget(source), CodeGenTarget(target), PassThroughMode(compiler));
+    }
+}
+
+SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget inSource, SlangCompileTarget inTarget)
+{
+    const CodeGenTarget source = CodeGenTarget(inSource);
+    const CodeGenTarget target = CodeGenTarget(inTarget);
+
+    if (m_codeGenTransitionMap.hasTransition(source, target))
+    {
+        return (SlangPassThrough)m_codeGenTransitionMap.getTransition(source, target);
+    }
+
+    // Special case host-callable
+    if (target == CodeGenTarget::HostCallable)
+    {
+        if (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource)
+        {
+            // We prefer LLVM if it's available
+            DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
+            if (llvm)
+            {
+                return SLANG_PASS_THROUGH_LLVM;
+            }
+        }
+    }
+
+    // Use the legacy 'sourceLanguage' default mechanism.
+    // This says nothing about the target type, so it is *assumed* the target type is possible
+    // If not it will fail when trying to compile to an unknown target
+    const SourceLanguage sourceLanguage = (SourceLanguage)TypeConvertUtil::getSourceLanguageFromTarget(inSource);
+    if (sourceLanguage != SourceLanguage::Unknown)
+    {
+        return getDefaultDownstreamCompiler(SlangSourceLanguage(sourceLanguage));
+    }
+
+    // Unknwon
+    return SLANG_PASS_THROUGH_NONE;
+}
+
+DownstreamCompiler* Session::getDownstreamCompiler(CodeGenTarget source, CodeGenTarget target)
+{
+    PassThroughMode compilerType = (PassThroughMode)getDownstreamCompilerForTransition(SlangCompileTarget(source), SlangCompileTarget(target));
+    return getOrLoadDownstreamCompiler(compilerType, nullptr);
 }
 
 Profile getEffectiveProfile(EntryPoint* entryPoint, TargetRequest* target)
@@ -1062,6 +1156,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 {
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
+
+    if (!subType || !supType)
+        return SLANG_FAIL;
+
     auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
     auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
     uint32_t resultIndex = 0;

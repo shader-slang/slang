@@ -247,6 +247,7 @@ struct AssociatedTypeLookupSpecializationContext
                         continue;
                     use->set(witnessTableIDType);
                 }
+                sharedContext->sharedBuilderStorage.deduplicateAndRebuildGlobalNumberingMap();
             }
         }
 
