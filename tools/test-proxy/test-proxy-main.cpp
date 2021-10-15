@@ -3,20 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "../../source/core/slang-secure-crt.h"
 
 #include "../../slang-com-helper.h"
 
-#include "../../source/core/slang-list.h"
 #include "../../source/core/slang-string.h"
-#include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-slice-pool.h"
 #include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-file-system.h"
+
 #include "../../source/core/slang-shared-library.h"
 
-#include "../../source/core/slang-io.h"
 #include "../../source/core/slang-test-tool-util.h"
 
 namespace TestProxy
@@ -82,7 +79,7 @@ static SlangResult execute(int argc, const char* const* argv)
     return res;
 }
 
-} // namespace CppExtract
+} // namespace TestProxy
 
 int main(int argc, const char* const* argv)
 {
