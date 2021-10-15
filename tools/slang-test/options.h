@@ -74,7 +74,8 @@ struct Options
     bool dumpOutputOnFailure = false;
 
     // Set the default spawn type to use
-    // Set to SpawnType::UseProxy, if isolation of test execution is desired. Note this doesn't work for unit tests.
+    // Set to SpawnType::UseProxy, if isolation of test execution is desired.
+    // Note isolation through proxy doesn't currently work for unit tests.
     SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
     
     // kind of output to generate
