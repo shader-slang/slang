@@ -196,16 +196,15 @@ void Session::init()
 
 void Session::_initCodeGenTransitionMap()
 {
-    // TODO(JS): Might need to do something about these...
+    // TODO(JS): Might want to do something about these in the future...
 
     //PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target);
-    /// Given a target returns a downstream compiler the prelude should be taken from.
     //SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode compiler);
 
     // Set up the default ways to do compilations between code gen targets
     auto& map = m_codeGenTransitionMap;
     
-    // TODO(JS): There currently have a 'downstream compiler' for direct spirv output. If we did
+    // TODO(JS): There currently isn't a 'downstream compiler' for direct spirv output. If we did
     // it would presumably a transition from SlangIR to SPIRV.
 
     // For C and C++ we default to use the 'genericCCpp' compiler 
@@ -213,29 +212,27 @@ void Session::_initCodeGenTransitionMap()
         const CodeGenTarget sources[] = { CodeGenTarget::CSource, CodeGenTarget::CPPSource };
         for (auto source : sources)
         {
+            // We *don't* add a default for host callable, as we will determine what is suitable depending on what
+            // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
+
             map.addTransition(source, CodeGenTarget::SharedLibrary, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::Executable, PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
         }
     }
 
-    // We *don't* add a default for host callable, as we will determine what is suitable depending on what
-    // is available. We prefer LLVM if that's available. If it's not we can use generic C/C++ compiler
-
-    // Add all the straightforward ones
+    
+    // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
 
-
     // To assembly
-
     map.addTransition(CodeGenTarget::SPIRV, CodeGenTarget::SPIRVAssembly, PassThroughMode::Glslang);
     map.addTransition(CodeGenTarget::DXIL, CodeGenTarget::DXILAssembly, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::DXBytecode, CodeGenTarget::DXBytecodeAssembly, PassThroughMode::Fxc);
 }
-
 
 void Session::addBuiltins(
     char const*     sourcePath,
@@ -673,7 +670,7 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(SlangCompileTarget 
     {
         if (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource)
         {
-            // If we prefer LLVM if it's available
+            // We prefer LLVM if it's available
             DownstreamCompiler* llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
             if (llvm)
             {
