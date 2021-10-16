@@ -27,10 +27,22 @@ void copyTexFloat(
     buffer[sv_dispatchThreadID.x] = tex[uint2(sv_dispatchThreadID.x % width, sv_dispatchThreadID.x / height)];
 }
 
-// Sample from "tex" and save the resuls in "buffer".
+[shader("compute")]
+[numthreads(4,1,1)]
+void sampleTexFloat(
+    uint3 sv_dispatchThreadID : SV_DispatchThreadID,
+    uniform Texture2D<float4> tex,
+    uniform SamplerState sampler,
+    uniform RWStructuredBuffer<float4> buffer)
+{
+    buffer[sv_dispatchThreadID.x] = tex.SampleLevel(sampler, float2(0.5, 0.5), 0);
+}
+
+// Sample from "tex" and save the resuls in "buffer". This sampler samples from a specific location
+// and only varies by mipmap layer.
 [shader("compute")]
 [numthreads(2,1,1)]
-void sampleTexFloat(
+void sampleMipsFloat(
     uint3 sv_dispatchThreadID : SV_DispatchThreadID,
     uniform Texture2D<float4> tex,
     uniform SamplerState sampler,
