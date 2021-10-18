@@ -3568,7 +3568,8 @@ SlangResult innerMain(int argc, char** argv)
             }
 #if 0
             // TODO(JS): Disable gfx unit tests for now as having problems with CI failing
-            // and it may(?) be related. 
+            // and it may(?) be related.
+            // Test: 1 2
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
