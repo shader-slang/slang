@@ -5873,9 +5873,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
-    // TODO(JS): HACK! Disable swiftshader for now
-    //for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
-    for (int forceSoftware = 0; forceSoftware <= 0; forceSoftware++)
+    for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)    
     {
         initDeviceResult = m_module.init(forceSoftware != 0);
         if (initDeviceResult != SLANG_OK)
