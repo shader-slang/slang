@@ -11,7 +11,7 @@
 #include "../../source/core/slang-string.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-string-util.h""
+#include "../../source/core/slang-string-util.h"
 
 #include "../../source/core/slang-shared-library.h"
 
@@ -209,7 +209,14 @@ static SlangResult execute(int argc, const char* const* argv)
 
         UnitTestFunc testFunc = testModule->getTestFunc(testIndex);
 
-        testFunc(&unitTestContext);
+        try
+        {
+            testFunc(&unitTestContext);
+        }
+        catch (...)
+        {
+            testReporter.m_failCount++;
+        }
 
         if (testReporter.m_failCount > 0)
         {
