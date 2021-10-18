@@ -266,6 +266,10 @@ static bool _isSubCommand(const char* arg)
                 return res;
             }
         }
+        else if (strcmp(arg, "-skip-api-detection") == 0)
+        {
+            optionsOut->skipApiDetection = true;
+        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);

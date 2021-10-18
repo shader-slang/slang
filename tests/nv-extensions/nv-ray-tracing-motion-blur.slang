@@ -1,3 +1,6 @@
+// Note: this test is disabled because it causes an "error:xxx" line being printed by
+// glsl-validator to the console output, this will leads to github actions to terminate
+// the job and return failure status.
 //DISABLE_TEST:CROSS_COMPILE: -profile glsl_460+GL_EXT_ray_tracing -stage raygeneration -entry main -target spirv-assembly
 
 #define TRACING_EPSILON 1e-6
