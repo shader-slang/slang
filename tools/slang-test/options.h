@@ -76,7 +76,8 @@ struct Options
     // Set the default spawn type to use
     // Set to SpawnType::UseProxy, if isolation of test execution is desired.
     // Note isolation through the proxy doesn't currently work for unit tests.
-    SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
+    //SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
+    SpawnType defaultSpawnType = SpawnType::UseProxy;
     
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;

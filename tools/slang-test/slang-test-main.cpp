@@ -3662,14 +3662,13 @@ SlangResult innerMain(int argc, char** argv)
                 testOptions.categories.add(smokeTestCategory);
                 runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
             }
-#if 1
-            // TODO(JS): Disable gfx unit tests for now, because may be causing TC instability issue.
+            
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 runUnitTestModule(&context, testOptions, "gfx-unit-test-tool");
             }
-#endif
+
             TestReporter::set(nullptr);
         }
 
