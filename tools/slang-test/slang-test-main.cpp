@@ -3401,6 +3401,9 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     auto testCount = testModule->getTestCount();
+
+    TestReporter* reporter = TestReporter::get();
+
     for (SlangInt i = 0; i < testCount; i++)
     {
         auto testFunc = testModule->getTestFunc(i);
@@ -3415,9 +3418,63 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                TestReporter::get()->startTest(testOptions.command.getBuffer());
-                testFunc(&unitTestContext);
-                TestReporter::get()->endTest();
+                if (context->options.defaultSpawnType == SpawnType::UseProxy)
+                {
+                    CommandLine cmdLine;
+
+                    // The 'command' is the module 
+                    cmdLine.setExecutablePath(Path::combine(context->exeDirectoryPath, moduleName));
+
+                    // Pass the test name / index
+                    cmdLine.addArg(testName);
+
+                    {
+                        StringBuilder buf;
+                        buf << i;
+                        cmdLine.addArg(buf.ProduceString());
+                    }
+
+                    // Pass the enabled apis
+                    {
+                        StringBuilder buf;
+                        buf << context->options.enabledApis;
+                        cmdLine.addArg(buf.ProduceString());
+                    }
+
+                    reporter->startTest(testOptions.command.getBuffer());
+
+                    ExecuteResult exeRes;
+                    ToolReturnCode retCode = spawnAndWait(context, filePath, context->options.defaultSpawnType, cmdLine, exeRes);
+
+                    switch (retCode)
+                    {
+                        case ToolReturnCode::CompilationFailed:
+                        case ToolReturnCode::Failed:
+                        case ToolReturnCode::FailedToRun:
+                        {
+                            reporter->addResult(TestResult::Fail);
+                            break;
+                        }
+                        case ToolReturnCode::Success:
+                        {
+                            reporter->addResult(TestResult::Pass);
+                            break;
+                        }
+                        case ToolReturnCode::Ignored:
+                        {
+                            reporter->addResult(TestResult::Ignored);
+                            break;
+                        }
+                    }
+
+                    reporter->endTest();
+                }
+                else
+                {
+                    reporter->startTest(testOptions.command.getBuffer());
+                    testFunc(&unitTestContext);
+                    reporter->endTest();
+                }
             }
         }
     }
@@ -3605,7 +3662,7 @@ SlangResult innerMain(int argc, char** argv)
                 testOptions.categories.add(smokeTestCategory);
                 runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
             }
-#if 0
+#if 1
             // TODO(JS): Disable gfx unit tests for now, because may be causing TC instability issue.
             {
                 TestOptions testOptions;
