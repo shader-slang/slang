@@ -300,6 +300,7 @@
     <ClInclude Include="..\..\..\tools\gfx\debug-layer.h" />
     <ClInclude Include="..\..\..\tools\gfx\flag-combiner.h" />
     <ClInclude Include="..\..\..\tools\gfx\immediate-renderer-base.h" />
+    <ClInclude Include="..\..\..\tools\gfx\mutable-shader-object.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-include.h" />
     <ClInclude Include="..\..\..\tools\gfx\nvapi\nvapi-util.h" />
     <ClInclude Include="..\..\..\tools\gfx\open-gl\render-gl.h" />

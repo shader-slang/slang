@@ -563,6 +563,26 @@ Result DebugDevice::createShaderObject(
     return result;
 }
 
+Result DebugDevice::createMutableShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outShaderObject)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto typeName = type->getName();
+    auto result =
+        baseObject->createMutableShaderObject(type, containerType, outObject->baseObject.writeRef());
+    outObject->m_typeName = typeName;
+    outObject->m_device = this;
+    outObject->m_slangType = type;
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outShaderObject, outObject);
+    return result;
+}
+
 Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     SLANG_GFX_API_FUNC;
@@ -863,8 +883,10 @@ Result DebugComputeCommandEncoder::bindPipeline(
     SLANG_GFX_API_FUNC;
 
     auto innerState = static_cast<DebugPipelineState*>(state)->baseObject;
-    auto result =
-        baseObject->bindPipeline(innerState, commandBuffer->rootObject.baseObject.writeRef());
+    IShaderObject* innerRootObject = nullptr;
+    commandBuffer->rootObject.reset();
+    auto result = baseObject->bindPipeline(innerState, &innerRootObject);
+    commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootShaderObject = &commandBuffer->rootObject;
     return result;
 }
@@ -895,8 +917,10 @@ Result DebugRenderCommandEncoder::bindPipeline(
     SLANG_GFX_API_FUNC;
 
     auto innerState = static_cast<DebugPipelineState*>(state)->baseObject;
-    auto result =
-        baseObject->bindPipeline(innerState, commandBuffer->rootObject.baseObject.writeRef());
+    IShaderObject* innerRootObject = nullptr;
+    commandBuffer->rootObject.reset();
+    auto result = baseObject->bindPipeline(innerState, &innerRootObject);
+    commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootShaderObject = &commandBuffer->rootObject;
     return result;
 }
@@ -1142,7 +1166,10 @@ void DebugRayTracingCommandEncoder::bindPipeline(
 {
     SLANG_GFX_API_FUNC;
     auto innerPipeline = getInnerObj(state);
-    baseObject->bindPipeline(innerPipeline, commandBuffer->rootObject.baseObject.writeRef());
+    IShaderObject* innerRootObject = nullptr;
+    commandBuffer->rootObject.reset();
+    baseObject->bindPipeline(innerPipeline, &innerRootObject);
+    commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootObject = &commandBuffer->rootObject;
 }
 
@@ -1393,8 +1420,19 @@ Result DebugShaderObject::setSpecializationArgs(
     const slang::SpecializationArg* args,
     uint32_t count)
 {
-
     return baseObject->setSpecializationArgs(offset, args, count);
+}
+
+Result DebugShaderObject::getCurrentVersion(
+    ITransientResourceHeap* transientHeap, IShaderObject** outObject)
+{
+    ComPtr<IShaderObject> innerObject;
+    SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
+    RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
+    debugShaderObject->baseObject = innerObject;
+    debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
+    returnComPtr(outObject, debugShaderObject);
+    return SLANG_OK;
 }
 
 DebugObjectBase::DebugObjectBase()
@@ -1411,6 +1449,15 @@ Result DebugRootShaderObject::setSpecializationArgs(
     SLANG_GFX_API_FUNC;
 
     return baseObject->setSpecializationArgs(offset, args, count);
+}
+
+void DebugRootShaderObject::reset()
+{
+    m_entryPoints.clear();
+    m_objects.Clear();
+    m_resources.Clear();
+    m_samplers.Clear();
+    baseObject.detach();
 }
 
 Result DebugQueryPool::getResult(SlangInt index, SlangInt count, uint64_t* data)

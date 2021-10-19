@@ -1062,6 +1062,10 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 {
     auto subType = asInternal(type);
     auto supType = asInternal(interfaceType);
+
+    if (!subType || !supType)
+        return SLANG_FAIL;
+
     auto name = getMangledNameForConformanceWitness(subType->getASTBuilder(), subType, supType);
     auto interfaceName = getMangledTypeName(supType->getASTBuilder(), supType);
     uint32_t resultIndex = 0;
