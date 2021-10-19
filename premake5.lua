@@ -14,7 +14,7 @@
 -- and see what happens.
 --
 -- If you are going to modify this file to change/customize the Slang
--- buidl, then you may need to read up on Premake's approach and
+-- build, then you may need to read up on Premake's approach and
 -- how it uses/abuses Lua syntax. A few important things to note:
 --
 -- * Everything that *looks* like a declarative (e.g., `kind "SharedLib"`)
@@ -676,6 +676,13 @@ newoption {
  
  example "heterogeneous-hello-world"
      kind "ConsoleApp"
+     -- Additionally add slangc for compiling shader.cpp
+     links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
+     -- Generate shader.cpp from shader.slang
+     prebuildmessage ("Generating shader.cpp from shader.slang")
+     prebuildcommands {
+         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+     }
  
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
