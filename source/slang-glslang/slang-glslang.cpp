@@ -113,30 +113,27 @@ static void dumpDiagnostics(
     dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
 }
 
-// Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
-// TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_env targetEnv, unsigned optimizationLevel, unsigned debugInfoType)
+struct SPIRVOptimizeDiagnosticListener
 {
-    spvtools::Optimizer optimizer(targetEnv);
-    optimizer.SetMessageConsumer(
-        [](spv_message_level_t level, const char *source, const spv_position_t &position, const char *message) {
-        auto &out = std::cerr;
+    void operator()(spv_message_level_t level, const char* source, const spv_position_t& position, const char* message)
+    {
+        auto& out = std::cerr;
         switch (level)
         {
-        case SPV_MSG_FATAL:
-        case SPV_MSG_INTERNAL_ERROR:
-        case SPV_MSG_ERROR:
-            out << "error: ";
-            break;
-        case SPV_MSG_WARNING:
-            out << "warning: ";
-            break;
-        case SPV_MSG_INFO:
-        case SPV_MSG_DEBUG:
-            out << "info: ";
-            break;
-        default:
-            break;
+            case SPV_MSG_FATAL:
+            case SPV_MSG_INTERNAL_ERROR:
+            case SPV_MSG_ERROR:
+                out << "error: ";
+                break;
+            case SPV_MSG_WARNING:
+                out << "warning: ";
+                break;
+            case SPV_MSG_INFO:
+            case SPV_MSG_DEBUG:
+                out << "info: ";
+                break;
+            default:
+                break;
         }
         if (source)
         {
@@ -148,7 +145,41 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
             out << " " << message;
         }
         out << std::endl;
-    });
+    }
+};
+
+struct SPIRVOptimizationDiagnostic
+{
+    spv_message_level_t level;
+    std::string source;
+    spv_position_t position;
+    std::string message;
+};
+
+// Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
+// TODO: add flag for optimizing SPIR-V size as well
+static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_env targetEnv, unsigned optimizationLevel, unsigned debugInfoType)
+{
+    spvtools::Optimizer optimizer(targetEnv);
+
+    std::vector<SPIRVOptimizationDiagnostic> optDiagnostics;
+
+    optimizer.SetMessageConsumer(
+        [&](spv_message_level_t level, const char* source, const spv_position_t& position, const char* message) {
+
+            SPIRVOptimizationDiagnostic diag;
+            diag.level = level;
+            if (source)
+            {
+                diag.source = source;
+            }
+            diag.position = position;
+            if (message)
+            {
+                diag.message = message;
+            }
+            optDiagnostics.push_back(diag);
+        });
 
     // If debug info is being generated, propagate
     // line information into all SPIR-V instructions. This avoids loss of
@@ -175,12 +206,12 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
-    case SLANG_OPTIMIZATION_LEVEL_NONE:
-        // Don't register any passes if our optimization level is none
-        break;
-    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
-        // Use a minimal set of performance settings
-        // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
+        case SLANG_OPTIMIZATION_LEVEL_NONE:
+            // Don't register any passes if our optimization level is none
+            break;
+        case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+            // Use a minimal set of performance settings
+            // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
 
 #if 0
         // This is the previous 'default optimization' passes setting for glslang
@@ -296,77 +327,77 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 #endif
 
         break;
-    case SLANG_OPTIMIZATION_LEVEL_HIGH:
+        case SLANG_OPTIMIZATION_LEVEL_HIGH:
 
-        // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
-        // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
-        // needed.
-        //
-        // Currently we just have high have the same meaning as 'maximal'. 
+            // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
+            // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
+            // needed.
+            //
+            // Currently we just have high have the same meaning as 'maximal'. 
 
-    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
-        // Use the same passes when specifying the "-O" flag in spirv-opt
-        // Roughly equivalent to `RegisterPerformancePasses`
+        case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+            // Use the same passes when specifying the "-O" flag in spirv-opt
+            // Roughly equivalent to `RegisterPerformancePasses`
 
-        
-        optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
-        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-        optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
-        optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
-        optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
-        optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
-        // We run CompactIdsPass here, because CreateLocalMultiStoreElimPass can explode
-        // id usage (by a factor of 10), and compacting ids here has been shown to half
-        // id usage with a complex shader.
-        optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+            optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+            optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
+            optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
+            optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
+            optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
-        // Note that CreateLocalMultiStoreElimPass really just does a SSARewritePass
-        optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
-        
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateCCPPass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
-        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-        optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
-        optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
-        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
-        optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
-        optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateSSARewritePass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
-        optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
-        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
-        optimizer.RegisterPass(spvtools::CreateIfConversionPass());
-        optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
-        optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
-        optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        optimizer.RegisterPass(spvtools::CreateBlockMergePass());
-        optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
-        optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
-        optimizer.RegisterPass(spvtools::CreateBlockMergePass());
-        optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+            // We run CompactIdsPass here, because CreateLocalMultiStoreElimPass can explode
+            // id usage (by a factor of 10), and compacting ids here has been shown to half
+            // id usage with a complex shader.
+            optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
 
-        // We again run compaction to try and ensure the final output uses ids that are in range.
-        // On a complex shader, this reduced the amount ids by 5.
-        optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+            // Note that CreateLocalMultiStoreElimPass really just does a SSARewritePass
+            optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
 
-        break;
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateCCPPass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+            optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+            optimizer.RegisterPass(spvtools::CreateCombineAccessChainsPass());
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+            optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
+            optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateSSARewritePass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
+            optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+            optimizer.RegisterPass(spvtools::CreateIfConversionPass());
+            optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
+            optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
+            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+            optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
+            optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
+            optimizer.RegisterPass(spvtools::CreateBlockMergePass());
+            optimizer.RegisterPass(spvtools::CreateSimplificationPass());
+
+            // We again run compaction to try and ensure the final output uses ids that are in range.
+            // On a complex shader, this reduced the amount ids by 5.
+            optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+
+            break;
     }
 
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
@@ -374,11 +405,47 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
         optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
 
-    
+
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
     optimizer.Run(spirv.data(), spirv.size(), &spirv, spvOptOptions);
-}
 
+    {
+        auto& out = std::cerr;
+        
+        for (auto& diag : optDiagnostics)
+        {
+            switch (diag.level)
+            {
+                case SPV_MSG_FATAL:
+                case SPV_MSG_INTERNAL_ERROR:
+                case SPV_MSG_ERROR:
+                    out << "error: ";
+                    break;
+                case SPV_MSG_WARNING:
+                    out << "warning: ";
+                    break;
+                case SPV_MSG_INFO:
+                case SPV_MSG_DEBUG:
+                    out << "info: ";
+                    break;
+                default:
+                    break;
+            }
+            if (diag.source.length() > 0)
+            {
+                out << diag.source << ":";
+            }
+            const auto& position = diag.position;
+
+            out << position.line << ":" << position.column << ":" << position.index << ":";
+            if (diag.message.length())
+            {
+                out << " " << diag.message;
+            }
+            out << std::endl;
+        }
+    }
+}
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
 {
