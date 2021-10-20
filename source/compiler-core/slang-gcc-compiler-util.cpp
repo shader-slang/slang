@@ -45,46 +45,44 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
 
     for (auto line : lines)
     {
-        if (line.startsWith(prefix))
+        Index prefixIndex = line.indexOf(prefix);
+        if (prefixIndex < 0)
         {
-            const UnownedStringSlice remainingSlice = UnownedStringSlice(line.begin() + prefix.getLength(), line.end()).trim();
-            const Index versionEndIndex = _findVersionEnd(remainingSlice);
-            if (versionEndIndex < 0)
-            {
-                printf(">%s<\n", String(remainingSlice).getBuffer());
-
-                return SLANG_FAIL;
-            }
-
-            const UnownedStringSlice versionSlice(remainingSlice.begin(), remainingSlice.begin() + versionEndIndex);
-
-            // Version is in format 0.0.0 
-            List<UnownedStringSlice> split;
-            StringUtil::split(versionSlice, '.', split);
-            List<Int> digits;
-
-            for (auto v : split)
-            {
-                Int version;
-                SLANG_RETURN_ON_FAIL(StringUtil::parseInt(v, version));
-                digits.add(version);
-            }
-
-            if (digits.getCount() < 2)
-            {
-                printf(">%s<\n", String(versionSlice).getBuffer());
-
-                return SLANG_FAIL;
-            }
-
-            outDesc.majorVersion = digits[0];
-            outDesc.minorVersion = digits[1];
-            return SLANG_OK;
+            continue;
         }
+
+        const UnownedStringSlice remainingSlice = UnownedStringSlice(line.begin() + prefixIndex + prefix.getLength(), line.end()).trim();
+
+        const Index versionEndIndex = _findVersionEnd(remainingSlice);
+        if (versionEndIndex < 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        const UnownedStringSlice versionSlice(remainingSlice.begin(), remainingSlice.begin() + versionEndIndex);
+
+        // Version is in format 0.0.0 
+        List<UnownedStringSlice> split;
+        StringUtil::split(versionSlice, '.', split);
+        List<Int> digits;
+
+        for (auto v : split)
+        {
+            Int version;
+            SLANG_RETURN_ON_FAIL(StringUtil::parseInt(v, version));
+            digits.add(version);
+        }
+
+        if (digits.getCount() < 2)
+        {
+            return SLANG_FAIL;
+        }
+
+        outDesc.majorVersion = digits[0];
+        outDesc.minorVersion = digits[1];
+        return SLANG_OK;
     }
 
-
-    printf(">couldn't extract version<\n%s\n\n", String(text).getBuffer());
     return SLANG_FAIL;
 }
 
@@ -97,6 +95,8 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, Downst
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
 
+    // Note we now have builds that add other words in front of the version
+    // such as "Ubuntu clang version"
     const UnownedStringSlice prefixes[] =
     {
         UnownedStringSlice::fromLiteral("clang version"),
