@@ -338,6 +338,7 @@ void TestReporter::_addResult(const TestInfo& info)
             _appendTime(info.executionTime, buffer);
         }
         printf("%s test: '%S' %s\n", resultString, info.name.toWString().begin(), buffer.getBuffer());
+        fflush(stdout);
     };
 
     switch (m_outputMode)
@@ -498,7 +499,7 @@ void TestReporter::message(TestMessageType type, const String& message)
         {
             fputs(message.getBuffer(), stderr);
         }
-
+        fflush(stderr);
         // Just dump out if can dump out
         return;
     }
@@ -515,6 +516,7 @@ void TestReporter::message(TestMessageType type, const String& message)
         {
             fputs(message.getBuffer(), stderr);
         }
+        fflush(stderr);
     }
 
     if (m_currentMessage.getLength() > 0)

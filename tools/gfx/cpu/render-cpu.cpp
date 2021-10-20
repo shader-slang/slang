@@ -11,7 +11,7 @@
 
 #include "../immediate-renderer-base.h"
 #include "../slang-context.h"
-
+#include "../mutable-shader-object.h"
 #define SLANG_PRELUDE_NAMESPACE slang_prelude
 #include "prelude/slang-cpp-types.h"
 
@@ -942,6 +942,9 @@ public:
     char* getDataBuffer() { return m_data.getBuffer(); }
 };
 
+class CPUMutableShaderObject : public MutableShaderObject<CPUMutableShaderObject, CPUShaderObjectLayout>
+{};
+
 class CPUEntryPointShaderObject : public CPUShaderObject
 {
 public:
@@ -951,12 +954,9 @@ public:
 class CPURootShaderObject : public CPUShaderObject
 {
 public:
-    // Override default reference counting behavior to disable lifetime management via ComPtr.
-    // Root objects are managed by command buffer and does not need to be freed by the user.
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+    virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
-public:
     SlangResult init(IDevice* device, CPUProgramLayout* programLayout);
 
     CPUProgramLayout* getLayout() { return static_cast<CPUProgramLayout*>(m_layout.Ptr()); }
@@ -1007,16 +1007,8 @@ public:
     }
 };
 
-class CPUQueryPool : public IQueryPool, public ComObject
+class CPUQueryPool : public QueryPoolBase
 {
-public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL;
-    IQueryPool* getInterface(const Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-            return static_cast<IQueryPool*>(this);
-        return nullptr;
-    }
 public:
     List<uint64_t> m_queries;
     Result init(const IQueryPool::Desc& desc)
@@ -1210,6 +1202,19 @@ public:
         auto cpuLayout = static_cast<CPUShaderObjectLayout*>(layout);
 
         RefPtr<CPUShaderObject> result = new CPUShaderObject();
+        SLANG_RETURN_ON_FAIL(result->init(this, cpuLayout));
+        returnComPtr(outObject, result);
+
+        return SLANG_OK;
+    }
+
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject** outObject) override
+    {
+        auto cpuLayout = static_cast<CPUShaderObjectLayout*>(layout);
+
+        RefPtr<CPUMutableShaderObject> result = new CPUMutableShaderObject();
         SLANG_RETURN_ON_FAIL(result->init(this, cpuLayout));
         returnComPtr(outObject, result);
 

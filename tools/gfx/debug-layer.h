@@ -95,6 +95,10 @@ public:
         slang::TypeReflection* type,
         ShaderObjectContainerType container,
         IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType container,
+        IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
@@ -189,6 +193,25 @@ public:
     ISamplerState* getInterface(const Slang::Guid& guid);
 };
 
+struct ShaderOffsetKey
+{
+    ShaderOffset offset;
+    bool operator==(ShaderOffsetKey other)
+    {
+        return offset.bindingArrayIndex == other.offset.bindingArrayIndex &&
+            offset.bindingRangeIndex == other.offset.bindingRangeIndex &&
+            offset.uniformOffset == other.offset.uniformOffset;
+    }
+    Slang::HashCode getHashCode()
+    {
+        return Slang::combineHash(
+            (Slang::HashCode)offset.uniformOffset,
+            Slang::combineHash(
+                (Slang::HashCode)offset.bindingArrayIndex,
+                (Slang::HashCode)offset.bindingRangeIndex));
+    }
+};
+
 class DebugShaderObject : public DebugObject<IShaderObject>
 {
 public:
@@ -220,25 +243,10 @@ public:
         const slang::SpecializationArg* args,
         uint32_t count) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
+        ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
+
 public:
-    struct ShaderOffsetKey
-    {
-        ShaderOffset offset;
-        bool operator==(ShaderOffsetKey other)
-        {
-            return offset.bindingArrayIndex == other.offset.bindingArrayIndex &&
-                   offset.bindingRangeIndex == other.offset.bindingRangeIndex &&
-                   offset.uniformOffset == other.offset.uniformOffset;
-        }
-        Slang::HashCode getHashCode()
-        {
-            return Slang::combineHash(
-                (Slang::HashCode)offset.uniformOffset,
-                Slang::combineHash(
-                    (Slang::HashCode)offset.bindingArrayIndex,
-                    (Slang::HashCode)offset.bindingRangeIndex));
-        }
-    };
     Slang::String m_typeName;
     slang::TypeReflection* m_slangType = nullptr;
     DebugDevice* m_device;
@@ -257,6 +265,7 @@ public:
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
         uint32_t count) override;
+    void reset();
 };
 
 class DebugCommandBuffer;

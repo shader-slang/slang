@@ -360,6 +360,7 @@ struct IREntryPointDecoration : IRDecoration
     Profile getProfile() { return Profile(Profile::RawVal(getIntVal(getProfileInst()))); }
 
     IRStringLit* getName()  { return cast<IRStringLit>(getOperand(1)); }
+    IRStringLit* getModuleName() { return cast<IRStringLit>(getOperand(2)); }
 };
 
 struct IRGeometryInputPrimitiveTypeDecoration: IRDecoration
@@ -2623,9 +2624,10 @@ struct IRBuilder
         addDecoration(value, kIROp_ExportDecoration, getStringValue(mangledName));
     }
 
-    void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name)
+    void addEntryPointDecoration(IRInst* value, Profile profile, UnownedStringSlice const& name, UnownedStringSlice const& moduleName)
     {
-        addDecoration(value, kIROp_EntryPointDecoration, getIntValue(getIntType(), profile.raw), getStringValue(name));
+        IRInst* operands[] = { getIntValue(getIntType(), profile.raw), getStringValue(name), getStringValue(moduleName) };
+        addDecoration(value, kIROp_EntryPointDecoration, operands, SLANG_COUNT_OF(operands));
     }
 
     void addKeepAliveDecoration(IRInst* value)
