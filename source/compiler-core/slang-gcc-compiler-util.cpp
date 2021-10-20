@@ -14,28 +14,28 @@ namespace Slang
 
 static Index _findVersionEnd(const UnownedStringSlice& in)
 {
-   Index numDots = 0;
-   const Index len = in.getLength();
+    Index numDots = 0;
+    const Index len = in.getLength();
 
-   for (Index i = 0; i < len; ++i)
-   {
-       const char c = in[i];
-       if (CharUtil::isDigit(c))
-       {
-           continue;
-       }
-       if (c == '.')
-       {
-           if (numDots >= 2)
-           {
-               return i;
-           }
-           numDots++;
-           continue;
-       }
-       return i;
-   }
-   return len;
+    for (Index i = 0; i < len; ++i)
+    {
+        const char c = in[i];
+        if (CharUtil::isDigit(c))
+        {
+            continue;
+        }
+        if (c == '.')
+        {
+            if (numDots >= 2)
+            {
+                return i;
+            }
+            numDots++;
+            continue;
+        }
+        return i;
+    }
+    return len;
 }
 
 /* static */SlangResult GCCDownstreamCompilerUtil::parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompiler::Desc& outDesc)
@@ -622,7 +622,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     {
         // Make STD libs available
         cmdLine.addArg("-lstdc++");
-	    // Make maths lib available
+        // Make maths lib available
         cmdLine.addArg("-lm");
     }
 
