@@ -2,6 +2,8 @@
 
 #include "slang-gfx.h"
 #include "source/core/slang-basic.h"
+#include "source/core/slang-render-api-util.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 namespace gfx_test
 {
@@ -34,6 +36,37 @@ namespace gfx_test
         expectedBuffer.setCount(bufferSize);
         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
         return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
+    }
+    
+    Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api);
+
+    void initializeRenderDoc();
+    void renderDocBeginFrame();
+    void renderDocEndFrame();
+
+    template<typename ImplFunc>
+    void runTestImpl(const ImplFunc& f, UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    {
+        if ((api & context->enabledApis) == 0)
+        {
+            SLANG_IGNORE_TEST
+        }
+        auto device = createTestingDevice(context, api);
+        if (!device)
+        {
+            SLANG_IGNORE_TEST
+        }
+        try
+        {
+            renderDocBeginFrame();
+            f(device, context);
+        }
+        catch (AbortTestException& e)
+        {
+            renderDocEndFrame();
+            throw e;
+        }
+        renderDocEndFrame();
     }
 
 #define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))

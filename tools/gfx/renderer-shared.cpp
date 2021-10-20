@@ -1,4 +1,5 @@
 #include "renderer-shared.h"
+#include "mutable-shader-object.h"
 #include "core/slang-io.h"
 #include "core/slang-token-reader.h"
 
@@ -128,6 +129,13 @@ IResourceView* ResourceViewBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+ISamplerState* SamplerStateBase::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
+        return static_cast<ISamplerState*>(this);
+    return nullptr;
+}
+
 IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResourceView ||
@@ -136,14 +144,7 @@ IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Gui
     return nullptr;
 }
 
-IShaderObject* ShaderObjectBase::getInterface(const Guid& guid)
-{
-    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderObject)
-        return static_cast<IShaderObject*>(this);
-    return nullptr;
-}
-
-bool ShaderObjectBase::_doesValueFitInExistentialPayload(
+bool _doesValueFitInExistentialPayload(
     slang::TypeLayoutReflection*    concreteTypeLayout,
     slang::TypeLayoutReflection*    existentialTypeLayout)
 {
@@ -223,6 +224,20 @@ IFramebufferLayout* FramebufferLayoutBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+IFramebuffer* FramebufferBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
+        return static_cast<IFramebuffer*>(this);
+    return nullptr;
+}
+
+IQueryPool* QueryPoolBase::getInterface(const Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
+        return static_cast<IQueryPool*>(this);
+    return nullptr;
+}
+
 IPipelineState* gfx::PipelineStateBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
@@ -298,8 +313,18 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(
     IShaderObject** outObject)
 {
     RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
-    SLANG_RETURN_FALSE_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, container, shaderObjectLayout.writeRef()));
     return createShaderObject(shaderObjectLayout, outObject);
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createMutableShaderObject(
+    slang::TypeReflection* type,
+    ShaderObjectContainerType containerType,
+    IShaderObject** outObject)
+{
+    RefPtr<ShaderObjectLayoutBase> shaderObjectLayout;
+    SLANG_RETURN_ON_FAIL(getShaderObjectLayout(type, containerType, shaderObjectLayout.writeRef()));
+    return createMutableShaderObject(shaderObjectLayout, outObject);
 }
 
 Result RendererBase::getAccelerationStructurePrebuildInfo(
@@ -452,7 +477,7 @@ Result ShaderObjectBase::_getSpecializedShaderObjectType(ExtendedShaderObjectTyp
     else
     {
         shaderObjectType.slangType = getRenderer()->slangContext.session->specializeType(
-            getElementTypeLayout()->getType(),
+            _getElementTypeLayout()->getType(),
             specializationArgs.components.getArrayView().getBuffer(), specializationArgs.getCount());
         shaderObjectType.componentID = getRenderer()->shaderCache.getComponentId(shaderObjectType.slangType);
     }

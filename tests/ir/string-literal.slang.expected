@@ -1,7 +1,7 @@
 result code = 0
 standard error = {
 ### LOWER-TO-IR:
-[entryPoint(6 : Int, "main")]
+[entryPoint(6 : Int, "main", "string-literal")]
 [numThreads(1 : Int, 1 : Int, 1 : Int)]
 [export("_S3tu04mainp1puV")]
 [nameHint("main")]
