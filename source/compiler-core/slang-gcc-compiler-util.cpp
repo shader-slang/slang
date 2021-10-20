@@ -51,6 +51,8 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
             const Index versionEndIndex = _findVersionEnd(remainingSlice);
             if (versionEndIndex < 0)
             {
+                printf(">%s<\n", String(remainingSlice).getBuffer());
+
                 return SLANG_FAIL;
             }
 
@@ -70,6 +72,8 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
 
             if (digits.getCount() < 2)
             {
+                printf(">%s<\n", String(versionSlice).getBuffer());
+
                 return SLANG_FAIL;
             }
 
@@ -79,6 +83,8 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
         }
     }
 
+
+    printf(">couldn't extract version<\n%s\n\n", String(text).getBuffer());
     return SLANG_FAIL;
 }
 
