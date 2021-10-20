@@ -9,19 +9,8 @@
 namespace gfx
 {
 template<typename TDevice, typename TCommandBuffer>
-class SimpleTransientResourceHeap
-    : public ITransientResourceHeap
-    , public Slang::ComObject
+class SimpleTransientResourceHeap : public TransientResourceHeapBase
 {
-public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
-    ITransientResourceHeap* getInterface(const Slang::Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
-            return static_cast<ITransientResourceHeap*>(this);
-        return nullptr;
-    }
-
 public:
     Slang::RefPtr<TDevice> m_device;
     Slang::ComPtr<IBufferResource> m_constantBuffer;
@@ -49,6 +38,10 @@ public:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override { return SLANG_OK; }
+    virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override
+    {
+        ++getVersionCounter();
+        return SLANG_OK;
+    }
 };
 }

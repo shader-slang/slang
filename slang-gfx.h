@@ -110,6 +110,8 @@ enum class BindingStyle
     CountOf,
 };
 
+class ITransientResourceHeap;
+
 class IShaderProgram: public ISlangUnknown
 {
 public:
@@ -685,6 +687,20 @@ struct ShaderOffset
     SlangInt uniformOffset = 0;
     SlangInt bindingRangeIndex = 0;
     SlangInt bindingArrayIndex = 0;
+    uint32_t getHashCode() const
+    {
+        return (uint32_t)(((bindingRangeIndex << 20) + bindingArrayIndex) ^ uniformOffset);
+    }
+    bool operator==(const ShaderOffset& other) const
+    {
+        return uniformOffset == other.uniformOffset
+            && bindingRangeIndex == other.bindingRangeIndex
+            && bindingArrayIndex == other.bindingArrayIndex;
+    }
+    bool operator!=(const ShaderOffset& other) const
+    {
+        return !this->operator==(other);
+    }
 };
 
 enum class ShaderObjectContainerType
@@ -734,12 +750,15 @@ public:
         ShaderOffset const& offset,
         const slang::SpecializationArg* args,
         uint32_t count) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
+        ITransientResourceHeap* transientHeap,
+        IShaderObject** outObject) = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \
         0xc1fa997e, 0x5ca2, 0x45ae, { 0x9b, 0xcb, 0xc4, 0x35, 0x9e, 0x85, 0x5, 0x85 } \
     }
-
 
 enum class StencilOp : uint8_t
 {
@@ -1359,6 +1378,7 @@ public:
         0xcd48bd29, 0xee72, 0x41b8, { 0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb } \
     }
 
+
 class ISwapchain : public ISlangUnknown
 {
 public:
@@ -1673,6 +1693,11 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createShaderObject(type, ShaderObjectContainerType::None, object.writeRef()));
         return object;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createMutableShaderObject(
+        slang::TypeReflection* type,
+        ShaderObjectContainerType container,
+        IShaderObject** outObject) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) = 0;
 
