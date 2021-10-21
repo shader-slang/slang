@@ -3107,17 +3107,17 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
         char const* typeName = "Unknown";
         switch (inputElementsIn[ii].format)
         {
-            case Format::RGBA_Float32:
-            case Format::RGBA_Unorm_UInt8:
+            case Format::R32G32B32A32_FLOAT:
+            case Format::R8G8B8A8_UNORM:
                 typeName = "float4";
                 break;
-            case Format::RGB_Float32:
+            case Format::R32G32B32_FLOAT:
                 typeName = "float3";
                 break;
-            case Format::RG_Float32:
+            case Format::R32G32_FLOAT:
                 typeName = "float2";
                 break;
-            case Format::R_Float32:
+            case Format::R32_FLOAT:
                 typeName = "float";
                 break;
             default:

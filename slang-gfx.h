@@ -128,79 +128,79 @@ public:
 #define GFX_FORMAT(x) \
     x( Unknown, 0, 0) \
     \
-    x(RGBA_Typeless32, 16, 1) \
-    x(RGB_Typeless32, 12, 1) \
-    x(RG_Typeless32, 8, 1) \
-    x(R_Typeless32, 4, 1) \
+    x(R32G32B32A32_TYPELESS, 16, 1) \
+    x(R32G32B32_TYPELESS, 12, 1) \
+    x(R32G32_TYPELESS, 8, 1) \
+    x(R32_TYPELESS, 4, 1) \
     \
-    x(RGBA_Typeless16, 8, 1) \
-    x(RG_Typeless16, 4, 1) \
-    x(R_Typeless16, 2, 1) \
+    x(R16G16B16A16_TYPELESS, 8, 1) \
+    x(R16G16_TYPELESS, 4, 1) \
+    x(R16_TYPELESS, 2, 1) \
     \
-    x(RGBA_Typeless8, 4, 1) \
-    x(RG_Typeless8, 2, 1) \
-    x(R_Typeless8, 1, 1) \
-    x(BGRA_Typeless8, 4, 1) \
+    x(R8G8B8A8_TYPELESS, 4, 1) \
+    x(R8G8_TYPELESS, 2, 1) \
+    x(R8_TYPELESS, 1, 1) \
+    x(B8G8R8A8_TYPELESS, 4, 1) \
     \
-    x(RGBA_Float32, 16, 1) \
-    x(RGB_Float32, 12, 1) \
-    x(RG_Float32, 8, 1) \
-    x(R_Float32, 4, 1) \
+    x(R32G32B32A32_FLOAT, 16, 1) \
+    x(R32G32B32_FLOAT, 12, 1) \
+    x(R32G32_FLOAT, 8, 1) \
+    x(R32_FLOAT, 4, 1) \
     \
-    x(RGBA_Float16, 8, 1) \
-    x(RG_Float16, 4, 1) \
-    x(R_Float16, 2, 1) \
+    x(R16G16B16A16_FLOAT, 8, 1) \
+    x(R16G16_FLOAT, 4, 1) \
+    x(R16_FLOAT, 2, 1) \
     \
-    x(RGBA_UInt32, 16, 1) \
-    x(RGB_UInt32, 12, 1) \
-    x(RG_UInt32, 8, 1) \
-    x(R_UInt32, 4, 1) \
+    x(R32G32B32A32_UINT, 16, 1) \
+    x(R32G32B32_UINT, 12, 1) \
+    x(R32G32_UINT, 8, 1) \
+    x(R32_UINT, 4, 1) \
     \
-    x(RGBA_UInt16, 8, 1) \
-    x(RG_UInt16, 4, 1) \
-    x(R_UInt16, 2, 1) \
+    x(R16G16B16A16_UINT, 8, 1) \
+    x(R16G16_UINT, 4, 1) \
+    x(R16_UINT, 2, 1) \
     \
-    x(RGBA_UInt8, 4, 1) \
-    x(RG_UInt8, 2, 1) \
-    x(R_UInt8, 1, 1) \
+    x(R8G8B8A8_UINT, 4, 1) \
+    x(R8G8_UINT, 2, 1) \
+    x(R8_UINT, 1, 1) \
     \
-    x(RGBA_SInt32, 16, 1) \
-    x(RGB_SInt32, 12, 1) \
-    x(RG_SInt32, 8, 1) \
-    x(R_SInt32, 4, 1) \
+    x(R32G32B32A32_SINT, 16, 1) \
+    x(R32G32B32_SINT, 12, 1) \
+    x(R32G32_SINT, 8, 1) \
+    x(R32_SINT, 4, 1) \
     \
-    x(RGBA_SInt16, 8, 1) \
-    x(RG_SInt16, 4, 1) \
-    x(R_SInt16, 2, 1) \
+    x(R16G16B16A16_SINT, 8, 1) \
+    x(R16G16_SINT, 4, 1) \
+    x(R16_SINT, 2, 1) \
     \
-    x(RGBA_SInt8, 4, 1) \
-    x(RG_SInt8, 2, 1) \
-    x(R_SInt8, 1, 1) \
+    x(R8G8B8A8_SINT, 4, 1) \
+    x(R8G8_SINT, 2, 1) \
+    x(R8_SINT, 1, 1) \
     \
-    x(RGBA_Unorm_UInt16, 8, 1) \
-    x(RG_Unorm_UInt16, 4, 1) \
-    x(R_Unorm_UInt16, 2, 1) \
+    x(R16G16B16A16_UNORM, 8, 1) \
+    x(R16G16_UNORM, 4, 1) \
+    x(R16_UNORM, 2, 1) \
     \
-    x(RGBA_Unorm_UInt8, 4, 1) \
-    x(RGBA_Unorm_UInt8_Srgb, 4, 1) \
-    x(RG_Unorm_UInt8, 2, 1) \
-    x(R_Unorm_UInt8, 1, 1) \
-    x(BGRA_Unorm_UInt8, 4, 1) \
+    x(R8G8B8A8_UNORM, 4, 1) \
+    x(R8G8B8A8_UNORM_SRGB, 4, 1) \
+    x(R8G8_UNORM, 2, 1) \
+    x(R8_UNORM, 1, 1) \
+    x(B8G8R8A8_UNORM, 4, 1) \
     \
-    x(RGBA_Snorm_Int16, 8, 1) \
-    x(RG_Snorm_Int16, 4, 1) \
-    x(R_Snorm_Int16, 2, 1) \
+    x(R16G16B16A16_SNORM, 8, 1) \
+    x(R16G16_SNORM, 4, 1) \
+    x(R16_SNORM, 2, 1) \
     \
-    x(RGBA_Snorm_Int8, 4, 1) \
-    x(RG_Snorm_Int8, 2, 1) \
-    x(R_Snorm_Int8, 1, 1) \
+    x(R8G8B8A8_SNORM, 4, 1) \
+    x(R8G8_SNORM, 2, 1) \
+    x(R8_SNORM, 1, 1) \
     \
-    x(D_Float32, 4, 1) \
-    x(D_Unorm16, 2, 1) \
+    x(D32_FLOAT, 4, 1) \
+    x(D16_UNORM, 2, 1) \
     \
-    x(BGRA_Unorm4, 2, 1) \
-    x(B5G6R5_Unorm, 2, 1) \
-    x(B5G5R5A1_Unorm, 2, 1) \
+    x(B4G4R4A4_UNORM, 2, 1) \
+    x(B5G6R5_UNORM, 2, 1) \
+    x(B5G5R5A1_UNORM, 2, 1) \
     \
     x(R9G9B9E5_SHAREDEXP, 4, 1) \
     x(R10G10B10A2_TYPELESS, 4, 1) \
@@ -208,20 +208,20 @@ public:
     x(R10G10B10A2_UINT, 4, 1) \
     x(R11G11B10_FLOAT, 4, 1) \
     \
-    x(BC1_Unorm, 8, 16) \
-    x(BC1_Unorm_Srgb, 8, 16) \
-    x(BC2_Unorm, 16, 16) \
-    x(BC2_Unorm_Srgb, 16, 16) \
-    x(BC3_Unorm, 16, 16) \
-    x(BC3_Unorm_Srgb, 16, 16) \
-    x(BC4_Unorm, 8, 16) \
-    x(BC4_Snorm, 8, 16) \
-    x(BC5_Unorm, 16, 16) \
-    x(BC5_Snorm, 16, 16) \
-    x(BC6_Unsigned, 16, 16) \
-    x(BC6_Signed, 16, 16) \
-    x(BC7_Unorm, 16, 16) \
-    x(BC7_Unorm_Srgb, 16, 16)
+    x(BC1_UNORM, 8, 16) \
+    x(BC1_UNORM_SRGB, 8, 16) \
+    x(BC2_UNORM, 16, 16) \
+    x(BC2_UNORM_SRGB, 16, 16) \
+    x(BC3_UNORM, 16, 16) \
+    x(BC3_UNORM_SRGB, 16, 16) \
+    x(BC4_UNORM, 8, 16) \
+    x(BC4_SNORM, 8, 16) \
+    x(BC5_UNORM, 16, 16) \
+    x(BC5_SNORM, 16, 16) \
+    x(BC6H_UF16, 16, 16) \
+    x(BC6H_SF16, 16, 16) \
+    x(BC7_UNORM, 16, 16) \
+    x(BC7_UNORM_SRGB, 16, 16)
 
 /// Different formats of things like pixels or elements of vertices
 /// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
@@ -232,79 +232,79 @@ enum class Format
     // has a matching Vulkan format but is also omitted as it is only supported by Nvidia.
     Unknown,
 
-    RGBA_Typeless32,
-    RGB_Typeless32,
-    RG_Typeless32,
-    R_Typeless32,
+    R32G32B32A32_TYPELESS,
+    R32G32B32_TYPELESS,
+    R32G32_TYPELESS,
+    R32_TYPELESS,
 
-    RGBA_Typeless16,
-    RG_Typeless16,
-    R_Typeless16,
+    R16G16B16A16_TYPELESS,
+    R16G16_TYPELESS,
+    R16_TYPELESS,
 
-    RGBA_Typeless8,
-    RG_Typeless8,
-    R_Typeless8,
-    BGRA_Typeless8,
+    R8G8B8A8_TYPELESS,
+    R8G8_TYPELESS,
+    R8_TYPELESS,
+    B8G8R8A8_TYPELESS,
 
-    RGBA_Float32,
-    RGB_Float32,
-    RG_Float32,
-    R_Float32,
+    R32G32B32A32_FLOAT,
+    R32G32B32_FLOAT,
+    R32G32_FLOAT,
+    R32_FLOAT,
 
-    RGBA_Float16,
-    RG_Float16,
-    R_Float16,
+    R16G16B16A16_FLOAT,
+    R16G16_FLOAT,
+    R16_FLOAT,
 
-    RGBA_UInt32,
-    RGB_UInt32,
-    RG_UInt32,
-    R_UInt32,
+    R32G32B32A32_UINT,
+    R32G32B32_UINT,
+    R32G32_UINT,
+    R32_UINT,
 
-    RGBA_UInt16,
-    RG_UInt16,
-    R_UInt16,
+    R16G16B16A16_UINT,
+    R16G16_UINT,
+    R16_UINT,
 
-    RGBA_UInt8,
-    RG_UInt8,
-    R_UInt8,
+    R8G8B8A8_UINT,
+    R8G8_UINT,
+    R8_UINT,
 
-    RGBA_SInt32,
-    RGB_SInt32,
-    RG_SInt32,
-    R_SInt32,
+    R32G32B32A32_SINT,
+    R32G32B32_SINT,
+    R32G32_SINT,
+    R32_SINT,
 
-    RGBA_SInt16,
-    RG_SInt16,
-    R_SInt16,
+    R16G16B16A16_SINT,
+    R16G16_SINT,
+    R16_SINT,
 
-    RGBA_SInt8,
-    RG_SInt8,
-    R_SInt8,
+    R8G8B8A8_SINT,
+    R8G8_SINT,
+    R8_SINT,
 
-    RGBA_Unorm_UInt16,
-    RG_Unorm_UInt16,
-    R_Unorm_UInt16,
+    R16G16B16A16_UNORM,
+    R16G16_UNORM,
+    R16_UNORM,
 
-    RGBA_Unorm_UInt8,
-    RGBA_Unorm_UInt8_Srgb,
-    RG_Unorm_UInt8,
-    R_Unorm_UInt8,
-    BGRA_Unorm_UInt8,
+    R8G8B8A8_UNORM,
+    R8G8B8A8_UNORM_SRGB,
+    R8G8_UNORM,
+    R8_UNORM,
+    B8G8R8A8_UNORM,
 
-    RGBA_Snorm_Int16,
-    RG_Snorm_Int16,
-    R_Snorm_Int16,
+    R16G16B16A16_SNORM,
+    R16G16_SNORM,
+    R16_SNORM,
 
-    RGBA_Snorm_Int8,
-    RG_Snorm_Int8,
-    R_Snorm_Int8,
+    R8G8B8A8_SNORM,
+    R8G8_SNORM,
+    R8_SNORM,
 
-    D_Float32,
-    D_Unorm16,
+    D32_FLOAT,
+    D16_UNORM,
 
-    BGRA_Unorm4,
-    B5G6R5_Unorm,
-    B5G5R5A1_Unorm,
+    B4G4R4A4_UNORM,
+    B5G6R5_UNORM,
+    B5G5R5A1_UNORM,
 
     R9G9B9E5_SHAREDEXP,
     R10G10B10A2_TYPELESS,
@@ -312,20 +312,20 @@ enum class Format
     R10G10B10A2_UINT,
     R11G11B10_FLOAT,
 
-    BC1_Unorm,
-    BC1_Unorm_Srgb,
-    BC2_Unorm,
-    BC2_Unorm_Srgb,
-    BC3_Unorm,
-    BC3_Unorm_Srgb,
-    BC4_Unorm,
-    BC4_Snorm,
-    BC5_Unorm,
-    BC5_Snorm,
-    BC6_Unsigned,
-    BC6_Signed,
-    BC7_Unorm,
-    BC7_Unorm_Srgb,
+    BC1_UNORM,
+    BC1_UNORM_SRGB,
+    BC2_UNORM,
+    BC2_UNORM_SRGB,
+    BC3_UNORM,
+    BC3_UNORM_SRGB,
+    BC4_UNORM,
+    BC4_SNORM,
+    BC5_UNORM,
+    BC5_SNORM,
+    BC6H_UF16,
+    BC6H_SF16,
+    BC7_UNORM,
+    BC7_UNORM_SRGB,
 
     CountOf,
 };

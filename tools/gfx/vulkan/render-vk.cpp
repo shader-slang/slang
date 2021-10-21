@@ -3809,10 +3809,10 @@ public:
             {
                 switch (indexFormat)
                 {
-                case Format::R_UInt16:
+                case Format::R16_UINT:
                     m_boundIndexFormat = VK_INDEX_TYPE_UINT16;
                     break;
-                case Format::R_UInt32:
+                case Format::R32_UINT:
                     m_boundIndexFormat = VK_INDEX_TYPE_UINT32;
                     break;
                 default:
@@ -5045,7 +5045,7 @@ public:
             List<VkFormat> formats;
             formats.add(VulkanUtil::getVkFormat(desc.format));
             // HACK! To check for a different format if couldn't be found
-            if (desc.format == Format::RGBA_Unorm_UInt8)
+            if (desc.format == Format::R8G8B8A8_UNORM)
             {
                 formats.add(VK_FORMAT_B8G8R8A8_UNORM);
             }
@@ -5066,10 +5066,10 @@ public:
 
             // Save the desc
             m_desc = desc;
-            if (m_desc.format == Format::RGBA_Unorm_UInt8 &&
+            if (m_desc.format == Format::R8G8B8A8_UNORM &&
                 m_vkformat == VK_FORMAT_B8G8R8A8_UNORM)
             {
-                m_desc.format = Format::BGRA_Unorm_UInt8;
+                m_desc.format = Format::B8G8R8A8_UNORM;
             }
 
             SLANG_RETURN_ON_FAIL(createSwapchainAndImages());

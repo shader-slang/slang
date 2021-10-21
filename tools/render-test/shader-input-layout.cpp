@@ -1096,14 +1096,14 @@ namespace renderer_test
 
         switch (desc.format)
         {
-            case Format::RGBA_Unorm_UInt8:
+            case Format::R8G8B8A8_UNORM:
             {
                 generateTextureDataRGB8(output, desc);
                 break;
             }
-            case Format::R_Float16:
-            case Format::RG_Float16:
-            case Format::RGBA_Float16:
+            case Format::R16_FLOAT:
+            case Format::R16G16_FLOAT:
+            case Format::R16G16B16A16_FLOAT:
             {
                 TextureData work;
                 generateTextureDataRGB8(work, desc);
@@ -1176,11 +1176,11 @@ namespace renderer_test
                 }
                 break;
             }
-            case Format::R_Float32:
-            case Format::RG_Float32:
-            case Format::RGB_Float32:
-            case Format::RGBA_Float32:
-            case Format::D_Float32:
+            case Format::R32_FLOAT:
+            case Format::R32G32_FLOAT:
+            case Format::R32G32B32_FLOAT:
+            case Format::R32G32B32A32_FLOAT:
+            case Format::D32_FLOAT:
             {
                 TextureData work;
                 generateTextureDataRGB8(work, desc);
@@ -1285,7 +1285,7 @@ namespace renderer_test
         if (arrLen == 0)
             arrLen = 1;
 
-        output.init(Format::RGBA_Unorm_UInt8);
+        output.init(Format::R8G8B8A8_UNORM);
 
         //List<List<unsigned int>>& dataBuffer = output.dataBuffer;
         int arraySize = arrLen;

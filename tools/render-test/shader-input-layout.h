@@ -41,7 +41,7 @@ struct InputTextureDesc
     int size = 4;
     int mipMapCount = 0;            ///< 0 means the maximum number of mips will be bound
 
-    Format format = Format::RGBA_Unorm_UInt8;            
+    Format format = Format::R8G8B8A8_UNORM;            
 
     InputTextureContent content = InputTextureContent::One;
 };
