@@ -360,9 +360,7 @@ public:
         /// True if this compiler can compile the specified language
     static bool canCompile(SlangPassThrough compiler, SlangSourceLanguage sourceLanguage);
 
-        /// Given a source language return as the equivalent compile target
-    static SlangCompileTarget getCompileTarget(SlangSourceLanguage sourceLanguage);
-
+    
 protected:
     static Infos s_infos;
 
