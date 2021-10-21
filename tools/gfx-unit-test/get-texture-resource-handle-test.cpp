@@ -33,6 +33,7 @@ namespace gfx_test
         {
             SLANG_CHECK(handle != NULL);
         }
+
 #if SLANG_WINDOWS_FAMILY
         else
         {
@@ -77,7 +78,12 @@ namespace gfx_test
         {
             SLANG_IGNORE_TEST;
         }
-
+        // Ignore this test on swiftshader. Swiftshader seems to have a bug that causes the test
+        // to crash.
+        if (Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
+        {
+            SLANG_IGNORE_TEST;
+        }
         getTextureResourceHandleTestImpl(device, context);
     }
 

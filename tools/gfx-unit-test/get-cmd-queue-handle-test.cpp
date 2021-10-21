@@ -67,7 +67,12 @@ namespace gfx_test
         {
             SLANG_IGNORE_TEST;
         }
-
+        // Ignore this test on swiftshader. Swiftshader seems to have a bug that causes the test
+        // to crash.
+        if (Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
+        {
+            SLANG_IGNORE_TEST;
+        }
         getQueueHandleTestImpl(device, context);
     }
 

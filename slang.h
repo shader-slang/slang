@@ -3267,6 +3267,20 @@ namespace slang
             */
         virtual SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(
             char const*     name) = 0;
+
+            /** Set the downstream/pass through compiler to be used for a transition from the source type to the target type
+            @param source The source 'code gen target'
+            @param target The target 'code gen target'
+            @param compiler The compiler/pass through to use for the transition from source to target
+            */
+        virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target, SlangPassThrough compiler) = 0;
+
+            /** Get the downstream/pass through compiler for a transition specified by source and target
+            @param source The source 'code gen target'
+            @param target The target 'code gen target'
+            @return The compiler that is used for the transition. Returns SLANG_PASS_THROUGH_NONE it is not defined
+            */
+        virtual SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(SlangCompileTarget source, SlangCompileTarget target) = 0;
     };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()

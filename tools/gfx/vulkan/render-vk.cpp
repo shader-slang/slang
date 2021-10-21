@@ -4,6 +4,7 @@
 //WORKING:#include "options.h"
 #include "../renderer-shared.h"
 #include "../transient-resource-heap-base.h"
+#include "../mutable-shader-object.h"
 
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
@@ -95,6 +96,8 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
+    virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
+        override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -140,6 +143,7 @@ public:
     ~VKDevice();
 
 public:
+    class TransientResourceHeapImpl;
 
     class Buffer
     {
@@ -243,16 +247,8 @@ public:
         }
     };
 
-    class SamplerStateImpl : public ISamplerState, public ComObject
+    class SamplerStateImpl : public SamplerStateBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ISamplerState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
-                return static_cast<ISamplerState*>(this);
-            return nullptr;
-        }
     public:
         VkSampler m_sampler;
         RefPtr<VKDevice> m_device;
@@ -562,19 +558,8 @@ public:
         }
     };
 
-    class FramebufferImpl
-        : public IFramebuffer
-        , public ComObject
+    class FramebufferImpl : public FramebufferBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebuffer* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
-                return static_cast<IFramebuffer*>(this);
-            return nullptr;
-        }
-
     public:
         VkFramebuffer m_handle;
         ShortList<ComPtr<IResourceView>> renderTargetViews;
@@ -2322,6 +2307,8 @@ public:
 
             memcpy(dest + offset, data, size);
 
+            m_isConstantBufferDirty = true;
+
             return SLANG_OK;
         }
 
@@ -2388,7 +2375,9 @@ public:
         {
             m_layout = layout;
 
-            m_upToDateConstantBufferHeapVersion = 0;
+            m_constantBufferTransientHeap = nullptr;
+            m_constantBufferTransientHeapVersion = 0;
+            m_isConstantBufferDirty = true;
 
             // If the layout tells us that there is any uniform data,
             // then we will allocate a CPU memory buffer to hold that data
@@ -2812,30 +2801,31 @@ public:
             }
         }
 
+        bool shouldAllocateConstantBuffer(TransientResourceHeapImpl* transientHeap)
+        {
+            return m_isConstantBufferDirty || m_constantBufferTransientHeap != transientHeap ||
+                m_constantBufferTransientHeapVersion != transientHeap->getVersion();
+        }
+
         /// Ensure that the `m_ordinaryDataBuffer` has been created, if it is needed
         Result _ensureOrdinaryDataBufferCreatedIfNeeded(
             PipelineCommandEncoder* encoder,
             ShaderObjectLayoutImpl* specializedLayout)
         {
-            // If we have already created a buffer to hold ordinary data, then we should
-            // simply re-use that buffer rather than re-create it.
+            // If data has been changed since last allocation/filling of constant buffer,
+            // we will need to allocate a new one.
             //
-            // TODO: Simply re-using the buffer without any kind of validation checks
-            // means that we are assuming that users cannot or will not perform any `set`
-            // operations on a shader object once an operation has requested this buffer
-            // be created. We need to enforce that rule if we want to rely on it.
-            //
-            if (m_upToDateConstantBufferHeapVersion ==
-                encoder->m_commandBuffer->m_transientHeap->getVersion())
+            if (!shouldAllocateConstantBuffer(encoder->m_commandBuffer->m_transientHeap))
             {
                 return SLANG_OK;
             }
+            m_isConstantBufferDirty = false;
+            m_constantBufferTransientHeap = encoder->m_commandBuffer->m_transientHeap;
+            m_constantBufferTransientHeapVersion = encoder->m_commandBuffer->m_transientHeap->getVersion();
 
             m_constantBufferSize = specializedLayout->getTotalOrdinaryDataSize();
             if (m_constantBufferSize == 0)
             {
-                m_upToDateConstantBufferHeapVersion =
-                    encoder->m_commandBuffer->m_transientHeap->getVersion();
                 return SLANG_OK;
             }
 
@@ -2858,10 +2848,6 @@ public:
                 m_constantBufferSize,
                 specializedLayout));
 
-            // Update version tracker so that we don't redundantly alloc and fill in
-            // constant buffers for the same transient heap.
-            m_upToDateConstantBufferHeapVersion =
-                encoder->m_commandBuffer->m_transientHeap->getVersion();
             return SLANG_OK;
         }
 
@@ -3213,15 +3199,19 @@ public:
 
         List<CombinedTextureSamplerSlot> m_combinedTextureSamplers;
 
-        // The version number of the transient resource heap that contains up-to-date
-        // constant buffer content for this shader object.
-        uint64_t m_upToDateConstantBufferHeapVersion;
         // The transient constant buffer that holds the GPU copy of the constant data,
         // weak referenced.
         IBufferResource* m_constantBuffer = nullptr;
         // The offset into the transient constant buffer where the constant data starts.
         size_t m_constantBufferOffset = 0;
         size_t m_constantBufferSize = 0;
+
+        /// Dirty bit tracking whether the constant buffer needs to be updated.
+        bool m_isConstantBufferDirty = true;
+        /// The transient heap from which the constant buffer is allocated.
+        VKDevice::TransientResourceHeapImpl* m_constantBufferTransientHeap;
+        /// The version of the transient heap when the constant buffer is allocated.
+        uint64_t m_constantBufferTransientHeapVersion;
 
         /// Get the layout of this shader object with specialization arguments considered
         ///
@@ -3260,6 +3250,9 @@ public:
 
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
+
+    class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
+    {};
 
     class EntryPointShaderObject : public ShaderObjectImpl
     {
@@ -3540,8 +3533,6 @@ public:
 
         List<RefPtr<EntryPointShaderObject>> m_entryPoints;
     };
-
-    class TransientResourceHeapImpl;
 
     class CommandBufferImpl
         : public ICommandBuffer
@@ -4141,7 +4132,7 @@ public:
                 VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, count, barriers.getBuffer());
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, (uint32_t)count, barriers.getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
                 size_t count,
@@ -4150,7 +4141,7 @@ public:
                 ResourceState dst)
             {
                 List<VkBufferMemoryBarrier> barriers;
-                barriers.setCount(count);
+                barriers.reserve(count);
 
                 for (size_t i = 0; i < count; i++)
                 {
@@ -4171,7 +4162,7 @@ public:
                 VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
 
                 auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, count, barriers.getBuffer(), 0, nullptr);
+                vkApi.vkCmdPipelineBarrier(m_commandBuffer->m_commandBuffer, srcStage, dstStage, 0, 0, nullptr, (uint32_t)count, barriers.getBuffer(), 0, nullptr);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -4661,10 +4652,10 @@ public:
     };
 
     class TransientResourceHeapImpl
-        : public TransientResourceHeapBase<VKDevice, BufferResourceImpl>
+        : public TransientResourceHeapBaseImpl<VKDevice, BufferResourceImpl>
     {
     private:
-        typedef TransientResourceHeapBase<VKDevice, BufferResourceImpl> Super;
+        typedef TransientResourceHeapBaseImpl<VKDevice, BufferResourceImpl> Super;
 
     public:
         VkCommandPool m_commandPool;
@@ -4708,18 +4699,8 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
     };
 
-    class QueryPoolImpl
-        : public IQueryPool
-        , public ComObject
+    class QueryPoolImpl : public QueryPoolBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IQueryPool* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-                return static_cast<IQueryPool*>(this);
-            return nullptr;
-        }
     public:
         Result init(const IQueryPool::Desc& desc, VKDevice* device)
         {
@@ -5873,9 +5854,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
-    // TODO(JS): HACK! Disable swiftshader for now
-    //for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
-    for (int forceSoftware = 0; forceSoftware <= 0; forceSoftware++)
+    for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
     {
         initDeviceResult = m_module.init(forceSoftware != 0);
         if (initDeviceResult != SLANG_OK)
@@ -6177,9 +6156,9 @@ static VkBufferUsageFlagBits _calcBufferUsageFlags(ResourceState state)
             return VkBufferUsageFlagBits(0);
         }
     case ResourceState::UnorderedAccess:
-        return VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::ShaderResource:
-        return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        return (VkBufferUsageFlagBits)(VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     case ResourceState::CopySource:
         return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
@@ -6302,7 +6281,7 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = desc.numMipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
@@ -6427,7 +6406,6 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     // Create the image
     {
         VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-
         switch (desc.type)
         {
             case IResource::Type::Texture1D:
@@ -6446,6 +6424,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
             {
                 imageInfo.imageType = VK_IMAGE_TYPE_2D;
                 imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+                imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
                 break;
             }
             case IResource::Type::Texture3D:
@@ -6472,9 +6451,8 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
+        
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-        imageInfo.flags = 0; // Optional
 
         SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
     }
@@ -6663,7 +6641,11 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     {
         usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     }
-
+    if (desc.allowedStates.contains(ResourceState::ShaderResource) &&
+        m_api.m_extendedFeatures.accelerationStructureFeatures.accelerationStructure)
+    {
+        usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+    }
     if (initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -6863,19 +6845,20 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     createInfo.format = gfxIsTypelessFormat(texture->getDesc()->format) ? VulkanUtil::getVkFormat(desc.format) : resourceImpl->m_vkformat;
     createInfo.image = resourceImpl->m_image;
     createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
+    bool isArray = resourceImpl->getDesc()->arraySize != 0;
     switch (resourceImpl->getType())
     {
     case IResource::Type::Texture1D:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_1D;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
         break;
     case IResource::Type::Texture2D:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
         break;
     case IResource::Type::Texture3D:
         createInfo.viewType = VK_IMAGE_VIEW_TYPE_3D;
         break;
     case IResource::Type::TextureCube:
-        createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        createInfo.viewType = isArray ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
         break;
     default:
         SLANG_UNIMPLEMENTED_X("Unknown Texture type.");
@@ -7145,6 +7128,19 @@ Result VKDevice::createShaderObject(ShaderObjectLayoutBase* layout, IShaderObjec
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(
         this, static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
+}
+
+Result VKDevice::createMutableShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
+{
+    auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
+
+    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
+    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    returnComPtr(outObject, result);
+
     return SLANG_OK;
 }
 

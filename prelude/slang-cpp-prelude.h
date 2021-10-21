@@ -139,7 +139,7 @@ struct gfx_ResourceView_0;
 struct gfx_TransientResourceHeap_0;
 struct gfx_PipelineState_0;
 
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0);
+gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0, char* _1, char* _2);
 gfx_TransientResourceHeap_0* buildTransientHeap_0(gfx_Device_0* _0);
 gfx_PipelineState_0* buildPipelineState_0(gfx_Device_0* _0, gfx_ShaderProgram_0* _1);
 gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1);
