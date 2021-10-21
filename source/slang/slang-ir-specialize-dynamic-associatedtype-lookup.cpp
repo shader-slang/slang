@@ -176,7 +176,7 @@ struct AssociatedTypeLookupSpecializationContext
         {
             // If the operand is a witness table, it is already replaced with a uint2
             // at this point, where the first element in the uint2 is the id of the
-            // witneess table.
+            // witness table.
             auto vectorType = inst->getRTTIOperand()->getDataType();
             IRBuilder builder;
             builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
