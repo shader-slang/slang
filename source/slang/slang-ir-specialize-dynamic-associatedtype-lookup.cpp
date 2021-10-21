@@ -122,7 +122,18 @@ struct AssociatedTypeLookupSpecializationContext
     {
         // Ignore lookups for RTTI objects for now, since they are not used anywhere.
         if (!as<IRWitnessTableType>(inst->getDataType()))
+        {
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+            auto uint2Type = builder.getVectorType(
+                builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+            auto zero = builder.getIntValue(builder.getUIntType(), 0);
+            IRInst* args[] = { zero, zero };
+            auto zeroUint2 = builder.emitMakeVector(uint2Type, 2, args);
+            inst->replaceUsesWith(zeroUint2);
             return;
+        }
 
         // Replace all witness table lookups with calls to specialized functions that directly
         // returns the sequential ID of the resulting witness table, effectively getting rid
