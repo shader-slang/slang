@@ -177,39 +177,10 @@ struct AssociatedTypeLookupSpecializationContext
         }
     }
 
-    template<typename TFunc>
-    void workOnModule(const TFunc& func)
-    {
-        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-        sharedBuilder->module = sharedContext->module;
-        sharedBuilder->session = sharedContext->module->session;
-
-        sharedContext->addToWorkList(sharedContext->module->getModuleInst());
-
-        while (sharedContext->workList.getCount() != 0)
-        {
-            IRInst* inst = sharedContext->workList.getLast();
-
-            sharedContext->workList.removeLast();
-            sharedContext->workListSet.Remove(inst);
-
-            func(inst);
-            if (inst->getOp() == kIROp_lookup_interface_method)
-            {
-                processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
-            }
-
-            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-            {
-                sharedContext->addToWorkList(child);
-            }
-        }
-    }
-
     void processModule()
     {
         // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized functions.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_lookup_interface_method)
             {
@@ -218,7 +189,7 @@ struct AssociatedTypeLookupSpecializationContext
         });
 
         // Replace all direct uses of IRWitnessTables with its sequential ID.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {
@@ -267,7 +238,7 @@ struct AssociatedTypeLookupSpecializationContext
         }
 
         // `GetSequentialID(WitnessTableIDOperand)` becomes just `WitnessTableIDOperand`.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_GetSequentialID)
             {

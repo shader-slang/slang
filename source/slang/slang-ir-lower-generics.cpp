@@ -131,19 +131,20 @@ namespace Slang
             }
         }
         // Check if an interface type has any implementations.
-        for (auto inst : context->module->getGlobalInsts())
-        {
-            if (inst->getOp() == kIROp_WitnessTableType)
+        workOnModule(context, [&](IRInst* inst)
             {
-                auto interfaceType = as<IRWitnessTableType>(inst)->getConformanceType();
-                if (!implementedInterfaces.Contains(interfaceType))
+                if (auto lookupWitnessMethod = as<IRLookupWitnessMethod>(inst))
                 {
-                    context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
-                    // Add to set to prevent duplicate diagnostic messages.
-                    implementedInterfaces.Add(interfaceType);
+                    auto witnessTableType = lookupWitnessMethod->getWitnessTable()->getDataType();
+                    auto interfaceType = cast<IRWitnessTableType>(witnessTableType)->getConformanceType();
+                    if (!implementedInterfaces.Contains(interfaceType))
+                    {
+                        context->sink->diagnose(interfaceType->sourceLoc, Diagnostics::noTypeConformancesFoundForInterface, interfaceType);
+                        // Add to set to prevent duplicate diagnostic messages.
+                        implementedInterfaces.Add(interfaceType);
+                    }
                 }
-            }
-        }
+            });
     }
 
     void lowerGenerics(
