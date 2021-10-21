@@ -5050,7 +5050,8 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube is not accessed
             // appropriately (rather than just passing nullptr to CreateShaderResourceView)
             const D3D12_RESOURCE_DESC resourceDesc = resourceImpl->m_resource.getResource()->GetDesc();
-            const DXGI_FORMAT pixelFormat = resourceDesc.Format;
+            const DXGI_FORMAT pixelFormat =
+                gfxIsTypelessFormat(texture->getDesc()->format) ? D3DUtil::getMapFormat(desc.format) : resourceDesc.Format;
 
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
             _initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), resourceDesc, pixelFormat, srvDesc);

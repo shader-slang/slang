@@ -142,66 +142,71 @@ public:
     x(R_Typeless8, 1, 1) \
     x(BGRA_Typeless8, 4, 1) \
     \
-    x(RGBA_Float32, sizeof(float) * 4, 1) \
-    x(RGB_Float32, sizeof(float) * 3, 1) \
-    x(RG_Float32, sizeof(float) * 2, 1) \
-    x(R_Float32, sizeof(float), 1) \
+    x(RGBA_Float32, 16, 1) \
+    x(RGB_Float32, 12, 1) \
+    x(RG_Float32, 8, 1) \
+    x(R_Float32, 4, 1) \
     \
-    x(RGBA_Float16, sizeof(float) * 2, 1) \
-    x(RG_Float16, sizeof(float), 1) \
-    x(R_Float16, sizeof(uint16_t), 1) \
+    x(RGBA_Float16, 8, 1) \
+    x(RG_Float16, 4, 1) \
+    x(R_Float16, 2, 1) \
     \
-    x(RGBA_UInt32, sizeof(uint32_t) * 4, 1) \
-    x(RGB_UInt32, sizeof(uint32_t) * 3, 1) \
-    x(RG_UInt32, sizeof(uint32_t) * 2, 1) \
-    x(R_UInt32, sizeof(uint32_t), 1) \
+    x(RGBA_UInt32, 16, 1) \
+    x(RGB_UInt32, 12, 1) \
+    x(RG_UInt32, 8, 1) \
+    x(R_UInt32, 4, 1) \
     \
-    x(RGBA_UInt16, sizeof(uint32_t) * 2, 1) \
-    x(RG_UInt16, sizeof(uint32_t), 1) \
-    x(R_UInt16, sizeof(uint16_t), 1) \
+    x(RGBA_UInt16, 8, 1) \
+    x(RG_UInt16, 4, 1) \
+    x(R_UInt16, 2, 1) \
     \
-    x(RGBA_UInt8, sizeof(uint32_t), 1) \
-    x(RG_UInt8, sizeof(uint16_t), 1) \
-    x(R_UInt8, sizeof(uint8_t), 1) \
+    x(RGBA_UInt8, 4, 1) \
+    x(RG_UInt8, 2, 1) \
+    x(R_UInt8, 1, 1) \
     \
-    x(RGBA_SInt32, sizeof(int32_t) * 4, 1) \
-    x(RGB_SInt32, sizeof(int32_t) * 3, 1) \
-    x(RG_SInt32, sizeof(int32_t) * 2, 1) \
-    x(R_SInt32, sizeof(int32_t) * 1, 1) \
+    x(RGBA_SInt32, 16, 1) \
+    x(RGB_SInt32, 12, 1) \
+    x(RG_SInt32, 8, 1) \
+    x(R_SInt32, 4, 1) \
     \
-    x(RGBA_SInt16, sizeof(int32_t) * 2, 1) \
-    x(RG_SInt16, sizeof(int32_t), 1) \
-    x(R_SInt16, sizeof(int16_t), 1) \
+    x(RGBA_SInt16, 8, 1) \
+    x(RG_SInt16, 4, 1) \
+    x(R_SInt16, 2, 1) \
     \
-    x(RGBA_SInt8, sizeof(int32_t), 1) \
-    x(RG_SInt8, sizeof(int16_t), 1) \
-    x(R_SInt8, sizeof(int8_t), 1) \
+    x(RGBA_SInt8, 4, 1) \
+    x(RG_SInt8, 2, 1) \
+    x(R_SInt8, 1, 1) \
     \
-    x(RGBA_Unorm_UInt16, sizeof(uint32_t) * 2, 1) \
-    x(RG_Unorm_UInt16, sizeof(uint32_t), 1) \
-    x(R_Unorm_UInt16, sizeof(uint16_t), 1) \
+    x(RGBA_Unorm_UInt16, 8, 1) \
+    x(RG_Unorm_UInt16, 4, 1) \
+    x(R_Unorm_UInt16, 2, 1) \
     \
-    x(RGBA_Unorm_UInt8, sizeof(uint32_t), 1) \
-    x(RGBA_Unorm_UInt8_Srgb, sizeof(uint32_t), 1) \
-    x(RG_Unorm_UInt8, sizeof(uint16_t), 1) \
-    x(R_Unorm_UInt8, sizeof(uint8_t), 1) \
-    x(BGRA_Unorm_UInt8, sizeof(uint32_t), 1) \
+    x(RGBA_Unorm_UInt8, 4, 1) \
+    x(RGBA_Unorm_UInt8_Srgb, 4, 1) \
+    x(RG_Unorm_UInt8, 2, 1) \
+    x(R_Unorm_UInt8, 1, 1) \
+    x(BGRA_Unorm_UInt8, 4, 1) \
     \
-    x(RGBA_Snorm_Int16, sizeof(int32_t) * 2, 1) \
-    x(RG_Snorm_Int16, sizeof(int32_t), 1) \
-    x(R_Snorm_Int16, sizeof(int16_t), 1) \
+    x(RGBA_Snorm_Int16, 8, 1) \
+    x(RG_Snorm_Int16, 4, 1) \
+    x(R_Snorm_Int16, 2, 1) \
     \
-    x(RGBA_Snorm_Int8, sizeof(int32_t), 1) \
-    x(RG_Snorm_Int8, sizeof(int16_t), 1) \
-    x(R_Snorm_Int8, sizeof(int8_t), 1) \
+    x(RGBA_Snorm_Int8, 4, 1) \
+    x(RG_Snorm_Int8, 2, 1) \
+    x(R_Snorm_Int8, 1, 1) \
     \
-    x(D_Float32, sizeof(float), 1) \
-    x(D_Unorm24_S8, sizeof(uint32_t), 1) \
-    x(D_Unorm16, sizeof(uint16_t), 1) \
+    x(D_Float32, 4, 1) \
+    x(D_Unorm16, 2, 1) \
     \
-    x(BGRA_Unorm4, sizeof(uint16_t), 1) \
-    x(B5G6R5_Unorm, sizeof(uint16_t), 1) \
-    x(B5G5R5A1_Unorm, sizeof(uint16_t), 1) \
+    x(BGRA_Unorm4, 2, 1) \
+    x(B5G6R5_Unorm, 2, 1) \
+    x(B5G5R5A1_Unorm, 2, 1) \
+    \
+    x(R9G9B9E5_SHAREDEXP, 4, 1) \
+    x(R10G10B10A2_TYPELESS, 4, 1) \
+    x(R10G10B10A2_UNORM, 4, 1) \
+    x(R10G10B10A2_UINT, 4, 1) \
+    x(R11G11B10_FLOAT, 4, 1) \
     \
     x(BC1_Unorm, 8, 16) \
     x(BC1_Unorm_Srgb, 8, 16) \
@@ -222,7 +227,9 @@ public:
 /// NOTE! Any change to this type (adding, removing, changing order) - must also be reflected in changes GFX_FORMAT
 enum class Format
 {
-    // D3D formats omitted: 19-26, 44, 46, 47, 65-70, 73, 76, 79, 82, 88, 89, 92-94, 97, 100-114
+    // D3D formats omitted: 19-22, 44-47, 65-66, 68-70, 73, 76, 79, 82, 88-89, 92-94, 97, 100-114
+    // These formats are omitted due to lack of a corresponding Vulkan format. D24_UNORM_S8_UINT (DXGI_FORMAT 45)
+    // has a matching Vulkan format but is also omitted as it is only supported by Nvidia.
     Unknown,
 
     RGBA_Typeless32,
@@ -293,12 +300,17 @@ enum class Format
     R_Snorm_Int8,
 
     D_Float32,
-    D_Unorm24_S8,
     D_Unorm16,
 
     BGRA_Unorm4,
     B5G6R5_Unorm,
     B5G5R5A1_Unorm,
+
+    R9G9B9E5_SHAREDEXP,
+    R10G10B10A2_TYPELESS,
+    R10G10B10A2_UNORM,
+    R10G10B10A2_UINT,
+    R11G11B10_FLOAT,
 
     BC1_Unorm,
     BC1_Unorm_Srgb,
@@ -1892,7 +1904,11 @@ public:
 
 extern "C"
 {
+    /// Checks if format is compressed
     SLANG_GFX_API bool gfxIsCompressedFormat(Format format);
+
+    /// Checks if format is typeless
+    SLANG_GFX_API bool gfxIsTypelessFormat(Format format);
 
     /// Gets information about the format 
     SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo);

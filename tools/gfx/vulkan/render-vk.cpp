@@ -6860,7 +6860,7 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     createInfo.flags = 0;
-    createInfo.format = resourceImpl->m_vkformat;
+    createInfo.format = gfxIsTypelessFormat(texture->getDesc()->format) ? VulkanUtil::getVkFormat(desc.format) : resourceImpl->m_vkformat;
     createInfo.image = resourceImpl->m_image;
     createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
     switch (resourceImpl->getType())

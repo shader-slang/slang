@@ -103,46 +103,51 @@ struct FormatInfoMap
         set(Format::RG_SInt8, SLANG_SCALAR_TYPE_INT8, 2);
         set(Format::R_SInt8, SLANG_SCALAR_TYPE_INT8, 1);
 
-        set(Format::RGBA_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 4);
-        set(Format::RG_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 2);
-        set(Format::R_Unorm_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
+        set(Format::RGBA_Unorm_UInt16, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RG_Unorm_UInt16, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R_Unorm_UInt16, SLANG_SCALAR_TYPE_FLOAT32, 1);
 
-        set(Format::RGBA_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::RGBA_Unorm_UInt8_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::RG_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 2);
-        set(Format::R_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 1);
-        set(Format::BGRA_Unorm_UInt8, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::RGBA_Unorm_UInt8, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RGBA_Unorm_UInt8_Srgb, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RG_Unorm_UInt8, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R_Unorm_UInt8, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::BGRA_Unorm_UInt8, SLANG_SCALAR_TYPE_FLOAT32, 4);
 
-        set(Format::RGBA_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 4);
-        set(Format::RG_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 2);
-        set(Format::R_Snorm_Int16, SLANG_SCALAR_TYPE_INT16, 1);
+        set(Format::RGBA_Snorm_Int16, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RG_Snorm_Int16, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R_Snorm_Int16, SLANG_SCALAR_TYPE_FLOAT32, 1);
 
-        set(Format::RGBA_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 4);
-        set(Format::RG_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 2);
-        set(Format::R_Snorm_Int8, SLANG_SCALAR_TYPE_INT8, 1);
+        set(Format::RGBA_Snorm_Int8, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::RG_Snorm_Int8, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R_Snorm_Int8, SLANG_SCALAR_TYPE_FLOAT32, 1);
 
         set(Format::D_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
-        set(Format::D_Unorm24_S8, SLANG_SCALAR_TYPE_UINT32, 2);
-        set(Format::D_Unorm16, SLANG_SCALAR_TYPE_UINT16, 1);
+        set(Format::D_Unorm16, SLANG_SCALAR_TYPE_FLOAT32, 1);
 
-        set(Format::BGRA_Unorm4, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::B5G6R5_Unorm, SLANG_SCALAR_TYPE_UINT8, 3);
-        set(Format::B5G5R5A1_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::BGRA_Unorm4, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::B5G6R5_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::B5G5R5A1_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 4);
 
-        set(Format::BC1_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC1_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC2_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC2_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC3_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC3_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC4_Unorm, SLANG_SCALAR_TYPE_UINT8, 1);
-        set(Format::BC4_Snorm, SLANG_SCALAR_TYPE_INT8, 1);
-        set(Format::BC5_Unorm, SLANG_SCALAR_TYPE_UINT8, 2);
-        set(Format::BC5_Snorm, SLANG_SCALAR_TYPE_UINT8, 2);
-        set(Format::BC6_Unsigned, SLANG_SCALAR_TYPE_FLOAT16, 3);
-        set(Format::BC6_Signed, SLANG_SCALAR_TYPE_FLOAT16, 3);
-        set(Format::BC7_Unorm, SLANG_SCALAR_TYPE_UINT8, 4);
-        set(Format::BC7_Unorm_Srgb, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::R9G9B9E5_SHAREDEXP, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::R10G10B10A2_TYPELESS, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R10G10B10A2_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R10G10B10A2_UINT, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::R11G11B10_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 3);
+
+        set(Format::BC1_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC1_Unorm_Srgb, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC2_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC2_Unorm_Srgb, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC3_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC3_Unorm_Srgb, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC4_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::BC4_Snorm, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::BC5_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::BC5_Snorm, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::BC6_Unsigned, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::BC6_Signed, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::BC7_Unorm, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC7_Unorm_Srgb, SLANG_SCALAR_TYPE_FLOAT32, 4);
     }
 
     void set(Format format, SlangScalarType type, Index channelCount)
@@ -188,6 +193,28 @@ extern "C"
         case Format::BC6_Signed:
         case Format::BC7_Unorm:
         case Format::BC7_Unorm_Srgb:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    SLANG_GFX_API bool gfxIsTypelessFormat(Format format)
+    {
+        switch (format)
+        {
+        case Format::RGBA_Typeless32:
+        case Format::RGB_Typeless32:
+        case Format::RG_Typeless32:
+        case Format::R_Typeless32:
+        case Format::RGBA_Typeless16:
+        case Format::RG_Typeless16:
+        case Format::R_Typeless16:
+        case Format::RGBA_Typeless8:
+        case Format::RG_Typeless8:
+        case Format::R_Typeless8:
+        case Format::BGRA_Typeless8:
+        case Format::R10G10B10A2_TYPELESS:
             return true;
         default:
             return false;

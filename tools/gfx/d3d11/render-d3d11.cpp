@@ -2047,6 +2047,64 @@ SlangResult SLANG_MCALL createD3D11Device(const IDevice::Desc* desc, IDevice** o
     return SLANG_OK;
 }
 
+static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, DXGI_FORMAT pixelFormat, D3D11_SHADER_RESOURCE_VIEW_DESC& descOut)
+{
+    // create SRV
+    descOut = D3D11_SHADER_RESOURCE_VIEW_DESC();
+
+    descOut.Format = (pixelFormat == DXGI_FORMAT_UNKNOWN) ? D3DUtil::calcFormat(D3DUtil::USAGE_SRV, D3DUtil::getMapFormat(textureDesc.format)) : pixelFormat;
+    if (textureDesc.arraySize == 1)
+    {
+        switch (textureDesc.type)
+        {
+        case IResource::Type::Texture1D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D; break;
+        case IResource::Type::Texture2D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D; break;
+        case IResource::Type::Texture3D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D; break;
+        default: assert(!"Unknown dimension");
+        }
+
+        descOut.Texture2D.MipLevels = textureDesc.numMipLevels;
+        descOut.Texture2D.MostDetailedMip = 0;
+    }
+    else if (resourceType == IResource::Type::TextureCube)
+    {
+        if (textureDesc.arraySize > 1)
+        {
+            descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+
+            descOut.TextureCubeArray.NumCubes = textureDesc.arraySize;
+            descOut.TextureCubeArray.First2DArrayFace = 0;
+            descOut.TextureCubeArray.MipLevels = textureDesc.numMipLevels;
+            descOut.TextureCubeArray.MostDetailedMip = 0;
+        }
+        else
+        {
+            descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+
+            descOut.TextureCube.MipLevels = textureDesc.numMipLevels;
+            descOut.TextureCube.MostDetailedMip = 0;
+        }
+    }
+    else
+    {
+        assert(textureDesc.size.depth > 1 || textureDesc.arraySize > 1);
+
+        switch (textureDesc.type)
+        {
+        case IResource::Type::Texture1D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY; break;
+        case IResource::Type::Texture2D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY; break;
+        case IResource::Type::Texture3D:  descOut.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D; break;
+
+        default: assert(!"Unknown dimension");
+        }
+
+        descOut.Texture2DArray.ArraySize = max(textureDesc.size.depth, textureDesc.arraySize);
+        descOut.Texture2DArray.MostDetailedMip = 0;
+        descOut.Texture2DArray.MipLevels = textureDesc.numMipLevels;
+        descOut.Texture2DArray.FirstArraySlice = 0;
+    }
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ScopeNVAPI !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 SlangResult D3D11Device::ScopeNVAPI::init(D3D11Device* device, Index regIndex)
@@ -2907,8 +2965,11 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
 
     case IResourceView::Type::ShaderResource:
         {
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+            _initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), D3DUtil::getMapFormat(desc.format), srvDesc);
+
             ComPtr<ID3D11ShaderResourceView> srv;
-            SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(resourceImpl->m_resource, nullptr, srv.writeRef()));
+            SLANG_RETURN_ON_FAIL(m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, srv.writeRef()));
 
             RefPtr<ShaderResourceViewImpl> viewImpl = new ShaderResourceViewImpl();
             viewImpl->m_type = ResourceViewImpl::Type::SRV;
