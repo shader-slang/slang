@@ -1102,6 +1102,47 @@ struct SpecializationContext
         return false;
     }
 
+    // Test if a type is compile time constant.
+    static bool isCompileTimeConstantType(IRInst* inst)
+    {
+        // TODO: We probably need/want a more robust test here.
+        // For now we are just look into the dependency graph of the inst and
+        // see if there are any opcodes that are causing problems.
+        List<IRInst*> localWorkList;
+        HashSet<IRInst*> processedInsts;
+        localWorkList.add(inst);
+        processedInsts.Add(inst);
+
+        while (localWorkList.getCount() != 0)
+        {
+            IRInst* curInst = localWorkList.getLast();
+
+            localWorkList.removeLast();
+            processedInsts.Remove(curInst);
+
+            switch (curInst->getOp())
+            {
+            case kIROp_Load:
+            case kIROp_Call:
+            case kIROp_ExtractExistentialType:
+            case kIROp_CreateExistentialObject:
+                return false;
+            default:
+                break;
+            }
+
+            for (UInt i = 0; i < curInst->getOperandCount(); ++i)
+            {
+                auto operand = curInst->getOperand(i);
+                if (processedInsts.Add(operand))
+                {
+                    localWorkList.add(operand);
+                }
+            }
+        }
+        return true;
+    }
+
     // Similarly, we want to be able to test whether an instruction
     // used as an argument for an existential-type parameter is
     // suitable for use in specialization.
@@ -1127,18 +1168,7 @@ struct SpecializationContext
             auto concreteVal = makeExistential->getWrappedValue();
             auto concreteType = concreteVal->getDataType();
 
-            // TODO: We probably need/want a more robust test here.
-            // For now we are just listing the single opcode that is
-            // causing problems.
-            //
-            // TODO: eventually this check would become unnecessary because
-            // we can simply check if the `concreteType` is a compile-time
-            // constant value.
-            //
-            if(concreteType->getOp() == kIROp_ExtractExistentialType)
-                return false;
-
-            return true;
+            return isCompileTimeConstantType(concreteType);
         }
 
         // A `wrapExistential(v, T0,w0, T1, w1, ...)` instruction
