@@ -3844,7 +3844,7 @@ Result D3D12Device::TransientResourceHeapImpl::createCommandBuffer(ICommandBuffe
 Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitter, RefPtr<PipelineStateBase>& newPipeline)
 {
     RootShaderObjectImpl* rootObjectImpl = &m_commandBuffer->m_rootShaderObject;
-    m_renderer->maybeSpecializePipeline(m_currentPipeline, rootObjectImpl, newPipeline);
+    SLANG_RETURN_ON_FAIL(m_renderer->maybeSpecializePipeline(m_currentPipeline, rootObjectImpl, newPipeline));
     PipelineStateBase* newPipelineImpl = static_cast<PipelineStateBase*>(newPipeline.Ptr());
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
