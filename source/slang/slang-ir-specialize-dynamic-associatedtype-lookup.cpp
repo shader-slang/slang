@@ -157,7 +157,22 @@ struct AssociatedTypeLookupSpecializationContext
     {
         if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_WitnessTableIDType)
         {
+            // If the operand is a witness table id, just return the operand.
             inst->replaceUsesWith(inst->getRTTIOperand());
+            inst->removeAndDeallocate();
+        }
+        else if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_VectorType)
+        {
+            // If the operand is a witness table, it is already replaced with a uint2
+            // at this point, where the first element in the uint2 is the id of the
+            // witneess table.
+            auto vectorType = inst->getRTTIOperand()->getDataType();
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+            UInt index = 0;
+            auto id = builder.emitSwizzle(as<IRVectorType>(vectorType)->getElementType(), inst->getRTTIOperand(), 1, &index);
+            inst->replaceUsesWith(id);
             inst->removeAndDeallocate();
         }
     }
