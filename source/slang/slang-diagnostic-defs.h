@@ -545,6 +545,8 @@ DIAGNOSTIC(51090, Error, cannotGenerateCodeForExternComponentType, "cannot gener
 DIAGNOSTIC(51091, Error, typeCannotBePlacedInATexture, "type '$0' cannot be placed in a texture.")
 DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have any input world")
 
+DIAGNOSTIC(50100, Error, noTypeConformancesFoundForInterface, "No type conformances are found for interface '$0'. Code generation for current target requires at least one implementation type present in the linkage.")
+
 DIAGNOSTIC(52000, Error, multiLevelBreakUnsupported, "control flow appears to require multi-level `break`, which Slang does not yet support")
 
 DIAGNOSTIC(52001, Warning, dxilNotFound, "dxil shared library not found, so 'dxc' output cannot be signed! Shader code will not be runnable in non-development environments.")

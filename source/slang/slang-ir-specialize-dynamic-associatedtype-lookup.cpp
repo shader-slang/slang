@@ -122,7 +122,18 @@ struct AssociatedTypeLookupSpecializationContext
     {
         // Ignore lookups for RTTI objects for now, since they are not used anywhere.
         if (!as<IRWitnessTableType>(inst->getDataType()))
+        {
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+            auto uint2Type = builder.getVectorType(
+                builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
+            auto zero = builder.getIntValue(builder.getUIntType(), 0);
+            IRInst* args[] = { zero, zero };
+            auto zeroUint2 = builder.emitMakeVector(uint2Type, 2, args);
+            inst->replaceUsesWith(zeroUint2);
             return;
+        }
 
         // Replace all witness table lookups with calls to specialized functions that directly
         // returns the sequential ID of the resulting witness table, effectively getting rid
@@ -157,44 +168,30 @@ struct AssociatedTypeLookupSpecializationContext
     {
         if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_WitnessTableIDType)
         {
+            // If the operand is a witness table id, just return the operand.
             inst->replaceUsesWith(inst->getRTTIOperand());
             inst->removeAndDeallocate();
         }
-    }
-
-    template<typename TFunc>
-    void workOnModule(const TFunc& func)
-    {
-        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-        sharedBuilder->module = sharedContext->module;
-        sharedBuilder->session = sharedContext->module->session;
-
-        sharedContext->addToWorkList(sharedContext->module->getModuleInst());
-
-        while (sharedContext->workList.getCount() != 0)
+        else if (inst->getRTTIOperand()->getDataType()->getOp() == kIROp_VectorType)
         {
-            IRInst* inst = sharedContext->workList.getLast();
-
-            sharedContext->workList.removeLast();
-            sharedContext->workListSet.Remove(inst);
-
-            func(inst);
-            if (inst->getOp() == kIROp_lookup_interface_method)
-            {
-                processLookupInterfaceMethodInst(cast<IRLookupWitnessMethod>(inst));
-            }
-
-            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
-            {
-                sharedContext->addToWorkList(child);
-            }
+            // If the operand is a witness table, it is already replaced with a uint2
+            // at this point, where the first element in the uint2 is the id of the
+            // witness table.
+            auto vectorType = inst->getRTTIOperand()->getDataType();
+            IRBuilder builder;
+            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            builder.setInsertBefore(inst);
+            UInt index = 0;
+            auto id = builder.emitSwizzle(as<IRVectorType>(vectorType)->getElementType(), inst->getRTTIOperand(), 1, &index);
+            inst->replaceUsesWith(id);
+            inst->removeAndDeallocate();
         }
     }
 
     void processModule()
     {
         // Replace all `lookup_interface_method():IRWitnessTable` with call to specialized functions.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_lookup_interface_method)
             {
@@ -203,7 +200,7 @@ struct AssociatedTypeLookupSpecializationContext
         });
 
         // Replace all direct uses of IRWitnessTables with its sequential ID.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {
@@ -252,7 +249,7 @@ struct AssociatedTypeLookupSpecializationContext
         }
 
         // `GetSequentialID(WitnessTableIDOperand)` becomes just `WitnessTableIDOperand`.
-        workOnModule([this](IRInst* inst)
+        workOnModule(sharedContext, [this](IRInst* inst)
         {
             if (inst->getOp() == kIROp_GetSequentialID)
             {
