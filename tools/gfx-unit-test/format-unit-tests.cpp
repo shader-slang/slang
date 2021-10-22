@@ -908,7 +908,10 @@ namespace gfx_test
                 ITextureResource::SubresourceData {(void*)texData, 16, 32},
                 ITextureResource::SubresourceData {(void*)(texData + 32), 8, 0}
             };
-            ITextureResource::Size size = { 8, 8, 1 };
+            ITextureResource::Size size = {};
+            size.width = 8;
+            size.height = 8;
+            size.depth = 1;
             
             auto texView = createTexView(device, size, gfx::Format::BC1_UNORM, subData, 2);
             setUpAndRunTest(device, texView, floatBufferView, "sampleMips", sampler);
