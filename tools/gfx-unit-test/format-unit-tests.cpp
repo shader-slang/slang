@@ -35,6 +35,8 @@ namespace gfx_test
             return gfx::Format::R8_UNORM;
         case gfx::Format::B8G8R8A8_TYPELESS:
             return gfx::Format::B8G8R8A8_UNORM;
+        case gfx::Format::R10G10B10A2_TYPELESS:
+            return gfx::Format::R10G10B10A2_UNORM;
         default:
             return gfx::Format::Unknown;
         }
@@ -160,11 +162,11 @@ namespace gfx_test
         ISamplerState::Desc samplerDesc;
         auto sampler = device->createSamplerState(samplerDesc);
 
-        float initFloatData[16] = { 0.0 };
+        float initFloatData[16] = { 0.0f };
         auto floatResults = createBuffer<float>(device, 16, initFloatData);
         auto floatBufferView = createBufferView(device, floatResults);
 
-        uint32_t initUintData[16] = { 0 };
+        uint32_t initUintData[16] = { 0u };
         auto uintResults = createBuffer<uint32_t>(device, 16, initUintData);
         auto uintBufferView = createBufferView(device, uintResults);
 
@@ -847,7 +849,7 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-                    1.0f, 0.0f, 0.0f, 1.0f, 0.466666669f, 0.466666669f, 0.466666669f, 0.466666669f));
+                                        1.0f, 0.0f, 0.0f, 1.0f, 0.466666669f, 0.466666669f, 0.466666669f, 0.466666669f));
         }
 
         {
@@ -869,7 +871,66 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 1.0f, 0.0f, 0.0313725509f, 1.0f, 0.0f, 0.0f,
-                    0.968627453f, 0.0f, 0.0f, 1.0f, 0.968627453f, 1.0f, 0.482352942f, 0.0f));
+                                        0.968627453f, 0.0f, 0.0f, 1.0f, 0.968627453f, 1.0f, 0.482352942f, 0.0f));
+        }
+
+        {
+            uint32_t texData[] = { 2950951416u, 2013265920u, 3086219772u, 3087007228u };
+            ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
+            ITextureResource::Size size = { 2, 2, 1 };
+
+            auto texView = createTexView(device, size, gfx::Format::R9G9B9E5_SHAREDEXP, &subData);
+            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat3");
+            compareComputeResult(
+                device,
+                floatResults,
+                Slang::makeArray<float>(63.0f, 63.0f, 63.0f, 0.0f, 0.0f, 0.0f,
+                                        127.0f, 127.0f, 127.0f, 127.0f, 127.5f, 127.75f));
+        }
+
+        {
+            uint32_t texData[] = { 4294967295u, 0u, 2683829759u, 1193046471u };
+            ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
+            ITextureResource::Size size = { 2, 2, 1 };
+
+            auto texView = createTexView(device, size, gfx::Format::R10G10B10A2_TYPELESS, &subData);
+            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat4");
+            compareComputeResult(
+                device,
+                floatResults,
+                Slang::makeArray<float>(1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        0.499511242f, 0.499511242f, 0.499511242f, 0.666666687f,
+                                        0.444770277f, 0.778103590f, 0.110459432f, 0.333333343f));
+
+            texView = createTexView(device, size, gfx::Format::R10G10B10A2_UNORM, &subData);
+            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat4");
+            compareComputeResult(
+                device,
+                floatResults,
+                Slang::makeArray<float>(1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                        0.499511242f, 0.499511242f, 0.499511242f, 0.666666687f,
+                                        0.444770277f, 0.778103590f, 0.110459432f, 0.333333343f));
+
+            texView = createTexView(device, size, gfx::Format::R10G10B10A2_UINT, &subData);
+            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint4");
+            compareComputeResult(
+                device,
+                uintResults,
+                Slang::makeArray<uint32_t>(1023u, 1023u, 1023u, 3u, 0u, 0u, 0u, 0u,
+                    511u, 511u, 511u, 2u, 455u, 796u, 113u, 1u));
+        }
+
+        {
+            uint32_t texData[] = { 3085827519u, 0u, 2951478655u, 1880884096u };
+            ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
+            ITextureResource::Size size = { 2, 2, 1 };
+
+            auto texView = createTexView(device, size, gfx::Format::R11G11B10_FLOAT, &subData);
+            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat3");
+            compareComputeResult(
+                device,
+                floatResults,
+                Slang::makeArray<float>(254.0f, 254.0f, 252.0f, 0.0f, 0.0f, 0.0f, 127.0f, 127.0f, 126.0f, 0.5f, 0.5f, 0.5f));
         }
 
         // These BC1 tests also check that mipmaps are working correctly for compressed formats.
@@ -1031,54 +1092,21 @@ namespace gfx_test
         }
     }
 
-    void FormatTestsAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
-    {
-        if ((api & context->enabledApis) == 0)
-        {
-            SLANG_IGNORE_TEST
-        }
-        Slang::ComPtr<IDevice> device;
-        IDevice::Desc deviceDesc = {};
-        switch (api)
-        {
-        case Slang::RenderApiFlag::D3D11:
-            deviceDesc.deviceType = gfx::DeviceType::DirectX11;
-            break;
-        case Slang::RenderApiFlag::D3D12:
-            deviceDesc.deviceType = gfx::DeviceType::DirectX12;
-            break;
-        case Slang::RenderApiFlag::Vulkan:
-            deviceDesc.deviceType = gfx::DeviceType::Vulkan;
-            break;
-        default:
-            SLANG_IGNORE_TEST
-        }
-        deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
-        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
-        deviceDesc.slang.searchPaths = searchPaths;
-        auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
-        if (SLANG_FAILED(createDeviceResult))
-        {
-            SLANG_IGNORE_TEST
-        }
-
-        formatTestsImpl(device, context);
-    }
-
     SLANG_UNIT_TEST(FormatTestsD3D11)
     {
-        FormatTestsAPI(unitTestContext, Slang::RenderApiFlag::D3D11);
+        runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::D3D11);
     }
 
+#if SLANG_WINDOWS_FAMILY
     SLANG_UNIT_TEST(FormatTestsD3D12)
     {
-        FormatTestsAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
+        runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
+#endif
 
     SLANG_UNIT_TEST(FormatTestsVulkan)
     {
-        FormatTestsAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(formatTestsImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 
 }
