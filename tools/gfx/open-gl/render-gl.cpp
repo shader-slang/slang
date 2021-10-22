@@ -1600,9 +1600,8 @@ public:
 {
     switch (format)
     {
-        case Format::R8G8B8A8_UNORM:      return GlPixelFormat::R8G8B8A8_UNORM;
+        case Format::R8G8B8A8_UNORM:        return GlPixelFormat::R8G8B8A8_UNORM;
         case Format::D32_FLOAT:             return GlPixelFormat::D32_FLOAT;
-        case Format::D_Unorm24_S8:          return GlPixelFormat::D_Unorm24_S8;
 
         default:                            return GlPixelFormat::Unknown;
     }

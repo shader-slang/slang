@@ -81,14 +81,14 @@ namespace gfx {
         case Format::D32_FLOAT:                 return VK_FORMAT_D32_SFLOAT;
         case Format::D16_UNORM:                 return VK_FORMAT_D16_UNORM;
 
-        case Format::B4G4R4A4_UNORM:            return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
-        case Format::B5G6R5_UNORM:              return VK_FORMAT_B5G6R5_UNORM_PACK16;
-        case Format::B5G5R5A1_UNORM:            return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
+        case Format::B4G4R4A4_UNORM:            return VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT;
+        case Format::B5G6R5_UNORM:              return VK_FORMAT_R5G6B5_UNORM_PACK16;
+        case Format::B5G5R5A1_UNORM:            return VK_FORMAT_A1R5G5B5_UNORM_PACK16;
 
         case Format::R9G9B9E5_SHAREDEXP:        return VK_FORMAT_E5B9G9R9_UFLOAT_PACK32;
-        case Format::R10G10B10A2_TYPELESS:      return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
-        case Format::R10G10B10A2_UINT:          return VK_FORMAT_A2R10G10B10_UINT_PACK32;
-        case Format::R10G10B10A2_UNORM:         return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+        case Format::R10G10B10A2_TYPELESS:      return VK_FORMAT_A2B10G10R10_UINT_PACK32;
+        case Format::R10G10B10A2_UINT:          return VK_FORMAT_A2B10G10R10_UINT_PACK32;
+        case Format::R10G10B10A2_UNORM:         return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
         case Format::R11G11B10_FLOAT:           return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
 
         case Format::BC1_UNORM:                 return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;

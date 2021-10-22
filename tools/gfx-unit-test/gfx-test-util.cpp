@@ -74,7 +74,12 @@ namespace gfx_test
             buffer, 0, expectedBufferSize, resultBlob.writeRef()));
         SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
         // Compare results.
-        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
+        //SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
+        if (memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) != 0)
+        {
+            auto r = resultBlob->getBufferPointer();
+            SLANG_CHECK(false);
+        }
     }
 
     Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)

@@ -134,23 +134,23 @@ struct FormatInfoMap
         set(Format::R10G10B10A2_UINT, SLANG_SCALAR_TYPE_UINT32, 4);
         set(Format::R11G11B10_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 3);
 
-        set(Format::BC1_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC1_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC2_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC2_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC3_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC3_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC4_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
-        set(Format::BC4_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
-        set(Format::BC5_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
-        set(Format::BC5_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
-        set(Format::BC6H_UF16, SLANG_SCALAR_TYPE_FLOAT32, 3);
-        set(Format::BC6H_SF16, SLANG_SCALAR_TYPE_FLOAT32, 3);
-        set(Format::BC7_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::BC7_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::BC1_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC1_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC2_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC2_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC3_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC3_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC4_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1, 4, 4);
+        set(Format::BC4_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 1, 4, 4);
+        set(Format::BC5_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 2, 4, 4);
+        set(Format::BC5_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 2, 4, 4);
+        set(Format::BC6H_UF16, SLANG_SCALAR_TYPE_FLOAT32, 3, 4, 4);
+        set(Format::BC6H_SF16, SLANG_SCALAR_TYPE_FLOAT32, 3, 4, 4);
+        set(Format::BC7_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC7_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
     }
 
-    void set(Format format, SlangScalarType type, Index channelCount)
+    void set(Format format, SlangScalarType type, Index channelCount, uint32_t blockWidth = 1, uint32_t blockHeight = 1)
     {
         FormatInfo& info = m_infos[Index(format)];
         info.channelCount = uint8_t(channelCount);
@@ -159,6 +159,8 @@ struct FormatInfoMap
         auto sizeInfo = s_formatSizeInfo[Index(format)];
         info.blockSizeInBytes = sizeInfo[0];
         info.pixelsPerBlock = sizeInfo[1];
+        info.blockWidth = blockWidth;
+        info.blockHeight = blockHeight;
     }
 
     const FormatInfo& get(Format format) const { return m_infos[Index(format)]; }

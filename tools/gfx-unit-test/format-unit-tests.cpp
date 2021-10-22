@@ -36,7 +36,7 @@ namespace gfx_test
         case gfx::Format::B8G8R8A8_TYPELESS:
             return gfx::Format::B8G8R8A8_UNORM;
         case gfx::Format::R10G10B10A2_TYPELESS:
-            return gfx::Format::R10G10B10A2_UNORM;
+            return gfx::Format::R10G10B10A2_UINT;
         default:
             return gfx::Format::Unknown;
         }
@@ -169,6 +169,10 @@ namespace gfx_test
         uint32_t initUintData[16] = { 0u };
         auto uintResults = createBuffer<uint32_t>(device, 16, initUintData);
         auto uintBufferView = createBufferView(device, uintResults);
+
+        int32_t initIntData[16] = { 0 };
+        auto intResults = createBuffer<uint32_t>(device, 16, initIntData);
+        auto intBufferView = createBufferView(device, intResults);
 
         // Note: D32_FLOAT and D16_UNORM are not directly tested as they are only used for raster. These
         // are the same as R32_FLOAT and R16_UNORM, respectively, when passed to a shader.
@@ -480,12 +484,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R32G32B32A32_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint4");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt4");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
-                                           0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 255, 0, 255, 0, 255,
+                                          0, 0, 255, 255, 127, 127, 127, 255));
         }
 
         {
@@ -495,12 +499,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R32G32B32_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint3");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt3");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 0u, 0u, 255u, 0u,
-                                           0u, 0u, 255u, 127u, 127u, 127u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 0, 255, 0,
+                                          0, 0, 255, 127, 127, 127));
         }
 
         {
@@ -510,12 +514,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
 
             auto texView = createTexView(device, size, gfx::Format::R32G32_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint2");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt2");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 0u, 255u,
-                                           255u, 255u, 127u, 127u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 255,
+                                          255, 255, 127, 127));
         }
 
         {
@@ -524,11 +528,11 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R32_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 127u, 73u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 127, 73));
         }
 
         {
@@ -538,12 +542,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R16G16B16A16_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint4");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt4");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
-                                           0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 255, 0, 255, 0, 255,
+                                          0, 0, 255, 255, 127, 127, 127, 255));
         }
 
         {
@@ -553,12 +557,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R16G16_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint2");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt2");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 0u, 255u,
-                                           255u, 255u, 127u, 127u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 0, 255,
+                                          255, 255, 127, 127));
         }
 
         {
@@ -567,11 +571,11 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R16_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(255u, 0u, 127u, 73u));
+                intResults,
+                Slang::makeArray<int32_t>(255, 0, 127, 73));
         }
 
         {
@@ -581,12 +585,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R8G8B8A8_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint4");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt4");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(127u, 0u, 0u, 127u, 0u, 127u, 0u, 127u,
-                                           0u, 0u, 127u, 127u, 0u, 0u, 0u, 127u));
+                intResults,
+                Slang::makeArray<int32_t>(127, 0, 0, 127, 0, 127, 0, 127,
+                                          0, 0, 127, 127, 0, 0, 0, 127));
         }
 
         {
@@ -596,12 +600,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R8G8_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint2");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt2");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(127u, 0u, 0u, 127u,
-                                           127u, 127u, 73u, 73u));
+                intResults,
+                Slang::makeArray<int32_t>(127, 0, 0, 127,
+                                          127, 127, 73, 73));
         }
 
         {
@@ -610,11 +614,11 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
             
             auto texView = createTexView(device, size, gfx::Format::R8_SINT, &subData);
-            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint");
+            setUpAndRunTest(device, texView, intBufferView, "copyTexInt");
             compareComputeResult(
                 device,
-                uintResults,
-                Slang::makeArray<uint32_t>(127u, 0u, 73u, 25u));
+                intResults,
+                Slang::makeArray<int32_t>(127, 0, 73, 25));
         }
 
         {
@@ -894,13 +898,12 @@ namespace gfx_test
             ITextureResource::Size size = { 2, 2, 1 };
 
             auto texView = createTexView(device, size, gfx::Format::R10G10B10A2_TYPELESS, &subData);
-            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat4");
+            setUpAndRunTest(device, texView, uintBufferView, "copyTexUint4");
             compareComputeResult(
                 device,
-                floatResults,
-                Slang::makeArray<float>(1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-                                        0.499511242f, 0.499511242f, 0.499511242f, 0.666666687f,
-                                        0.444770277f, 0.778103590f, 0.110459432f, 0.333333343f));
+                uintResults,
+                Slang::makeArray<uint32_t>(1023u, 1023u, 1023u, 3u, 0u, 0u, 0u, 0u,
+                                        511u, 511u, 511u, 2u, 455u, 796u, 113u, 1u));
 
             texView = createTexView(device, size, gfx::Format::R10G10B10A2_UNORM, &subData);
             setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat4");
@@ -917,7 +920,7 @@ namespace gfx_test
                 device,
                 uintResults,
                 Slang::makeArray<uint32_t>(1023u, 1023u, 1023u, 3u, 0u, 0u, 0u, 0u,
-                    511u, 511u, 511u, 2u, 455u, 796u, 113u, 1u));
+                                           511u, 511u, 511u, 2u, 455u, 796u, 113u, 1u));
         }
 
         {

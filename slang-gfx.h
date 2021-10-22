@@ -339,6 +339,8 @@ struct FormatInfo
 
     uint32_t blockSizeInBytes;     ///< The size of a block in bytes.
     uint32_t pixelsPerBlock;       ///< The number of pixels contained in a block.
+    uint32_t blockWidth;
+    uint32_t blockHeight;
 };
 
 struct InputElementDesc

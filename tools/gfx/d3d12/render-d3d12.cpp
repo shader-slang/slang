@@ -4714,8 +4714,8 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
                 TextureResource::Size mipSize = calcMipSize(srcDesc.size, j);
                 if (gfxIsCompressedFormat(descIn.format))
                 {
-                    mipSize.width = D3DUtil::calcAligned(mipSize.width, 4);
-                    mipSize.height = D3DUtil::calcAligned(mipSize.height, 4);
+                    mipSize.width = int(D3DUtil::calcAligned(mipSize.width, 4));
+                    mipSize.height = int(D3DUtil::calcAligned(mipSize.height, 4));
                 }
 
                 assert(footprint.Width == mipSize.width && footprint.Height == mipSize.height && footprint.Depth == mipSize.depth);

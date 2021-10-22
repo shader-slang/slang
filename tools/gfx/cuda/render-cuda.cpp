@@ -1368,7 +1368,8 @@ public:
             case Format::R32_FLOAT:
             case Format::D32_FLOAT:
                 {
-                    const FormatInfo info = gfxGetFormatInfo(desc.format);
+                    FormatInfo info;
+                    gfxGetFormatInfo(desc.format, &info);
                     format = CU_AD_FORMAT_FLOAT;
                     numChannels = info.channelCount;
                     elementSize = sizeof(float) * numChannels;
@@ -1378,7 +1379,8 @@ public:
             case Format::R16G16_FLOAT:
             case Format::R16_FLOAT:
                 {
-                    const FormatInfo info = gfxGetFormatInfo(desc.format);
+                    FormatInfo info;
+                    gfxGetFormatInfo(desc.format, &info);
                     format = CU_AD_FORMAT_HALF;
                     numChannels = info.channelCount;
                     elementSize = sizeof(uint16_t) * numChannels;

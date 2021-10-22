@@ -5763,7 +5763,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool us
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
-
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
         {
             extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -5781,7 +5780,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool us
             m_features.add("ray-query");
             m_features.add("ray-tracing");
         }
-
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
         {
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -6375,17 +6373,14 @@ size_t calcRowSize(Format format, int width)
 {
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
-    size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
-    if (pixelSize == 0)
-    {
-        return 0;
-    }
-    return size_t(pixelSize * width);
+    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
 }
 
 size_t calcNumRows(Format format, int height)
 {
-    return (size_t)height;
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
 
 Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
@@ -6518,6 +6513,8 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
 
             uint8_t* dstData;
             m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
+            uint8_t* dstDataStart;
+            dstDataStart = dstData;
 
             size_t dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)
@@ -6824,6 +6821,8 @@ Result VKDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerSta
     samplerInfo.compareEnable = desc.reductionOp == TextureReductionOp::Comparison;
     samplerInfo.compareOp = translateComparisonFunc(desc.comparisonFunc);
     samplerInfo.mipmapMode = translateMipFilterMode(desc.mipFilter);
+    samplerInfo.minLod = Math::Max(0.0f, desc.minLOD);
+    samplerInfo.maxLod = Math::Clamp(desc.maxLOD, samplerInfo.minLod, VK_LOD_CLAMP_NONE);
 
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
