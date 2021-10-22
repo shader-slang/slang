@@ -12,10 +12,11 @@ The submodule update step is required to pull in dependencies used for testing i
 
 ## Windows Using Visual Studio
 
-Building from source is really only well supported for Windows users with Visual Studio 2015 or later.
-If you are on Windows, then you can just open `slang.sln` and build your desired platform/configuration. 
+If you are using Visual Studio on Windows, then you can just open `slang.sln` and build your desired platform/configuration. 
 
 The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
+ 
+Whilst using the `slang.sln` solution is a fast and easy way to get a build to work, it does not make binary dependencies available (such as [slang-llvm](https://github.com/shader-slang/slang-llvm)). For that you should create the solution using [`premake5`](https://premake.github.io/) described in a later section.
  
 ## Other Targets
 
@@ -52,22 +53,31 @@ If you are on a unix-like operating system such as OSX/Linux, it may be necesary
 
 Alternatively you can download and install [`premake5`](https://premake.github.io/) on your build system. 
 
-You can run `premake5` with `--help` to see available command line options (assuming premake5 is in your `PATH`):
+You can run `premake5` with `--help` to see available command line options (assuming `premake5` is in your `PATH`):
  
 ```
 % premake5 --help
 ```
 
+To download and use binaries for a particular architecture the `slang-pack` package manager can be invoked via the additional `--deps` and `--arch` options with premake5. If `--arch` isn't specified it defaults to `x64`. On Windows targets, the binaries built in Visual Studio platform should be consistent with the `--arch` option. The `--deps=true` option just indicates that on invoking premake it should make the binary dependencies for the `arch` available. 
+
+Supported `--arch` options are
+
+* x64
+* x86
+* aarch64
+* arm
+
 For Unix like targets that might have `clang` or `gcc` compilers available you can select which one via the `-cc` option. For example...
 
 ```
-% premake5 gmake --cc=clang
+% premake5 gmake --cc=clang --deps=true --arch=x64
 ```
 
 or 
 
 ```
-% premake5 gmake --cc=clang
+% premake5 gmake --cc=gcc --deps=true --arch=x64
 ```
 
 If you want to build the [`glslang`](https://github.com/KhronosGroup/glslang) library that Slang uses, add the option `--build-glslang=true`.
