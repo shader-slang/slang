@@ -177,7 +177,7 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\debug &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\debug &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -199,7 +199,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xc
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\debug &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\debug &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -221,7 +221,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xc
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\debug &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll ..\..\..\bin\windows-aarch64\debug &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll ..\..\..\bin\windows-aarch64\debug &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -247,7 +247,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x86\release\slang-llvm.dll ..\..\..\bin\windows-x86\release &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll ..\..\..\bin\windows-x86\release &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -273,7 +273,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-x86\slang-glslang.dll\ (xc
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-x64\release\slang-llvm.dll ..\..\..\bin\windows-x64\release &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll ..\..\..\bin\windows-x64\release &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
@@ -299,7 +299,7 @@ IF EXIST ..\..\..\external\slang-binaries\bin\windows-x64\slang-glslang.dll\ (xc
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <PostBuildEvent>
-      <Command>IF EXIST E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul) ELSE (xcopy /Q /Y /I E:\git\slang-jsmall-nvidia\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul)
+      <Command>IF EXIST ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-llvm\bin\windows-aarch64\release\slang-llvm.dll ..\..\..\bin\windows-aarch64\release &gt; nul)
 IF EXIST ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll\ (xcopy /Q /E /Y /I ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll ..\..\..\bin\windows-aarch64\release &gt; nul) ELSE (xcopy /Q /Y /I ..\..\..\external\slang-binaries\bin\windows-aarch64\slang-glslang.dll ..\..\..\bin\windows-aarch64\release &gt; nul)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>

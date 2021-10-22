@@ -1307,6 +1307,7 @@ end
  
      -- If we have slang-llvm copy it
      local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
+     
      if slangLLVMPath then
      
         filter { "system:windows" }
