@@ -208,6 +208,8 @@ namespace gfx_test
                                         0.0f, 0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f, 1.0f));
         }
 
+        // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
+        if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
             float texData[] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, 0.5f };
@@ -348,6 +350,8 @@ namespace gfx_test
                                            0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u));
         }
 
+        // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
+        if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
             uint32_t texData[] = { 255u, 0u, 0u, 0u, 255u, 0u,
                                    0u, 0u, 255u, 127u, 127u, 127u };
@@ -482,6 +486,8 @@ namespace gfx_test
                                           0, 0, 255, 255, 127, 127, 127, 255));
         }
 
+        // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
+        if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
             int32_t texData[] = { 255, 0, 0, 0, 255, 0,
                                   0, 0, 255, 127, 127, 127 };
@@ -810,6 +816,8 @@ namespace gfx_test
                 Slang::makeArray<float>(1.0f, 0.0f, -1.0f, 0.0f));
         }
 
+        // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
+        if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
             uint8_t texData[] = { 15u, 240u, 240u, 240u, 0u, 255u, 119u, 119u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };

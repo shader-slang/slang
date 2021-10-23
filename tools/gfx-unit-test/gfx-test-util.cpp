@@ -77,7 +77,6 @@ namespace gfx_test
         //SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
         if (memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) != 0)
         {
-            auto r = resultBlob->getBufferPointer();
             SLANG_CHECK(false);
         }
     }
