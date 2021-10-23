@@ -180,9 +180,9 @@ namespace gfx_test
         size.depth = 1;
 
         ITextureResource::Size bcSize = {};
-        size.width = 4;
-        size.height = 4;
-        size.depth = 1;
+        bcSize.width = 4;
+        bcSize.height = 4;
+        bcSize.depth = 1;
 
         // Note: D32_FLOAT and D16_UNORM are not directly tested as they are only used for raster. These
         // are the same as R32_FLOAT and R16_UNORM, respectively, when passed to a shader.
