@@ -12,10 +12,9 @@ The submodule update step is required to pull in dependencies used for testing i
 
 ## Windows Using Visual Studio
 
-Building from source is really only well supported for Windows users with Visual Studio 2015 or later.
-If you are on Windows, then you can just open `slang.sln` and build your desired platform/configuration. 
-
-The Visual Studio solution in the project is actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
+If you are using Visual Studio on Windows, then you can just open `slang.sln` and build your desired platform/configuration. `slang.sln` and associated project files are actually just generated using [`premake5`](https://premake.github.io/). See instructions in premake section below for further explanation.
+ 
+Whilst using the provided `slang.sln` solution is a fast and easy way to get a build to work, it does not make all binary dependencies available which can add features and improve performance (such as [slang-llvm](https://github.com/shader-slang/slang-llvm)). To get the binary dependencies create the solution using [`premake5`](https://premake.github.io/) described in a later section.
  
 ## Other Targets
 
@@ -52,22 +51,31 @@ If you are on a unix-like operating system such as OSX/Linux, it may be necesary
 
 Alternatively you can download and install [`premake5`](https://premake.github.io/) on your build system. 
 
-You can run `premake5` with `--help` to see available command line options (assuming premake5 is in your `PATH`):
+Run `premake5` with `--help` to in the root of the Slang project to see available command line options (assuming `premake5` is in your `PATH`):
  
 ```
 % premake5 --help
 ```
 
+To download and use binaries for a particular architecture the [slang-pack](https://github.com/shader-slang/slang-binaries/tree/master/lua-modules) package manager can be invoked via the additional `--deps` and `--arch` options. If `--arch` isn't specified it defaults to `x64`. On Windows targets, the Visual Studio platform setting should be consistent with the `--arch` option such that the appropriate binary dependencies are available. The `--deps=true` option just indicates that on invoking premake it should make the binary dependencies for the `arch` available. 
+
+Supported `--arch` options are
+
+* x64
+* x86
+* aarch64
+* arm
+
 For Unix like targets that might have `clang` or `gcc` compilers available you can select which one via the `-cc` option. For example...
 
 ```
-% premake5 gmake --cc=clang
+% premake5 gmake --cc=clang --deps=true --arch=x64
 ```
 
 or 
 
 ```
-% premake5 gmake --cc=clang
+% premake5 gmake --cc=gcc --deps=true --arch=x64
 ```
 
 If you want to build the [`glslang`](https://github.com/KhronosGroup/glslang) library that Slang uses, add the option `--build-glslang=true`.
@@ -97,19 +105,19 @@ To check what compiler is being used/command line options you can add `verbose=1
 
 First download and install [`premake5`](https://premake.github.io/) on your build system. Open up a command line and go to the root directory of the slang source tree (ie the directory containing `slang.h`).
  
-Assuming premake5 is in your `PATH`, you can create a Visual Studio 2015 project for Slang with the following command line
+Assuming premake5 is in your `PATH`, you can create a Visual Studio 2017 project for Slang with the following command line
 
 ```
-% premake5 vs2015
+% premake5 vs2017 --deps=true --arch=x64
 ```
 
-For Visual Studio 2017 use
+For Visual Studio 2019 use
 
 ```
-% premake5 vs2017
+% premake5 vs2019 --deps=true --arch=x64
 ```
 
-These should create a slang.sln in the same directory and which you can then open in the appropriate Visual Studio. Building will build all of slang and it's test infrastructure.
+These should create a slang.sln in the same directory and which you can then open in the appropriate Visual Studio. Building will build all of Slang, examples and it's test infrastructure.
 
 ### Linux 
 
@@ -118,7 +126,7 @@ On Linux we need to generate Makefiles using `premake`. Please read the `premake
 In the terminal go to the root directory of the slang source tree (ie the directory containing `slang.h`). Assuming `premake5` is in your `PATH` use  
 
 ```
-% premake5 gmake 
+% premake5 gmake --deps=true --arch=x64
 ```
 
 To create a release build use
@@ -136,13 +144,13 @@ Note that OSX isn't an official target.
 On Mac OSX to generate Makefiles or an XCode project we use `premake`. Please read the `premake` section for more details. 
 
 ```
-% premake5 gmake 
+% premake5 gmake --deps=true --arch=x64
 ```
 
 If you want to build `glslang` (necessary for Slang to output SPIR-V for example), then the additional `--build-glslang` option should be used
 
 ```
-% premake5 gmake --build-glslang=true
+% premake5 gmake --build-glslang=true --deps=true --arch=x64
 ```
 
 To build for release you can use...
@@ -154,7 +162,7 @@ To build for release you can use...
 Slang can also be built within the Xcode IDE. Invoke `premake` as follows
 
 ```
-% premake5 xcode4
+% premake5 xcode4 --deps=true --arch=x64
 ```
 
 Then open the `slang.xcworkspace` project inside of Xcode and build. 
@@ -166,7 +174,7 @@ Note that Cygwin isn't an official target.
 One issue with building on [Cygwin](https://cygwin.com/), is that there isn't a binary version of `premake` currently available. It may be possible to make this work by building `premake` from source, and then just doing `premake5 gmake`. Here we use another approach - using the windows `premake` to create a Cygwin project. To do this use the command line...
 
 ```
-% premake5 --target-detail=cygwin gmake
+% premake5 --target-detail=cygwin gmake --deps=true --arch=x64
 ```
 
 ## Testing
