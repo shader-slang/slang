@@ -32,7 +32,7 @@ jobs:
       # Do the premake for the actual target, downloading dependencies if necessary    
       - name: premake 
         run:
-          .\premake.bat vs2017 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true --no-progress=true
+          .\premake.bat vs2017 --enable-embed-stdlib=true --arch=${{matrix.platform}} --deps=true
       - name: msbuild
         run:
           MSBuild.exe slang.sln -v:m -m -property:Configuration=${{matrix.configuration}} -property:Platform=${{matrix.platform}} -property:WindowsTargetPlatformVersion=10.0.19041.0
@@ -68,7 +68,6 @@ jobs:
           7z a "$binArchive" bin\*\*\slang.dll
           7z a "$binArchive" bin\*\*\slang.lib
           7z a "$binArchive" bin\*\*\slang-glslang.dll
-          7z a "$binArchive" bin\*\*\slang-llvm.dll
           7z a "$binArchive" bin\*\*\gfx.dll
           7z a "$binArchive" bin\*\*\slangc.exe
           7z a "$binArchive" docs\*.md
