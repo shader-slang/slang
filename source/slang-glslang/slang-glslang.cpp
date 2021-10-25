@@ -113,11 +113,12 @@ static void dumpDiagnostics(
     dump(log.c_str(), log.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
 }
 
-struct SPIRVOptimizeDiagnosticListener
+struct SPIRVOptimizationDiagnostic
 {
-    void operator()(spv_message_level_t level, const char* source, const spv_position_t& position, const char* message)
+    std::string toString() const
     {
-        auto& out = std::cerr;
+        std::ostringstream out;
+
         switch (level)
         {
             case SPV_MSG_FATAL:
@@ -135,21 +136,19 @@ struct SPIRVOptimizeDiagnosticListener
             default:
                 break;
         }
-        if (source)
+        if (source.length())
         {
             out << source << ":";
         }
         out << position.line << ":" << position.column << ":" << position.index << ":";
-        if (message)
+        if (message.length())
         {
             out << " " << message;
         }
-        out << std::endl;
-    }
-};
 
-struct SPIRVOptimizationDiagnostic
-{
+        return out.str();
+    }
+
     spv_message_level_t level;
     std::string source;
     spv_position_t position;
@@ -158,11 +157,12 @@ struct SPIRVOptimizationDiagnostic
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_env targetEnv, unsigned optimizationLevel, unsigned debugInfoType)
+static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_1& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& outSpirv)
 {
-    spvtools::Optimizer optimizer(targetEnv);
+    const auto optimizationLevel = request.optimizationLevel;
+    const auto debugInfoType = request.debugInfoType;
 
-    std::vector<SPIRVOptimizationDiagnostic> optDiagnostics;
+    spvtools::Optimizer optimizer(targetEnv);
 
     optimizer.SetMessageConsumer(
         [&](spv_message_level_t level, const char* source, const spv_position_t& position, const char* message) {
@@ -178,7 +178,7 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
             {
                 diag.message = message;
             }
-            optDiagnostics.push_back(diag);
+            outDiags.push_back(diag);
         });
 
     // If debug info is being generated, propagate
@@ -407,44 +407,8 @@ static void glslang_optimizeSPIRV(std::vector<unsigned int>& spirv, spv_target_e
 
 
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
-    optimizer.Run(spirv.data(), spirv.size(), &spirv, spvOptOptions);
+    optimizer.Run(outSpirv.data(), outSpirv.size(), &outSpirv, spvOptOptions);
 
-    {
-        auto& out = std::cerr;
-        
-        for (auto& diag : optDiagnostics)
-        {
-            switch (diag.level)
-            {
-                case SPV_MSG_FATAL:
-                case SPV_MSG_INTERNAL_ERROR:
-                case SPV_MSG_ERROR:
-                    out << "error: ";
-                    break;
-                case SPV_MSG_WARNING:
-                    out << "warning: ";
-                    break;
-                case SPV_MSG_INFO:
-                case SPV_MSG_DEBUG:
-                    out << "info: ";
-                    break;
-                default:
-                    break;
-            }
-            if (diag.source.length() > 0)
-            {
-                out << diag.source << ":";
-            }
-            const auto& position = diag.position;
-
-            out << position.line << ":" << position.column << ":" << position.index << ":";
-            if (diag.message.length())
-            {
-                out << " " << diag.message;
-            }
-            out << std::endl;
-        }
-    }
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
@@ -630,26 +594,28 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         &request.sourcePath,
         1);
 
-    EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
-     
-    if( !shader->parse(&gResources, 110, false, messages) )
     {
-        dumpDiagnostics(request, shader->getInfoLog());
-        return 1;
-    }
+        const EShMessages messages = EShMessages(EShMsgSpvRules | EShMsgVulkanRules);
 
-    program->addShader(shader);
+        if (!shader->parse(&gResources, 110, false, messages))
+        {
+            dumpDiagnostics(request, shader->getInfoLog());
+            return 1;
+        }
 
-    if( !program->link(messages) )
-    {
-        dumpDiagnostics(request, program->getInfoLog());
-        return 1;
-    }
+        program->addShader(shader);
 
-    if( !program->mapIO() )
-    {
-        dumpDiagnostics(request, program->getInfoLog());
-        return 1;
+        if (!program->link(messages))
+        {
+            dumpDiagnostics(request, program->getInfoLog());
+            return 1;
+        }
+
+        if (!program->mapIO())
+        {
+            dumpDiagnostics(request, program->getInfoLog());
+            return 1;
+        }
     }
 
     for(int stage = 0; stage < EShLangCount; ++stage)
@@ -659,18 +625,48 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
             continue;
 
         std::vector<unsigned int> spirv;
-        std::string warningsErrors;
+        //std::string warningsErrors;
         spv::SpvBuildLogger logger;
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
 
+        int optErrorCount = 0;
+
         if (request.optimizationLevel != SLANG_OPTIMIZATION_LEVEL_NONE)
         {
-            glslang_optimizeSPIRV(spirv, targetEnv, request.optimizationLevel, request.debugInfoType);
+            std::vector<SPIRVOptimizationDiagnostic> optDiags;
+            glslang_optimizeSPIRV(targetEnv, request, optDiags, spirv);
+
+            {
+                for (const auto& diag : optDiags)
+                {
+                    // TODO(JS):
+                    // Hack to stop CapabilityRayTracingMotionBlurNV outputting an error
+                    if (diag.level == SPV_MSG_ERROR && diag.message == "Invalid capability operand: 5341")
+                    {
+                        continue;
+                    }
+
+                    // Count the number of errors
+                    optErrorCount += int(diag.level <= SPV_MSG_ERROR);
+
+                    // Note this string does not have \n. 
+                    std::string diagString = diag.toString();
+
+                    // Dump
+                    dump(diagString.c_str(), diagString.length(), request.diagnosticFunc, request.diagnosticUserData, stderr);
+                }
+            }
         }
 
         dumpDiagnostics(request, logger.getAllMessages());
 
         dump(spirv.data(), spirv.size() * sizeof(unsigned int), request.outputFunc, request.outputUserData, stdout);
+
+        if (optErrorCount > 0)
+        {
+            // It's an error...
+            return 1;
+        }
     }
 
     return 0;
