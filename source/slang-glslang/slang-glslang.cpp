@@ -147,7 +147,7 @@ struct SPIRVOptimizationDiagnostic
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_1& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& outSpirv)
+static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_1& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
 {
     const auto optimizationLevel = request.optimizationLevel;
     const auto debugInfoType = request.debugInfoType;
@@ -400,7 +400,15 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     }
 
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
-    optimizer.Run(outSpirv.data(), outSpirv.size(), &outSpirv, spvOptOptions);
+
+    // Put the output optimized spirv into optSpirv
+    std::vector<unsigned int> optSpirv;
+
+    // Optimize
+    optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions);
+
+    // Make the ioSpirv the optimized spirv
+    ioSpirv.swap(optSpirv);
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
