@@ -48,6 +48,22 @@
 -- From in the build directory you can use
 -- % premake5 --file=../premake5.lua --os=linux gmake
 
+--
+-- Add the package path for slang-pack/slang-util
+-- The question mark is there the name of the module is inserted.
+---
+
+local modulePath = "external/slang-binaries/lua-modules/?.lua"
+
+package.path = package.path .. ";" .. modulePath
+
+-- Load the slack package manager module
+slangPack = require("slang-pack")
+slangUtil = require("slang-util")
+
+-- Load the dependencies from the json file
+deps = slangPack.loadDependencies("deps/target-deps.json")
+
 newoption {
     trigger     = "override-module",
     description = "(Optional) Specify a lua file that can override functions",
@@ -66,13 +82,6 @@ newoption {
     value       = "bool",
     default     = "true",
     allowed     = { { "true", "True"}, { "false", "False" } }
- }
- 
- newoption {
-    trigger     = "target-detail",
-    description = "(Optional) More specific target information",
-    value       = "string",
-    allowed     = { {"cygwin"}, {"mingw"} }
  }
  
  newoption {
@@ -143,9 +152,16 @@ newoption {
      allowed     = { { "true", "True"}, { "false", "False" } }
   }
  
+newoption {
+    trigger     = "enable-experimental-projects",
+    description = "(Optional) If true include experimental projects in build.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+ }
+
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
- targetDetail = _OPTIONS["target-detail"]
  buildGlslang = (_OPTIONS["build-glslang"] == "true")
  enableCuda = not not (_OPTIONS["enable-cuda"] == "true" or _OPTIONS["cuda-sdk-path"])
  enableProfile = (_OPTIONS["enable-profile"] == "true")
@@ -154,6 +170,20 @@ newoption {
  enableProfile = (_OPTIONS["enable-profile"] == "true")
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
+ enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
+ -- Determine the target info
+
+ targetInfo = slangUtil.getTargetInfo()
+ 
+ --
+ -- Update the dependencies for the target
+ --
+
+ deps:update(targetInfo.name)
+ 
+ -- Get the target name that can be used as paths that generate for different configurations (ie contains premake Tokens)
+ 
+ targetName = targetInfo.tokenName
  
  -- This is the path where nvapi is expected to be found
  
@@ -161,7 +191,7 @@ newoption {
  
  if enableOptix then
      optixPath = optixPath or "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0/"
-     enableCuda = true;
+     enableCuda = true
  end
  
  -- cudaPath is only set if cuda is enabled, and CUDA_PATH enviromental variable is set
@@ -171,35 +201,29 @@ newoption {
      cudaPath = (_OPTIONS["cuda-sdk-path"] or os.getenv("CUDA_PATH"))
  end
  
- -- Is true when the target is really windows (ie not something on top of windows like cygwin)
- isTargetWindows = (os.target() == "windows") and not (targetDetail == "mingw" or targetDetail == "cygwin")
+ -- TODO(JS): What's the point in the enable-xlib command line option if it's just overridden here?
  
- if isTargetWindows then
+ if targetInfo.isWindows then
      enableXlib = false
  end
- 
  -- Even if we have the nvapi path, we only want to currently enable on windows targets
  
- enableNvapi = not not (os.isdir(nvapiPath) and isTargetWindows and _OPTIONS["enable-nvapi"] == "true")
+ enableNvapi = not not (os.isdir(nvapiPath) and targetInfo.isWindows and _OPTIONS["enable-nvapi"] == "true")
  
  if enableNvapi then
      printf("Enabled NVAPI")
  end
+ 
  overrideModule = {}
  local overrideModulePath = _OPTIONS["override-module"]
  if overrideModulePath then
      overrideModule = require(overrideModulePath)
  end
  
- targetName = "%{cfg.system}-%{cfg.platform:lower()}"
- 
- if not (targetDetail == nil) then
-     targetName = targetDetail .. "-%{cfg.platform:lower()}"
- end
  
  -- This is needed for gcc, for the 'fileno' functions on cygwin
  -- _GNU_SOURCE makes realpath available in gcc
- if targetDetail == "cygwin" then
+ if targetInfo.os == "cygwin" then
      buildoptions { "-D_POSIX_SOURCE" }
      filter { "toolset:gcc*" }
          buildoptions { "-D_GNU_SOURCE" }
@@ -345,27 +369,9 @@ newoption {
      }
  end
  
- --
- -- A function to return a name to place project files under
- -- in build directory
- --
- -- This is complicated in so far as when this is used (with location for example)
- -- we can't use Tokens
- -- https://github.com/premake/premake-core/wiki/Tokens
- 
- function getBuildLocationName()
-     if not not targetDetail then
-         return targetDetail
-     elseif isTargetWindows then
-         return "visual-studio"
-     else
-         return os.target()
-     end
- end
- 
  -- Adds CUDA dependency to a project
  function addCUDAIfEnabled()
-     if type(cudaPath) == "string" and isTargetWindows then
+     if type(cudaPath) == "string" and targetInfo.isWindows then
          filter {}
          includedirs { cudaPath .. "/include" }
          includedirs { cudaPath .. "/include", cudaPath .. "/common/inc" }
@@ -443,7 +449,7 @@ newoption {
  
      -- Location could do with a better name than 'other' - but it seems as if %{cfg.buildcfg:lower()} and similar variables
      -- is not available for location to expand.
-     location("build/" .. getBuildLocationName() .. "/" .. name)
+     location("build/" .. slangUtil.getBuildLocationName(targetInfo) .. "/" .. name)
  
  
      -- The intermediate ("object") directory will use a similar
@@ -604,7 +610,7 @@ newoption {
      -- rather than in each example.
      links { "example-base", "slang", "gfx", "gfx-util", "platform", "core" }
  
-     if isTargetWindows then
+     if targetInfo.isWindows then
      else
          if enableXlib then
              defines { "SLANG_ENABLE_XLIB" }
@@ -674,16 +680,20 @@ newoption {
  example "cpu-hello-world"
      kind "ConsoleApp"
  
- example "heterogeneous-hello-world"
-     kind "ConsoleApp"
-     -- Additionally add slangc for compiling shader.cpp
-     links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
-     -- Generate shader.cpp from shader.slang
-     prebuildmessage ("Generating shader.cpp from shader.slang")
-     prebuildcommands {
-         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
-     }
- 
+if enableExperimental then
+    -- TODO: Currently this project doesn't build on linux CI.
+    -- Need to fix so that we don't check in shader.cpp, which changes
+    -- everytime when it is generated on a different machine (contains absolute path)
+    example "heterogeneous-hello-world"
+        kind "ConsoleApp"
+        -- Additionally add slangc for compiling shader.cpp
+        links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
+        -- Generate shader.cpp from shader.slang
+        prebuildmessage ("Generating shader.cpp from shader.slang")
+        prebuildcommands {
+            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+        }
+end
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
  --
@@ -706,7 +716,7 @@ newoption {
      warnings "Extra"
      flags { "FatalWarnings" }
  
-     if isTargetWindows then
+     if targetInfo.isWindows then
          addSourceDir "source/core/windows"
      else
          addSourceDir "source/core/unix"
@@ -728,7 +738,7 @@ newoption {
      warnings "Extra"
      flags { "FatalWarnings" }
  
-     if isTargetWindows then
+     if targetInfo.isWindows then
          addSourceDir "source/compiler-core/windows"
      else
          addSourceDir "source/compiler-core/unix"
@@ -810,7 +820,7 @@ newoption {
  
      includedirs { ".", "external", "source", "tools/gfx", "tools/platform" }
      links { "core", "compiler-core", "slang", "gfx", "gfx-util", "platform" }
-     if isTargetWindows then
+     if targetInfo.isWindows then
          addSourceDir "tools/render-test/windows"
  
          systemversion "latest"
@@ -853,7 +863,7 @@ newoption {
  
      -- To special case that we may be building using cygwin on windows. If 'true windows' we build for dx12/vk and run the script
      -- If not we assume it's a cygwin/mingw type situation and remove files that aren't appropriate
-     if isTargetWindows then
+     if targetInfo.isWindows then
          systemversion "latest"
  
          -- For Windows targets, we want to copy
@@ -867,7 +877,7 @@ newoption {
          addSourceDir "tools/gfx/d3d"
          addSourceDir "tools/gfx/d3d11"
          addSourceDir "tools/gfx/d3d12"
-     elseif targetDetail == "mingw" or targetDetail == "cygwin" then
+     elseif targetInfo.os == "mingw" or targetInfo.os == "cygwin" then
          -- Don't support any render techs...
      elseif os.target() == "macosx" then
          --addSourceDir "tools/gfx/open-gl"
@@ -932,7 +942,7 @@ newoption {
      addSourceDir "tools/platform/windows"
      addSourceDir "tools/platform/placeholder"
      -- Include windowing support on Windows.
-     if isTargetWindows then
+     if targetInfo.isWindows then
          systemversion "latest"
      else
          if enableXlib then

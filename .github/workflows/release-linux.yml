@@ -10,6 +10,11 @@ jobs:
   build:
     name: Upload Release Asset
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        configuration: ['release']
+        compiler: ['gcc']
+        platform: ['x64'] 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -20,8 +25,9 @@ jobs:
         id: build
         run: |
           echo "starting to build..."
-          export CC=gcc
-          export CONFIGURATION=release
+          export CC=${{matrix.compiler}}
+          export CONFIGURATION=${{matrix.configuration}}
+          export ARCH=${{matrix.platform}}
           echo "building..."
           source ./github_build.sh
           echo "creating binary archieves..."
