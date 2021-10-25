@@ -150,6 +150,13 @@ struct SPIRVOptimizationDiagnostic
 static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_CompileRequest_1_1& request, std::vector<SPIRVOptimizationDiagnostic>& outDiags, std::vector<unsigned int>& ioSpirv)
 {
     const auto optimizationLevel = request.optimizationLevel;
+
+    // If there is no optimization then we are done
+    if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
+    {
+        return;
+    }
+
     const auto debugInfoType = request.debugInfoType;
 
     spvtools::Optimizer optimizer(targetEnv);
@@ -195,11 +202,6 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
     {
-        case SLANG_OPTIMIZATION_LEVEL_NONE:
-        {
-            // Don't register any passes if our optimization level is none
-            break;
-        }
         default:
         case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
         {
