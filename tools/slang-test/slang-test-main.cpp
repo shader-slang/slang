@@ -3386,7 +3386,7 @@ static void _disableCPPBackends(TestContext* context)
 }
 
     /// Loads a DLL containing unit test functions and run them one by one.
-static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, const char* moduleName)
+static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, SpawnType spawnType, const char* moduleName)
 {
     SharedLibrary::Handle moduleHandle;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(
@@ -3424,7 +3424,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                if (context->options.defaultSpawnType == SpawnType::UseProxy)
+                if (spawnType == SpawnType::UseProxy)
                 {
                     CommandLine cmdLine;
 
@@ -3666,13 +3666,13 @@ SlangResult innerMain(int argc, char** argv)
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
+                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "slang-unit-test-tool");
             }
             
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, "gfx-unit-test-tool");
+                runUnitTestModule(&context, testOptions, SpawnType::UseProxy, "gfx-unit-test-tool");
             }
 
             TestReporter::set(nullptr);
