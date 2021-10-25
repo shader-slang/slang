@@ -187,6 +187,7 @@ namespace gfx_test
         // Note: D32_FLOAT and D16_UNORM are not directly tested as they are only used for raster. These
         // are the same as R32_FLOAT and R16_UNORM, respectively, when passed to a shader.
         {
+            printf("1\n");
             float texData[] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f,
                                 0.0f, 0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f, 1.0f };
             ITextureResource::SubresourceData subData = { (void*)texData, 32, 0 };
@@ -211,6 +212,7 @@ namespace gfx_test
         // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
         if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
+            printf("2\n");
             float texData[] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
                                 0.0f, 0.0f, 1.0f, 0.5f, 0.5f, 0.5f };
             ITextureResource::SubresourceData subData = { (void*)texData, 24, 0 };
@@ -233,6 +235,7 @@ namespace gfx_test
         }
 
         {
+            printf("3\n");
             float texData[] = { 1.0f, 0.0f, 0.0f, 1.0f,
                                 1.0f, 1.0f, 0.5f, 0.5f };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -255,6 +258,7 @@ namespace gfx_test
         }
 
         {
+            printf("4\n");
             float texData[] = { 1.0f, 0.0f, 0.5f, 0.25f };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
             
@@ -274,6 +278,7 @@ namespace gfx_test
         }
 
         {
+            printf("5\n");
             uint16_t texData[] = { 15360u, 0u, 0u, 15360u, 0u, 15360u, 0u, 15360u,
                                    0u, 0u, 15360u, 15360u, 14336u, 14336u, 14336u, 15360u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -296,6 +301,7 @@ namespace gfx_test
         }
 
         {
+            printf("6\n");
             uint16_t texData[] = { 15360u, 0u, 0u, 15360u,
                                    15360u, 15360u, 14336u, 14336u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -318,6 +324,7 @@ namespace gfx_test
         }
 
         {
+            printf("7\n");
             uint16_t texData[] = { 15360u, 0u, 14336u, 13312u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -337,6 +344,7 @@ namespace gfx_test
         }
 
         {
+            printf("8\n");
             uint32_t texData[] = { 255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
                                    0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u };
             ITextureResource::SubresourceData subData = { (void*)texData, 32, 0 };
@@ -353,6 +361,7 @@ namespace gfx_test
         // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
         if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
+            printf("9\n");
             uint32_t texData[] = { 255u, 0u, 0u, 0u, 255u, 0u,
                                    0u, 0u, 255u, 127u, 127u, 127u };
             ITextureResource::SubresourceData subData = { (void*)texData, 24, 0 };
@@ -367,6 +376,7 @@ namespace gfx_test
         }
 
         {
+            printf("10\n");
             uint32_t texData[] = { 255u, 0u, 0u, 255u,
                                    255u, 255u, 127u, 127u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -381,6 +391,7 @@ namespace gfx_test
         }
 
         {
+            printf("11\n");
             uint32_t texData[] = { 255u, 0u, 127u, 73u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
             
@@ -393,6 +404,7 @@ namespace gfx_test
         }
 
         {
+            printf("12\n");
             uint16_t texData[] = { 255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
                                    0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -407,6 +419,7 @@ namespace gfx_test
         }
 
         {
+            printf("13\n");
             uint16_t texData[] = { 255u, 0u, 0u, 255u,
                                    255u, 255u, 127u, 127u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -421,6 +434,7 @@ namespace gfx_test
         }
 
         {
+            printf("14\n");
             uint16_t texData[] = { 255u, 0u, 127u, 73u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -433,6 +447,7 @@ namespace gfx_test
         }
 
         {
+            printf("15\n");
             uint8_t texData[] = { 255u, 0u, 0u, 255u, 0u, 255u, 0u, 255u,
                                   0u, 0u, 255u, 255u, 127u, 127u, 127u, 255u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -447,6 +462,7 @@ namespace gfx_test
         }
 
         {
+            printf("16\n");
             uint8_t texData[] = { 255u, 0u, 0u, 255u,
                                   255u, 255u, 127u, 127u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
@@ -461,6 +477,7 @@ namespace gfx_test
         }
 
         {
+            printf("17\n");
             uint8_t texData[] = { 255u, 0u, 127u, 73u };
             ITextureResource::SubresourceData subData = { (void*)texData, 2, 0 };
 
@@ -473,6 +490,7 @@ namespace gfx_test
         }
 
         {
+            printf("18\n");
             int32_t texData[] = { 255, 0, 0, 255, 0, 255, 0, 255,
                                   0, 0, 255, 255, 127, 127, 127, 255 };
             ITextureResource::SubresourceData subData = { (void*)texData, 32, 0 };
@@ -489,6 +507,7 @@ namespace gfx_test
         // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
         if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
+            printf("19\n");
             int32_t texData[] = { 255, 0, 0, 0, 255, 0,
                                   0, 0, 255, 127, 127, 127 };
             ITextureResource::SubresourceData subData = { (void*)texData, 24, 0 };
@@ -503,6 +522,7 @@ namespace gfx_test
         }
 
         {
+            printf("20\n");
             int32_t texData[] = { 255, 0, 0, 255,
                                   255, 255, 127, 127 };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -517,6 +537,7 @@ namespace gfx_test
         }
 
         {
+            printf("21\n");
             int32_t texData[] = { 255, 0, 127, 73 };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
             
@@ -529,6 +550,7 @@ namespace gfx_test
         }
 
         {
+            printf("22\n");
             int16_t texData[] = { 255, 0, 0, 255, 0, 255, 0, 255,
                                   0, 0, 255, 255, 127, 127, 127, 255 };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -543,6 +565,7 @@ namespace gfx_test
         }
 
         {
+            printf("23\n");
             int16_t texData[] = { 255, 0, 0, 255,
                                   255, 255, 127, 127 };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -557,6 +580,7 @@ namespace gfx_test
         }
 
         {
+            printf("24\n");
             int16_t texData[] = { 255, 0, 127, 73 };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -569,6 +593,7 @@ namespace gfx_test
         }
 
         {
+            printf("25\n");
             int8_t texData[] = { 127, 0, 0, 127, 0, 127, 0, 127,
                                  0, 0, 127, 127, 0, 0, 0, 127 };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -583,6 +608,7 @@ namespace gfx_test
         }
 
         {
+            printf("26\n");
             int8_t texData[] = { 127, 0, 0, 127,
                                  127, 127, 73, 73 };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
@@ -597,6 +623,7 @@ namespace gfx_test
         }
 
         {
+            printf("27\n");
             int8_t texData[] = { 127, 0, 73, 25 };
             ITextureResource::SubresourceData subData = { (void*)texData, 2, 0 };
             
@@ -609,6 +636,7 @@ namespace gfx_test
         }
 
         {
+            printf("28\n");
             uint16_t texData[] = { 65535u, 0u, 0u, 65535u, 0u, 65535u, 0u, 65535u,
                                    0u, 0u, 65535u, 65535u, 32767u, 32767u, 32767u, 32767u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -623,6 +651,7 @@ namespace gfx_test
         }
 
         {
+            printf("29\n");
             uint16_t texData[] = { 65535u, 0u, 0u, 65535u,
                                    65535u, 65535u, 32767u, 32767u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -637,6 +666,7 @@ namespace gfx_test
         }
 
         {
+            printf("30\n");
             uint16_t texData[] = { 65535u, 0u, 32767u, 16383u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -649,6 +679,7 @@ namespace gfx_test
         }
 
         {
+            printf("31\n");
             uint8_t texData[] = { 0u, 0u, 0u, 255u, 127u, 127u, 127u, 255u,
                                   255u, 255u, 255u, 255u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0};
@@ -679,6 +710,7 @@ namespace gfx_test
         }
 
         {
+            printf("32\n");
             uint8_t texData[] = { 255u, 0u, 0u, 255u, 255u, 255u, 127u, 127u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -698,6 +730,7 @@ namespace gfx_test
         }
 
         {
+            printf("33\n");
             uint8_t texData[] = { 255u, 0u, 127u, 63u };
             ITextureResource::SubresourceData subData = { (void*)texData, 2, 0 };
             
@@ -717,6 +750,7 @@ namespace gfx_test
         }
 
         {
+            printf("34\n");
             uint8_t texData[] = { 0u, 0u, 0u, 255u, 127u, 127u, 127u, 255u,
                                   255u, 255u, 255u, 255u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -739,6 +773,7 @@ namespace gfx_test
         }
 
         {
+            printf("35\n");
             int16_t texData[] = { 32767, 0, 0, 32767, 0, 32767, 0, 32767,
                                   0, 0, 32767, 32767, -32768, -32768, 0, 32767 };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -753,6 +788,7 @@ namespace gfx_test
         }
 
         {
+            printf("36\n");
             int16_t texData[] = { 32767, 0, 0, 32767,
                                   32767, 32767, -32768, -32768 };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -766,6 +802,7 @@ namespace gfx_test
         }
 
         {
+            printf("37\n");
             int16_t texData[] = { 32767, 0, -32768, 0};
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -778,6 +815,7 @@ namespace gfx_test
         }
 
         {
+            printf("38\n");
             int8_t texData[] = { 127, 0, 0, 127, 0, 127, 0, 127,
                                  0, 0, 127, 127, -128, -128, 0, 127 };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
@@ -792,6 +830,7 @@ namespace gfx_test
         }
 
         {
+            printf("39\n");
             int8_t texData[] = { 127, 0, 0, 127,
                                  127, 127, -128, -128 };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
@@ -805,6 +844,7 @@ namespace gfx_test
         }
 
         {
+            printf("40\n");
             int8_t texData[] = { 127, 0, -128, 0 };
             ITextureResource::SubresourceData subData = { (void*)texData, 2, 0 };
             
@@ -819,6 +859,7 @@ namespace gfx_test
         // Ignore this test on swiftshader. Swiftshader produces unsupported format warnings for this test.
         if (!Slang::String(device->getDeviceInfo().adapterName).toLower().contains("swiftshader"))
         {
+            printf("41\n");
             uint8_t texData[] = { 15u, 240u, 240u, 240u, 0u, 255u, 119u, 119u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -832,6 +873,7 @@ namespace gfx_test
         }
 
         {
+            printf("42\n");
             uint16_t texData[] = { 31u, 2016u, 63488u, 31727u };
             ITextureResource::SubresourceData subData = { (void*)texData, 4, 0 };
             
@@ -853,6 +895,7 @@ namespace gfx_test
         }
 
         {
+            printf("43\n");
             uint32_t texData[] = { 2950951416u, 2013265920u, 3086219772u, 3087007228u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
 
@@ -866,6 +909,7 @@ namespace gfx_test
         }
 
         {
+            printf("44\n");
             uint32_t texData[] = { 4294967295u, 0u, 2683829759u, 1193046471u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
 
@@ -896,6 +940,7 @@ namespace gfx_test
         }
 
         {
+            printf("45\n");
             uint32_t texData[] = { 3085827519u, 0u, 2951478655u, 1880884096u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
 
@@ -909,6 +954,7 @@ namespace gfx_test
 
         // These BC1 tests also check that mipmaps are working correctly for compressed formats.
         {
+            printf("46\n");
             uint8_t texData[] = { 16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
                                   16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u,
                                   255u, 255u, 255u, 255u, 0u, 0u, 0u, 0u };
@@ -937,6 +983,7 @@ namespace gfx_test
         }
 
         {
+            printf("47\n");
             uint8_t texData[] = { 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
                                   16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -957,6 +1004,7 @@ namespace gfx_test
         }
 
         {
+            printf("48\n");
             uint8_t texData[] = { 0u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
                                   16u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -977,6 +1025,7 @@ namespace gfx_test
         }
 
         {
+            printf("49\n");
             uint8_t texData[] = { 127u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 8, 0 };
             
@@ -996,6 +1045,7 @@ namespace gfx_test
         }
 
         {
+            printf("50\n");
             uint8_t texData[] = { 127u, 0u, 0u, 0u, 0u, 0u, 0u, 0u, 127u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
             
@@ -1016,6 +1066,7 @@ namespace gfx_test
 
         // BC6H_UF16 and BC6H_SF16 are tested separately due to requiring different texture data.
         {
+            printf("51\n");
             uint8_t texData[] = { 98u, 238u, 232u, 77u, 240u, 66u, 148u, 31u,
                                   124u, 95u, 2u, 224u, 255u, 107u, 77u, 250u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -1029,6 +1080,7 @@ namespace gfx_test
         }
 
         {
+            printf("52\n");
             uint8_t texData[] = { 107u, 238u, 232u, 77u, 240u, 71u, 128u, 127u,
                                   1u, 0u, 255u, 255u, 170u, 218u, 221u, 254u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
@@ -1042,6 +1094,7 @@ namespace gfx_test
         }
 
         {
+            printf("53\n");
             uint8_t texData[] = { 104u, 0u, 0u, 0u, 64u, 163u, 209u, 104u,
                                   0u, 0u, 0u, 0u, 0u, 0u, 0u, 0u };
             ITextureResource::SubresourceData subData = { (void*)texData, 16, 0 };
