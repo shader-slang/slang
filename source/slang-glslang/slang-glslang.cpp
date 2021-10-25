@@ -328,17 +328,19 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
         break;
         case SLANG_OPTIMIZATION_LEVEL_HIGH:
-
+        {
             // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
             // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
             // needed.
             //
-            // Currently we just have high have the same meaning as 'maximal'. 
-
+            // Currently we just have high have the same meaning as 'maximal'.
+            
+            // Fall-through
+        }
         case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+        {
             // Use the same passes when specifying the "-O" flag in spirv-opt
             // Roughly equivalent to `RegisterPerformancePasses`
-
 
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
@@ -398,6 +400,7 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
 
             break;
+        }
     }
 
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
@@ -405,10 +408,8 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
         optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
 
-
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
     optimizer.Run(outSpirv.data(), outSpirv.size(), &outSpirv, spvOptOptions);
-
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
