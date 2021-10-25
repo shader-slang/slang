@@ -75,7 +75,11 @@ Builds of the core Slang tools depend on the following projects, either automati
 * [`spirv-headers`](https://github.com/KhronosGroup/SPIRV-Headers) (Modified MIT)
 * [`spirv-tools`](https://github.com/KhronosGroup/SPIRV-Tools) (Apache 2.0)
 
-Some of the tests and example programs that build with Slang use the following projets, which may have their own licenses:
+Slang releases may include [slang-llvm](https://github.com/shader-slang/slang-llvm) which includes [LLVM](https://github.com/llvm/llvm-project) under the license:
+
+* [`llvm`](https://llvm.org/docs/DeveloperPolicy.html#new-llvm-project-license-framework) (Apache 2.0 License with LLVM exceptions)
+
+Some of the tests and example programs that build with Slang use the following projects, which may have their own licenses:
 
 * [`glm`](https://github.com/g-truc/glm) (MIT)
 * `stb_image` and `stb_image_write` from the [`stb`](https://github.com/nothings/stb) collection of single-file libraries (Public Domain)
