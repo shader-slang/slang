@@ -2030,7 +2030,8 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
     descOut = D3D11_SHADER_RESOURCE_VIEW_DESC();
 
     descOut.Format = (pixelFormat == DXGI_FORMAT_UNKNOWN) ? D3DUtil::calcFormat(D3DUtil::USAGE_SRV, D3DUtil::getMapFormat(textureDesc.format)) : pixelFormat;
-    if (textureDesc.arraySize == 1)
+    const int arraySize = calcEffectiveArraySize(textureDesc);
+    if (arraySize <= 1)
     {
         switch (textureDesc.type)
         {
@@ -2064,7 +2065,7 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
     }
     else
     {
-        assert(textureDesc.size.depth > 1 || textureDesc.arraySize > 1);
+        assert(textureDesc.size.depth > 1 || arraySize > 1);
 
         switch (textureDesc.type)
         {
@@ -2075,7 +2076,7 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
         default: assert(!"Unknown dimension");
         }
 
-        descOut.Texture2DArray.ArraySize = max(textureDesc.size.depth, textureDesc.arraySize);
+        descOut.Texture2DArray.ArraySize = max(textureDesc.size.depth, arraySize);
         descOut.Texture2DArray.MostDetailedMip = 0;
         descOut.Texture2DArray.MipLevels = textureDesc.numMipLevels;
         descOut.Texture2DArray.FirstArraySlice = 0;
