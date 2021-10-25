@@ -18,16 +18,6 @@
 #include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/libspirv.h"
 
-#if 0
-#include <cstring>
-#include <cstdlib>
-#include <cctype>
-#include <cmath>
-#include <array>
-#include <memory>
-#include <thread>
-#endif
-
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -166,7 +156,6 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
     optimizer.SetMessageConsumer(
         [&](spv_message_level_t level, const char* source, const spv_position_t& position, const char* message) {
-
             SPIRVOptimizationDiagnostic diag;
             diag.level = level;
             if (source)
@@ -207,15 +196,18 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
     switch (optimizationLevel)
     {
         case SLANG_OPTIMIZATION_LEVEL_NONE:
+        {
             // Don't register any passes if our optimization level is none
             break;
+        }
+        default:
         case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+        {
             // Use a minimal set of performance settings
             // If we run CreateInlineExhaustivePass, We need to run CreateMergeReturnPass first.
 
 #if 0
-        // This is the previous 'default optimization' passes setting for glslang
-        {
+            // This is the previous 'default optimization' passes setting for glslang
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
@@ -223,21 +215,20 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
-        }
 #elif 1
-        // 6Mb 27 secs (all passes up to 9) 
-        // 9Mb 25 secs (all passes up to 7)
-        // 8Mb 15 secs (all passes) -(5,6,7)
-        // 6Mb 15 secs (all passes) -(6,7) 
+            // 6Mb 27 secs (all passes up to 9) 
+            // 9Mb 25 secs (all passes up to 7)
+            // 8Mb 15 secs (all passes) -(5,6,7)
+            // 6Mb 15 secs (all passes) -(6,7) 
 
-        // This list of passes takes the previous 'default optimization'
-        // passes (as listed above) and tries to combine them in order with the 'new' passes below.
-        // The issue with the passes below is that although it produces smaller SPIR-V fairly quickly
-        // it can cause serious problem on some drivers.
-        // 
-        // Across a wide range of compilations this produced SPIR-V that is less than half size of the
-        // previous -O1 passes above.
-        {
+            // This list of passes takes the previous 'default optimization'
+            // passes (as listed above) and tries to combine them in order with the 'new' passes below.
+            // The issue with the passes below is that although it produces smaller SPIR-V fairly quickly
+            // it can cause serious problem on some drivers.
+            // 
+            // Across a wide range of compilations this produced SPIR-V that is less than half size of the
+            // previous -O1 passes above.
+
             optimizer.RegisterPass(spvtools::CreateWrapOpKillPass());           // 1
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());       // 2
 
@@ -263,15 +254,15 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
             optimizer.RegisterPass(spvtools::CreateVectorDCEPass());            // 9
-        }
+
 #else
-        // The following selection of passes was created by
-        // 1) Taking the list of passes from optimizer.RegisterSizePasses
-        // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V output size and compilation speed
-        // 
-        // For a particularly difficult glsl shader this produced 1/3 SPIR-V code (against previous -O1), in around 13th the time (against -O3 option)
-        // Over a wide range of compiles the SPIR-V is around 6% larger than -O3
-        {
+            // The following selection of passes was created by
+            // 1) Taking the list of passes from optimizer.RegisterSizePasses
+            // 2) Disable/enable passes to try to produce some reasonable combination of low SPIR-V output size and compilation speed
+            // 
+            // For a particularly difficult glsl shader this produced 1/3 SPIR-V code (against previous -O1), in around 13th the time (against -O3 option)
+            // Over a wide range of compiles the SPIR-V is around 6% larger than -O3
+
             // The following comments describe the path to finding this combination. The original compilation produces 18Mb SPIR-V binaries
             // in around 3 1/2 mins. The integer number increases with the ordering of the test.
             //
@@ -323,10 +314,10 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             optimizer.RegisterPass(spvtools::CreateSimplificationPass());             // 14
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
-        }
 #endif
 
-        break;
+            break;
+        }
         case SLANG_OPTIMIZATION_LEVEL_HIGH:
         {
             // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
@@ -335,7 +326,7 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
             //
             // Currently we just have high have the same meaning as 'maximal'.
             
-            // Fall-through
+            // fall-through
         }
         case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         {
