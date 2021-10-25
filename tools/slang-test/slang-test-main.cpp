@@ -3450,7 +3450,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
                     reporter->startTest(testOptions.command.getBuffer());
 
                     ExecuteResult exeRes;
-                    ToolReturnCode retCode = spawnAndWait(context, filePath, context->options.defaultSpawnType, cmdLine, exeRes);
+                    ToolReturnCode retCode = spawnAndWait(context, filePath, spawnType, cmdLine, exeRes);
 
                     switch (retCode)
                     {
