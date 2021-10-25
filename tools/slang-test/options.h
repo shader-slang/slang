@@ -68,6 +68,9 @@ struct Options
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
 
+    // Whether to skip the step of creating test devices to check if an API is actually available.
+    bool skipApiDetection = false;
+
     // Dump expected/actual output on failures, for debugging.
     // This is especially intended for use in continuous
     // integration builds.

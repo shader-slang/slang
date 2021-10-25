@@ -10,6 +10,7 @@
 #include "../d3d/d3d-util.h"
 #include "../d3d/d3d-swapchain.h"
 #include "../nvapi/nvapi-util.h"
+#include "../mutable-shader-object.h"
 
 // In order to use the Slang API, we need to include its header
 
@@ -108,6 +109,7 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
+    virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
     virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
         override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
@@ -229,16 +231,8 @@ protected:
 
     };
 
-    class SamplerStateImpl : public ISamplerState, public ComObject
+    class SamplerStateImpl : public SamplerStateBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ISamplerState* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
-                return static_cast<ISamplerState*>(this);
-            return nullptr;
-        }
     public:
         ComPtr<ID3D11SamplerState> m_sampler;
     };
@@ -291,19 +285,8 @@ protected:
         IFramebufferLayout::AttachmentLayout m_depthStencil;
     };
 
-    class FramebufferImpl
-        : public IFramebuffer
-        , public ComObject
+    class FramebufferImpl : public FramebufferBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL
-        IFramebuffer* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFramebuffer)
-                return static_cast<IFramebuffer*>(this);
-            return nullptr;
-        }
-
     public:
         ShortList<RefPtr<RenderTargetViewImpl>, kMaxRTVs> renderTargetViews;
         ShortList<ID3D11RenderTargetView*, kMaxRTVs> d3dRenderTargetViews;
@@ -367,16 +350,8 @@ protected:
 		ComPtr<ID3D11InputLayout> m_layout;
 	};
 
-    class QueryPoolImpl : public IQueryPool, public ComObject
+    class QueryPoolImpl : public QueryPoolBase
     {
-    public:
-        SLANG_COM_OBJECT_IUNKNOWN_ALL;
-        IQueryPool* getInterface(const Guid& guid)
-        {
-            if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IQueryPool)
-                return static_cast<IQueryPool*>(this);
-            return nullptr;
-        }
     public:
         List<ComPtr<ID3D11Query>> m_queries;
         RefPtr<D3D11Device> m_device;
@@ -1290,6 +1265,8 @@ protected:
 
             memcpy(dest + offset, data, size);
 
+            m_isConstantBufferDirty = true;
+
             return SLANG_OK;
         }
 
@@ -1510,49 +1487,43 @@ protected:
             D3D11Device*            device,
             ShaderObjectLayoutImpl* specializedLayout)
         {
-            // If we have already created a buffer to hold ordinary data, then we should
-            // simply re-use that buffer rather than re-create it.
-            //
-            // TODO: Simply re-using the buffer without any kind of validation checks
-            // means that we are assuming that users cannot or will not perform any `set`
-            // operations on a shader object once an operation has requested this buffer
-            // be created. We need to enforce that rule if we want to rely on it.
-            //
-            if (m_ordinaryDataBuffer)
-                return SLANG_OK;
-
             auto specializedOrdinaryDataSize = specializedLayout->getTotalOrdinaryDataSize();
             if (specializedOrdinaryDataSize == 0)
                 return SLANG_OK;
 
-            // Once we have computed how large the buffer should be, we can allocate
-            // it using the existing public `IDevice` API.
-            //
+            // If we have already created a buffer to hold ordinary data, then we should
+            // simply re-use that buffer rather than re-create it.
+            if (!m_ordinaryDataBuffer)
+            {
+                ComPtr<IBufferResource> bufferResourcePtr;
+                IBufferResource::Desc bufferDesc = {};
+                bufferDesc.type = IResource::Type::Buffer;
+                bufferDesc.sizeInBytes = specializedOrdinaryDataSize;
+                bufferDesc.defaultState = ResourceState::ConstantBuffer;
+                bufferDesc.allowedStates =
+                    ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
+                bufferDesc.cpuAccessFlags |= AccessFlag::Write;
+                SLANG_RETURN_ON_FAIL(
+                    device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
+                m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
+            }
 
-            ComPtr<IBufferResource> bufferResourcePtr;
-            IBufferResource::Desc bufferDesc = {};
-            bufferDesc.type = IResource::Type::Buffer;
-            bufferDesc.sizeInBytes = specializedOrdinaryDataSize;
-            bufferDesc.defaultState = ResourceState::ConstantBuffer;
-            bufferDesc.allowedStates =
-                ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
-            SLANG_RETURN_ON_FAIL(
-                device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
-            m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
+            if (m_isConstantBufferDirty)
+            {
+                // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
+                //
+                // Note that `_writeOrdinaryData` is potentially recursive in the case
+                // where this object contains interface/existential-type fields, so we
+                // don't need or want to inline it into this call site.
+                //
 
-            // Once the buffer is allocated, we can use `_writeOrdinaryData` to fill it in.
-            //
-            // Note that `_writeOrdinaryData` is potentially recursive in the case
-            // where this object contains interface/existential-type fields, so we
-            // don't need or want to inline it into this call site.
-            //
-
-            auto ordinaryData = device->map(m_ordinaryDataBuffer, gfx::MapFlavor::WriteDiscard);
-            auto result = _writeOrdinaryData(ordinaryData, specializedOrdinaryDataSize, specializedLayout);
-            device->unmap(m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize);
-            
-            return result;
+                auto ordinaryData = device->map(m_ordinaryDataBuffer, gfx::MapFlavor::WriteDiscard);
+                auto result = _writeOrdinaryData(ordinaryData, specializedOrdinaryDataSize, specializedLayout);
+                device->unmap(m_ordinaryDataBuffer, 0, specializedOrdinaryDataSize);
+                m_isConstantBufferDirty = false;
+                return result;
+            }
+            return SLANG_OK;
         }
 
             /// Bind the buffer for ordinary/uniform data, if needed
@@ -1776,6 +1747,8 @@ protected:
             /// Created on demand with `_createOrdinaryDataBufferIfNeeded()`
         RefPtr<BufferResourceImpl> m_ordinaryDataBuffer;
 
+        bool m_isConstantBufferDirty = true;
+
             /// Get the layout of this shader object with specialization arguments considered
             ///
             /// This operation should only be called after the shader object has been
@@ -1814,16 +1787,20 @@ protected:
         RefPtr<ShaderObjectLayoutImpl> m_specializedLayout;
     };
 
+    class MutableShaderObjectImpl
+        : public MutableShaderObject<
+        MutableShaderObjectImpl,
+        ShaderObjectLayoutImpl>
+    {};
+
     class RootShaderObjectImpl : public ShaderObjectImpl
     {
         typedef ShaderObjectImpl Super;
 
     public:
-        // Override default reference counting behavior to disable lifetime management via ComPtr.
-        // Root objects are managed by command buffer and does not need to be freed by the user.
-        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
-        SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
-    public:
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
+
         static Result create(IDevice* device, RootShaderObjectLayoutImpl* layout, RootShaderObjectImpl** outShaderObject)
         {
             RefPtr<RootShaderObjectImpl> object = new RootShaderObjectImpl();
@@ -3564,6 +3541,19 @@ Result D3D11Device::createShaderObject(ShaderObjectLayoutBase* layout, IShaderOb
     SLANG_RETURN_ON_FAIL(ShaderObjectImpl::create(this,
         static_cast<ShaderObjectLayoutImpl*>(layout), shaderObject.writeRef()));
     returnComPtr(outObject, shaderObject);
+    return SLANG_OK;
+}
+
+Result D3D11Device::createMutableShaderObject(
+    ShaderObjectLayoutBase* layout,
+    IShaderObject** outObject)
+{
+    auto layoutImpl = static_cast<ShaderObjectLayoutImpl*>(layout);
+
+    RefPtr<MutableShaderObjectImpl> result = new MutableShaderObjectImpl();
+    SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
+    returnComPtr(outObject, result);
+
     return SLANG_OK;
 }
 

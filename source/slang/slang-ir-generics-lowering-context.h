@@ -103,4 +103,28 @@ namespace Slang
     // Ptr(RTTIType).
     bool isTypeValue(IRInst* typeInst);
 
+    template<typename TFunc>
+    void workOnModule(SharedGenericsLoweringContext* sharedContext, const TFunc& func)
+    {
+        SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
+        sharedBuilder->module = sharedContext->module;
+        sharedBuilder->session = sharedContext->module->session;
+
+        sharedContext->addToWorkList(sharedContext->module->getModuleInst());
+
+        while (sharedContext->workList.getCount() != 0)
+        {
+            IRInst* inst = sharedContext->workList.getLast();
+
+            sharedContext->workList.removeLast();
+            sharedContext->workListSet.Remove(inst);
+
+            func(inst);
+
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                sharedContext->addToWorkList(child);
+            }
+        }
+    }
 }
