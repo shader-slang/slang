@@ -1488,6 +1488,9 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                         break;
                     }
                     break;
+                case BaseType::Bool:
+                    m_writer->emit("bool");
+                    break;
             }
 
             m_writer->emit("(");

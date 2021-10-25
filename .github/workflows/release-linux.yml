@@ -10,6 +10,11 @@ jobs:
   build:
     name: Upload Release Asset
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        configuration: ['release']
+        compiler: ['gcc']
+        platform: ['x64'] 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -20,8 +25,9 @@ jobs:
         id: build
         run: |
           echo "starting to build..."
-          export CC=gcc
-          export CONFIGURATION=release
+          export CC=${{matrix.compiler}}
+          export CONFIGURATION=${{matrix.configuration}}
+          export ARCH=${{matrix.platform}}
           echo "building..."
           source ./github_build.sh
           echo "creating binary archieves..."
@@ -34,9 +40,9 @@ jobs:
           export SLANG_BINARY_ARCHIVE=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.zip
           export SLANG_BINARY_ARCHIVE_TAR=slang-${SLANG_TAG}-${SLANG_OS_NAME}-${SLANG_ARCH_NAME}.tar.gz
           echo "creating zip"
-          zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+          zip -r ${SLANG_BINARY_ARCHIVE} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
           echo "creating tar"
-          tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
+          tar -czf ${SLANG_BINARY_ARCHIVE_TAR} bin/*/*/slangc bin/*/*/libslang.so bin/*/*/libslang-glslang.so bin/*/*/libgfx.so bin/*/*/libslang-llvm.so docs/*.md README.md LICENSE slang.h slang-com-helper.h slang-com-ptr.h slang-tag-version.h slang-gfx.h prelude/*.h
           echo "::set-output name=SLANG_BINARY_ARCHIVE::${SLANG_BINARY_ARCHIVE}"
           echo "::set-output name=SLANG_BINARY_ARCHIVE_TAR::${SLANG_BINARY_ARCHIVE_TAR}"
       - name: UploadBinary

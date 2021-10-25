@@ -185,20 +185,6 @@ SlangResult DownstreamCompiler::disassemble(SlangCompileTarget sourceBlobTarget,
     return (info.sourceLanguageFlags & (SourceLanguageFlags(1) << int(sourceLanguage))) != 0;
 }
 
-/* static */SlangCompileTarget DownstreamCompiler::getCompileTarget(SlangSourceLanguage sourceLanguage)
-{
-    switch (sourceLanguage)
-    {
-        case SLANG_SOURCE_LANGUAGE_HLSL:    return SLANG_HLSL;
-        case SLANG_SOURCE_LANGUAGE_GLSL:    return SLANG_GLSL;
-        case SLANG_SOURCE_LANGUAGE_C:       return SLANG_C_SOURCE;
-        case SLANG_SOURCE_LANGUAGE_CPP:     return SLANG_CPP_SOURCE;
-        case SLANG_SOURCE_LANGUAGE_CUDA:    return SLANG_CUDA_SOURCE;
-        
-        default:                            return SLANG_TARGET_UNKNOWN;
-    }
-}
-
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DownstreamDiagnostics !!!!!!!!!!!!!!!!!!!!!!*/
 
 Index DownstreamDiagnostics::getCountAtLeastSeverity(Diagnostic::Severity severity) const
@@ -719,20 +705,6 @@ const DownstreamCompiler::Desc& DownstreamCompilerUtil::getCompiledWithDesc()
         case SLANG_SOURCE_LANGUAGE_CPP:
         case SLANG_SOURCE_LANGUAGE_C:
         {
-
-#if 0
-            // TODO(JS): We can't just enable this because we can currently only use slang-llvm, if we want to 'host-callable'
-            // It *can't* handle pass through (the includes are not available with just the dll),
-            // As it stands it doesn't support ext/obj/shared library output
-
-            // If we have LLVM, lets use that as the default
-            {
-                DownstreamCompiler::Desc desc;
-                desc.type = SLANG_PASS_THROUGH_LLVM;
-                compiler = findCompiler(set, MatchType::Newest, desc);
-            }
-#endif
-
             // Find the compiler closest to the compiler this was compiled with
             if (!compiler)
             {

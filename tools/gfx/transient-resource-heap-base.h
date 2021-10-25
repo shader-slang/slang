@@ -4,18 +4,9 @@
 namespace gfx
 {
 template <typename TDevice, typename TBufferResource>
-class TransientResourceHeapBase
-    : public ITransientResourceHeap
-    , public Slang::ComObject
+class TransientResourceHeapBaseImpl : public TransientResourceHeapBase
 {
 public:
-    SLANG_COM_OBJECT_IUNKNOWN_ALL
-    ITransientResourceHeap* getInterface(const Slang::Guid& guid)
-    {
-        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
-            return static_cast<ITransientResourceHeap*>(this);
-        return nullptr;
-    }
     void breakStrongReferenceToDevice() { m_device.breakStrongReference(); }
 
 public:
@@ -24,13 +15,6 @@ public:
     Slang::Index m_constantBufferAllocCounter = 0;
     size_t m_constantBufferOffsetAllocCounter = 0;
     uint32_t m_alignment = 256;
-    uint64_t m_version;
-    uint64_t getVersion() { return m_version; }
-    uint64_t& getVersionCounter()
-    {
-        static uint64_t version = 1;
-        return version;
-    }
 
     Result init(const ITransientResourceHeap::Desc& desc, uint32_t alignment, TDevice* device)
     {
