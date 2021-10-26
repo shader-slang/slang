@@ -3385,6 +3385,16 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+static TestResult _asTestResult(ToolReturnCode retCode)
+{
+    switch (retCode)
+    {
+        default:                        return TestResult::Fail;
+        case ToolReturnCode::Success:   return TestResult::Pass;
+        case ToolReturnCode::Ignored:   return TestResult::Ignored;
+    }
+}
+
     /// Loads a DLL containing unit test functions and run them one by one.
 static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, SpawnType spawnType, const char* moduleName)
 {
@@ -3447,39 +3457,26 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
                         cmdLine.addArg(buf.ProduceString());
                     }
 
-                    reporter->startTest(testOptions.command.getBuffer());
-
-                    ExecuteResult exeRes;
-                    ToolReturnCode retCode = spawnAndWait(context, filePath, spawnType, cmdLine, exeRes);
-
-                    switch (retCode)
                     {
-                        case ToolReturnCode::CompilationFailed:
-                        case ToolReturnCode::Failed:
-                        case ToolReturnCode::FailedToRun:
-                        {
-                            reporter->addResult(TestResult::Fail);
-                            break;
-                        }
-                        case ToolReturnCode::Success:
-                        {
-                            reporter->addResult(TestResult::Pass);
-                            break;
-                        }
-                        case ToolReturnCode::Ignored:
-                        {
-                            reporter->addResult(TestResult::Ignored);
-                            break;
-                        }
-                    }
+                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
+                        ExecuteResult exeRes;
 
-                    reporter->endTest();
+                        const auto testResult = _asTestResult(spawnAndWait(context, filePath, spawnType, cmdLine, exeRes));
+
+                        // If the test fails, output any output - which might give information about individual tests that have failed.
+                        if (testResult == TestResult::Fail)
+                        {
+                            String output = getOutput(exeRes);
+                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
+                        }
+
+                        reporter->addResult(testResult);
+                    }
                 }
                 else
                 {
-                    reporter->startTest(testOptions.command.getBuffer());
+                    TestReporter::TestScope scopeTest(reporter, testOptions.command);
                     testFunc(&unitTestContext);
-                    reporter->endTest();
                 }
             }
         }
