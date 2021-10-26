@@ -205,30 +205,30 @@ void validateAccelerationStructureBuildInputs(
             case IAccelerationStructure::GeometryType::Triangles:
                 switch (buildInputs.geometryDescs[i].content.triangles.vertexFormat)
                 {
-                case Format::RGB_Float32:
-                case Format::RG_Float32:
-                case Format::RGBA_Float16:
-                case Format::RG_Float16:
-                case Format::RGBA_Snorm_UInt16:
-                case Format::RG_Snorm_UInt16:
+                case Format::R32G32B32_FLOAT:
+                case Format::R32G32_FLOAT:
+                case Format::R16G16B16A16_FLOAT:
+                case Format::R16G16_FLOAT:
+                case Format::R16G16B16A16_SNORM:
+                case Format::R16G16_SNORM:
                     break;
                 default:
                     GFX_DIAGNOSE_ERROR(
                         "Unsupported IAccelerationStructure::TriangleDesc::vertexFormat. Valid "
-                        "values are RGB_Float32, RG_Float32, RGBA_Float16, RG_Float16, "
-                        "RGBA_Snorm_UInt16 or RG_Snorm_UInt16.");
+                        "values are R32G32B32_FLOAT, R32G32_FLOAT, R16G16B16A16_FLOAT, R16G16_FLOAT, "
+                        "R16G16B16A16_SNORM or R16G16_SNORM.");
                 }
                 if (buildInputs.geometryDescs[i].content.triangles.indexCount)
                 {
                     switch (buildInputs.geometryDescs[i].content.triangles.indexFormat)
                     {
-                    case Format::R_UInt32:
-                    case Format::R_UInt16:
+                    case Format::R32_UINT:
+                    case Format::R16_UINT:
                         break;
                     default:
                         GFX_DIAGNOSE_ERROR(
                             "Unsupported IAccelerationStructure::TriangleDesc::indexFormat. Valid "
-                            "values are Unknown, R_UInt32 or R_UInt16.");
+                            "values are Unknown, R32_UINT or R16_UINT.");
                     }
                     if (!buildInputs.geometryDescs[i].content.triangles.indexData)
                     {

@@ -224,8 +224,8 @@ Slang::Result initialize()
     // First, we create an input layout:
     //
     InputElementDesc inputElements[] = {
-        { "POSITION", 0, Format::RGB_Float32, offsetof(Vertex, position) },
-        { "COLOR",    0, Format::RGB_Float32, offsetof(Vertex, color) },
+        { "POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position) },
+        { "COLOR",    0, Format::R32G32B32_FLOAT, offsetof(Vertex, color) },
     };
     auto inputLayout = gDevice->createInputLayout(
         &inputElements[0],

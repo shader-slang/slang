@@ -29,8 +29,8 @@ using Slang::Result;
 {
     ITextureResource::Desc textureResourceDesc = {};
 
-    // Default to RGBA_Unorm_UInt8
-    const Format format = (inputDesc.format == Format::Unknown) ? Format::RGBA_Unorm_UInt8 : inputDesc.format;
+    // Default to R8G8B8A8_UNORM
+    const Format format = (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
 
     textureResourceDesc.format = format;
     textureResourceDesc.numMipLevels = texData.m_mipLevels;

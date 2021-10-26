@@ -744,9 +744,9 @@ Result initialize()
     SLANG_RETURN_ON_FAIL(context.init(gDevice));
 
     InputElementDesc inputElements[] = {
-        {"POSITION", 0, Format::RGB_Float32, offsetof(Model::Vertex, position) },
-        {"NORMAL",   0, Format::RGB_Float32, offsetof(Model::Vertex, normal) },
-        {"UV",       0, Format::RG_Float32,  offsetof(Model::Vertex, uv) },
+        {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, position) },
+        {"NORMAL",   0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, normal) },
+        {"UV",       0, Format::R32G32_FLOAT,  offsetof(Model::Vertex, uv) },
     };
     auto inputLayout = gDevice->createInputLayout(
         &inputElements[0],
@@ -870,7 +870,7 @@ void renderFrame(int frameIndex) override
     for(auto& model : gModels)
     {
         drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer, sizeof(Model::Vertex));
-        drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R_UInt32);
+        drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R32_UINT);
         // For each model we provide a parameter
         // block that holds the per-model transformation
         // parameters, corresponding to the `PerModel` type

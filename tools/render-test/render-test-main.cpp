@@ -539,9 +539,9 @@ SlangResult RenderTestApp::initialize(
                 // fixed/known set of attributes.
                 //
                 const InputElementDesc inputElements[] = {
-                    { "A", 0, Format::RGB_Float32, offsetof(Vertex, position) },
-                    { "A", 1, Format::RGB_Float32, offsetof(Vertex, color) },
-                    { "A", 2, Format::RG_Float32,  offsetof(Vertex, uv) },
+                    { "A", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position) },
+                    { "A", 1, Format::R32G32B32_FLOAT, offsetof(Vertex, color) },
+                    { "A", 2, Format::R32G32_FLOAT,  offsetof(Vertex, uv) },
                 };
 
                 ComPtr<IInputLayout> inputLayout;
@@ -600,7 +600,7 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.size.height = gWindowHeight;
     depthBufferDesc.size.depth = 1;
     depthBufferDesc.numMipLevels = 1;
-    depthBufferDesc.format = Format::D_Float32;
+    depthBufferDesc.format = Format::D32_FLOAT;
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
     depthBufferDesc.allowedStates = ResourceState::DepthWrite;
 
@@ -613,14 +613,14 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.size.height = gWindowHeight;
     colorBufferDesc.size.depth = 1;
     colorBufferDesc.numMipLevels = 1;
-    colorBufferDesc.format = Format::RGBA_Unorm_UInt8;
+    colorBufferDesc.format = Format::R8G8B8A8_UNORM;
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
     colorBufferDesc.allowedStates = ResourceState::RenderTarget;
     m_colorBuffer = m_device->createTextureResource(colorBufferDesc, nullptr);
 
     gfx::IResourceView::Desc colorBufferViewDesc;
     memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
-    colorBufferViewDesc.format = gfx::Format::RGBA_Unorm_UInt8;
+    colorBufferViewDesc.format = gfx::Format::R8G8B8A8_UNORM;
     colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
     colorBufferViewDesc.type = gfx::IResourceView::Type::RenderTarget;
     ComPtr<gfx::IResourceView> rtv =
@@ -628,14 +628,14 @@ void RenderTestApp::_initializeRenderPass()
 
     gfx::IResourceView::Desc depthBufferViewDesc;
     memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
-    depthBufferViewDesc.format = gfx::Format::D_Float32;
+    depthBufferViewDesc.format = gfx::Format::D32_FLOAT;
     depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
     depthBufferViewDesc.type = gfx::IResourceView::Type::DepthStencil;
     ComPtr<gfx::IResourceView> dsv =
         m_device->createTextureView(depthBufferResource.get(), depthBufferViewDesc);
 
-    IFramebufferLayout::AttachmentLayout colorAttachment = {gfx::Format::RGBA_Unorm_UInt8, 1};
-    IFramebufferLayout::AttachmentLayout depthAttachment = {gfx::Format::D_Float32, 1};
+    IFramebufferLayout::AttachmentLayout colorAttachment = {gfx::Format::R8G8B8A8_UNORM, 1};
+    IFramebufferLayout::AttachmentLayout depthAttachment = {gfx::Format::D32_FLOAT, 1};
     gfx::IFramebufferLayout::Desc framebufferLayoutDesc;
     framebufferLayoutDesc.renderTargetCount = 1;
     framebufferLayoutDesc.renderTargets = &colorAttachment;
@@ -703,7 +703,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         geomDesc.content.triangles.indexFormat = Format::Unknown;
         geomDesc.content.triangles.vertexCount = kVertexCount;
         geomDesc.content.triangles.vertexData = vertexBuffer->getDeviceAddress();
-        geomDesc.content.triangles.vertexFormat = Format::RGB_Float32;
+        geomDesc.content.triangles.vertexFormat = Format::R32G32B32_FLOAT;
         geomDesc.content.triangles.vertexStride = sizeof(Vertex);
         geomDesc.content.triangles.transform3x4 = transformBuffer->getDeviceAddress();
         accelerationStructureBuildInputs.geometryDescs = &geomDesc;
