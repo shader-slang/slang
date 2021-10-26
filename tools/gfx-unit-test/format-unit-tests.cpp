@@ -941,7 +941,7 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 0.517647088f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f));
-
+            
             texView = createTexView(device, size, gfx::Format::BC1_UNORM_SRGB, subData, 2);
             setUpAndRunTest(device, texView, floatBufferView, "sampleMips", sampler);
             compareComputeResult(
@@ -963,7 +963,7 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 0.517647088f, 1.0f));
-
+            
             texView = createTexView(device, bcSize, gfx::Format::BC2_UNORM_SRGB, &subData);
             setUpAndRunTest(device, texView, floatBufferView, "sampleTex", sampler);
             compareComputeResult(
@@ -985,7 +985,7 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 0.517647088f, 1.0f));
-
+            
             texView = createTexView(device, bcSize, gfx::Format::BC3_UNORM_SRGB, &subData);
             setUpAndRunTest(device, texView, floatBufferView, "sampleTex", sampler);
             compareComputeResult(
@@ -1080,7 +1080,7 @@ namespace gfx_test
                 device,
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.101960786f, 0.0f, 1.0f));
-
+            
             texView = createTexView(device, bcSize, gfx::Format::BC7_UNORM_SRGB, &subData);
             setUpAndRunTest(device, texView, floatBufferView, "sampleTex", sampler);
             compareComputeResult(
