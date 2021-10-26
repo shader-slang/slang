@@ -320,16 +320,12 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
             break;
         }
+        // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
+        // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
+        // needed.
+        //
+        // Currently we just have high have the same meaning as 'maximal'.
         case SLANG_OPTIMIZATION_LEVEL_HIGH:
-        {
-            // TODO(JS): It would be better if we had some distinction here where 'high' meant optimize 'in a reasonable time' for
-            // a better optimization, and 'maximal' meant compilation might take a really long time... so only use it if it's really
-            // needed.
-            //
-            // Currently we just have high have the same meaning as 'maximal'.
-            
-            // fall-through
-        }
         case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
         {
             // Use the same passes when specifying the "-O" flag in spirv-opt
