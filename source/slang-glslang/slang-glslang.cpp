@@ -19,7 +19,7 @@
 #include "spirv-tools/libspirv.h"
 
 #ifdef _WIN32
-#include <Windows.h>
+#   include <Windows.h>
 #endif
 
 #include <memory>
@@ -534,7 +534,6 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
         return 1;
     }
 
-
     spv_target_env targetEnv = SPV_ENV_UNIVERSAL_1_2;
     glslang::EShTargetLanguageVersion targetLanguage = glslang::EShTargetLanguageVersion(0);
 
@@ -623,8 +622,8 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
             continue;
 
         std::vector<unsigned int> spirv;
-        //std::string warningsErrors;
         spv::SpvBuildLogger logger;
+
         glslang::GlslangToSpv(*stageIntermediate, spirv, &logger);
 
         int optErrorCount = 0;
@@ -801,26 +800,3 @@ int glslang_compile(glslang_CompileRequest_1_0* inRequest)
     request.set(*inRequest);
     return glslang_compile_1_1(&request);
 }
-
-#if 0
-static std::mutex g_globalMutex;
-
-namespace glslang {
-
-void InitGlobalLock()
-{
-    
-}
-
-void GetGlobalLock()
-{
-    g_globalMutex.lock();
-}
-
-void ReleaseGlobalLock()
-{
-    g_globalMutex.unlock();
-}
-
-} // namespace glslang
-#endif
