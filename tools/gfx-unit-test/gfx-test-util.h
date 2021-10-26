@@ -25,6 +25,13 @@ namespace gfx_test
         uint8_t* expectedResult,
         size_t expectedBufferSize);
 
+        /// Reads back the content of `buffer` and compares it against `expectedResult` with a set tolerance.
+    void compareComputeResultFuzzy(
+        gfx::IDevice* device,
+        gfx::IBufferResource* buffer,
+        float* expectedResult,
+        size_t expectedBufferSize);
+
     template<typename T, Slang::Index count>
     void compareComputeResult(
         gfx::IDevice* device,
@@ -35,6 +42,7 @@ namespace gfx_test
         size_t bufferSize = sizeof(T) * count;
         expectedBuffer.setCount(bufferSize);
         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
+        if (std::is_same<T, float>::value) return compareComputeResultFuzzy(device, buffer, (float*)expectedBuffer.getBuffer(), bufferSize);
         return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
     }
     

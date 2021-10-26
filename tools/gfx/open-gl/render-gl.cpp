@@ -1532,8 +1532,8 @@ public:
     enum class GlPixelFormat
     {
         Unknown,
-        RGBA_Unorm_UInt8,
-        D_Float32,
+        R8G8B8A8_UNORM,
+        D32_FLOAT,
         D_Unorm24_S8,
         CountOf,
     };
@@ -1600,9 +1600,8 @@ public:
 {
     switch (format)
     {
-        case Format::RGBA_Unorm_UInt8:      return GlPixelFormat::RGBA_Unorm_UInt8;
-        case Format::D_Float32:             return GlPixelFormat::D_Float32;
-        case Format::D_Unorm24_S8:          return GlPixelFormat::D_Unorm24_S8;
+        case Format::R8G8B8A8_UNORM:        return GlPixelFormat::R8G8B8A8_UNORM;
+        case Format::D32_FLOAT:             return GlPixelFormat::D32_FLOAT;
 
         default:                            return GlPixelFormat::Unknown;
     }
@@ -1612,8 +1611,8 @@ public:
 {
     // internalType, format, formatType
     { 0,                0,          0},                         // GlPixelFormat::Unknown
-    { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::RGBA_Unorm_UInt8
-    { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Float32
+    { GL_RGBA8,         GL_RGBA,    GL_UNSIGNED_BYTE },         // GlPixelFormat::R8G8B8A8_UNORM
+    { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE}, // GlPixelFormat::D32_FLOAT
     { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_BYTE}, // GlPixelFormat::D_Unorm24_S8
 
 };
@@ -1651,10 +1650,10 @@ void GLDevice::debugCallback(GLenum source, GLenum type, GLuint id, GLenum sever
 #define CASE(NAME, COUNT, TYPE, NORMALIZED) \
         case Format::NAME: do { VertexAttributeFormat result = {COUNT, TYPE, NORMALIZED}; return result; } while (0)
 
-        CASE(RGBA_Float32, 4, GL_FLOAT, GL_FALSE);
-        CASE(RGB_Float32, 3, GL_FLOAT, GL_FALSE);
-        CASE(RG_Float32, 2, GL_FLOAT, GL_FALSE);
-        CASE(R_Float32, 1, GL_FLOAT, GL_FALSE);
+        CASE(R32G32B32A32_FLOAT, 4, GL_FLOAT, GL_FALSE);
+        CASE(R32G32B32_FLOAT, 3, GL_FLOAT, GL_FALSE);
+        CASE(R32G32_FLOAT, 2, GL_FLOAT, GL_FALSE);
+        CASE(R32_FLOAT, 1, GL_FLOAT, GL_FALSE);
 #undef CASE
     }
 }
