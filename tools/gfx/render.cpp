@@ -19,9 +19,9 @@ static bool debugLayerEnabled = false;
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Global Renderer Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-#define GFX_FORMAT_SIZE(name, size) uint8_t(size),
+#define GFX_FORMAT_SIZE(name, blockSizeInBytes, pixelsPerBlock) {blockSizeInBytes, pixelsPerBlock},
 
-static const uint8_t s_formatSize[] =
+static const uint32_t s_formatSizeInfo[][2] =
 {
     GFX_FORMAT(GFX_FORMAT_SIZE)
 };
@@ -32,7 +32,7 @@ static bool _checkFormat()
     Index count = 0;
 
     // Check the values are in the same order
-#define GFX_FORMAT_CHECK(name, size) count += Index(Index(Format::name) == value++);
+#define GFX_FORMAT_CHECK(name, blockSizeInBytes, pixelsPerblock) count += Index(Index(Format::name) == value++);
     GFX_FORMAT(GFX_FORMAT_CHECK)
 
     const bool r = (count == Index(Format::CountOf));
@@ -54,26 +54,113 @@ struct FormatInfoMap
             info.channelType = SLANG_SCALAR_TYPE_NONE;
         }
 
-        set(Format::RGBA_Float16, SLANG_SCALAR_TYPE_FLOAT16, 4);
-        set(Format::RG_Float16, SLANG_SCALAR_TYPE_FLOAT16, 2);
-        set(Format::R_Float16, SLANG_SCALAR_TYPE_FLOAT16, 1);
+        set(Format::R32G32B32A32_TYPELESS, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::R32G32B32_TYPELESS, SLANG_SCALAR_TYPE_UINT32, 3);
+        set(Format::R32G32_TYPELESS, SLANG_SCALAR_TYPE_UINT32, 2);
+        set(Format::R32_TYPELESS, SLANG_SCALAR_TYPE_UINT32, 1);
 
-        set(Format::RGBA_Float32, SLANG_SCALAR_TYPE_FLOAT32, 4);
-        set(Format::RGB_Float32, SLANG_SCALAR_TYPE_FLOAT32, 3);
-        set(Format::RG_Float32, SLANG_SCALAR_TYPE_FLOAT32, 2);
-        set(Format::R_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::R16G16B16A16_TYPELESS, SLANG_SCALAR_TYPE_UINT16, 4);
+        set(Format::R16G16_TYPELESS, SLANG_SCALAR_TYPE_UINT16, 2);
+        set(Format::R16_TYPELESS, SLANG_SCALAR_TYPE_UINT16, 1);
 
-        set(Format::R_UInt16, SLANG_SCALAR_TYPE_UINT16, 1);
-        set(Format::R_UInt32, SLANG_SCALAR_TYPE_UINT32, 1);
+        set(Format::R8G8B8A8_TYPELESS, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::R8G8_TYPELESS, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::R8_TYPELESS, SLANG_SCALAR_TYPE_UINT8, 1);
+        set(Format::B8G8R8A8_TYPELESS, SLANG_SCALAR_TYPE_UINT8, 4);
 
-        set(Format::D_Float32, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::R32G32B32A32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R32G32B32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::R32G32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::R16G16B16A16_FLOAT, SLANG_SCALAR_TYPE_FLOAT16, 4);
+        set(Format::R16G16_FLOAT, SLANG_SCALAR_TYPE_FLOAT16, 2);
+        set(Format::R16_FLOAT, SLANG_SCALAR_TYPE_FLOAT16, 1);
+
+        set(Format::R32G32B32A32_UINT, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::R32G32B32_UINT, SLANG_SCALAR_TYPE_UINT32, 3);
+        set(Format::R32G32_UINT, SLANG_SCALAR_TYPE_UINT32, 2);
+        set(Format::R32_UINT, SLANG_SCALAR_TYPE_UINT32, 1);
+
+        set(Format::R16G16B16A16_UINT, SLANG_SCALAR_TYPE_UINT16, 4);
+        set(Format::R16G16_UINT, SLANG_SCALAR_TYPE_UINT16, 2);
+        set(Format::R16_UINT, SLANG_SCALAR_TYPE_UINT16, 1);
+
+        set(Format::R8G8B8A8_UINT, SLANG_SCALAR_TYPE_UINT8, 4);
+        set(Format::R8G8_UINT, SLANG_SCALAR_TYPE_UINT8, 2);
+        set(Format::R8_UINT, SLANG_SCALAR_TYPE_UINT8, 1);
+
+        set(Format::R32G32B32A32_SINT, SLANG_SCALAR_TYPE_INT32, 4);
+        set(Format::R32G32B32_SINT, SLANG_SCALAR_TYPE_INT32, 3);
+        set(Format::R32G32_SINT, SLANG_SCALAR_TYPE_INT32, 2);
+        set(Format::R32_SINT, SLANG_SCALAR_TYPE_INT32, 1);
+
+        set(Format::R16G16B16A16_SINT, SLANG_SCALAR_TYPE_INT16, 4);
+        set(Format::R16G16_SINT, SLANG_SCALAR_TYPE_INT16, 2);
+        set(Format::R16_SINT, SLANG_SCALAR_TYPE_INT16, 1);
+
+        set(Format::R8G8B8A8_SINT, SLANG_SCALAR_TYPE_INT8, 4);
+        set(Format::R8G8_SINT, SLANG_SCALAR_TYPE_INT8, 2);
+        set(Format::R8_SINT, SLANG_SCALAR_TYPE_INT8, 1);
+
+        set(Format::R16G16B16A16_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R16G16_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R16_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::R8G8B8A8_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R8G8B8A8_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R8G8_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R8_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::B8G8R8A8_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+
+        set(Format::R16G16B16A16_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R16G16_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R16_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::R8G8B8A8_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R8G8_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 2);
+        set(Format::R8_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::D32_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 1);
+        set(Format::D16_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1);
+
+        set(Format::B4G4R4A4_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::B5G6R5_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::B5G5R5A1_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+
+        set(Format::R9G9B9E5_SHAREDEXP, SLANG_SCALAR_TYPE_FLOAT32, 3);
+        set(Format::R10G10B10A2_TYPELESS, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R10G10B10A2_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4);
+        set(Format::R10G10B10A2_UINT, SLANG_SCALAR_TYPE_UINT32, 4);
+        set(Format::R11G11B10_FLOAT, SLANG_SCALAR_TYPE_FLOAT32, 3);
+
+        set(Format::BC1_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC1_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC2_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC2_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC3_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC3_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC4_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 1, 4, 4);
+        set(Format::BC4_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 1, 4, 4);
+        set(Format::BC5_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 2, 4, 4);
+        set(Format::BC5_SNORM, SLANG_SCALAR_TYPE_FLOAT32, 2, 4, 4);
+        set(Format::BC6H_UF16, SLANG_SCALAR_TYPE_FLOAT32, 3, 4, 4);
+        set(Format::BC6H_SF16, SLANG_SCALAR_TYPE_FLOAT32, 3, 4, 4);
+        set(Format::BC7_UNORM, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
+        set(Format::BC7_UNORM_SRGB, SLANG_SCALAR_TYPE_FLOAT32, 4, 4, 4);
     }
 
-    void set(Format format, SlangScalarType type, Index channelCount)
+    void set(Format format, SlangScalarType type, Index channelCount, uint32_t blockWidth = 1, uint32_t blockHeight = 1)
     {
         FormatInfo& info = m_infos[Index(format)];
         info.channelCount = uint8_t(channelCount);
         info.channelType = uint8_t(type);
+
+        auto sizeInfo = s_formatSizeInfo[Index(format)];
+        info.blockSizeInBytes = sizeInfo[0];
+        info.pixelsPerBlock = sizeInfo[1];
+        info.blockWidth = blockWidth;
+        info.blockHeight = blockHeight;
     }
 
     const FormatInfo& get(Format format) const { return m_infos[Index(format)]; }
@@ -85,19 +172,61 @@ static const FormatInfoMap s_formatInfoMap;
 
 static void _compileTimeAsserts()
 {
-    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSize) == int(Format::CountOf));
+    SLANG_COMPILE_TIME_ASSERT(SLANG_COUNT_OF(s_formatSizeInfo) == int(Format::CountOf));
 }
 
 extern "C"
 {
-    size_t SLANG_MCALL gfxGetFormatSize(Format format)
+    SLANG_GFX_API bool gfxIsCompressedFormat(Format format)
     {
-        return s_formatSize[int(format)];
+        switch (format)
+        {
+        case Format::BC1_UNORM:
+        case Format::BC1_UNORM_SRGB:
+        case Format::BC2_UNORM:
+        case Format::BC2_UNORM_SRGB:
+        case Format::BC3_UNORM:
+        case Format::BC3_UNORM_SRGB:
+        case Format::BC4_UNORM:
+        case Format::BC4_SNORM:
+        case Format::BC5_UNORM:
+        case Format::BC5_SNORM:
+        case Format::BC6H_UF16:
+        case Format::BC6H_SF16:
+        case Format::BC7_UNORM:
+        case Format::BC7_UNORM_SRGB:
+            return true;
+        default:
+            return false;
+        }
     }
 
-    SLANG_GFX_API FormatInfo gfxGetFormatInfo(Format format)
+    SLANG_GFX_API bool gfxIsTypelessFormat(Format format)
     {
-        return s_formatInfoMap.get(format);
+        switch (format)
+        {
+        case Format::R32G32B32A32_TYPELESS:
+        case Format::R32G32B32_TYPELESS:
+        case Format::R32G32_TYPELESS:
+        case Format::R32_TYPELESS:
+        case Format::R16G16B16A16_TYPELESS:
+        case Format::R16G16_TYPELESS:
+        case Format::R16_TYPELESS:
+        case Format::R8G8B8A8_TYPELESS:
+        case Format::R8G8_TYPELESS:
+        case Format::R8_TYPELESS:
+        case Format::B8G8R8A8_TYPELESS:
+        case Format::R10G10B10A2_TYPELESS:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    SLANG_GFX_API SlangResult gfxGetFormatInfo(Format format, FormatInfo* outInfo)
+    {
+        *outInfo = s_formatInfoMap.get(format);
+        return SLANG_OK;
     }
 
     SlangResult _createDevice(const IDevice::Desc* desc, IDevice** outDevice)

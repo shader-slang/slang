@@ -97,11 +97,6 @@ struct FileTestList
     List<TestDetails> tests;
 };
 
-enum class SpawnType
-{
-    UseExe,
-    UseSharedLibrary,
-};
 
 struct TestInput
 {
@@ -531,6 +526,8 @@ static SlangResult _gatherTestsForFile(
     return SLANG_OK;
 }
 
+
+
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
@@ -549,6 +546,7 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
     }
     return res;
 }
+
 
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
@@ -619,6 +617,44 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
     return SLANG_FAIL;
 }
 
+
+Result spawnAndWaitProxy(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    // Get the name of the thing to execute
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+
+    if (exeName == "slangc")
+    {
+        // If the test is slangc there is a command line version we can just directly use
+        //return spawnAndWaitExe(context, testPath, inCmdLine, outRes);
+        return spawnAndWaitSharedLibrary(context, testPath, inCmdLine, outRes);
+    }
+
+    CommandLine cmdLine(inCmdLine);
+
+    // Make the first arg the name of the tool to invoke
+    cmdLine.m_args.insert(0, exeName);
+
+    auto exePath = Path::combine(Path::getParentDirectory(inCmdLine.m_executable), String("test-proxy") + ProcessUtil::getExecutableSuffix());
+    cmdLine.setExecutablePath(exePath);
+
+    const auto& options = context->options;
+    if (options.shouldBeVerbose)
+    {
+        String commandLine = ProcessUtil::getCommandLineString(cmdLine);
+        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
+    }
+
+    // Execute
+    Result res = ProcessUtil::execute(cmdLine, outRes);
+    if (SLANG_FAILED(res))
+    {
+        //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
+        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
+    }
+
+    return res;
+}
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
 {
@@ -970,6 +1006,11 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         case SpawnType::UseSharedLibrary:
         {
             spawnResult = spawnAndWaitSharedLibrary(context, testPath, cmdLine, outExeRes);
+            break;
+        }
+        case SpawnType::UseProxy:
+        {
+            spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -2880,8 +2921,6 @@ TestResult runTest(
         return TestResult::Pass;
     }
 
-    const SpawnType defaultSpawnType = context->options.useExes ? SpawnType::UseExe : SpawnType::UseSharedLibrary;
-
     auto testInfo = _findTestCommandInfoByCommand(testOptions.command.getUnownedSlice());
 
     if (testInfo)
@@ -2890,7 +2929,7 @@ TestResult runTest(
         testInput.filePath = filePath;
         testInput.outputStem = outputStem;
         testInput.testOptions = &testOptions;
-        testInput.spawnType = defaultSpawnType;
+        testInput.spawnType = context->options.defaultSpawnType;
 
         return testInfo->callback(context, testInput);
     }
@@ -3346,8 +3385,18 @@ static void _disableCPPBackends(TestContext* context)
     }
 }
 
+static TestResult _asTestResult(ToolReturnCode retCode)
+{
+    switch (retCode)
+    {
+        default:                        return TestResult::Fail;
+        case ToolReturnCode::Success:   return TestResult::Pass;
+        case ToolReturnCode::Ignored:   return TestResult::Ignored;
+    }
+}
+
     /// Loads a DLL containing unit test functions and run them one by one.
-static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, const char* moduleName)
+static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOptions, SpawnType spawnType, const char* moduleName)
 {
     SharedLibrary::Handle moduleHandle;
     SLANG_RETURN_ON_FAIL(SharedLibrary::load(
@@ -3368,6 +3417,9 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
     auto testCount = testModule->getTestCount();
+
+    TestReporter* reporter = TestReporter::get();
+
     for (SlangInt i = 0; i < testCount; i++)
     {
         auto testFunc = testModule->getTestFunc(i);
@@ -3382,9 +3434,50 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                TestReporter::get()->startTest(testOptions.command.getBuffer());
-                testFunc(&unitTestContext);
-                TestReporter::get()->endTest();
+                if (spawnType == SpawnType::UseProxy)
+                {
+                    CommandLine cmdLine;
+
+                    // The 'command' is the module 
+                    cmdLine.setExecutablePath(Path::combine(context->exeDirectoryPath, moduleName));
+
+                    // Pass the test name / index
+                    cmdLine.addArg(testName);
+
+                    {
+                        StringBuilder buf;
+                        buf << i;
+                        cmdLine.addArg(buf.ProduceString());
+                    }
+
+                    // Pass the enabled apis
+                    {
+                        StringBuilder buf;
+                        buf << context->options.enabledApis;
+                        cmdLine.addArg(buf.ProduceString());
+                    }
+
+                    {
+                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
+                        ExecuteResult exeRes;
+
+                        const auto testResult = _asTestResult(spawnAndWait(context, filePath, spawnType, cmdLine, exeRes));
+
+                        // If the test fails, output any output - which might give information about individual tests that have failed.
+                        if (testResult == TestResult::Fail)
+                        {
+                            String output = getOutput(exeRes);
+                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
+                        }
+
+                        reporter->addResult(testResult);
+                    }
+                }
+                else
+                {
+                    TestReporter::TestScope scopeTest(reporter, testOptions.command);
+                    testFunc(&unitTestContext);
+                }
             }
         }
     }
@@ -3570,13 +3663,15 @@ SlangResult innerMain(int argc, char** argv)
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, "slang-unit-test-tool");
+                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "slang-unit-test-tool");
             }
+            
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, "gfx-unit-test-tool");
+                runUnitTestModule(&context, testOptions, SpawnType::UseProxy, "gfx-unit-test-tool");
             }
+
             TestReporter::set(nullptr);
         }
 

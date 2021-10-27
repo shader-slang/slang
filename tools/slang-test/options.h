@@ -36,6 +36,13 @@ protected:
     Slang::Dictionary<Slang::String, Slang::RefPtr<TestCategory> > m_categoryMap;
 };
 
+enum class SpawnType
+{
+    UseExe,
+    UseSharedLibrary,
+    UseProxy,
+};
+
 struct Options
 {
     char const* appName = "slang-test";
@@ -69,9 +76,13 @@ struct Options
     // integration builds.
     bool dumpOutputOnFailure = false;
 
-    // If set, will force using of executables (not shared library) for tests
-    bool useExes = false;
-
+    // Set the default spawn type to use
+    // Set to SpawnType::UseProxy, if isolation of test execution is desired.
+    // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
+    // desirable default usually.
+    SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
+    //SpawnType defaultSpawnType = SpawnType::UseProxy;
+    
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;
 

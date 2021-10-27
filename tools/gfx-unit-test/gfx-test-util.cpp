@@ -77,6 +77,21 @@ namespace gfx_test
         SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
     }
 
+    void compareComputeResultFuzzy(gfx::IDevice* device, gfx::IBufferResource* buffer, float* expectedResult, size_t expectedBufferSize)
+    {
+        // Read back the results.
+        ComPtr<ISlangBlob> resultBlob;
+        GFX_CHECK_CALL_ABORT(device->readBufferResource(
+            buffer, 0, expectedBufferSize, resultBlob.writeRef()));
+        SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
+        // Compare results with a tolerance of 0.01.
+        auto result = (float*)resultBlob->getBufferPointer();
+        for (int i = 0; i < expectedBufferSize / sizeof(float); ++i)
+        {
+            SLANG_CHECK(abs(result[i] - expectedResult[i]) <= 0.01);
+        }
+    }
+
     Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
     {
         Slang::ComPtr<gfx::IDevice> device;

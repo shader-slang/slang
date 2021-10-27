@@ -756,6 +756,13 @@ end
  
      links { "compiler-core", "core" }
  
+ 
+ tool "test-proxy"
+     uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
+     includedirs { "." }
+ 
+     links { "compiler-core", "core", "slang" }
+ 
  --
  -- `slang-generate` is a tool we use for source code generation on
  -- the compiler. It depends on the `core` library, so we need to
@@ -1304,6 +1311,22 @@ end
      -- which produces the appropriate source
  
      dependson { "run-generators" }
+ 
+     -- If we have slang-llvm copy it
+     local slangLLVMPath = deps:getProjectRelativePath("slang-llvm", "../../..")
+     
+     if slangLLVMPath then
+     
+        filter { "system:windows" }
+             postbuildcommands {
+                 "{COPY} " .. slangLLVMPath .."/bin/" .. targetName .. "/release/slang-llvm.dll %{cfg.targetdir}"
+             }
+ 
+         filter { "system:linux" }
+             postbuildcommands {
+                 "{COPY} " .. slangLLVMPath .. "/bin/" .. targetName .. "/release/libslang-llvm.so %{cfg.targetdir}"
+             }
+     end
  
      -- If we are not building glslang from source, then be
      -- sure to copy a binary copy over to the output directory
