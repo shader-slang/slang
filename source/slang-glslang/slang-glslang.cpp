@@ -399,14 +399,18 @@ static void glslang_optimizeSPIRV(spv_target_env targetEnv, const glslang_Compil
 
     spvOptOptions.set_run_validator(false); // Don't run the validator by default
 
-    // Put the output optimized spirv into optSpirv
-    std::vector<unsigned int> optSpirv;
+    {
+        // Put the output optimized spirv into optSpirv
+        std::vector<unsigned int> optSpirv;
 
-    // Optimize
-    optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions);
-
-    // Make the ioSpirv the optimized spirv
-    ioSpirv.swap(optSpirv);
+        // Optimize
+        if (optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
+        {
+            assert(optSpirv.size() > 0);
+            // Make the ioSpirv the optimized spirv
+            ioSpirv.swap(optSpirv);
+        }
+    }
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(int majorVersion, int minorVersion)
