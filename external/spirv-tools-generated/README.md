@@ -7,6 +7,12 @@ To build spirv-tools we need [cmake](https://cmake.org/download/). On windows we
 
 Inside the `external/spirv-tools` directory make a directory `build.vs` which is where we are going to generate all the files.
 
+Make sure that there is a suitable version of spirv-headers in `external/spirv-tools/external`. First delete one if its there, and then from the `external/spirv-tools` directory do. 
+
+```
+git clone https://github.com/KhronosGroup/SPIRV-Headers.git external/spirv-headers
+```
+
 You may need to make sure you have the other dependencies that spirv-tools requires as described on their github main page...
 
 https://github.com/KhronosGroup/SPIRV-Tools
@@ -14,7 +20,6 @@ https://github.com/KhronosGroup/SPIRV-Tools
 At the time of writing in `external/spirv-tools` the following were needed
 
 ```
-git clone https://github.com/KhronosGroup/SPIRV-Headers.git external/spirv-headers
 git clone https://github.com/google/effcee.git external/effcee
 git clone https://github.com/google/re2.git external/re2
 ```
@@ -23,4 +28,5 @@ Next run the cmake gui. Set the source path to be `external/spirv-tools` (in the
 
 Now go into to the `build.vs` directory and open `spirv-tools.sln` with Visual Studio and compile. This will generate many of the files needed, once regular C++/C compilation has started all of the files should have been created. 
 
-Take the files with '.inc' and '.h' extensions from the build.vs directory and copy it into this directory.
+Delete all the '.inc' and '.h' files in this directory.
+Now copy the files with '.inc' and '.h' extensions from the build.vs directory and copy it into this directory.
