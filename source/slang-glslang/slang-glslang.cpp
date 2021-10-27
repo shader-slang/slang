@@ -640,13 +640,6 @@ static int glslang_compileGLSLToSPIRV(const glslang_CompileRequest_1_1& request)
             {
                 for (const auto& diag : optDiags)
                 {
-                    // TODO(JS):
-                    // Hack to stop CapabilityRayTracingMotionBlurNV outputting an error
-                    if (diag.level == SPV_MSG_ERROR && diag.message == "Invalid capability operand: 5341")
-                    {
-                        continue;
-                    }
-
                     // Count the number of errors
                     optErrorCount += int(diag.level <= SPV_MSG_ERROR);
 
