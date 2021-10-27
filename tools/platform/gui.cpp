@@ -102,9 +102,9 @@ GUI::GUI(
     program = device->createProgram(programDesc);
 #endif
     InputElementDesc inputElements[] = {
-        {"U", 0, Format::RG_Float32,        offsetof(ImDrawVert, pos) },
-        {"U", 1, Format::RG_Float32,        offsetof(ImDrawVert, uv) },
-        {"U", 2, Format::RGBA_Unorm_UInt8,  offsetof(ImDrawVert, col) },
+        {"U", 0, Format::R32G32_FLOAT,        offsetof(ImDrawVert, pos) },
+        {"U", 1, Format::R32G32_FLOAT,        offsetof(ImDrawVert, uv) },
+        {"U", 2, Format::R8G8B8A8_UNORM,  offsetof(ImDrawVert, col) },
     };
     auto inputLayout = device->createInputLayout(
         &inputElements[0],
@@ -141,7 +141,7 @@ GUI::GUI(
     {
         gfx::ITextureResource::Desc desc = {};
         desc.type = IResource::Type::Texture2D;
-        desc.format = Format::RGBA_Unorm_UInt8;
+        desc.format = Format::R8G8B8A8_UNORM;
         desc.arraySize = 0;
         desc.size.width = width;
         desc.size.height = height;
@@ -289,7 +289,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
     renderEncoder->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
     renderEncoder->setIndexBuffer(
-        indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R_UInt16 : Format::R_UInt32);
+        indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
     UInt vertexOffset = 0;

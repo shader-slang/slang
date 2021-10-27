@@ -3800,10 +3800,10 @@ public:
             {
                 switch (indexFormat)
                 {
-                case Format::R_UInt16:
+                case Format::R16_UINT:
                     m_boundIndexFormat = VK_INDEX_TYPE_UINT16;
                     break;
-                case Format::R_UInt32:
+                case Format::R32_UINT:
                     m_boundIndexFormat = VK_INDEX_TYPE_UINT32;
                     break;
                 default:
@@ -5026,7 +5026,7 @@ public:
             List<VkFormat> formats;
             formats.add(VulkanUtil::getVkFormat(desc.format));
             // HACK! To check for a different format if couldn't be found
-            if (desc.format == Format::RGBA_Unorm_UInt8)
+            if (desc.format == Format::R8G8B8A8_UNORM)
             {
                 formats.add(VK_FORMAT_B8G8R8A8_UNORM);
             }
@@ -5047,10 +5047,10 @@ public:
 
             // Save the desc
             m_desc = desc;
-            if (m_desc.format == Format::RGBA_Unorm_UInt8 &&
+            if (m_desc.format == Format::R8G8B8A8_UNORM &&
                 m_vkformat == VK_FORMAT_B8G8R8A8_UNORM)
             {
-                m_desc.format = Format::BGRA_Unorm_UInt8;
+                m_desc.format = Format::B8G8R8A8_UNORM;
             }
 
             SLANG_RETURN_ON_FAIL(createSwapchainAndImages());
@@ -5763,7 +5763,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool us
             deviceExtensions.add(VK_KHR_SHADER_SUBGROUP_EXTENDED_TYPES_EXTENSION_NAME);
             m_features.add("shader-subgroup-extended-types");
         }
-
         if (extendedFeatures.accelerationStructureFeatures.accelerationStructure)
         {
             extendedFeatures.accelerationStructureFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -5781,7 +5780,6 @@ Result VKDevice::initVulkanInstanceAndDevice(const NativeHandle handles, bool us
             m_features.add("ray-query");
             m_features.add("ray-tracing");
         }
-
         if (extendedFeatures.bufferDeviceAddressFeatures.bufferDeviceAddress)
         {
             extendedFeatures.bufferDeviceAddressFeatures.pNext = (void*)deviceCreateInfo.pNext;
@@ -6373,17 +6371,16 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
 
 size_t calcRowSize(Format format, int width)
 {
-    size_t pixelSize = gfxGetFormatSize(format);
-    if (pixelSize == 0)
-    {
-        return 0;
-    }
-    return size_t(pixelSize * width);
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
 }
 
 size_t calcNumRows(Format format, int height)
 {
-    return (size_t)height;
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
 
 Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
@@ -6516,6 +6513,8 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
 
             uint8_t* dstData;
             m_api.vkMapMemory(m_device, uploadBuffer.m_memory, 0, bufferSize, 0, (void**)&dstData);
+            uint8_t* dstDataStart;
+            dstDataStart = dstData;
 
             size_t dstSubresourceOffset = 0;
             for (int i = 0; i < arraySize; ++i)
@@ -6822,6 +6821,8 @@ Result VKDevice::createSamplerState(ISamplerState::Desc const& desc, ISamplerSta
     samplerInfo.compareEnable = desc.reductionOp == TextureReductionOp::Comparison;
     samplerInfo.compareOp = translateComparisonFunc(desc.comparisonFunc);
     samplerInfo.mipmapMode = translateMipFilterMode(desc.mipFilter);
+    samplerInfo.minLod = Math::Max(0.0f, desc.minLOD);
+    samplerInfo.maxLod = Math::Clamp(desc.maxLOD, samplerInfo.minLod, VK_LOD_CLAMP_NONE);
 
     VkSampler sampler;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateSampler(m_device, &samplerInfo, nullptr, &sampler));
@@ -6840,7 +6841,7 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     VkImageViewCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     createInfo.flags = 0;
-    createInfo.format = resourceImpl->m_vkformat;
+    createInfo.format = gfxIsTypelessFormat(texture->getDesc()->format) ? VulkanUtil::getVkFormat(desc.format) : resourceImpl->m_vkformat;
     createInfo.image = resourceImpl->m_image;
     createInfo.components = VkComponentMapping{ VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A };
     bool isArray = resourceImpl->getDesc()->arraySize != 0;
@@ -7013,7 +7014,9 @@ Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numEle
 
         dstDesc.offset = uint32_t(srcDesc.offset);
 
-        const size_t elementSize = gfxGetFormatSize(srcDesc.format);
+        FormatInfo sizeInfo;
+        gfxGetFormatInfo(srcDesc.format, &sizeInfo);
+        const size_t elementSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
         assert(elementSize > 0);
         const size_t endElement = srcDesc.offset + elementSize;
 

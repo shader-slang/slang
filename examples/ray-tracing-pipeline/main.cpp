@@ -352,10 +352,10 @@ Slang::Result initialize()
         geomDesc.type = IAccelerationStructure::GeometryType::Triangles;
         geomDesc.content.triangles.indexCount = kIndexCount;
         geomDesc.content.triangles.indexData = gIndexBuffer->getDeviceAddress();
-        geomDesc.content.triangles.indexFormat = Format::R_UInt32;
+        geomDesc.content.triangles.indexFormat = Format::R32_UINT;
         geomDesc.content.triangles.vertexCount = kVertexCount;
         geomDesc.content.triangles.vertexData = gVertexBuffer->getDeviceAddress();
-        geomDesc.content.triangles.vertexFormat = Format::RGB_Float32;
+        geomDesc.content.triangles.vertexFormat = Format::R32G32B32_FLOAT;
         geomDesc.content.triangles.vertexStride = sizeof(Vertex);
         geomDesc.content.triangles.transform3x4 = gTransformBuffer->getDeviceAddress();
         accelerationStructureBuildInputs.geometryDescs = &geomDesc;
@@ -505,7 +505,7 @@ Slang::Result initialize()
         return SLANG_FAIL;
 
     InputElementDesc inputElements[] = {
-        {"POSITION", 0, Format::RG_Float32, offsetof(FullScreenTriangle::Vertex, position)},
+        {"POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position)},
     };
     auto inputLayout = gDevice->createInputLayout(&inputElements[0], SLANG_COUNT_OF(inputElements));
     if (!inputLayout)
@@ -554,7 +554,7 @@ void createResultTexture()
     resultTextureDesc.size.height = windowHeight;
     resultTextureDesc.size.depth = 1;
     resultTextureDesc.defaultState = ResourceState::UnorderedAccess;
-    resultTextureDesc.format = Format::RGBA_Float16;
+    resultTextureDesc.format = Format::R16G16B16A16_FLOAT;
     gResultTexture = gDevice->createTextureResource(resultTextureDesc);
     IResourceView::Desc resultUAVDesc = {};
     resultUAVDesc.format = resultTextureDesc.format;

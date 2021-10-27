@@ -282,7 +282,7 @@ Result initialize()
     gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { handleEvent(e); };
 
     InputElementDesc inputElements[] = {
-        { "POSITION", 0, Format::RG_Float32, offsetof(FullScreenTriangle::Vertex, position) },
+        { "POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position) },
     };
     auto inputLayout = gDevice->createInputLayout(
         &inputElements[0],

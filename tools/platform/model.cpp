@@ -125,7 +125,7 @@ ComPtr<ITextureResource> loadTextureImage(
     default:
         return nullptr;
 
-    case 4: format = Format::RGBA_Unorm_UInt8;
+    case 4: format = Format::R8G8B8A8_UNORM;
 
     // TODO: handle other cases here if/when we stop forcing 4-component
     // results when loading the image with stb_image.

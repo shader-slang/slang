@@ -169,21 +169,21 @@ struct CPUFormatInfoMap
     {
         memset(m_infos, 0, sizeof(m_infos));
 
-        set(Format::RGBA_Float32, &_unpackFloatTexel<4>);
-        set(Format::RGB_Float32, &_unpackFloatTexel<3>);
+        set(Format::R32G32B32A32_FLOAT, &_unpackFloatTexel<4>);
+        set(Format::R32G32B32_FLOAT, &_unpackFloatTexel<3>);
 
-        set(Format::RG_Float32, &_unpackFloatTexel<2>);
-        set(Format::R_Float32, &_unpackFloatTexel<1>);
+        set(Format::R32G32_FLOAT, &_unpackFloatTexel<2>);
+        set(Format::R32_FLOAT, &_unpackFloatTexel<1>);
 
-        set(Format::RGBA_Float16, &_unpackFloat16Texel<4>);
-        set(Format::RG_Float16, &_unpackFloat16Texel<2>);
-        set(Format::R_Float16, &_unpackFloat16Texel<1>);
+        set(Format::R16G16B16A16_FLOAT, &_unpackFloat16Texel<4>);
+        set(Format::R16G16_FLOAT, &_unpackFloat16Texel<2>);
+        set(Format::R16_FLOAT, &_unpackFloat16Texel<1>);
 
-        set(Format::RGBA_Unorm_UInt8, &_unpackUnorm8Texel<4>);
-        set(Format::BGRA_Unorm_UInt8, &_unpackUnormBGRA8Texel);
-        set(Format::R_UInt16, &_unpackUInt16Texel<1>);
-        set(Format::R_UInt32, &_unpackUInt32Texel<1>);
-        set(Format::D_Float32, &_unpackFloatTexel<1>);
+        set(Format::R8G8B8A8_UNORM, &_unpackUnorm8Texel<4>);
+        set(Format::B8G8R8A8_UNORM, &_unpackUnormBGRA8Texel);
+        set(Format::R16_UINT, &_unpackUInt16Texel<1>);
+        set(Format::R32_UINT, &_unpackUInt32Texel<1>);
+        set(Format::D32_FLOAT, &_unpackFloatTexel<1>);
     }
 
     void set(Format format, CPUTextureUnpackFunc func)
@@ -233,8 +233,10 @@ public:
         // the block extents would be 1 along each axis.
         //
         auto format = desc.format;
-        auto texelSize = gfxGetFormatSize(format);
-        m_texelSize = (int32_t) texelSize;
+        FormatInfo texelInfo;
+        gfxGetFormatInfo(format, &texelInfo);
+        uint32_t texelSize = uint32_t(texelInfo.blockSizeInBytes / texelInfo.pixelsPerBlock);
+        m_texelSize = texelSize;
 
         int32_t formatBlockSize[kMaxRank] = { 1, 1, 1 };
 
@@ -353,7 +355,7 @@ public:
     CPUTextureBaseShapeInfo const* m_baseShape;
     CPUTextureFormatInfo const* m_formatInfo;
     int32_t m_effectiveArrayElementCount = 0;
-    int32_t m_texelSize = 0;
+    uint32_t m_texelSize = 0;
 
     struct MipLevel
     {

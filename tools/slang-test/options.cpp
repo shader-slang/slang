@@ -125,9 +125,9 @@ static bool _isSubCommand(const char* arg)
             }
             optionsOut->binDir = *argCursor++;
         }
-        else if (strcmp(arg, "-useexes") == 0)
+        else if (strcmp(arg, "-use-test-proxy") == 0)
         {
-            optionsOut->useExes = true;
+            optionsOut->defaultSpawnType = SpawnType::UseProxy;
         }
         else if (strcmp(arg, "-v") == 0)
         {

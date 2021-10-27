@@ -22,7 +22,7 @@ namespace gfx_test
         desc.size.height = 1;
         desc.size.depth = 1;
         desc.defaultState = ResourceState::UnorderedAccess;
-        desc.format = Format::RGBA_Float16;
+        desc.format = Format::R16G16B16A16_FLOAT;
 
         Slang::ComPtr<ITextureResource> buffer;
         buffer = device->createTextureResource(desc);

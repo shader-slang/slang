@@ -1362,29 +1362,31 @@ public:
             
             switch (desc.format)
             {
-            case Format::RGBA_Float32:
-            case Format::RGB_Float32:
-            case Format::RG_Float32:
-            case Format::R_Float32:
-            case Format::D_Float32:
+            case Format::R32G32B32A32_FLOAT:
+            case Format::R32G32B32_FLOAT:
+            case Format::R32G32_FLOAT:
+            case Format::R32_FLOAT:
+            case Format::D32_FLOAT:
                 {
-                    const FormatInfo info = gfxGetFormatInfo(desc.format);
+                    FormatInfo info;
+                    gfxGetFormatInfo(desc.format, &info);
                     format = CU_AD_FORMAT_FLOAT;
                     numChannels = info.channelCount;
                     elementSize = sizeof(float) * numChannels;
                     break;
                 }
-            case Format::RGBA_Float16:
-            case Format::RG_Float16:
-            case Format::R_Float16:
+            case Format::R16G16B16A16_FLOAT:
+            case Format::R16G16_FLOAT:
+            case Format::R16_FLOAT:
                 {
-                    const FormatInfo info = gfxGetFormatInfo(desc.format);
+                    FormatInfo info;
+                    gfxGetFormatInfo(desc.format, &info);
                     format = CU_AD_FORMAT_HALF;
                     numChannels = info.channelCount;
                     elementSize = sizeof(uint16_t) * numChannels;
                     break;
                 }
-            case Format::RGBA_Unorm_UInt8:
+            case Format::R8G8B8A8_UNORM:
                 {
                     format = CU_AD_FORMAT_UNSIGNED_INT8;
                     numChannels = 4;
@@ -1393,7 +1395,7 @@ public:
                 }
             default:
                 {
-                    SLANG_ASSERT(!"Only support R_Float32/RGBA_Unorm_UInt8 formats for now");
+                    SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");
                     return SLANG_FAIL;
                 }
             }
