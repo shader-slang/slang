@@ -4516,6 +4516,8 @@ void TraceRay(
 // NOTE!
 // The name of the following functions may change when DXR supports
 // a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
+//
+// https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
 
 void TraceMotionRay<payload_t>(
     RaytracingAccelerationStructure AccelerationStructure,
