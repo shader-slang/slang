@@ -484,7 +484,7 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
             StringSlicePool pool(StringSlicePool::Style::Empty);
 
             // We are going to search the paths in order 
-            for (const auto path : paths)
+            for (const auto& path : paths)
             {
                 // PATH can have the same path multiple times. If we have already searched this path, we don't need to again
                 if (!pool.has(path))
