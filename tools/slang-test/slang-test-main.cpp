@@ -3685,14 +3685,11 @@ SlangResult innerMain(int argc, char** argv)
                 runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "slang-unit-test-tool");
             }
 
-            // TODO(JS): Temporarily disable gfx unit tests, as some tests are failing for unknown reasons.
-#if 0
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 runUnitTestModule(&context, testOptions, SpawnType::UseProxy, "gfx-unit-test-tool");
             }
-#endif
 
             TestReporter::set(nullptr);
         }
