@@ -3690,7 +3690,7 @@ SlangResult innerMain(int argc, char** argv)
                 testOptions.categories.add(unitTestCategory);
                 runUnitTestModule(&context, testOptions, SpawnType::UseProxy, "gfx-unit-test-tool");
             }
-
+             
             TestReporter::set(nullptr);
         }
 
