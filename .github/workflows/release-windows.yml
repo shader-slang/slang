@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         configuration: ['Release']
-        platform: ['Win32', 'x64', 'aarch64']
+        platform: ['Win32', 'x64']
     steps:
       - uses: actions/checkout@v2.3.4
         with:
