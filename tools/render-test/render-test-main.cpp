@@ -1358,7 +1358,7 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
         
         desc.nvapiExtnSlot = int(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
-
+        desc.slang.targetProfile = options.profileName.getBuffer();
         {
             SlangResult res = gfxCreateDevice(&desc, device.writeRef());
             if (SLANG_FAILED(res))

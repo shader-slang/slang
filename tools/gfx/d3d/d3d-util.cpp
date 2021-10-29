@@ -609,6 +609,31 @@ bool D3DUtil::isUAVBinding(slang::BindingType bindingType)
     }
 }
 
+int D3DUtil::getShaderModelFromProfileName(const char* name)
+{
+    UnownedStringSlice nameSlice(name);
+
+    if (nameSlice.endsWith("5_1"))
+        return D3D_SHADER_MODEL_5_1;
+    if (nameSlice.endsWith("6_0"))
+        return D3D_SHADER_MODEL_6_0;
+    if (nameSlice.endsWith("6_1"))
+        return D3D_SHADER_MODEL_6_1;
+    if (nameSlice.endsWith("6_2"))
+        return D3D_SHADER_MODEL_6_2;
+    if (nameSlice.endsWith("6_3"))
+        return D3D_SHADER_MODEL_6_3;
+    if (nameSlice.endsWith("6_4"))
+        return D3D_SHADER_MODEL_6_4;
+    if (nameSlice.endsWith("6_5"))
+        return D3D_SHADER_MODEL_6_5;
+    if (nameSlice.endsWith("6_6"))
+        return D3D_SHADER_MODEL_6_6;
+    if (nameSlice.endsWith("6_7"))
+        return 0x67;
+    return 0;
+}
+
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     Slang::String lowerAdapterName = Slang::String(adapterName).toLower();

@@ -1,7 +1,7 @@
 //TEST_CATEGORY(wave, compute)
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj -render-feature hardware-device
 // Disabled on VK because glsl can't do WaveReadLaneAt on matrix. 
 //DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0 -shaderobj
