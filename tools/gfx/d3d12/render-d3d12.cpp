@@ -4474,10 +4474,52 @@ Result D3D12Device::initialize(const Desc& desc)
     m_device->QueryInterface<ID3D12Device5>(m_deviceInfo.m_device5.writeRef());
     m_device5 = m_deviceInfo.m_device5.get();
 #endif
+    // Check shader model version.
+    SlangCompileTarget compileTarget = SLANG_DXBC;
+    const char* profileName = "sm_5_1";
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
+    if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))))
+    {
+        switch (shaderModelData.HighestShaderModel)
+        {
+        case D3D_SHADER_MODEL_5_1:
+            compileTarget = SLANG_DXBC;
+            profileName = "sm_5_1";
+            break;
+        case D3D_SHADER_MODEL_6_0:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_0";
+            break;
+        case D3D_SHADER_MODEL_6_1:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_1";
+            break;
+        case D3D_SHADER_MODEL_6_2:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_2";
+            break;
+        case D3D_SHADER_MODEL_6_3:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_3";
+            break;
+        case D3D_SHADER_MODEL_6_4:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_4";
+            break;
+        case D3D_SHADER_MODEL_6_5:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_5";
+            break;
+        default:
+            compileTarget = SLANG_DXIL;
+            profileName = "sm_6_6";
+            break;
+        }
+    }
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
-        m_device5 ? SLANG_DXIL : SLANG_DXBC,
-        m_device5 ? "sm_6_5" : "sm_5_1",
+        compileTarget,
+        profileName,
         makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
     m_isInitialized = true;
