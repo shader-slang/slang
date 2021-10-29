@@ -4234,8 +4234,9 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
     outDeviceInfo.m_dxgiFactory = dxgiFactory;
     outDeviceInfo.m_adapter = adapter;
     outDeviceInfo.m_isWarp = D3DUtil::isWarp(dxgiFactory, adapter);
+    const UINT kMicrosoftVendorId = 5140;
     outDeviceInfo.m_isSoftware = outDeviceInfo.m_isWarp || ((outDeviceInfo.m_desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0)
-        || outDeviceInfo.m_desc.VendorId == 5140;
+        || outDeviceInfo.m_desc.VendorId == kMicrosoftVendorId;
 
     return SLANG_OK;
 }
