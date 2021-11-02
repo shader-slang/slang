@@ -63,7 +63,7 @@ jobs:
           7z a "$binArchive" slang-com-helper.h
           7z a "$binArchive" slang-com-ptr.h
           7z a "$binArchive" slang-tag-version.h
-          7z a "$srcArchive" slang-gfx.h
+          7z a "$binArchive" slang-gfx.h
           7z a "$binArchive" prelude\*.h
           7z a "$binArchive" bin\*\*\slang.dll
           7z a "$binArchive" bin\*\*\slang.lib
