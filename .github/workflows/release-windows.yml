@@ -70,6 +70,7 @@ jobs:
           7z a "$binArchive" bin\*\*\slang-glslang.dll
           7z a "$binArchive" bin\*\*\slang-llvm.dll
           7z a "$binArchive" bin\*\*\gfx.dll
+          7z a "$binArchive" bin\*\*\gfx.lib
           7z a "$binArchive" bin\*\*\slangc.exe
           7z a "$binArchive" docs\*.md
 
