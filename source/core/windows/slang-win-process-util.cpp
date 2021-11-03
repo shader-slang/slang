@@ -3,6 +3,11 @@
 
 #include "../slang-string.h"
 #include "../slang-string-escape-util.h"
+#include "../slang-string-util.h"
+
+#include "../../../slang-com-helper.h"
+
+#include "slang-win-stream.h"
 
 #ifdef _WIN32
 // Include Windows header in a way that minimized namespace pollution.
@@ -29,50 +34,105 @@ struct ThreadInfo
     String	output;
 };
 
-// Has behavior very similar to unique_ptr - assignment is a move.
-class WinHandle
+} // anonymous
+
+class WinProcess : public Process
 {
 public:
-        /// Detach the encapsulated handle. Returns the handle (which now must be externally handled) 
-    HANDLE detach() { HANDLE handle = m_handle; m_handle = nullptr; return handle; }
 
-        /// Return as a handle
-    operator HANDLE() const { return m_handle; }
+    virtual bool isTerminated() SLANG_OVERRIDE;
+    virtual void waitForTermination() SLANG_OVERRIDE;
 
-        /// Assign
-    void operator=(HANDLE handle) { setNull(); m_handle = handle; }
-    void operator=(WinHandle&& rhs) { HANDLE handle = m_handle; m_handle = rhs.m_handle; rhs.m_handle = handle; }
-
-        /// Get ready for writing 
-    SLANG_FORCE_INLINE HANDLE* writeRef() { setNull(); return &m_handle; }
-        /// Get for read access
-    SLANG_FORCE_INLINE const HANDLE* readRef() const { return &m_handle; }
-
-    void setNull()
+    WinProcess(HANDLE handle, Stream*const* streams) :
+        m_processHandle(handle)
     {
-        if (m_handle)
+        for (Index i = 0; i < Index(Process::StreamType::CountOf); ++i)
         {
-            CloseHandle(m_handle);
-            m_handle = nullptr;
+            m_streams[i] = streams[i];
         }
     }
 
-        /// Ctor
-    WinHandle(HANDLE handle = nullptr):m_handle(handle) {}
-    WinHandle(WinHandle&& rhs):m_handle(rhs.m_handle) { rhs.m_handle = nullptr; }
-
-        /// Dtor
-    ~WinHandle() { setNull(); }
-
-private:
-    
-    WinHandle(const WinHandle&) = delete;
-    void operator=(const WinHandle& rhs) = delete;
-
-    HANDLE m_handle;
+protected:
+    void _hasTerminated();
+    WinHandle m_processHandle;          ///< If not set the process has terminated
 };
 
-} // anonymous
+void WinProcess::_hasTerminated()
+{
+    // get exit code for process
+    // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
+
+    DWORD childExitCode = 0;
+    if (GetExitCodeProcess(m_processHandle, &childExitCode))
+    {
+        m_returnValue = int32_t(childExitCode);
+    }
+    m_processHandle.setNull();
+}
+
+void WinProcess::waitForTermination()
+{
+    if (m_processHandle.isNull())
+    {
+        return;
+    }
+
+    // wait for the process to exit
+    // TODO: set a timeout as a safety measure...
+    WaitForSingleObject(m_processHandle, INFINITE);
+
+    _hasTerminated();
+}
+
+bool WinProcess::isTerminated()
+{
+    if (m_processHandle.isNull())
+    {
+        return true;
+    }
+
+    auto res = WaitForSingleObject(m_processHandle, 0);
+
+    if (res == WAIT_TIMEOUT)
+    {
+        return false;
+    }
+    _hasTerminated();
+    return true;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+
+
+/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
+{
+    return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
+}
+
+/* static */UnownedStringSlice ProcessUtil::getExecutableSuffix()
+{
+    return UnownedStringSlice::fromLiteral(".exe");
+}
+
+/* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
+{
+    auto escapeHandler = getEscapeHandler();
+
+    StringBuilder cmd;
+    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
+
+    for (const auto& arg : commandLine.m_args)
+    {
+        cmd << " ";
+        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
+    }
+    return cmd.ToString();
+}
+
+#define SLANG_RETURN_FAIL_ON_FALSE(x) if (!(x)) return SLANG_FAIL;
+
+#if 0
 
 static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
 {
@@ -118,20 +178,20 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
             prevChar = c;
             switch (c)
             {
-            case '\r': case '\n':
-                // swallow input if '\r' and '\n' appear in sequence
-                if ((p ^ c) == ('\r' ^ '\n'))
-                {
-                    // but don't swallow the next byte
-                    prevChar = -1;
-                    continue;
-                }
-                // always replace '\r' with '\n'
-                c = '\n';
-                break;
+                case '\r': case '\n':
+                    // swallow input if '\r' and '\n' appear in sequence
+                    if ((p ^ c) == ('\r' ^ '\n'))
+                    {
+                        // but don't swallow the next byte
+                        prevChar = -1;
+                        continue;
+                    }
+                    // always replace '\r' with '\n'
+                    c = '\n';
+                    break;
 
-            default:
-                break;
+                default:
+                    break;
             }
 
             *writeCursor++ = (char)c;
@@ -148,33 +208,6 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
 
     return 0;
 }
-
-/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
-{
-    return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
-}
-
-/* static */UnownedStringSlice ProcessUtil::getExecutableSuffix()
-{
-    return UnownedStringSlice::fromLiteral(".exe");
-}
-
-/* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
-{
-    auto escapeHandler = getEscapeHandler();
-
-    StringBuilder cmd;
-    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
-
-    for (const auto& arg : commandLine.m_args)
-    {
-        cmd << " ";
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
-    }
-    return cmd.ToString();
-}
-
-#define SLANG_RETURN_FAIL_ON_FALSE(x) if (!(x)) return SLANG_FAIL;
 
 /* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
 {
@@ -306,6 +339,150 @@ static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
     outExecuteResult.standardError = stdErrThreadInfo.output;
     outExecuteResult.resultCode = childExitCode;
 
+    return SLANG_OK;
+}
+#endif
+
+static SlangResult _readText(Stream* stream, String& outString)
+{
+    List<Byte> contents;
+    const size_t expandSize = 1024;
+
+    while (!stream->isEnd())
+    {
+        const Index prevCount = contents.getCount();
+        contents.setCount(prevCount + expandSize);
+
+        size_t readSize;
+        SLANG_RETURN_ON_FAIL(stream->read(contents.getBuffer() + prevCount, expandSize, readSize));
+
+        contents.setCount(prevCount + Index(readSize));
+    }
+
+    StringBuilder buf;
+    StringUtil::appendStandardLines(UnownedStringSlice((const char*)contents.begin(), (const char*)contents.end()), buf);
+
+    outString = buf.ProduceString();
+    return SLANG_OK;
+}
+
+/* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
+{
+    RefPtr<Process> process;
+    SLANG_RETURN_ON_FAIL(createProcess(commandLine, process));
+    process->waitForTermination();
+
+    // Grab the contents of the pipe
+
+    outExecuteResult.resultCode = ExecuteResult::ResultCode(process->getReturnValue());
+
+    SLANG_RETURN_ON_FAIL(_readText(process->getStream(Process::StreamType::StdOut), outExecuteResult.standardOutput));
+    SLANG_RETURN_ON_FAIL(_readText(process->getStream(Process::StreamType::ErrorOut), outExecuteResult.standardError));
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ProcessUtil::createProcess(const CommandLine& commandLine, RefPtr<Process>& outProcess)
+{
+    SECURITY_ATTRIBUTES securityAttributes;
+    securityAttributes.nLength = sizeof(securityAttributes);
+    securityAttributes.lpSecurityDescriptor = nullptr;
+    securityAttributes.bInheritHandle = true;
+
+    WinHandle childStdOutRead;
+    WinHandle childStdErrRead;
+    WinHandle childStdInWrite;
+
+    WinHandle processHandle;
+    {
+        WinHandle childStdOutWrite;
+        WinHandle childStdErrWrite;
+        WinHandle childStdInRead;
+
+        {
+            WinHandle childStdOutReadTmp;
+            WinHandle childStdErrReadTmp;
+            WinHandle childStdInWriteTmp;
+            // create stdout pipe for child process
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, 0));
+            // create stderr pipe for child process
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, 0));
+            // create stdin pipe for child process        
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, 0));
+
+            const HANDLE currentProcess = GetCurrentProcess();
+
+            // create a non-inheritable duplicate of the stdout reader        
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            // create a non-inheritable duplicate of the stderr reader
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdErrReadTmp, currentProcess, childStdErrRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+            // create a non-inheritable duplicate of the stdin writer
+            SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdInWriteTmp, currentProcess, childStdInWrite.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
+        }
+
+        // TODO: switch to proper wide-character versions of these...
+        STARTUPINFOW startupInfo;
+        ZeroMemory(&startupInfo, sizeof(startupInfo));
+        startupInfo.cb = sizeof(startupInfo);
+        startupInfo.hStdError = childStdErrWrite;
+        startupInfo.hStdOutput = childStdOutWrite;
+        startupInfo.hStdInput = childStdInRead;
+        startupInfo.dwFlags = STARTF_USESTDHANDLES;
+
+        OSString pathBuffer;
+        LPCWSTR path = nullptr;
+
+        if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
+        {
+            StringBuilder cmd;
+            StringEscapeUtil::appendMaybeQuoted(getEscapeHandler(), commandLine.m_executable.getUnownedSlice(), cmd);
+
+            pathBuffer = cmd.toWString();
+            path = pathBuffer.begin();
+        }
+
+        // Produce the command line string
+        String cmdString = getCommandLineString(commandLine);
+        OSString cmdStringBuffer = cmdString.toWString();
+
+        // Now we can actually get around to starting a process
+        PROCESS_INFORMATION processInfo;
+        ZeroMemory(&processInfo, sizeof(processInfo));
+
+        // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
+        // `CreateProcess` requires write access to this, for some reason...
+        BOOL success = CreateProcessW(
+            path,
+            (LPWSTR)cmdStringBuffer.begin(),
+            nullptr,
+            nullptr,
+            true,
+            CREATE_NO_WINDOW,
+            nullptr, // TODO: allow specifying environment variables?
+            nullptr,
+            &startupInfo,
+            &processInfo);
+
+        if (!success)
+        {
+            DWORD err = GetLastError();
+            SLANG_UNUSED(err);
+
+            return SLANG_FAIL;
+        }
+
+        // close handles we are now done with
+        CloseHandle(processInfo.hThread);
+
+        processHandle = processInfo.hProcess;
+    }
+
+    RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
+    streams[Index(Process::StreamType::ErrorOut)] = new WinFileStream(childStdErrRead.detach(), FileAccess::Read);
+    streams[Index(Process::StreamType::StdOut)] = new WinFileStream(childStdOutRead.detach(), FileAccess::Read);
+    streams[Index(Process::StreamType::StdIn)] = new WinFileStream(childStdInWrite.detach(), FileAccess::Write);
+
+    outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
     return SLANG_OK;
 }
 

@@ -350,6 +350,54 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
     return (fromChar == toChar || string.indexOf(fromChar) == Index(-1)) ? string : calcCharReplaced(string.getUnownedSlice(), fromChar, toChar);
 }
 
+/* static */void StringUtil::appendStandardLines(const UnownedStringSlice& text, StringBuilder& out)
+{
+    const char* cur = text.begin();
+    const char* start = cur;
+    const char* const end = text.end();
+
+    while (cur < end)
+    {
+        const char c = *cur;
+        switch (c)
+        {
+            case '\n':
+            {
+                if (cur + 1 < end && cur[1] == '\r')
+                {
+                    // Append and skip
+                    out.append(start, cur + 1);
+                    cur += 2;
+                    start = cur;
+                    break;
+                }
+                break;
+            }
+            case '\r':
+            {
+                out.append(start, cur);
+                out.appendChar('\n');
+
+                cur++;
+                // If next is \n, we want to skip that
+                cur += Index(cur < end && * cur == '\n');
+                start = cur;
+                break;
+            }
+            default:
+            {
+                cur++;
+                break;
+            }
+        }
+    }
+
+    if (start < end)
+    {
+        out.append(start, end);
+    }
+}
+
 /* static */bool StringUtil::extractLine(UnownedStringSlice& ioText, UnownedStringSlice& outLine)
 {
     char const*const begin = ioText.begin();

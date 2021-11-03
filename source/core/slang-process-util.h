@@ -4,6 +4,7 @@
 
 #include "slang-string.h"
 #include "slang-list.h"
+#include "slang-stream.h"
 
 #include "slang-string-escape-util.h"
 
@@ -61,6 +62,31 @@ struct ExecuteResult
     Slang::String standardError;
 };
 
+class Process : public RefObject
+{
+public:
+    enum class StreamType
+    {
+        ErrorOut,
+        StdOut,
+        StdIn,
+        CountOf,
+    };
+
+        /// Get the stream for the type
+    Stream* getStream(StreamType type) const { return m_streams[Index(type)]; }
+    int32_t getReturnValue() const { return m_returnValue;  }
+
+        /// True if the process has terminated
+    virtual bool isTerminated() = 0;
+        /// Blocks until the process has completed
+    virtual void waitForTermination() = 0;
+
+protected:
+    int32_t m_returnValue = 0;                              ///< Value returned if process terminated
+    RefPtr<Stream> m_streams[Index(StreamType::CountOf)];   ///< Streams to communicate with the process
+};
+
 struct ProcessUtil
 {
         /// The quoting style used for the command line on this target. Currently just uses Space,
@@ -75,6 +101,9 @@ struct ProcessUtil
 
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
+
+        /// Create a process using the executable/args defined from the commandLine
+    static SlangResult createProcess(const CommandLine& commandLine, RefPtr<Process>& outProcess);
 
     static uint64_t getClockFrequency();
 
