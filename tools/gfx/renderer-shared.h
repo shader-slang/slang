@@ -38,6 +38,7 @@ struct GfxGUID
     static const Slang::Guid IID_ICommandQueue;
     static const Slang::Guid IID_IQueryPool;
     static const Slang::Guid IID_IAccelerationStructure;
+    static const Slang::Guid IID_IFence;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -199,6 +200,7 @@ protected:
     {}
 
     IResource::Type m_type;
+    Slang::String m_debugName;
 };
 
 class BufferResource : public IBufferResource, public Resource
@@ -219,6 +221,15 @@ public:
     virtual SLANG_NO_THROW IResource::Type SLANG_MCALL getType() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW IBufferResource::Desc* SLANG_MCALL getDesc() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override
+    {
+        m_debugName = name;
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override
+    {
+        return m_debugName.getBuffer();
+    }
 
 protected:
     Desc m_desc;
@@ -242,6 +253,15 @@ public:
     virtual SLANG_NO_THROW IResource::Type SLANG_MCALL getType() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW ITextureResource::Desc* SLANG_MCALL getDesc() SLANG_OVERRIDE;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override
+    {
+        m_debugName = name;
+        return SLANG_OK;
+    }
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override
+    {
+        return m_debugName.getBuffer();
+    }
 
 protected:
     Desc m_desc;
@@ -1151,6 +1171,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getFeatures(
         const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* featureName) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getSlangSession(slang::ISession** outSlangSession) SLANG_OVERRIDE;
     IDevice* getInterface(const Slang::Guid& guid);
 
@@ -1180,6 +1202,18 @@ public:
     // without ray tracing support.
     virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
         const RayTracingPipelineStateDesc& desc, IPipelineState** outState) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFence(const IFence::Desc& desc, IFence** outFence) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFences(IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout) override;
 
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,

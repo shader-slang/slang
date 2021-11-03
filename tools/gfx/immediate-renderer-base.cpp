@@ -153,6 +153,43 @@ public:
         {
             m_writer->writeTimestamp(pool, index);
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        {
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::bindPipelineAndRootObject");
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+            uint32_t maxDrawCount,
+            IBufferResource* argBuffer,
+            uint64_t argOffset,
+            IBufferResource* countBuffer,
+            uint64_t countOffset) override
+        {
+            SLANG_UNUSED(maxDrawCount);
+            SLANG_UNUSED(argBuffer);
+            SLANG_UNUSED(argOffset);
+            SLANG_UNUSED(countBuffer);
+            SLANG_UNUSED(countOffset);
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawIndirect");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+            uint32_t maxDrawCount,
+            IBufferResource* argBuffer,
+            uint64_t argOffset,
+            IBufferResource* countBuffer,
+            uint64_t countOffset) override
+        {
+            SLANG_UNUSED(maxDrawCount);
+            SLANG_UNUSED(argBuffer);
+            SLANG_UNUSED(argOffset);
+            SLANG_UNUSED(countBuffer);
+            SLANG_UNUSED(countOffset);
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawIndirect");
+        }
     };
 
     RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -196,10 +233,22 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
+        {
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::bindPipelineAndRootObject");
+            return SLANG_E_NOT_AVAILABLE;
+        }
+
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->dispatchCompute(x, y, z);
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+        {
+            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::dispatchComputeIndirect");
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
@@ -263,6 +312,42 @@ public:
             ResourceState src,
             ResourceState dst) override
         {
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+            ITextureResource* dst,
+            ITextureResource::SubresourceRange dstSubresource,
+            ITextureResource::Offset3D dstOffset,
+            ITextureResource* src,
+            ITextureResource::SubresourceRange srcSubresource,
+            ITextureResource::Offset3D srcOffset,
+            ITextureResource::Size extend) override
+        {
+            SLANG_UNUSED(dst);
+            SLANG_UNUSED(dstSubresource);
+            SLANG_UNUSED(dstOffset);
+            SLANG_UNUSED(src);
+            SLANG_UNUSED(srcSubresource);
+            SLANG_UNUSED(srcOffset);
+            SLANG_UNUSED(extend);
+            SLANG_UNIMPLEMENTED_X("copyTexture");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+            ITextureResource* dst,
+            ITextureResource::SubresourceRange subResourceRange,
+            ITextureResource::Offset3D offset,
+            ITextureResource::Offset3D extend,
+            ITextureResource::SubresourceData* subResourceData,
+            size_t subResourceDataCount) override
+        {
+            SLANG_UNUSED(dst);
+            SLANG_UNUSED(subResourceRange);
+            SLANG_UNUSED(offset);
+            SLANG_UNUSED(extend);
+            SLANG_UNUSED(subResourceData);
+            SLANG_UNUSED(subResourceDataCount);
+            SLANG_UNIMPLEMENTED_X("uploadTextureData");
         }
     };
 
@@ -408,9 +493,12 @@ public:
 
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+    virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
+        uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
     {
+        // TODO: implement fence signal.
+        assert(fence == nullptr);
+
         CommandBufferInfo info = {};
         for (uint32_t i = 0; i < count; i++)
         {
