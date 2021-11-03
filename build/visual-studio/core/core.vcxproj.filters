@@ -177,9 +177,6 @@
     <ClInclude Include="..\..\..\source\core\slang-zip-file-system.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\source\core\windows\slang-win-stream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\source\core\slang-archive-file-system.cpp">
@@ -288,9 +285,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\windows\slang-win-process-util.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\source\core\windows\slang-win-stream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

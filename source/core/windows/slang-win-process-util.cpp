@@ -7,8 +7,6 @@
 
 #include "../../../slang-com-helper.h"
 
-#include "slang-win-stream.h"
-
 #ifdef _WIN32
 // Include Windows header in a way that minimized namespace pollution.
 // TODO: We could try to avoid including this at all, but it would
@@ -26,15 +24,134 @@
 
 namespace Slang {
 
-namespace { // anonymous
-
-struct ThreadInfo
+// Has behavior very similar to unique_ptr - assignment is a move.
+class WinHandle
 {
-    HANDLE	file;
-    String	output;
+public:
+    /// Detach the encapsulated handle. Returns the handle (which now must be externally handled) 
+    HANDLE detach() { HANDLE handle = m_handle; m_handle = nullptr; return handle; }
+
+    /// Return as a handle
+    operator HANDLE() const { return m_handle; }
+
+    /// Assign
+    void operator=(HANDLE handle) { setNull(); m_handle = handle; }
+    void operator=(WinHandle&& rhs) { HANDLE handle = m_handle; m_handle = rhs.m_handle; rhs.m_handle = handle; }
+
+    /// Get ready for writing 
+    SLANG_FORCE_INLINE HANDLE* writeRef() { setNull(); return &m_handle; }
+    /// Get for read access
+    SLANG_FORCE_INLINE const HANDLE* readRef() const { return &m_handle; }
+
+    void setNull()
+    {
+        if (m_handle)
+        {
+            CloseHandle(m_handle);
+            m_handle = nullptr;
+        }
+    }
+    bool isNull() const { return m_handle == nullptr; }
+
+    /// Ctor
+    WinHandle(HANDLE handle = nullptr) :m_handle(handle) {}
+    WinHandle(WinHandle&& rhs) :m_handle(rhs.m_handle) { rhs.m_handle = nullptr; }
+
+    /// Dtor
+    ~WinHandle() { setNull(); }
+
+private:
+
+    WinHandle(const WinHandle&) = delete;
+    void operator=(const WinHandle& rhs) = delete;
+
+    HANDLE m_handle;
 };
 
-} // anonymous
+/* A simple Stream implementation of a File HANDLE (or Pipe). Note that currently does not allow getPosition/seek/atEnd */
+class WinFileStream : public Stream
+{
+public:
+    typedef WinFileStream ThisType;
+
+    // Stream
+    virtual Int64 getPosition() SLANG_OVERRIDE { return 0; }
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE { SLANG_UNUSED(origin); SLANG_UNUSED(offset); return SLANG_E_NOT_AVAILABLE; }
+    virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
+    virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
+    virtual bool isEnd() SLANG_OVERRIDE { return m_streamHandle.isNull(); }
+    virtual bool canRead() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Read)) && !m_streamHandle.isNull(); }
+    virtual bool canWrite() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Write)) && !m_streamHandle.isNull(); }
+    virtual void close() SLANG_OVERRIDE;
+
+    WinFileStream(HANDLE handle, FileAccess access);
+
+    ~WinFileStream() { close(); }
+
+protected:
+
+    FileAccess m_access = FileAccess::None;
+    WinHandle m_streamHandle;
+};
+
+
+WinFileStream::WinFileStream(HANDLE handle, FileAccess access) :
+    m_streamHandle(handle),
+    m_access(access)
+{
+}
+
+SlangResult WinFileStream::read(void* buffer, size_t length, size_t& outReadBytes)
+{
+    if ((Index(m_access) & Index(FileAccess::Read)) == 0 || m_streamHandle.isNull())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    DWORD bytesRead = 0;
+    BOOL readResult = ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr);
+
+    outReadBytes = bytesRead;
+
+    if (!readResult)
+    {
+        const auto err = GetLastError();
+
+        if (err == ERROR_BROKEN_PIPE)
+        {
+            m_streamHandle.setNull();
+            return SLANG_OK;
+        }
+
+        SLANG_UNUSED(err);
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult WinFileStream::write(const void* buffer, size_t length)
+{
+    if ((Index(m_access) & Index(FileAccess::Write)) == 0 || m_streamHandle.isNull())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    DWORD numWritten = 0;
+    BOOL writeResult = WriteFile(m_streamHandle, buffer, DWORD(length), &numWritten, nullptr);
+
+    if (!writeResult || numWritten != length)
+    {
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+void WinFileStream::close()
+{
+    m_streamHandle.setNull();
+}
 
 class WinProcess : public Process
 {
@@ -103,8 +220,6 @@ bool WinProcess::isTerminated()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-
-
 /* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
 {
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
@@ -133,6 +248,17 @@ bool WinProcess::isTerminated()
 #define SLANG_RETURN_FAIL_ON_FALSE(x) if (!(x)) return SLANG_FAIL;
 
 #if 0
+
+namespace { // anonymous
+
+struct ThreadInfo
+{
+    HANDLE	file;
+    String	output;
+};
+
+} // anonymous
+
 
 static DWORD WINAPI _readerThreadProc(LPVOID threadParam)
 {
