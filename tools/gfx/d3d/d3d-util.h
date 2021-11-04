@@ -94,6 +94,8 @@ class D3DUtil
 
     static bool isUAVBinding(slang::BindingType bindingType);
 
+    static int getShaderModelFromProfileName(const char* profile);
+
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT

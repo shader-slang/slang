@@ -756,6 +756,13 @@ end
  
      links { "compiler-core", "core" }
  
+ 
+ tool "test-proxy"
+     uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
+     includedirs { "." }
+ 
+     links { "compiler-core", "core", "slang" }
+ 
  --
  -- `slang-generate` is a tool we use for source code generation on
  -- the compiler. It depends on the `core` library, so we need to

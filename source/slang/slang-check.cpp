@@ -93,10 +93,10 @@ namespace Slang
         if (type == PassThroughMode::GenericCCpp)
         {
             // try testing for availability on all C/C++ compilers
-            getOrLoadDownstreamCompiler(PassThroughMode::Clang, sink);
-            getOrLoadDownstreamCompiler(PassThroughMode::Gcc, sink);
-            getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, sink);
-            getOrLoadDownstreamCompiler(PassThroughMode::LLVM, sink);
+            getOrLoadDownstreamCompiler(PassThroughMode::Clang, nullptr);
+            getOrLoadDownstreamCompiler(PassThroughMode::Gcc, nullptr);
+            getOrLoadDownstreamCompiler(PassThroughMode::VisualStudio, nullptr);
+            getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr);
         }
 
         // Mark that we have tried to load it

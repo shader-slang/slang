@@ -194,9 +194,11 @@ public:
             m_desc = {}; 
             m_desc1 = {};
             m_isWarp = false;
+            m_isSoftware = false;
         }
 
         bool m_isWarp;
+        bool m_isSoftware;
         ComPtr<IDXGIFactory> m_dxgiFactory;
         ComPtr<ID3D12Device> m_device;
         ComPtr<ID3D12Device5> m_device5;
@@ -4274,6 +4276,9 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
     outDeviceInfo.m_dxgiFactory = dxgiFactory;
     outDeviceInfo.m_adapter = adapter;
     outDeviceInfo.m_isWarp = D3DUtil::isWarp(dxgiFactory, adapter);
+    const UINT kMicrosoftVendorId = 5140;
+    outDeviceInfo.m_isSoftware = outDeviceInfo.m_isWarp || ((outDeviceInfo.m_desc1.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0)
+        || outDeviceInfo.m_desc.VendorId == kMicrosoftVendorId;
 
     return SLANG_OK;
 }
@@ -4396,6 +4401,15 @@ Result D3D12Device::initialize(const Desc& desc)
     // Set the device
     m_device = m_deviceInfo.m_device;
 
+    if (m_deviceInfo.m_isSoftware)
+    {
+        m_features.add("software-device");
+    }
+    else
+    {
+        m_features.add("hardware-device");
+    }
+
     // NVAPI
     if (desc.nvapiExtnSlot >= 0)
     {
@@ -4429,30 +4443,31 @@ Result D3D12Device::initialize(const Desc& desc)
 
     }
 
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModelData = {};
+    shaderModelData.HighestShaderModel = D3D_SHADER_MODEL_6_6;
+
     // Find what features are supported
     {
         // Check this is how this is laid out...
         SLANG_COMPILE_TIME_ASSERT(D3D_SHADER_MODEL_6_0 == 0x60);
 
         {
-            D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
-            featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x62);
-
             // TODO: Currently warp causes a crash when using half, so disable for now
-            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &featureShaderModel, sizeof(featureShaderModel))) &&
+            if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModelData, sizeof(shaderModelData))) &&
                 m_deviceInfo.m_isWarp == false &&
-                featureShaderModel.HighestShaderModel >= 0x62)
+                shaderModelData.HighestShaderModel >= 0x62)
             {
                 // With sm_6_2 we have half
                 m_features.add("half");
             }
         }
-        // Check what min precision support we have
+        // Check double precision support
         {
             D3D12_FEATURE_DATA_D3D12_OPTIONS options;
             if (SLANG_SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
             {
-                auto minPrecisionSupport = options.MinPrecisionSupport;
+                if (options.DoublePrecisionFloatShaderOps)
+                    m_features.add("double");
             }
         }
         // Check ray tracing support
@@ -4516,10 +4531,56 @@ Result D3D12Device::initialize(const Desc& desc)
     m_device->QueryInterface<ID3D12Device5>(m_deviceInfo.m_device5.writeRef());
     m_device5 = m_deviceInfo.m_device5.get();
 #endif
+    // Check shader model version.
+    SlangCompileTarget compileTarget = SLANG_DXBC;
+    const char* profileName = "sm_5_1";
+    switch (shaderModelData.HighestShaderModel)
+    {
+    case D3D_SHADER_MODEL_5_1:
+        compileTarget = SLANG_DXBC;
+        profileName = "sm_5_1";
+        break;
+    case D3D_SHADER_MODEL_6_0:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_0";
+        break;
+    case D3D_SHADER_MODEL_6_1:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_1";
+        break;
+    case D3D_SHADER_MODEL_6_2:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_2";
+        break;
+    case D3D_SHADER_MODEL_6_3:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_3";
+        break;
+    case D3D_SHADER_MODEL_6_4:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_4";
+        break;
+    case D3D_SHADER_MODEL_6_5:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_5";
+        break;
+    default:
+        compileTarget = SLANG_DXIL;
+        profileName = "sm_6_6";
+        break;
+    }
+    // If user specified a higher shader model than what the system supports, return failure.
+    int userSpecifiedShaderModel = D3DUtil::getShaderModelFromProfileName(desc.slang.targetProfile);
+    if (userSpecifiedShaderModel > shaderModelData.HighestShaderModel)
+    {
+        getDebugCallback()->handleMessage(gfx::DebugMessageType::Error, gfx::DebugMessageSource::Layer,
+            "The requested shader model is not supported by the system.");
+        return SLANG_E_NOT_AVAILABLE;
+    }
     SLANG_RETURN_ON_FAIL(slangContext.initialize(
         desc.slang,
-        m_device5 ? SLANG_DXIL : SLANG_DXBC,
-        m_device5 ? "sm_6_5" : "sm_5_1",
+        compileTarget,
+        profileName,
         makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
     m_isInitialized = true;
