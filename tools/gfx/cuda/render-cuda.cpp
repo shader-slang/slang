@@ -1035,7 +1035,7 @@ public:
                 ITextureResource* src,
                 ITextureResource::SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
-                ITextureResource::Size extend) override
+                ITextureResource::Size extent) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(dstSubresource);
@@ -1043,7 +1043,7 @@ public:
                 SLANG_UNUSED(src);
                 SLANG_UNUSED(srcSubresource);
                 SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extend);
+                SLANG_UNUSED(extent);
                 SLANG_UNIMPLEMENTED_X("copyTexture");
             }
 
@@ -1051,14 +1051,14 @@ public:
                 ITextureResource* dst,
                 ITextureResource::SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
-                ITextureResource::Offset3D extend,
+                ITextureResource::Offset3D extent,
                 ITextureResource::SubresourceData* subResourceData,
                 size_t subResourceDataCount) override
             {
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(subResourceRange);
                 SLANG_UNUSED(offset);
-                SLANG_UNUSED(extend);
+                SLANG_UNUSED(extent);
                 SLANG_UNUSED(subResourceData);
                 SLANG_UNUSED(subResourceDataCount);
                 SLANG_UNIMPLEMENTED_X("uploadTextureData");

@@ -1362,7 +1362,8 @@ public:
         return rootObject;
     }
 
-    // Sets the current pipeline state and bind an existing root shader object.
+    // Sets the pipeline state with a mutable root object. The root object is allowed to change
+    // between this call and future draw calls.
     virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineAndRootObject(
         IPipelineState* state,
         IShaderObject* rootObject) = 0;
@@ -1431,7 +1432,8 @@ public:
         return rootObject;
     }
 
-    // Sets the current pipeline state and bind an existing root shader object.
+    // Sets the pipeline state with a mutable root object. The root object is allowed to change
+    // between this call and future dispatch calls.
     virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineAndRootObject(
         IPipelineState* state,
         IShaderObject* rootObject) = 0;
@@ -1456,12 +1458,12 @@ public:
         ITextureResource* src,
         ITextureResource::SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extend) = 0;
+        ITextureResource::Size extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         ITextureResource::SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extend,
+        ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1522,8 +1524,10 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
 
+    // Binds pipeline with a mutable root object. The root object is allowed to change
+    // between this call and dispatchRays calls.
     virtual SLANG_NO_THROW void SLANG_MCALL
-        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) = 0;
+        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* mutableRootObject) = 0;
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
     /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for

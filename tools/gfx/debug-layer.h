@@ -376,13 +376,13 @@ public:
         ITextureResource* src,
         ITextureResource::SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
-        ITextureResource::Size extend) override;
+        ITextureResource::Size extent) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         ITextureResource::SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extend,
+        ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) override;
 

@@ -1168,7 +1168,7 @@ void DebugResourceCommandEncoder::copyTexture(
     ITextureResource* src,
     ITextureResource::SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
-    ITextureResource::Size extend)
+    ITextureResource::Size extent)
 {
     SLANG_GFX_API_FUNC;
     baseObject->copyTexture(
@@ -1178,20 +1178,20 @@ void DebugResourceCommandEncoder::copyTexture(
         getInnerObj(src),
         srcSubresource,
         srcOffset,
-        extend);
+        extent);
 }
 
 void DebugResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     ITextureResource::SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Offset3D extend,
+    ITextureResource::Offset3D extent,
     ITextureResource::SubresourceData* subResourceData,
     size_t subResourceDataCount)
 {
     SLANG_GFX_API_FUNC;
     baseObject->uploadTextureData(
-        getInnerObj(dst), subResourceRange, offset, extend, subResourceData, subResourceDataCount);
+        getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
