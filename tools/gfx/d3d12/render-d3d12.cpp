@@ -3101,6 +3101,13 @@ public:
             {
                 return bindPipelineImpl(state, outRootObject);
             }
+                        
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
+            {
+                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
+                return SLANG_E_NOT_AVAILABLE;
+            }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
@@ -3314,6 +3321,36 @@ public:
             {
                 m_d3dCmdList->OMSetStencilRef((UINT)referenceValue);
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+                uint32_t maxDrawCount,
+                IBufferResource* argBuffer,
+                uint64_t argOffset,
+                IBufferResource* countBuffer,
+                uint64_t countOffset) override
+            {
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+                uint32_t maxDrawCount,
+                IBufferResource* argBuffer,
+                uint64_t argOffset,
+                IBufferResource* countBuffer,
+                uint64_t countOffset) override
+            {
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
+            }
         };
 
         RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -3361,6 +3398,13 @@ public:
                 return bindPipelineImpl(state, outRootObject);
             }
 
+            virtual SLANG_NO_THROW Result SLANG_MCALL
+                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
+            {
+                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
+                return SLANG_E_NOT_AVAILABLE;
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 // Submit binding for compute
@@ -3373,6 +3417,12 @@ public:
                     }
                 }
                 m_d3dCmdList->Dispatch(x, y, z);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+            {
+                SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
             }
         };
 
@@ -3442,6 +3492,41 @@ public:
             {
                 static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_commandBuffer->m_cmdList, index);
             }
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+                ITextureResource* dst,
+                ITextureResource::SubresourceRange dstSubresource,
+                ITextureResource::Offset3D dstOffset,
+                ITextureResource* src,
+                ITextureResource::SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstSubresource);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTexture");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+                ITextureResource* dst,
+                ITextureResource::SubresourceRange subResourceRange,
+                ITextureResource::Offset3D offset,
+                ITextureResource::Offset3D extent,
+                ITextureResource::SubresourceData* subResourceData,
+                size_t subResourceDataCount) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(subResourceRange);
+                SLANG_UNUSED(offset);
+                SLANG_UNUSED(extent);
+                SLANG_UNUSED(subResourceData);
+                SLANG_UNUSED(subResourceDataCount);
+                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+            }
         };
 
         ResourceCommandEncoderImpl m_resourceCommandEncoder;
@@ -3491,6 +3576,8 @@ public:
                 AccessFlag::Enum destAccess) override;
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+            virtual SLANG_NO_THROW void SLANG_MCALL bindPipelineAndRootObject(
+                IPipelineState* state, IShaderObject* rootObject) override;
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 const char* rayGenShaderName,
                 int32_t width,
@@ -3582,8 +3669,10 @@ public:
         }
         
         virtual SLANG_NO_THROW void SLANG_MCALL
-            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
         {
+            // TODO: implement fence signal.
+            assert(fence == nullptr);
             ShortList<ID3D12CommandList*> commandLists;
             for (uint32_t i = 0; i < count; i++)
             {
@@ -5976,6 +6065,12 @@ void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipeline(
     IPipelineState* state, IShaderObject** outRootObject)
 {
     bindPipelineImpl(state, outRootObject);
+}
+
+void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipelineAndRootObject(
+    IPipelineState* state, IShaderObject* rootObject)
+{
+    SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
 }
 
 void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::dispatchRays(
