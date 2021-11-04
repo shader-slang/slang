@@ -616,7 +616,29 @@ class ExtractExistentialType : public Type
     SLANG_AST_CLASS(ExtractExistentialType)
 
     DeclRef<VarDeclBase> declRef;
-    DeclRef<InterfaceDecl> interfaceDeclRef;
+
+    // A reference to the original interface this type is known
+    // to be a subtype of.
+    //
+    Type* originalInterfaceType;
+    DeclRef<InterfaceDecl> originalInterfaceDeclRef;
+
+// Following fields will not be reflected (and thus won't be serialized, etc.)
+SLANG_UNREFLECTED
+
+    // A cached decl-ref to the original interface above, with
+    // a this-type substitution that refers to the type extracted here.
+    //
+    // This field is optional and can be filled in on-demand. It does *not*
+    // represent part of the logical value of this `Type`, and should not
+    // be serialized, included in hashes, etc.
+    //
+    DeclRef<InterfaceDecl> cachedSpecializedInterfaceDeclRef;
+
+    // A cached pointer to a witness that shows how this type is a subtype
+    // of `originalInterfaceType`.
+    //
+    SubtypeWitness* cachedSubtypeWitness = nullptr;
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
@@ -624,6 +646,19 @@ class ExtractExistentialType : public Type
     HashCode _getHashCodeOverride();
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+        /// Get a witness that shows how this type is a subtype of `originalInterfaceType`.
+        ///
+        /// This operation may create the witness on demand and cache it.
+        ///
+    SubtypeWitness* getSubtypeWitness();
+
+        /// Get a interface decl-ref for the original interface specialized to this type
+        /// (using a type-type substitution).
+        ///
+        /// This operation may create the decl-ref on demand and cache it.
+        ///
+    DeclRef<InterfaceDecl> getSpecializedInterfaceDeclRef();
 };
 
     /// A tagged union of zero or more other types.

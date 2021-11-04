@@ -655,7 +655,7 @@ bool ExtractExistentialType::_equalsImplOverride(Type* type)
 
 HashCode ExtractExistentialType::_getHashCodeOverride()
 {
-    return combineHash(declRef.getHashCode(), interfaceDeclRef.getHashCode());
+    return combineHash(declRef.getHashCode(), originalInterfaceType->getHashCode(), originalInterfaceDeclRef.getHashCode());
 }
 
 Type* ExtractExistentialType::_createCanonicalTypeOverride()
@@ -667,7 +667,8 @@ Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, Sub
 {
     int diff = 0;
     auto substDeclRef = declRef.substituteImpl(astBuilder, subst, &diff);
-    auto interfaceSubstDeclRef = interfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceType = originalInterfaceType->substituteImpl(astBuilder, subst, &diff);
+    auto substOriginalInterfaceDeclRef = originalInterfaceDeclRef.substituteImpl(astBuilder, subst, &diff);
     if (!diff)
         return this;
 
@@ -675,9 +676,45 @@ Val* ExtractExistentialType::_substituteImplOverride(ASTBuilder* astBuilder, Sub
 
     ExtractExistentialType* substValue = astBuilder->create<ExtractExistentialType>();
     substValue->declRef = substDeclRef;
-    substValue->interfaceDeclRef = interfaceSubstDeclRef;
+    substValue->originalInterfaceType = as<Type>(substOriginalInterfaceType);
+    substValue->originalInterfaceDeclRef = substOriginalInterfaceDeclRef;
     return substValue;
 }
+
+SubtypeWitness* ExtractExistentialType::getSubtypeWitness()
+{
+    if (auto cachedValue = this->cachedSubtypeWitness)
+        return cachedValue;
+
+    ExtractExistentialSubtypeWitness* openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
+    openedWitness->sub = this;
+    openedWitness->sup = originalInterfaceType;
+    openedWitness->declRef = this->declRef;
+
+    this->cachedSubtypeWitness = openedWitness;
+    return openedWitness;
+}
+
+DeclRef<InterfaceDecl> ExtractExistentialType::getSpecializedInterfaceDeclRef()
+{
+    if (auto cachedValue = this->cachedSpecializedInterfaceDeclRef)
+        return cachedValue;
+
+    auto interfaceDecl = originalInterfaceDeclRef.getDecl();
+
+    SubtypeWitness* openedWitness = getSubtypeWitness();
+
+    ThisTypeSubstitution* openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
+    openedThisType->outer = originalInterfaceDeclRef.substitutions.substitutions;
+    openedThisType->interfaceDecl = interfaceDecl;
+    openedThisType->witness = openedWitness;
+
+    DeclRef<InterfaceDecl> specialiedInterfaceDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
+
+    this->cachedSpecializedInterfaceDeclRef = specialiedInterfaceDeclRef;
+    return specialiedInterfaceDeclRef;
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TaggedUnionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
