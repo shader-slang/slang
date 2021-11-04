@@ -169,6 +169,14 @@ namespace Slang
         return (left * 16777619) ^ right;
     }
 
+    inline HashCode combineHash(HashCode hash0, HashCode hash1, HashCode hash2)
+    {
+        auto h = hash0;
+        h = combineHash(h, hash1);
+        h = combineHash(h, hash2);
+        return h;
+    }
+
     struct Hasher
     {
     public:
