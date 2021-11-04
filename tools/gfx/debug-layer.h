@@ -53,9 +53,21 @@ public:
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        IResource::NativeResourceHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
+        IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        IResource::NativeResourceHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        void* handle,
+        const IBufferResource::Desc& srcDesc,
         IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
@@ -148,7 +160,8 @@ public:
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(SharedHandle* outHandle) override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>
@@ -160,7 +173,8 @@ public:
     ITextureResource* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(SharedHandle* outHandle) override;
 };
 
 class DebugResourceView : public DebugObject<IResourceView>

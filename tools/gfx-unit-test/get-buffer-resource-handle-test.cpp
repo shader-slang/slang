@@ -35,16 +35,18 @@ namespace gfx_test
             (void*)initialData,
             buffer.writeRef()));
 
-        IBufferResource::NativeHandle handle;
-        GFX_CHECK_CALL_ABORT(buffer->getNativeHandle(&handle));
+        IBufferResource::NativeResourceHandle handle;
+        GFX_CHECK_CALL_ABORT(buffer->getNativeResourceHandle(&handle));
         if (device->getDeviceInfo().deviceType == gfx::DeviceType::Vulkan)
         {
-            SLANG_CHECK(handle != NULL);
+            SLANG_CHECK(handle.handle != NULL);
+            SLANG_CHECK(handle.type == IResource::NativeHandleType::Vulkan);
         }
 #if SLANG_WINDOWS_FAMILY
         else
         {
-            auto d3d12Handle = (ID3D12Resource*)handle;
+            SLANG_CHECK(handle.type == IResource::NativeHandleType::D3D12);
+            auto d3d12Handle = (ID3D12Resource*)handle.handle;
             Slang::ComPtr<IUnknown> testHandle1;
             GFX_CHECK_CALL_ABORT(d3d12Handle->QueryInterface<IUnknown>(testHandle1.writeRef()));
             Slang::ComPtr<ID3D12Resource> testHandle2;

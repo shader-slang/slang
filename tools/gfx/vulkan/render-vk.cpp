@@ -208,9 +208,16 @@ public:
                 m_buffer.m_api->m_device, &info);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_buffer.m_buffer;
+            outHandle->handle = (uint64_t)m_buffer.m_buffer;
+            outHandle->type = NativeHandleType::Vulkan;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(SharedHandle* outHandle) override
+        {
+            *outHandle = 0;
             return SLANG_OK;
         }
     };
@@ -240,9 +247,16 @@ public:
         bool m_isWeakImageReference = false;
         RefPtr<VKDevice> m_device;
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_image;
+            outHandle->handle = (uint64_t)m_image;
+            outHandle->type = NativeHandleType::Vulkan;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(SharedHandle* outHandle) override
+        {
+            *outHandle = 0;
             return SLANG_OK;
         }
     };

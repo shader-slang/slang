@@ -436,6 +436,14 @@ public:
         CountOf,
     };
 
+    enum NativeHandleType
+    {
+        Unknown,
+        D3D12,
+        Vulkan,
+        CUDA
+    };
+
         /// Base class for Descs
     struct DescBase
     {
@@ -445,9 +453,19 @@ public:
         ResourceState defaultState = ResourceState::Undefined;
         ResourceStateSet allowedStates = ResourceStateSet();
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
+        bool isShared = false;
     };
 
+    struct NativeResourceHandle
+    {
+        uint64_t handle; // A pointer to the resource.
+        NativeHandleType type;
+    };
+    typedef void* SharedHandle;     // System handle for the underlying resource that can be shared between APIs.
+
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(SharedHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IResource                                                           \
     {                                                                                  \
@@ -464,12 +482,8 @@ public:
         Format format = Format::Unknown;
     };
 
-    // Pointer to the buffer resource.
-    typedef uint64_t NativeHandle;
-
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -565,11 +579,7 @@ public:
         int64_t     strideZ;
     };
 
-    // A pointer to the resource if D3D12.
-    typedef uint64_t NativeHandle;
-
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ITextureResource                                                    \
     {                                                                                  \
@@ -1648,6 +1658,13 @@ public:
             return handles;
         }
 
+        static NativeHandle fromCUDAHandle(int64_t device)
+        {
+            NativeHandle handles = {};
+            handles.values[0] = device;
+            return handles;
+        }
+
         // The following functions provide a way of getting handles from values.
         uint64_t getD3D12Device() const { return values[0]; }
 
@@ -1655,9 +1672,12 @@ public:
         uint64_t getVkPhysicalDevice() const { return values[1]; }
         uint64_t getVkDevice() const { return values[2]; }
 
+        int64_t getCUDADevice() const { return values[0]; }
+
     private:
         // For D3D12, this only contains a single value for the ID3D12Device.
         // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
+        // For CUDA, this only contains a single value for the CUDADevice.
         uint64_t values[3] = { 0 };
     };
 
@@ -1665,7 +1685,7 @@ public:
     {
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
-        // The device's handles (if they exist).
+        // The device's handles (if they exist) and their associated API.
         NativeHandle existingDeviceHandles = {};
         // Name to identify the adapter to use
         const char* adapter = nullptr;
@@ -1738,6 +1758,11 @@ public:
         return resource;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        IResource::NativeResourceHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) = 0;
+
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
@@ -1752,6 +1777,16 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createBufferResource(desc, initData, resource.writeRef()));
         return resource;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        IResource::NativeResourceHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        void* handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) = 0;

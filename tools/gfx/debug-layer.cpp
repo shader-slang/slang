@@ -347,6 +347,21 @@ Result DebugDevice::createTextureResource(
     return result;
 }
 
+Result DebugDevice::createTextureFromNativeHandle(
+    IResource::NativeResourceHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    ITextureResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
+    auto result = baseObject->createTextureFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,
@@ -355,8 +370,37 @@ Result DebugDevice::createBufferResource(
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
-    auto result =
-        baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
+    auto result = baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
+Result DebugDevice::createBufferFromNativeHandle(
+    IResource::NativeResourceHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
+    auto result = baseObject->createBufferFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
+Result DebugDevice::createBufferFromSharedHandle(
+    void* handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
+    auto result = baseObject->createBufferFromSharedHandle(handle, srcDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -712,9 +756,14 @@ DeviceAddress DebugBufferResource::getDeviceAddress()
     return baseObject->getDeviceAddress();
 }
 
-Result DebugBufferResource::getNativeHandle(NativeHandle* outHandle)
+Result DebugBufferResource::getNativeResourceHandle(NativeResourceHandle* outHandle)
 {
-    return baseObject->getNativeHandle(outHandle);
+    return baseObject->getNativeResourceHandle(outHandle);
+}
+
+Result DebugBufferResource::getSharedHandle(SharedHandle* outHandle)
+{
+    return baseObject->getSharedHandle(outHandle);
 }
 
 IResource::Type DebugTextureResource::getType()
@@ -729,9 +778,14 @@ ITextureResource::Desc* DebugTextureResource::getDesc()
     return baseObject->getDesc();
 }
 
-Result DebugTextureResource::getNativeHandle(NativeHandle* outHandle)
+Result DebugTextureResource::getNativeResourceHandle(NativeResourceHandle* outHandle)
 {
-    return baseObject->getNativeHandle(outHandle);
+    return baseObject->getNativeResourceHandle(outHandle);
+}
+
+Result DebugTextureResource::getSharedHandle(SharedHandle* outHandle)
+{
+    return baseObject->getSharedHandle(outHandle);
 }
 
 DebugCommandBuffer::DebugCommandBuffer()
