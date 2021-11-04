@@ -3507,7 +3507,7 @@ public:
                 SLANG_UNUSED(src);
                 SLANG_UNUSED(srcSubresource);
                 SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extend);
+                SLANG_UNUSED(extent);
                 SLANG_UNIMPLEMENTED_X("copyTexture");
             }
 
@@ -3522,7 +3522,7 @@ public:
                 SLANG_UNUSED(dst);
                 SLANG_UNUSED(subResourceRange);
                 SLANG_UNUSED(offset);
-                SLANG_UNUSED(extend);
+                SLANG_UNUSED(extent);
                 SLANG_UNUSED(subResourceData);
                 SLANG_UNUSED(subResourceDataCount);
                 SLANG_UNIMPLEMENTED_X("uploadTextureData");
