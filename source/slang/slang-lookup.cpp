@@ -613,7 +613,13 @@ static void _lookUpMembersInSuperTypeImpl(
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
-        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, extractExistentialType->interfaceDeclRef, request, ioResult, inBreadcrumbs);
+        // We want lookup to be performed on the underlying interface type of the existential,
+        // but we need to have a this-type substitution applied to ensure that the result of
+        // lookup will have a comparable substitution applied (allowing things like associated
+        // types, etc. used in the signature of a method to resolve correctly).
+        //
+        auto interfaceDeclRef = extractExistentialType->getSpecializedInterfaceDeclRef();
+        _lookUpMembersInSuperTypeDeclImpl(astBuilder, name, leafType, superType, leafIsSuperWitness, interfaceDeclRef, request, ioResult, inBreadcrumbs);
     }
     else if( auto thisType = as<ThisType>(superType) )
     {

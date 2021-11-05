@@ -31,6 +31,7 @@ const Slang::Guid GfxGUID::IID_ICommandBuffer = SLANG_UUID_ICommandBuffer;
 const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
 const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
 const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAccelerationStructure;
+const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 
 
 StageType translateStage(SlangStage slangStage)
@@ -315,6 +316,30 @@ SLANG_NO_THROW bool SLANG_MCALL RendererBase::hasFeature(const char* featureName
     return m_features.findFirstIndex([&](Slang::String x) { return x == featureName; }) != -1;
 }
 
+Result RendererBase::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
+{
+    SLANG_UNUSED(format);
+    outStates->add(ResourceState::AccelerationStructure);
+    outStates->add(ResourceState::ConstantBuffer);
+    outStates->add(ResourceState::CopyDestination);
+    outStates->add(ResourceState::CopySource);
+    outStates->add(ResourceState::DepthRead);
+    outStates->add(ResourceState::DepthWrite);
+    outStates->add(ResourceState::IndexBuffer);
+    outStates->add(ResourceState::IndirectArgument);
+    outStates->add(ResourceState::PreInitialized);
+    outStates->add(ResourceState::Present);
+    outStates->add(ResourceState::RenderTarget);
+    outStates->add(ResourceState::ResolveDestination);
+    outStates->add(ResourceState::ResolveSource);
+    outStates->add(ResourceState::ShaderResource);
+    outStates->add(ResourceState::StreamOutput);
+    outStates->add(ResourceState::Undefined);
+    outStates->add(ResourceState::UnorderedAccess);
+    outStates->add(ResourceState::VertexBuffer);
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::getSlangSession(slang::ISession** outSlangSession)
 {
     *outSlangSession = slangContext.session.get();
@@ -396,6 +421,31 @@ Result RendererBase::createRayTracingPipelineState(const RayTracingPipelineState
 {
     SLANG_UNUSED(desc);
     SLANG_UNUSED(outState);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::createMutableRootShaderObject(
+    IShaderProgram* program, IShaderObject** outObject)
+{
+    SLANG_UNUSED(program);
+    SLANG_UNUSED(outObject);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::createFence(const IFence::Desc& desc, IFence** outFence)
+{
+    SLANG_UNUSED(desc);
+    *outFence = nullptr;
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::waitForFences(
+    IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout)
+{
+    SLANG_UNUSED(fences);
+    SLANG_UNUSED(fenceCount);
+    SLANG_UNUSED(waitForAll);
+    SLANG_UNUSED(timeout);
     return SLANG_E_NOT_AVAILABLE;
 }
 
