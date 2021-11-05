@@ -32,12 +32,12 @@ namespace gfx_test
             (void*)initialData,
             srcBuffer.writeRef()));
 
-        IBufferResource::SharedHandle handle;
-        GFX_CHECK_CALL_ABORT(srcBuffer->getSharedHandle(&handle));
+        InteropHandle sharedHandle;
+        GFX_CHECK_CALL_ABORT(srcBuffer->getSharedHandle(&sharedHandle));
         ComPtr<IBufferResource> dstBuffer;
-        GFX_CHECK_CALL_ABORT(dstDevice->createBufferFromSharedHandle(handle, bufferDesc, dstBuffer.writeRef()));
+        GFX_CHECK_CALL_ABORT(dstDevice->createBufferFromSharedHandle(sharedHandle, bufferDesc, dstBuffer.writeRef()));
 
-        IBufferResource::NativeResourceHandle testHandle;
+        InteropHandle testHandle;
         GFX_CHECK_CALL_ABORT(dstBuffer->getNativeResourceHandle(&testHandle));
         IBufferResource::Desc* testDesc = dstBuffer->getDesc();
         SLANG_CHECK(testDesc->elementSize == sizeof(float));

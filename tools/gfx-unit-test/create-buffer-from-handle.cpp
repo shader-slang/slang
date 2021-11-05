@@ -47,7 +47,7 @@ namespace gfx_test
             (void*)initialData,
             originalNumbersBuffer.writeRef()));
 
-        IResource::NativeResourceHandle handle;
+        InteropHandle handle;
         originalNumbersBuffer->getNativeResourceHandle(&handle);
         ComPtr<IBufferResource> numbersBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferFromNativeHandle(handle, bufferDesc, numbersBuffer.writeRef()));

@@ -1,5 +1,4 @@
-// Main entry-point. Applies the transformation encoded by `transformer`
-// to all elements in `buffer`.
+// compute-trivial.slang - Simple shader that takes a buffer and increments all elements by 1.
 
 uniform RWStructuredBuffer<float> buffer;
 

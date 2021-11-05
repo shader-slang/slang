@@ -196,10 +196,10 @@ public:
         return (DeviceAddress)m_cudaMemory;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        outHandle->handle = getBindlessHandle();
-        outHandle->type = NativeHandleType::CUDA;
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -244,10 +244,10 @@ public:
 
     RefPtr<CUDAContext> m_cudaContext;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(NativeResourceHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        outHandle->handle = getBindlessHandle();
-        outHandle->type = NativeHandleType::CUDA;
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -895,9 +895,10 @@ private:
     String m_adapterName;
 
 public:
-    Result getNativeHandle(NativeHandle* outHandle)
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
     {
-        *outHandle = IDevice::NativeHandle::fromCUDAHandle(m_device);
+        outHandle[0].handleValue = (uint64_t)m_device;
+        outHandle[0].api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 
@@ -1771,11 +1772,11 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
-        void* handle,
+        InteropHandle handle,
         const IBufferResource::Desc& desc,
         IBufferResource** outResource) override
     {
-        if (handle == NULL)
+        if (handle.handleValue == 0)
         {
             *outResource = nullptr;
             return SLANG_OK;
@@ -1790,9 +1791,9 @@ public:
         // memory association, we first need to fill in a descriptor struct.
         cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
         memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+        // TODO: Change according to the type of handle being passed in
         externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
-        
-        externalMemoryHandleDesc.handle.win32.handle = handle;
+        externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
         externalMemoryHandleDesc.size = desc.sizeInBytes;
         externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
 

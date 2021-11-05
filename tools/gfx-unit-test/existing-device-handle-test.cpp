@@ -113,11 +113,16 @@ namespace gfx_test
             SLANG_IGNORE_TEST;
         }
 
-        IDevice::NativeHandle handle = {};
-        GFX_CHECK_CALL_ABORT(device->getNativeHandle(&handle));
+        InteropHandle handle[3] = {};
+        GFX_CHECK_CALL_ABORT(device->getNativeHandle(handle));
         Slang::ComPtr<IDevice> testDevice;
         IDevice::Desc testDeviceDesc = deviceDesc;
-        testDeviceDesc.existingDeviceHandles = handle;
+        testDeviceDesc.existingDeviceHandles[0] = handle[0];
+        if (api == Slang::RenderApiFlag::Vulkan)
+        {
+            testDeviceDesc.existingDeviceHandles[1] = handle[1];
+            testDeviceDesc.existingDeviceHandles[2] = handle[2];
+        }
         auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
         if (SLANG_FAILED(createTestDeviceResult) || !device)
         {

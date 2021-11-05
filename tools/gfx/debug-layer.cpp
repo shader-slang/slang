@@ -285,7 +285,7 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(NativeHandle* outHandle)
+Result DebugDevice::getNativeHandle(InteropHandle* outHandle)
 {
     return baseObject->getNativeHandle(outHandle);
 }
@@ -348,7 +348,7 @@ Result DebugDevice::createTextureResource(
 }
 
 Result DebugDevice::createTextureFromNativeHandle(
-    IResource::NativeResourceHandle handle,
+    InteropHandle handle,
     const ITextureResource::Desc& srcDesc,
     ITextureResource** outResource)
 {
@@ -378,7 +378,7 @@ Result DebugDevice::createBufferResource(
 }
 
 Result DebugDevice::createBufferFromNativeHandle(
-    IResource::NativeResourceHandle handle,
+    InteropHandle handle,
     const IBufferResource::Desc& srcDesc,
     IBufferResource** outResource)
 {
@@ -393,7 +393,7 @@ Result DebugDevice::createBufferFromNativeHandle(
 }
 
 Result DebugDevice::createBufferFromSharedHandle(
-    void* handle,
+    InteropHandle handle,
     const IBufferResource::Desc& srcDesc,
     IBufferResource** outResource)
 {
@@ -756,13 +756,15 @@ DeviceAddress DebugBufferResource::getDeviceAddress()
     return baseObject->getDeviceAddress();
 }
 
-Result DebugBufferResource::getNativeResourceHandle(NativeResourceHandle* outHandle)
+Result DebugBufferResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeResourceHandle(outHandle);
 }
 
-Result DebugBufferResource::getSharedHandle(SharedHandle* outHandle)
+Result DebugBufferResource::getSharedHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getSharedHandle(outHandle);
 }
 
@@ -778,13 +780,15 @@ ITextureResource::Desc* DebugTextureResource::getDesc()
     return baseObject->getDesc();
 }
 
-Result DebugTextureResource::getNativeResourceHandle(NativeResourceHandle* outHandle)
+Result DebugTextureResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeResourceHandle(outHandle);
 }
 
-Result DebugTextureResource::getSharedHandle(SharedHandle* outHandle)
+Result DebugTextureResource::getSharedHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getSharedHandle(outHandle);
 }
 
