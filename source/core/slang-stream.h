@@ -43,6 +43,9 @@ public:
         /// Implies any pending data is flushed.
 	virtual void close() = 0;
 
+        /// Only applicable for write streams, flushes any buffers to underlying representation (such as pipe, or file)
+    virtual SlangResult flush() = 0;
+
         /// Helper function that will also *fail* if the specified amount of bytes aren't read.
     SlangResult readExactly(void* buffer, size_t length);
 };
@@ -76,6 +79,7 @@ public:
     virtual bool canRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
     virtual void close() SLANG_OVERRIDE { m_access = FileAccess::None; }
+    virtual SlangResult flush() SLANG_OVERRIDE { return canWrite() ? SLANG_OK : SLANG_E_NOT_AVAILABLE; }
 
         /// Get the contents
     ConstArrayView<uint8_t> getContents() const { return ConstArrayView<uint8_t>(m_contents, m_contentsSize); }
@@ -159,6 +163,7 @@ public:
 	virtual bool canWrite() SLANG_OVERRIDE;
 	virtual void close() SLANG_OVERRIDE;
 	virtual bool isEnd() SLANG_OVERRIDE;
+    virtual SlangResult flush() SLANG_OVERRIDE;
 
     FileStream();
     
@@ -173,6 +178,41 @@ private:
     FILE* m_handle;
     FileAccess m_fileAccess;            
     bool m_endReached = false;
+};
+
+class BufferedReadStream : public Stream
+{
+public:
+    typedef Stream Super;
+
+    virtual Int64 getPosition() SLANG_OVERRIDE;
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
+    virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
+    virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
+    virtual bool canRead() SLANG_OVERRIDE;
+    virtual bool canWrite() SLANG_OVERRIDE;
+    virtual void close() SLANG_OVERRIDE;
+    virtual bool isEnd() SLANG_OVERRIDE;
+    virtual SlangResult flush() SLANG_OVERRIDE;
+
+        /// Will read assuming backing stream is 
+    void update(size_t readSize = 1024);
+
+        /// We define the 'canonical' buffer as being *linear* and m_startIndex is 0
+    Byte* getCanonicalBuffer();
+        /// Get the buffer contents linear in memory
+    Byte* getLinearBuffer();
+    size_t getCount() const { return m_count;  }
+
+    // This buffer is treated like a queue
+
+protected:
+    void _advanceStartIndex(Index byteCount);
+
+    List<Byte> m_buffer;        ///< Holds the characters
+    Index m_startIndex;         ///< The start index
+    Index m_count;              ///< The size of the used buffer from the start index
+    RefPtr<Stream> m_stream;    ///< Stream that is being read from
 };
 
 } // namespace Slang
