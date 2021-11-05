@@ -290,7 +290,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(InteropHandle* outHandle)
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeDeviceHandles(InteropHandles* outHandles)
 {
     return SLANG_OK;
 }

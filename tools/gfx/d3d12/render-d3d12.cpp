@@ -158,7 +158,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override;
 
     ~D3D12Device();
 
@@ -224,6 +224,14 @@ public:
         {
         }
 
+        ~BufferResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
+        }
+
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
@@ -243,11 +251,20 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
             ComPtr<ID3D12Device> pDevice;
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
             outHandle->api = InteropHandleAPI::Win32;
+            sharedHandle = *outHandle;
             return SLANG_OK;
         }
     };
@@ -261,6 +278,14 @@ public:
             : Parent(desc)
             , m_defaultState(D3DUtil::translateResourceState(desc.defaultState))
         {
+        }
+
+        ~TextureResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
         }
 
         D3D12Resource m_resource;
@@ -4174,10 +4199,10 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(InteropHandle* outHandle)
+Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    outHandle[0].handleValue = (uint64_t)m_device;
-    outHandle[0].api = InteropHandleAPI::D3D12;
+    outHandles->handles[0].handleValue = (uint64_t)m_device;
+    outHandles->handles[0].api = InteropHandleAPI::D3D12;
     return SLANG_OK;
 }
 
@@ -4356,7 +4381,7 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles[0].handleValue == 0)
+    if (desc.existingDeviceHandles.handles[0].handleValue == 0)
     {
         FlagCombiner combiner;
         // TODO: we should probably provide a command-line option
@@ -4389,7 +4414,7 @@ Result D3D12Device::initialize(const Desc& desc)
     else
     {
         // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles[0].handleValue;
+        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.handles[0].handleValue;
     }
 
     // Set the device

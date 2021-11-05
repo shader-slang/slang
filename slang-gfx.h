@@ -1640,6 +1640,11 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
+    struct InteropHandles
+    {
+        InteropHandle handles[3] = {};
+    };
+
     struct Desc
     {
         // The underlying API/Platform of the device.
@@ -1647,7 +1652,7 @@ public:
         // The device's handles (if they exist) and their associated API. For D3D12, this contains a single InteropHandle
         // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
         // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
-        InteropHandle existingDeviceHandles[3] = {};
+        InteropHandles existingDeviceHandles;
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
@@ -1663,7 +1668,7 @@ public:
         SlangDesc slang = {};
     };
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 

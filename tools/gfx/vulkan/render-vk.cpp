@@ -138,7 +138,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override;
         /// Dtor
     ~VKDevice();
 
@@ -5340,12 +5340,12 @@ VKDevice::~VKDevice()
     
     if (m_device != VK_NULL_HANDLE)
     {
-        if (m_desc.existingDeviceHandles[2].handleValue == 0)
+        if (m_desc.existingDeviceHandles.handles[2].handleValue == 0)
             m_api.vkDestroyDevice(m_device, nullptr);
         m_device = VK_NULL_HANDLE;
         if (m_debugReportCallback != VK_NULL_HANDLE)
             m_api.vkDestroyDebugReportCallbackEXT(m_api.m_instance, m_debugReportCallback, nullptr);
-        if (m_api.m_instance != VK_NULL_HANDLE && m_desc.existingDeviceHandles[0].handleValue == 0)
+        if (m_api.m_instance != VK_NULL_HANDLE && m_desc.existingDeviceHandles.handles[0].handleValue == 0)
             m_api.vkDestroyInstance(m_api.m_instance, nullptr);
     }
 }
@@ -5424,14 +5424,14 @@ VkPipelineShaderStageCreateInfo VKDevice::compileEntryPoint(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result VKDevice::getNativeHandle(InteropHandle* outHandle)
+Result VKDevice::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    outHandle[0].handleValue = (uint64_t)m_api.m_instance;
-    outHandle[0].api = InteropHandleAPI::Vulkan;
-    outHandle[1].handleValue = (uint64_t)m_api.m_physicalDevice;
-    outHandle[1].api = InteropHandleAPI::Vulkan;
-    outHandle[2].handleValue = (uint64_t)m_api.m_device;
-    outHandle[2].api = InteropHandleAPI::Vulkan;
+    outHandles->handles[0].handleValue = (uint64_t)m_api.m_instance;
+    outHandles->handles[0].api = InteropHandleAPI::Vulkan;
+    outHandles->handles[1].handleValue = (uint64_t)m_api.m_physicalDevice;
+    outHandles->handles[1].api = InteropHandleAPI::Vulkan;
+    outHandles->handles[2].handleValue = (uint64_t)m_api.m_device;
+    outHandles->handles[2].api = InteropHandleAPI::Vulkan;
     return SLANG_OK;
 }
 
@@ -5882,7 +5882,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
         if (initDeviceResult != SLANG_OK)
             continue;
         descriptorSetAllocator.m_api = &m_api;
-        initDeviceResult = initVulkanInstanceAndDevice(desc.existingDeviceHandles, ENABLE_VALIDATION_LAYER != 0);
+        initDeviceResult = initVulkanInstanceAndDevice(desc.existingDeviceHandles.handles, ENABLE_VALIDATION_LAYER != 0);
         if (initDeviceResult == SLANG_OK)
             break;
     }
