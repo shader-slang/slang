@@ -895,10 +895,10 @@ private:
     String m_adapterName;
 
 public:
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override
     {
-        outHandle[0].handleValue = (uint64_t)m_device;
-        outHandle[0].api = InteropHandleAPI::CUDA;
+        outHandles->handles[0].handleValue = (uint64_t)m_device;
+        outHandles->handles[0].api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 
