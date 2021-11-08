@@ -304,6 +304,7 @@
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-process.h" />
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h" />
     <ClInclude Include="..\..\..\source\core\slang-render-api-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff-file-system.h" />
@@ -346,6 +347,7 @@
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-process-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-render-api-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-riff-file-system.cpp" />
@@ -367,7 +369,7 @@
     <ClCompile Include="..\..\..\source\core\slang-uint-set.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-writer.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-zip-file-system.cpp" />
-    <ClCompile Include="..\..\..\source\core\windows\slang-win-process-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\windows\slang-win-process.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />

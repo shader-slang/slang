@@ -163,7 +163,7 @@ static SlangResult _outputReflect()
     // Get in as Stream
 
     RefPtr<Stream> stdinStream;
-    ProcessUtil::getStdStream(Process::StreamType::StdIn, stdinStream);
+    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
 
     FILE* fileOut = stdout;
 

@@ -17,7 +17,7 @@ void CommandLineArgs::setArgs(const char*const* args, size_t argCount)
 
     StringBuilder buf;
    
-    auto escapeHandler = ProcessUtil::getEscapeHandler();
+    auto escapeHandler = Process::getEscapeHandler();
 
     for (size_t i = 0; i < argCount; ++i)
     {

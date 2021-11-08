@@ -1,9 +1,10 @@
 // slang-win-process-util.cpp
-#include "../slang-process-util.h"
+#include "../slang-process.h"
 
 #include "../slang-string.h"
 #include "../slang-string-escape-util.h"
 #include "../slang-string-util.h"
+#include "../slang-process-util.h"
 
 #include "../../../slang-com-helper.h"
 
@@ -302,100 +303,21 @@ bool WinProcess::isTerminated()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
+/* static */StringEscapeHandler* Process::getEscapeHandler()
 {
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
-/* static */UnownedStringSlice ProcessUtil::getExecutableSuffix()
+/* static */UnownedStringSlice Process::getExecutableSuffix()
 {
     return UnownedStringSlice::fromLiteral(".exe");
 }
 
-/* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
-{
-    auto escapeHandler = getEscapeHandler();
-
-    StringBuilder cmd;
-    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
-
-    for (const auto& arg : commandLine.m_args)
-    {
-        cmd << " ";
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
-    }
-    return cmd.ToString();
-}
-
-static String _getText(const ConstArrayView<Byte>& bytes)
-{
-    StringBuilder buf;
-    StringUtil::appendStandardLines(UnownedStringSlice((const char*)bytes.begin(), (const char*)bytes.end()), buf);
-    return buf.ProduceString();
-}
-
-/* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
-{
-    RefPtr<Process> process;
-    SLANG_RETURN_ON_FAIL(createProcess(commandLine, 0, process));
-    SLANG_RETURN_ON_FAIL(readUntilTermination(process, outExecuteResult));
-    return SLANG_OK;
-}
-
-static Index _getCount(List<Byte>* buf)
-{
-    return buf ? buf->getCount() : 0;
-}
-
-/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, ExecuteResult& outExecuteResult)
-{
-    List<Byte> stdOut;
-    List<Byte> stdError;
-
-    SLANG_RETURN_ON_FAIL(readUntilTermination(process, &stdOut, &stdError));
-
-    // Get the return code
-    outExecuteResult.resultCode = ExecuteResult::ResultCode(process->getReturnValue());
-
-    outExecuteResult.standardOutput = _getText(stdOut.getArrayView());
-    outExecuteResult.standardError = _getText(stdError.getArrayView());
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* outStdError)
-{
-    Stream* stdOutStream = process->getStream(Process::StreamType::StdOut);
-    Stream* stdErrorStream = process->getStream(Process::StreamType::ErrorOut);
-
-    while (process->isTerminated())
-    {
-        const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
-
-        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdOutStream, 0, outStdOut));
-        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdErrorStream, 0, outStdError));
-
-        const auto postCount = _getCount(outStdOut) + _getCount(outStdError);
-
-        // If nothing was read, we can yield
-        if (preCount == postCount)
-        {
-            sleep(0);
-        }
-    }
-
-    // Read anything remaining
-    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdOutStream, 0, outStdOut));
-    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdErrorStream, 0, outStdError));
-
-    return SLANG_OK;
-}
-
-/* static */SlangResult ProcessUtil::getStdStream(Process::StreamType type, RefPtr<Stream>& out)
+/* static */SlangResult Process::getStdStream(StreamType type, RefPtr<Stream>& out)
 {
     switch (type)
     {
-        case Process::StreamType::StdIn:
+        case StreamType::StdIn:
         {
             const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
             out = new WinPipeStream(stdinHandle, FileAccess::Read, false);
@@ -406,7 +328,7 @@ static Index _getCount(List<Byte>* buf)
     return SLANG_FAIL;
 }
 
-/* static */SlangResult ProcessUtil::createProcess(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
+/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
 {   
     WinHandle childStdOutRead;
     WinHandle childStdErrRead; 
@@ -472,7 +394,7 @@ static Index _getCount(List<Byte>* buf)
         }
 
         // Produce the command line string
-        String cmdString = getCommandLineString(commandLine);
+        String cmdString = ProcessUtil::getCommandLineString(commandLine);
         OSString cmdStringBuffer = cmdString.toWString();
 
         // Now we can actually get around to starting a process
@@ -536,7 +458,7 @@ static Index _getCount(List<Byte>* buf)
     return SLANG_OK;
 }
 
-/* static */void ProcessUtil::sleep(Index timeInMs)
+/* static */void Process::sleepCurrentThread(Index timeInMs)
 {
     ::Sleep(DWORD(timeInMs));
 }
@@ -550,16 +472,16 @@ static uint64_t _getClockFrequency()
 
 static const uint64_t g_frequency = _getClockFrequency();
 
-/* static */uint64_t ProcessUtil::getClockFrequency()
+/* static */uint64_t Process::getClockFrequency()
 {
     return g_frequency;
 }
 
-/* static */uint64_t ProcessUtil::getClockTick()
+/* static */uint64_t Process::getClockTick()
 {
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
     return counter.QuadPart;
 }
 
-} 
+} // namespace Slang
