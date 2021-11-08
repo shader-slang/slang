@@ -12,6 +12,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-writer.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-process-util.h"
 
 #include "../../source/core/slang-shared-library.h"
 
@@ -111,7 +112,109 @@ static SlangResult _createSlangSession(const char* exePath, int argc, const char
     return SLANG_OK;
 }
 
-static SlangResult execute(int argc, const char* const* argv)
+static SlangResult _appendBuffer(FILE* file, List<Byte>& ioDst)
+{
+    const size_t expandSize = 1024;
+
+    const Index prevCount = ioDst.getCount();
+    ioDst.setCount(prevCount + expandSize);
+
+    const size_t readSize = fread(ioDst.getBuffer() + prevCount, 1, expandSize, file);
+
+    ioDst.setCount(prevCount + Index(readSize));
+}
+
+static SlangResult _appendBuffer(Stream* stream, List<Byte>& ioDst)
+{
+    const size_t expandSize = 1024;
+
+    const Index prevCount = ioDst.getCount();
+    ioDst.setCount(prevCount + expandSize);
+
+    size_t readSize;
+    SLANG_RETURN_ON_FAIL(stream->read(ioDst.getBuffer() + prevCount, expandSize, readSize));
+
+    ioDst.setCount(prevCount + Index(readSize));
+    return SLANG_OK;
+}
+
+static SlangResult _outputCount(Index count)
+{
+    FILE* fileOut = stdout;
+
+    StringBuilder buf;
+    for (Index i = 0; i < count; ++i)
+    {
+        buf.Clear();
+        buf << i << "\n";
+
+        fwrite(buf.getBuffer(), 1, buf.getLength(), fileOut);
+    }
+
+    // NOTE! There is no flush here, we want to see if everything works if we just stream out.
+    return SLANG_OK;
+}
+
+static SlangResult _outputReflect()
+{
+    // Read lines from std input.
+    // When hit line with just 'end', terminate
+
+    // Get in as Stream
+
+    RefPtr<Stream> stdinStream;
+    ProcessUtil::getStdStream(Process::StreamType::StdIn, stdinStream);
+
+    FILE* fileOut = stdout;
+
+    //fprintf(fileOut, "end\n");
+    //fflush(fileOut);
+    //return SLANG_OK;
+
+#if 1
+    
+    List<Byte> buffer;
+
+    Index lineCount = 0;
+    Index startIndex = 0; 
+
+    while (true)
+    {
+        SLANG_RETURN_ON_FAIL(_appendBuffer(stdinStream, buffer));
+
+        while (true)
+        {
+            UnownedStringSlice slice((const char*)buffer.begin() + startIndex, (const char*)buffer.end());
+            UnownedStringSlice line;
+
+            if (!StringUtil::extractLine(slice, line) || slice.begin() == nullptr)
+            {
+                break;
+            }
+
+            // Process the line
+            if (line == UnownedStringSlice::fromLiteral("end"))
+            {
+                return SLANG_OK;
+            }
+
+            // Write the text to the output stream
+            fwrite(line.begin(), 1, line.getLength(), fileOut);
+            fputc('\n', fileOut);
+            fflush(fileOut);
+
+            lineCount++;
+
+            // Move the start index forward
+            const Index newStartIndex = slice.begin() ? Index(slice.begin() - (const char*)buffer.getBuffer()) : buffer.getCount();
+            SLANG_ASSERT(newStartIndex > startIndex);
+            startIndex = newStartIndex;
+        }
+    }
+#endif
+}
+
+static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
@@ -124,6 +227,21 @@ static SlangResult execute(int argc, const char* const* argv)
 
     // The 'exeName' of the tool. 
     const String toolName = argv[1];
+
+    if (toolName == "reflect")
+    {
+        return _outputReflect();
+    }
+
+    if (toolName == "count")
+    {
+        if (argc < 3)
+        {
+            return SLANG_FAIL;
+        }
+        Index value = StringToInt(argv[2]);
+        return _outputCount(value);
+    }
 
     {
         StringBuilder sharedLibToolBuilder;
