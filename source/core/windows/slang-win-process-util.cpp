@@ -73,10 +73,10 @@ private:
 };
 
 /* A simple Stream implementation of a File HANDLE (or Pipe). Note that currently does not allow getPosition/seek/atEnd */
-class WinFileStream : public Stream
+class WinPipeStream : public Stream
 {
 public:
-    typedef WinFileStream ThisType;
+    typedef WinPipeStream ThisType;
 
     // Stream
     virtual Int64 getPosition() SLANG_OVERRIDE { return 0; }
@@ -87,15 +87,19 @@ public:
     virtual bool canRead() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Read)) && !m_streamHandle.isNull(); }
     virtual bool canWrite() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Write)) && !m_streamHandle.isNull(); }
     virtual void close() SLANG_OVERRIDE;
+    virtual SlangResult flush() SLANG_OVERRIDE;
 
-    WinFileStream(HANDLE handle, FileAccess access);
+    WinPipeStream(HANDLE handle, FileAccess access, bool isOwned = true);
 
-    ~WinFileStream() { close(); }
+    ~WinPipeStream() { close(); }
 
 protected:
 
+    SlangResult _updateState(BOOL res);
+
     FileAccess m_access = FileAccess::None;
     WinHandle m_streamHandle;
+    bool m_isOwned;
 };
 
 
@@ -116,31 +120,37 @@ public:
     }
 
 protected:
+
     void _hasTerminated();
     WinHandle m_processHandle;          ///< If not set the process has terminated
 };
 
-/* !!!!!!!!!!!!!!!!!!!!!!!!!!! WinFileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!! WinPipeStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-WinFileStream::WinFileStream(HANDLE handle, FileAccess access) :
+WinPipeStream::WinPipeStream(HANDLE handle, FileAccess access, bool isOwned) :
     m_streamHandle(handle),
-    m_access(access)
+    m_access(access),
+    m_isOwned(isOwned)
 {
+    // It might be handy to get information about the handle
+    // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
+
+    {
+        DWORD flags, outBufferSize, inBufferSize, maxInstances;
+        // It appears that by default windows pipe buffer size is 4k.
+        if (GetNamedPipeInfo(handle, &flags, &outBufferSize, &inBufferSize, &maxInstances))
+        {
+        }
+    }
 }
 
-SlangResult WinFileStream::read(void* buffer, size_t length, size_t& outReadBytes)
+SlangResult WinPipeStream::_updateState(BOOL res)
 {
-    if ((Index(m_access) & Index(FileAccess::Read)) == 0 || m_streamHandle.isNull())
+    if (res)
     {
-        return SLANG_E_NOT_AVAILABLE;
+        return SLANG_OK;
     }
-
-    DWORD bytesRead = 0;
-    BOOL readResult = ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr);
-
-    outReadBytes = bytesRead;
-
-    if (!readResult)
+    else
     {
         const auto err = GetLastError();
 
@@ -153,11 +163,50 @@ SlangResult WinFileStream::read(void* buffer, size_t length, size_t& outReadByte
         SLANG_UNUSED(err);
         return SLANG_FAIL;
     }
+}
+
+SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
+{
+    outReadBytes = 0;
+
+    if ((Index(m_access) & Index(FileAccess::Read)) == 0 || m_streamHandle.isNull())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    if (true)
+    {
+        DWORD bytesRead = 0;
+        DWORD totalBytes = 0;
+        DWORD remainingBytes = 0;
+
+        // Works on anonymous pipes too
+        // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
+
+        SLANG_RETURN_ON_FAIL(_updateState(PeekNamedPipe(m_streamHandle, nullptr, DWORD(0), &bytesRead, &totalBytes, &remainingBytes)));
+        // If there is nothing to read we are done
+        // If we don't do this ReadFile will *block* if there is nothing available
+        if (totalBytes == 0)
+        {
+            return SLANG_OK;
+        }
+
+        SLANG_RETURN_ON_FAIL(_updateState(ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+
+        outReadBytes = bytesRead;
+    }
+    else
+    {
+        DWORD bytesRead = 0;
+        SLANG_RETURN_ON_FAIL(_updateState(ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+
+        outReadBytes = bytesRead;
+    }
 
     return SLANG_OK;
 }
 
-SlangResult WinFileStream::write(const void* buffer, size_t length)
+SlangResult WinPipeStream::write(const void* buffer, size_t length)
 {
     if ((Index(m_access) & Index(FileAccess::Write)) == 0 || m_streamHandle.isNull())
     {
@@ -175,9 +224,31 @@ SlangResult WinFileStream::write(const void* buffer, size_t length)
     return SLANG_OK;
 }
 
-void WinFileStream::close()
+void WinPipeStream::close()
 {
+    if (!m_isOwned)
+    {
+        // If we don't own it just detach it 
+        m_streamHandle.detach();
+    }
     m_streamHandle.setNull();
+}
+
+SlangResult WinPipeStream::flush()
+{
+    if ((Index(m_access) & Index(FileAccess::Write)) == 0 || m_streamHandle.isNull())
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers
+
+    if (!FlushFileBuffers(m_streamHandle))
+    {
+        auto err = GetLastError();
+        SLANG_UNUSED(err);
+    }
+    return SLANG_OK;
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!! WinProcess !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -256,55 +327,89 @@ bool WinProcess::isTerminated()
     return cmd.ToString();
 }
 
-
-static SlangResult _readText(Stream* stream, String& outString)
+static String _getText(const ConstArrayView<Byte>& bytes)
 {
-    List<Byte> contents;
-    const size_t expandSize = 1024;
-
-    while (!stream->isEnd())
-    {
-        const Index prevCount = contents.getCount();
-        contents.setCount(prevCount + expandSize);
-
-        size_t readSize;
-        SLANG_RETURN_ON_FAIL(stream->read(contents.getBuffer() + prevCount, expandSize, readSize));
-
-        contents.setCount(prevCount + Index(readSize));
-    }
-
     StringBuilder buf;
-    StringUtil::appendStandardLines(UnownedStringSlice((const char*)contents.begin(), (const char*)contents.end()), buf);
-
-    outString = buf.ProduceString();
-    return SLANG_OK;
+    StringUtil::appendStandardLines(UnownedStringSlice((const char*)bytes.begin(), (const char*)bytes.end()), buf);
+    return buf.ProduceString();
 }
 
 /* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
 {
     RefPtr<Process> process;
-    SLANG_RETURN_ON_FAIL(createProcess(commandLine, process));
-    process->waitForTermination();
+    SLANG_RETURN_ON_FAIL(createProcess(commandLine, 0, process));
+    SLANG_RETURN_ON_FAIL(readUntilTermination(process, outExecuteResult));
+    return SLANG_OK;
+}
 
-    // Grab the contents of the pipe
+static Index _getCount(List<Byte>* buf)
+{
+    return buf ? buf->getCount() : 0;
+}
 
+/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, ExecuteResult& outExecuteResult)
+{
+    List<Byte> stdOut;
+    List<Byte> stdError;
+
+    SLANG_RETURN_ON_FAIL(readUntilTermination(process, &stdOut, &stdError));
+
+    // Get the return code
     outExecuteResult.resultCode = ExecuteResult::ResultCode(process->getReturnValue());
 
-    SLANG_RETURN_ON_FAIL(_readText(process->getStream(Process::StreamType::StdOut), outExecuteResult.standardOutput));
-    SLANG_RETURN_ON_FAIL(_readText(process->getStream(Process::StreamType::ErrorOut), outExecuteResult.standardError));
+    outExecuteResult.standardOutput = _getText(stdOut.getArrayView());
+    outExecuteResult.standardError = _getText(stdError.getArrayView());
 
     return SLANG_OK;
 }
 
-/* static */SlangResult ProcessUtil::createProcess(const CommandLine& commandLine, RefPtr<Process>& outProcess)
+/* static */SlangResult ProcessUtil::readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* outStdError)
 {
-    SECURITY_ATTRIBUTES securityAttributes;
-    securityAttributes.nLength = sizeof(securityAttributes);
-    securityAttributes.lpSecurityDescriptor = nullptr;
-    securityAttributes.bInheritHandle = true;
+    Stream* stdOutStream = process->getStream(Process::StreamType::StdOut);
+    Stream* stdErrorStream = process->getStream(Process::StreamType::ErrorOut);
 
+    while (process->isTerminated())
+    {
+        const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
+
+        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdOutStream, 0, outStdOut));
+        SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscard(stdErrorStream, 0, outStdError));
+
+        const auto postCount = _getCount(outStdOut) + _getCount(outStdError);
+
+        // If nothing was read, we can yield
+        if (preCount == postCount)
+        {
+            sleep(0);
+        }
+    }
+
+    // Read anything remaining
+    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdOutStream, 0, outStdOut));
+    SLANG_RETURN_ON_FAIL(StreamUtil::readOrDiscardAll(stdErrorStream, 0, outStdError));
+
+    return SLANG_OK;
+}
+
+/* static */SlangResult ProcessUtil::getStdStream(Process::StreamType type, RefPtr<Stream>& out)
+{
+    switch (type)
+    {
+        case Process::StreamType::StdIn:
+        {
+            const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+            out = new WinPipeStream(stdinHandle, FileAccess::Read, false);
+            return SLANG_OK;
+        }
+    }
+
+    return SLANG_FAIL;
+}
+
+/* static */SlangResult ProcessUtil::createProcess(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
+{   
     WinHandle childStdOutRead;
-    WinHandle childStdErrRead;
+    WinHandle childStdErrRead; 
     WinHandle childStdInWrite;
 
     WinHandle processHandle;
@@ -313,18 +418,29 @@ static SlangResult _readText(Stream* stream, String& outString)
         WinHandle childStdErrWrite;
         WinHandle childStdInRead;
 
+        SECURITY_ATTRIBUTES securityAttributes;
+        securityAttributes.nLength = sizeof(securityAttributes);
+        securityAttributes.lpSecurityDescriptor = nullptr;
+        securityAttributes.bInheritHandle = true;
+
+        // 0 means use the 'system default'
+        //const DWORD bufferSize = 64 * 1024;
+        const DWORD bufferSize = 0;
+
         {
             WinHandle childStdOutReadTmp;
             WinHandle childStdErrReadTmp;
             WinHandle childStdInWriteTmp;
             // create stdout pipe for child process
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, 0));
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdOutReadTmp.writeRef(), childStdOutWrite.writeRef(), &securityAttributes, bufferSize));
             // create stderr pipe for child process
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, 0));
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdErrReadTmp.writeRef(), childStdErrWrite.writeRef(), &securityAttributes, bufferSize));
             // create stdin pipe for child process        
-            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, 0));
+            SLANG_RETURN_FAIL_ON_FALSE(CreatePipe(childStdInRead.writeRef(), childStdInWriteTmp.writeRef(), &securityAttributes, bufferSize));
 
             const HANDLE currentProcess = GetCurrentProcess();
+
+            // https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-duplicatehandle
 
             // create a non-inheritable duplicate of the stdout reader        
             SLANG_RETURN_FAIL_ON_FALSE(DuplicateHandle(currentProcess, childStdOutReadTmp, currentProcess, childStdOutRead.writeRef(), 0, FALSE, DUPLICATE_SAME_ACCESS));
@@ -363,6 +479,15 @@ static SlangResult _readText(Stream* stream, String& outString)
         PROCESS_INFORMATION processInfo;
         ZeroMemory(&processInfo, sizeof(processInfo));
 
+        // https://docs.microsoft.com/en-us/windows/win32/procthread/process-creation-flags
+
+        DWORD createFlags = CREATE_NO_WINDOW;
+
+        if (flags & Process::Flag::AttachDebugger)
+        {
+            createFlags |= CREATE_SUSPENDED;
+        }
+
         // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
         // `CreateProcess` requires write access to this, for some reason...
         BOOL success = CreateProcessW(
@@ -371,7 +496,7 @@ static SlangResult _readText(Stream* stream, String& outString)
             nullptr,
             nullptr,
             true,
-            CREATE_NO_WINDOW,
+            createFlags,
             nullptr, // TODO: allow specifying environment variables?
             nullptr,
             &startupInfo,
@@ -381,23 +506,39 @@ static SlangResult _readText(Stream* stream, String& outString)
         {
             DWORD err = GetLastError();
             SLANG_UNUSED(err);
-
             return SLANG_FAIL;
+        }
+
+        if (flags & Process::Flag::AttachDebugger)
+        {
+            // Lets see if we can set up to debug
+            // https://docs.microsoft.com/en-us/windows/win32/debug/debugging-a-running-process
+            
+            //DebugActiveProcess(processInfo.dwProcessId);
+        
+            // Resume the thread
+            ResumeThread(processInfo.hThread);
         }
 
         // close handles we are now done with
         CloseHandle(processInfo.hThread);
 
+        // Save the process handle
         processHandle = processInfo.hProcess;
     }
 
     RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
-    streams[Index(Process::StreamType::ErrorOut)] = new WinFileStream(childStdErrRead.detach(), FileAccess::Read);
-    streams[Index(Process::StreamType::StdOut)] = new WinFileStream(childStdOutRead.detach(), FileAccess::Read);
-    streams[Index(Process::StreamType::StdIn)] = new WinFileStream(childStdInWrite.detach(), FileAccess::Write);
+    streams[Index(Process::StreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
+    streams[Index(Process::StreamType::StdOut)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
+    streams[Index(Process::StreamType::StdIn)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
 
     outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
     return SLANG_OK;
+}
+
+/* static */void ProcessUtil::sleep(Index timeInMs)
+{
+    ::Sleep(DWORD(timeInMs));
 }
 
 static uint64_t _getClockFrequency()

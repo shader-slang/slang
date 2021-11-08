@@ -73,6 +73,15 @@ public:
         CountOf,
     };
 
+    typedef uint32_t Flags;
+    struct Flag
+    {
+        enum Enum : Flags
+        {
+            AttachDebugger = 0x01,
+        };
+    };
+
         /// Get the stream for the type
     Stream* getStream(StreamType type) const { return m_streams[Index(type)]; }
     int32_t getReturnValue() const { return m_returnValue;  }
@@ -102,8 +111,20 @@ struct ProcessUtil
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
 
+        /// Read from read from streams until process terminates.
+        /// Passing nullptr for a stream, will just discard what's in the stream
+    static SlangResult readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* stdError);
+
+        /// Read streams from process. 
+    static SlangResult readUntilTermination(Process* process, ExecuteResult& outExecuteResult);
+
         /// Create a process using the executable/args defined from the commandLine
-    static SlangResult createProcess(const CommandLine& commandLine, RefPtr<Process>& outProcess);
+    static SlangResult createProcess(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess);
+
+    static SlangResult getStdStream(Process::StreamType type, RefPtr<Stream>& out);
+
+        /// Sleep for time specified in milliseconds. 0 indicates to OS ok to yield this thread.
+    static void sleep(Index timeInMs);
 
     static uint64_t getClockFrequency();
 

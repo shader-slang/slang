@@ -180,6 +180,9 @@ private:
     bool m_endReached = false;
 };
 
+/* A simple BufferedReader. The valid data is between m_startIndex and getCount().
+Can be used as a buffer to build up a result from a stream in memory using 'update' to read to the appropriate buffer size. 
+*/
 class BufferedReadStream : public Stream
 {
 public:
@@ -196,24 +199,42 @@ public:
     virtual SlangResult flush() SLANG_OVERRIDE;
 
         /// Will read assuming backing stream is 
-    void update(size_t readSize = 1024);
+    SlangResult update();
 
-        /// We define the 'canonical' buffer as being *linear* and m_startIndex is 0
-    Byte* getCanonicalBuffer();
-        /// Get the buffer contents linear in memory
-    Byte* getLinearBuffer();
-    size_t getCount() const { return m_count;  }
+    Byte* getBuffer() { return m_buffer.getBuffer() + m_startIndex; }
+    const Byte* getBuffer() const { return m_buffer.getBuffer() + m_startIndex; }
 
-    // This buffer is treated like a queue
+    size_t getCount() const { return m_buffer.getCount() - m_startIndex; }
+
+    ConstArrayView<Byte> getView() const { return ConstArrayView<Byte>(getBuffer(), Index(getCount())); }
+    ArrayView<Byte> getView() { return ArrayView<Byte>(getBuffer(), Index(getCount())); }
 
 protected:
     void _advanceStartIndex(Index byteCount);
 
+    size_t m_defaultReadSize = 1024;   ///< When initiating a read the default read size
     List<Byte> m_buffer;        ///< Holds the characters
     Index m_startIndex;         ///< The start index
-    Index m_count;              ///< The size of the used buffer from the start index
     RefPtr<Stream> m_stream;    ///< Stream that is being read from
 };
+
+struct StreamUtil
+{
+        /// Appends all bytes that can be read from stream into bytes
+    static SlangResult readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes);
+
+        /// Read as much as can be read until a 0 sized read, or an error and append onto ioBytes
+        /// Read size controls the size of each buffer read. Passing 0, will use the default read size.
+    static SlangResult read(Stream* stream, size_t readSize, List<Byte>& ioBytes);
+
+    static SlangResult discard(Stream* stream);
+
+    static SlangResult discardAll(Stream* stream);
+
+    static SlangResult readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes);
+    static SlangResult readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes);
+};
+
 
 } // namespace Slang
 

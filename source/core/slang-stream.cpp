@@ -376,28 +376,17 @@ SlangResult OwnedMemoryStream::write(const void * buffer, size_t length)
 
 void BufferedReadStream::_advanceStartIndex(Index byteCount)
 {
-    SLANG_ASSERT(m_count >= byteCount && byteCount >= 0);
-
+    SLANG_ASSERT(Index(getCount()) >= byteCount && byteCount >= 0);
     m_startIndex += byteCount;
-    m_count -= byteCount;
-
-    if (m_count == 0)
+    if (getCount() == 0)
     {
         m_startIndex = 0;
-        return;
     }
-
-    const Index bufferCount = m_buffer.getCount();
-    
-    // Wrap around if necessary.
-    // NOTE! It's important if m_startIndex is pointing to end index (ie bufferCount),
-    // it is wrapped around to 0.
-    m_startIndex = (m_startIndex >= bufferCount) ? (m_startIndex - bufferCount) : m_startIndex;
 }
 
 Int64 BufferedReadStream::getPosition()
 {
-    return m_stream ? (m_stream->getPosition() - m_count) : 0;
+    return m_stream ? (m_stream->getPosition() - getCount()) : 0;
 }
 
 SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
@@ -406,56 +395,55 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
     {
         return SLANG_FAIL;
     }
+    // As it currently stands the data behind m_startIndex is the previous data.
+    // So we could seek backwards up to -m_startIndex.
+    // We don't worry about this here, for simplicity sake.
 
-    if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 || offset >= m_count)
+    if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 || offset >= Int64(getCount()))
     {
+        // Empty the buffer
         m_startIndex = 0;
-        m_count = 0;
-
+        m_buffer.setCount(0);
+        // Seek on underlying stream
         return m_stream->seek(origin, offset);
     }
 
+    // We can just seek on the buffered data
     _advanceStartIndex(Index(offset));
+    return SLANG_OK;
 }
 
 SlangResult BufferedReadStream::read(void* inBuffer, size_t length, size_t& outReadBytes)
-{
+{    
+    // If the buffer has no data and the read size is larger than the default read size - may as well just read directly into the output buffer
+    if (getCount() == 0 && length > m_defaultReadSize)
+    {
+        return m_stream->read(inBuffer, length, outReadBytes);
+    }
+
     Byte* buffer = (Byte*)inBuffer;
 
     size_t totalReadBytes = 0;
     outReadBytes = 0;
 
-    update();
-
-    const Index bufferCount = m_buffer.getCount();
+    // Do a read to fill the buffer.
+    SLANG_RETURN_ON_FAIL(update());
 
     while (length > 0)
     {
-        if (m_count > 0)
+        const size_t bufferCount = size_t(getCount());
+
+        if (bufferCount)
         {
-            // If it wraps around, deal with bytes up to end of buffer initially
-            if (m_startIndex + m_count > bufferCount)
-            {
-                const size_t maxRead = bufferCount - m_startIndex;
-                const size_t readCount = std::min(maxRead, length);
+            const size_t readCount = (bufferCount < length) ? bufferCount : length;
 
-                // Copy down
-                ::memcpy(buffer, m_buffer.getBuffer() + m_startIndex, readCount);
+            ::memcpy(buffer, getBuffer(), readCount);
 
-                _advanceStartIndex(Index(readCount));
-                buffer += readCount;
-                length -= readCount;
-            }
-            else
-            {
-                const size_t readCount = std::min(length, size_t(m_count));
+            _advanceStartIndex(Index(readCount));
+            buffer += readCount;
+            length -= readCount;
 
-                ::memcpy(buffer, m_buffer.getBuffer() + m_startIndex, readCount);
-
-                _advanceStartIndex(Index(readCount));
-                buffer += readCount;
-                length -= readCount;
-            }
+            totalReadBytes += readCount;
         }
         else
         {
@@ -487,7 +475,7 @@ SlangResult BufferedReadStream::write(const void* buffer, size_t length)
 
 bool BufferedReadStream::canRead()
 {
-    return m_count > 0 || (m_stream && m_stream->canRead());
+    return getCount() > 0 || (m_stream && m_stream->canRead());
 }
 
 bool BufferedReadStream::canWrite()
@@ -506,7 +494,7 @@ void BufferedReadStream::close()
 
 bool BufferedReadStream::isEnd()
 {
-    return m_count == 0 && (m_stream == nullptr || m_stream->isEnd());
+    return getCount() == 0 && (m_stream == nullptr || m_stream->isEnd());
 }
 
 SlangResult BufferedReadStream::flush()
@@ -514,125 +502,140 @@ SlangResult BufferedReadStream::flush()
     return SLANG_E_NOT_AVAILABLE;
 }
 
-Byte* BufferedReadStream::getCanonicalBuffer()
-{
-    Byte* data = m_buffer.getBuffer();
-    if (m_startIndex == 0)
-    {
-        return data;
-    }
-
-    const Index bufferCount = m_buffer.getCount();
-    if (m_count == 0)
-    {
-        // Don't need to do anything in terms of shifting
-    }
-    else if (m_startIndex + m_count <= bufferCount)
-    {
-        ::memmove(data, data + m_startIndex, m_count);
-    }
-    else
-    {
-        // We have to be wrapped around...
-        const Index startSize = bufferCount - m_startIndex;
-        const Index endSize = (m_startIndex + m_count) - bufferCount;
-
-        const Index gapSize = bufferCount - m_count;
-
-        // Lets rearrange such that the memory is linear, and whilst we are at it
-        // lets always make 0 indexed so 'canonical'.
-        // Ie
-        // EEEEEEEGGGGGSSSS
-        // Becomes
-        // SSSSEEEEEEEEGGGG
-
-        if (startSize <= gapSize)
-        {
-            // We can just shuffle around, in place
-            ::memmove(data + startSize, data, endSize);
-            ::memmove(data, data + m_startIndex, startSize);
-        }
-        else
-        {
-            // Copy the smallest section
-            if (startSize < endSize)
-            {
-                List<Byte> work;
-                work.setCount(startSize);
-                ::memcpy(work.getBuffer(), data + m_startIndex, startSize);
-                ::memmove(data + startSize, data, endSize);
-                ::memcpy(data, work.getBuffer(), startSize);
-            }
-            else
-            {
-                List<Byte> work;
-                work.setCount(endSize);
-                ::memcpy(work.getBuffer(), data, endSize);
-                ::memmove(data, data + m_startIndex, startSize);
-                ::memcpy(data + startSize, work.getBuffer(), endSize);
-            }
-        }
-    }
-
-    m_startIndex = 0;
-    return data;
-}
-
-Byte* BufferedReadStream::getLinearBuffer()
-{
-    const Index bufferCount = m_buffer.getCount();
-    Byte* data = m_buffer.getBuffer();
-    if (m_startIndex + m_count <= bufferCount)
-    {
-        return data + m_startIndex;
-    }
-    return getCanonicalBuffer();
-}
-
-void BufferedReadStream::update(size_t readSize)
+SlangResult BufferedReadStream::update()
 {
     if (m_stream == nullptr)
     {
-        return;
+        // Should this return an error?
+        return SLANG_OK;
     }
 
     {
-        const Index bufferSize = m_buffer.getCount();
-        const Index gapSize = bufferSize - m_count;
+        // How much buffer space do we have. We need at least m_defaultReadSize
+        const size_t remainingCount = size_t(m_buffer.getCapacity() - m_buffer.getCount());
 
-        if (size_t(gapSize) < readSize)
+        // Repeat until we have enough space
+        while (remainingCount < m_defaultReadSize)
         {
-            // In order to read, we'll have to reallocate.
-            getCanonicalBuffer();
-            SLANG_ASSERT(m_startIndex == 0);
-
-            m_buffer.setCount(m_count + readSize);
-            m_buffer.setCount(m_buffer.getCapacity());
-        }
-        else
-        {
-            /// GGGGSSSSSGGGG
-            if (m_startIndex + m_count <= bufferSize)
+            // If there is anything in the buffer shift it all down
+            if (m_startIndex > 0)
             {
-                const Index endGapSize = bufferSize - (m_startIndex + m_count);
-                if (size_t(endGapSize) < readSize)
+                Byte* buffer = m_buffer.getBuffer();
+                const Index count = getCount();
+                if (count > 0)
                 {
-                    getCanonicalBuffer();
+                    ::memmove(buffer, buffer + m_startIndex, count);
                 }
+
+                m_buffer.setCount(count);
+                m_startIndex = 0;
             }
             else
             {
-                // The gap is a contiguous run of the full gap size
-                // EEEEGGGGGSSSS
+                // Make sure we have the space 
+                const Index prevCount = m_buffer.getCount();
+                m_buffer.setCount(prevCount + m_defaultReadSize);
+                m_buffer.setCount(prevCount);
             }
         }
+        SLANG_ASSERT(size_t(m_buffer.getCapacity() - m_buffer.getCount()) >= m_defaultReadSize);
     }
+    
+    {
+        const Index prevCount = m_buffer.getCount();
+        m_buffer.setCount(prevCount + m_defaultReadSize);
 
-    Byte* dst = m_buffer.getBuffer() + m_startIndex + m_count;
+        size_t readBytes = 0;
 
-    size_t readBytes = 0;
-    m_stream->read(dst, readSize, readBytes);
-    m_count += Index(readBytes);
+        const  SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
+
+        m_buffer.setCount(prevCount + Index(readBytes));
+
+        return res;
+    }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/* static */SlangResult StreamUtil::readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes)
+{
+    while (!stream->isEnd())
+    {
+        SLANG_RETURN_ON_FAIL(read(stream, readSize, ioBytes));
+    }
+    
+    return SLANG_OK;
+}
+
+/* static */SlangResult StreamUtil::read(Stream* stream, size_t readSize, List<Byte>& ioBytes)
+{
+    readSize = (readSize <= 0) ? 1024 : readSize;
+
+    while (true)
+    {
+        const Index prevCount = ioBytes.getCount();
+        ioBytes.setCount(prevCount + readSize);
+
+        size_t readBytesCount;
+        SLANG_RETURN_ON_FAIL(stream->read(ioBytes.getBuffer() + prevCount, readSize, readBytesCount));
+        ioBytes.setCount(prevCount + Index(readBytesCount));
+
+        if (readBytesCount == 0)
+        {
+            return SLANG_OK;
+        }
+    }
+}
+
+/* static */SlangResult StreamUtil::discard(Stream* stream)
+{
+    Byte buf[1024];
+    const Index bufSize = SLANG_COUNT_OF(buf);
+
+    while (true)
+    {
+        size_t readBytesCount;
+        SLANG_RETURN_ON_FAIL(stream->read(buf, bufSize, readBytesCount));
+        
+        if (readBytesCount == 0)
+        {
+            return SLANG_OK;
+        }
+    }
+}
+
+/* static */SlangResult StreamUtil::discardAll(Stream* stream)
+{
+    while (!stream->isEnd())
+    {
+        SLANG_RETURN_ON_FAIL(discard(stream));
+    }
+    return SLANG_OK;
+}
+
+
+/* static */SlangResult StreamUtil::readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes)
+{
+    if (ioBytes)
+    {
+        return read(stream, readSize, *ioBytes);
+    }
+    else
+    {
+        return discard(stream);
+    }
+}
+
+/* static */SlangResult StreamUtil::readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes)
+{
+    if (ioBytes)
+    {
+        return readAll(stream, readSize, *ioBytes);
+    }
+    else
+    {
+        return discardAll(stream);
+    }
 }
 
 } // namespace Slang
