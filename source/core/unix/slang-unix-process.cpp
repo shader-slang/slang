@@ -28,8 +28,11 @@ public:
     virtual bool isTerminated() SLANG_OVERRIDE;
     virtual void waitForTermination() SLANG_OVERRIDE;
 
-    UnixProcess(pid_t pid, Stream*const* streams)
+    UnixProcess(pid_t pid, Stream*const* streams);
 protected:
+
+        /// Returns true if terminated
+    bool _updateTerminationState(int options);
 
     bool m_isTerminated = false;
     pid_t m_pid;
@@ -59,9 +62,7 @@ public:
 
 protected:
 
-        /// Returns true if terminated
-    bool _updateTerminationState(int options);
-
+    
     bool m_isOwned;
     FileAccess m_access;
     int m_fd;
@@ -85,6 +86,7 @@ bool UnixProcess::_updateTerminationState(int options)
 {
     if (!m_isTerminated)
     {
+        int childStatus;
         const pid_t terminatedPid = waitpid(m_pid, &childStatus, options);
         if (terminatedPid == -1)
         {
@@ -136,7 +138,8 @@ SlangResult UnixPipeStream::flush()
 {
     if (canWrite())
     {
-        flush(m_fd);
+        // We might want to use
+        ::fsync(m_fd);
     }
 }
 
@@ -165,7 +168,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_FAIL;
     }
 
-    if (poolResult == 0)
+    if (pollResult == 0)
     {
         // There were no results, so we are done
         return SLANG_OK;
@@ -236,12 +239,12 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 #endif
 }
 
-/* static */StringEscapeHandler* ProcessUtil::getEscapeHandler()
+/* static */StringEscapeHandler* Process::getEscapeHandler()
 {
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
-/* static */SlangResult Process::create(const CommandLine& commandLine, RefPtr<Process>& outProcess)
+/* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
 {
     List<char const*> argPtrs;
 
@@ -308,11 +311,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
 
         // Previously code didn't need to close, so we'll make stream not own the handles
-        streams[Index(Process::StreamType::StdOut)] = new UnixStream(stdoutPipe[0], FileAccess::Read, false);
-        streams[Index(Process::StreamType::ErrorOut)] = new UnixStream(stderrPipe[0], FileAccess::Read, false);
-        streams[Index(Process::StreamType::StdIn)] = new UnixStream(stdinPipe[1], FileAccess::Write, false);
+        streams[Index(Process::StreamType::StdOut)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, false);
+        streams[Index(Process::StreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, false);
+        streams[Index(Process::StreamType::StdIn)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, false);
 
-        outProcess = new UnixProcess(childProcessID, streams.readRef());
+        outProcess = new UnixProcess(childProcessID, streams[0].readRef());
         return SLANG_OK;
     }
 }
@@ -333,10 +336,10 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 {
     struct timespec timeSpec;
 
-    if (timeInMs)
+    if (timeInMs > 0)
     {
-        timeSpec.tv_sec = time / 1000;
-        timeSpec.tv_nsec = (time % 1000) * 1000 * 1000;
+        timeSpec.tv_sec = timeInMs / 1000;
+        timeSpec.tv_nsec = (timeInMs % 1000) * 1000 * 1000;
     }
     else
     {
