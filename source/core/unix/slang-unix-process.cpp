@@ -92,7 +92,7 @@ struct UnixPipe
     int detachRead() { return detachAt(0); }
     int detachWrite() { return detachAt(1); }
 
-    int detachAt(int i)
+    int detachAt(Index i)
     {
         SLANG_ASSERT(isValidAt(i));
         const int fd = m_fds[i];
@@ -216,47 +216,49 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_OK;
     }
 
-    auto count = ::read(m_fd, buffer, length);
+    // Check if it's hung up.
+    pollfd pollInfo;
 
-    // If it's -1 it seems like an error
-    if (count == -1)
+    pollInfo.fd = m_fd;
+    pollInfo.events = POLLIN | POLLHUP;
+    pollInfo.revents = 0;
+
+    // https://linux.die.net/man/2/poll
+
+    // Return immediately
+    const int pollTimeout = 0;
+
+    const int pollResult = ::poll(&pollInfo, 1, pollTimeout);
+    if (pollResult < 0)
     {
-        const int err = errno;
-
-        // On non blocking pipe these indicate there could be more to come
-        if (err == EAGAIN || err == EWOULDBLOCK)
-        {
-            return SLANG_OK;
-        }
-
-        // Check if it's hung up.
-        pollfd pollInfo;
-
-        pollInfo.fd = m_fd;
-        pollInfo.events = /* POLLIN | */POLLHUP;
-        pollInfo.revents = 0;
-
-        // https://linux.die.net/man/2/poll
-
-        // Return immediately
-        const int pollTimeout = 0;
-
-        const int pollResult = ::poll(&pollInfo, 1, pollTimeout);
-        if (pollResult < 0)
-        {
-            return SLANG_FAIL;
-        }
-
-        if (pollInfo.revents & POLLHUP)
-        {
-            close();
-            return SLANG_OK;
-        }
-
         return SLANG_FAIL;
     }
 
-    outReadBytes = size_t(count);
+    if (pollInfo.revents & POLLIN)
+    {
+        auto count = ::read(m_fd, buffer, length);
+
+        // If it's -1 it seems like an error
+        if (count == -1)
+        {
+            const int err = errno;
+
+            // On non blocking pipe these indicate there could be more to come
+            if (err == EAGAIN || err == EWOULDBLOCK)
+            {
+                return SLANG_OK;
+            }
+        }
+
+        outReadBytes = size_t(count);
+        return SLANG_OK;
+    }
+
+    if (pollInfo.revents & POLLHUP)
+    {
+        close();
+    }
+
     return SLANG_OK;
 }
 
