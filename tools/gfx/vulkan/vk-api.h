@@ -167,6 +167,7 @@ namespace gfx {
     x(vkCreateAccelerationStructureKHR) \
     x(vkDestroyAccelerationStructureKHR) \
     x(vkGetAccelerationStructureBuildSizesKHR) \
+    x(vkGetMemoryWin32HandleKHR) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \
