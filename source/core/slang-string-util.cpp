@@ -363,13 +363,19 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
         {
             case '\n':
             {
-                if (cur + 1 < end && cur[1] == '\r')
+                ++cur;
+                if (cur < end && *cur == '\r')
                 {
-                    // Append and skip
-                    out.append(start, cur + 1);
-                    cur += 2;
-                    start = cur;
-                    break;
+                    // If we have following \r, we should append with \n
+                    // Append (including \n) 
+                    out.append(start, cur);
+                    // Skip the \r
+                    start = ++cur;
+                }
+                else
+                {
+                    // If not, we don't need to append because just \n is 'standard', and everything remaining
+                    // is appended at the end
                 }
                 break;
             }
@@ -378,9 +384,9 @@ ComPtr<ISlangBlob> StringUtil::createStringBlob(const String& string)
                 out.append(start, cur);
                 out.appendChar('\n');
 
-                cur++;
+                ++cur;
                 // If next is \n, we want to skip that
-                cur += Index(cur < end && * cur == '\n');
+                cur += Index(cur < end && *cur == '\n');
                 start = cur;
                 break;
             }
