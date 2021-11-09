@@ -50,29 +50,32 @@ public:
     virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE { SLANG_UNUSED(origin); SLANG_UNUSED(offset); return SLANG_E_NOT_AVAILABLE; }
     virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
     virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
-    virtual bool isEnd() SLANG_OVERRIDE { return m_fd == 0; }
-    virtual bool canRead() SLANG_OVERRIDE { return _has(FileAccess::Read) && m_fd != 0; }
-    virtual bool canWrite() SLANG_OVERRIDE { return _has(FileAccess::Write) && m_fd != 0; }
+    virtual bool isEnd() SLANG_OVERRIDE { return m_isClosed; }
+    virtual bool canRead() SLANG_OVERRIDE { return _has(FileAccess::Read) && !m_isClosed; }
+    virtual bool canWrite() SLANG_OVERRIDE { return _has(FileAccess::Write) && !m_isClosed; }
     virtual void close() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
     UnixPipeStream(int fd, FileAccess access, bool isOwned) :
         m_fd(fd),
         m_access(access),
-        m_isOwned(isOwned)
+        m_isOwned(isOwned),
+        m_isClosed(false)
     {
-        SLANG_ASSERT(fd);
-
+#if 0
+        // Makes non blocking
         if (_has(FileAccess::Read))
         {
             // Make non blocking, for read
             fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
         }
+#endif
     }
 
 protected:
     bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
-    
+
+    bool m_isClosed;
     bool m_isOwned;
     FileAccess m_access;
     int m_fd;
@@ -184,13 +187,16 @@ void UnixProcess::waitForTermination()
 
 void UnixPipeStream::close()
 {
-    if (m_fd)
+    if (!m_isClosed)
     {
         if (m_isOwned)
         {
             ::close(m_fd);
         }
-        m_fd = 0;
+
+        m_isClosed = true;
+        // Make something hopefully invalid
+        m_fd = -1;
     }
 }
 
@@ -211,7 +217,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
     {
         return SLANG_E_NOT_AVAILABLE;
     }
-    if (m_fd == 0)
+    if (m_isClosed)
     {
         return SLANG_OK;
     }
@@ -268,7 +274,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     {
         return SLANG_E_NOT_AVAILABLE;
     }
-    if (m_fd == 0)
+    if (m_isClosed)
     {
         // The pipe is closed
         return SLANG_FAIL;
