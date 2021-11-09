@@ -1,5 +1,3 @@
-#define SLANG_HANDLE_RESULT_FAIL(x)     printf("%s:%i\n", __FILE__, int(__LINE__))
-
 // slang-unix-process.cpp
 #include "../slang-process.h"
 
@@ -81,56 +79,6 @@ protected:
     bool m_isOwned;
     FileAccess m_access;
     int m_fd;
-};
-
-/* !!!!!!!!!!!!!!!!!!!!!!!!! UnixPipe !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-struct UnixPipe
-{
-    UnixPipe() { m_flags = 0; ::memset(m_fds, 0, sizeof(m_fds)); }
-
-    bool isValidAt(Index i) const { return ((1 << i) & m_flags) != 0;  }
-    int getAt(Index i) const { SLANG_ASSERT(isValidAt(i)); return m_fds[i];  }
-
-    int getRead() const { return getAt(0); }
-    int getWrite() const { return getAt(1); }
-    int detachRead() { return detachAt(0); }
-    int detachWrite() { return detachAt(1); }
-
-    int detachAt(Index i)
-    {
-        SLANG_ASSERT(isValidAt(i));
-        const int fd = m_fds[i];
-        m_fds[i] = 0;
-        m_flags &= ~(1 << i);
-        return fd;
-    }
-    
-    SlangResult init()
-    {
-        // https://linux.die.net/man/2/pipe
-        // Note we can use ::pipe2 if we want to set up the pipe to be non blocking.
-        // If we do that presumably writes and reads are non blocking
-        if (::pipe(m_fds) == -1)
-        {
-            return SLANG_FAIL;
-        }
-        m_flags = 0x3;
-        return SLANG_OK;
-    }
-
-    ~UnixPipe()
-    {
-        for (Index i = 0; i < 2; ++i)
-        {
-            if (isValidAt(i))
-            {
-                ::close(m_fds[i]);
-            }
-        }
-    }
-    int m_fds[2];
-    int m_flags;                            ///< Bit to indicate which is valid
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixProcess !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -348,27 +296,41 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     // Terminate with a null
     argPtrs.add(nullptr);
 
-    UnixPipe stdOutPipe, stdErrPipe, stdInPipe;
+    int stdoutPipe[2];
+    int stderrPipe[2];
+    int stdinPipe[2];
 
-    SLANG_RETURN_ON_FAIL(stdOutPipe.init());
-    SLANG_RETURN_ON_FAIL(stdErrPipe.init());
-    SLANG_RETURN_ON_FAIL(stdInPipe.init());
+    if (pipe(stdoutPipe) == -1 || pipe(stderrPipe) == -1 || pipe(stdinPipe) == -1)
+    {
+        fprintf(stderr, "error: `pipe` failed\n");
+        return SLANG_FAIL;
+    }
 
-    pid_t childPid = fork();
-    if (childPid == -1)
+    pid_t childProcessID = fork();
+    if (childProcessID == -1)
     {
         fprintf(stderr, "error: `fork` failed\n");
         return SLANG_FAIL;
     }
 
-    if (childPid == 0)
+    if (childProcessID == 0)
     {
         // We are the child process.
-        dup2(stdOutPipe.getWrite(), STDOUT_FILENO);
-        dup2(stdErrPipe.getWrite(), STDERR_FILENO);
-        dup2(stdInPipe.getRead(), STDIN_FILENO);
 
-        ::execvp(argPtrs[0], (char*const*)&argPtrs[0]);
+        dup2(stdoutPipe[1], STDOUT_FILENO);
+        dup2(stderrPipe[1], STDERR_FILENO);
+        dup2(stdinPipe[0], STDIN_FILENO);
+
+        ::close(stdoutPipe[0]);
+        ::close(stdoutPipe[1]);
+
+        ::close(stderrPipe[0]);
+        ::close(stderrPipe[1]);
+
+        ::close(stdinPipe[0]);
+        ::close(stdinPipe[1]);
+
+        ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
 
         // If we get here, then `exec` failed
         fprintf(stderr, "error: `exec` failed\n");
@@ -377,14 +339,18 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     else
     {
         // We are the parent process
+        ::close(stdoutPipe[1]);
+        ::close(stderrPipe[1]);
+        ::close(stdinPipe[0]);
+
         RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
 
-        // Create the streams
-        streams[Index(Process::StreamType::StdOut)] = new UnixPipeStream(stdOutPipe.detachRead(), FileAccess::Read, true);
-        streams[Index(Process::StreamType::ErrorOut)] = new UnixPipeStream(stdErrPipe.detachRead(), FileAccess::Read, true);
-        streams[Index(Process::StreamType::StdIn)] = new UnixPipeStream(stdInPipe.detachWrite(), FileAccess::Write, true);
+        // Previously code didn't need to close, so we'll make stream not own the handles
+        streams[Index(Process::StreamType::StdOut)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+        streams[Index(Process::StreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+        streams[Index(Process::StreamType::StdIn)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
 
-        outProcess = new UnixProcess(childPid, streams[0].readRef());
+        outProcess = new UnixProcess(childProcessID, streams[0].readRef());
         return SLANG_OK;
     }
 }
