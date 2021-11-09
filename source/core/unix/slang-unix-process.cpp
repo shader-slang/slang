@@ -55,7 +55,9 @@ public:
     virtual SlangResult flush() SLANG_OVERRIDE;
 
     UnixPipeStream(int fd, FileAccess access, bool isOwned) :
-        m_fd(fd)
+        m_fd(fd),
+        m_access(access),
+        m_isOwned(isOwned)
     {
         SLANG_ASSERT(fd);
     }
@@ -146,6 +148,7 @@ SlangResult UnixPipeStream::flush()
 SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
 {
     outReadBytes = 0;
+
     if (!canRead())
     {
         return SLANG_E_NOT_AVAILABLE;
@@ -180,7 +183,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         outReadBytes = count;
     }
 
-    if (pollInfo.revents & POLLHUP)
+    if (pollInfo.revents & (POLLHUP | POLLERR))
     {
         close();
     }
