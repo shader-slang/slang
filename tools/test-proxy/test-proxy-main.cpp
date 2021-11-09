@@ -321,6 +321,7 @@ static SlangResult execute(int argc, const char*const* argv)
         unitTestContext.slangGlobalSession = session;
         unitTestContext.workDirectory = "";
         unitTestContext.enabledApis = RenderApiFlags(enabledApis);
+        unitTestContext.executableDirectory = exePath.getBuffer();
 
         auto testCount = testModule->getTestCount();
         SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);

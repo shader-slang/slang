@@ -2,13 +2,13 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-io.h"
 
 #include "tools/unit-test/slang-unit-test.h"
 
-
 using namespace Slang;
 
-static SlangResult _countTest(Index size)
+static SlangResult _countTest(UnitTestContext* context, Index size)
 {
     RefPtr<Process> process;
 
@@ -19,7 +19,7 @@ static SlangResult _countTest(Index size)
         CommandLine cmdLine;
         StringBuilder buf;
         buf << size;
-        cmdLine.setExecutableFilename("test-proxy");
+        cmdLine.setExecutablePath(context->executableDirectory, "test-proxy");
         cmdLine.addArg("count");
         cmdLine.addArg(buf);
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
@@ -57,22 +57,22 @@ static SlangResult _countTest(Index size)
     return v == size ? SLANG_OK : SLANG_FAIL;
 }
 
-static SlangResult _countTests()
+static SlangResult _countTests(UnitTestContext* context)
 {
     const Index sizes[] = { 1, 10, 1000, 1000, 10000, 100000 };
     for (auto size : sizes)
     {
-        SLANG_RETURN_ON_FAIL(_countTest(size));
+        SLANG_RETURN_ON_FAIL(_countTest(context, size));
     }
     return SLANG_OK;
 }
 
-static SlangResult _reflectTest()
+static SlangResult _reflectTest(UnitTestContext* context)
 {
     RefPtr<Process> process;
     {
         CommandLine cmdLine;
-        cmdLine.setExecutableFilename("test-proxy");
+        cmdLine.setExecutablePath(context->executableDirectory, "test-proxy");
         cmdLine.addArg("reflect");
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
@@ -107,7 +107,7 @@ static SlangResult _reflectTest()
 
 SLANG_UNIT_TEST(CommandLineProcess)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(_countTests()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
 
-    SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
 }

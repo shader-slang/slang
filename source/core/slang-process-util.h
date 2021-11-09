@@ -24,9 +24,6 @@ struct ExecuteResult
 
 struct ProcessUtil
 {
-        /// Output how the command line is executed on the target (with escaping and the such like)
-    static String getCommandLineString(const CommandLine& commandLine);
-
         /// Execute the command line 
     static SlangResult execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult);
 

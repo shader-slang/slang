@@ -402,7 +402,7 @@ bool WinProcess::isTerminated()
         }
 
         // Produce the command line string
-        String cmdString = ProcessUtil::getCommandLineString(commandLine);
+        String cmdString = commandLine.toString();
         OSString cmdStringBuffer = cmdString.toWString();
 
         // Now we can actually get around to starting a process

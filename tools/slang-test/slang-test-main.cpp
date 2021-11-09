@@ -536,7 +536,7 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
 
     if (options.shouldBeVerbose)
     {
-        String commandLine = ProcessUtil::getCommandLineString(cmdLine);
+        String commandLine = cmdLine.toString();
         context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
@@ -570,7 +570,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
         testCmdLine.addArg(exeName);
         testCmdLine.m_args.addRange(cmdLine.m_args);
 
-        String testCmdLineString = ProcessUtil::getCommandLineString(testCmdLine);
+        String testCmdLineString = testCmdLine.toString();
         context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLineString.getBuffer());
     }
 
@@ -643,7 +643,7 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     const auto& options = context->options;
     if (options.shouldBeVerbose)
     {
-        String commandLine = ProcessUtil::getCommandLineString(cmdLine);
+        String commandLine = cmdLine.toString();
         context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
@@ -3424,6 +3424,8 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
+    unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
+
     auto testCount = testModule->getTestCount();
 
     for (SlangInt i = 0; i < testCount; i++)

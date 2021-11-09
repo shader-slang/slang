@@ -10,22 +10,6 @@
 
 namespace Slang {
 
-/* static */String ProcessUtil::getCommandLineString(const CommandLine& commandLine)
-{
-    auto escapeHandler = Process::getEscapeHandler();
-
-    StringBuilder cmd;
-    StringEscapeUtil::appendMaybeQuoted(escapeHandler, commandLine.m_executable.getUnownedSlice(), cmd);
-
-    for (const auto& arg : commandLine.m_args)
-    {
-        cmd << " ";
-        StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), cmd);
-    }
-    return cmd.ToString();
-}
-
-
 /* static */SlangResult ProcessUtil::execute(const CommandLine& commandLine, ExecuteResult& outExecuteResult)
 {
     RefPtr<Process> process;

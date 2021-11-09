@@ -1405,7 +1405,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
     {
         CommandLine cmdLine;
         _calcCommandLine(base, requestState, cmdLine);
-        String text = ProcessUtil::getCommandLineString(cmdLine);
+        String text = cmdLine.toString();
         builder << text << "\n";
     }
         
