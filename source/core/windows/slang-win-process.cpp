@@ -85,8 +85,8 @@ public:
     virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
     virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_streamHandle.isNull(); }
-    virtual bool canRead() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Read)) && !m_streamHandle.isNull(); }
-    virtual bool canWrite() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Write)) && !m_streamHandle.isNull(); }
+    virtual bool canRead() SLANG_OVERRIDE { return _has(FileAccess::Read) && !m_streamHandle.isNull(); }
+    virtual bool canWrite() SLANG_OVERRIDE { return _has(FileAccess::Write) && !m_streamHandle.isNull(); }
     virtual void close() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
@@ -95,6 +95,8 @@ public:
     ~WinPipeStream() { close(); }
 
 protected:
+
+    bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
 
     SlangResult _updateState(BOOL res);
 
@@ -169,13 +171,17 @@ SlangResult WinPipeStream::_updateState(BOOL res)
 SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
 {
     outReadBytes = 0;
-
-    if ((Index(m_access) & Index(FileAccess::Read)) == 0 || m_streamHandle.isNull())
+    if (!_has(FileAccess::Read))
     {
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    if (true)
+    if (m_streamHandle.isNull())
+    {
+        return SLANG_OK;
+    }
+
+    // Check if there is any data, so won't block
     {
         DWORD bytesRead = 0;
         DWORD totalBytes = 0;
@@ -191,17 +197,13 @@ SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadByte
         {
             return SLANG_OK;
         }
-
-        SLANG_RETURN_ON_FAIL(_updateState(ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
-
-        outReadBytes = bytesRead;
     }
-    else
+
     {
         DWORD bytesRead = 0;
         SLANG_RETURN_ON_FAIL(_updateState(ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
 
-        outReadBytes = bytesRead;
+        outReadBytes = size_t(bytesRead);
     }
 
     return SLANG_OK;
@@ -209,9 +211,15 @@ SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadByte
 
 SlangResult WinPipeStream::write(const void* buffer, size_t length)
 {
-    if ((Index(m_access) & Index(FileAccess::Write)) == 0 || m_streamHandle.isNull())
+    if (!_has(FileAccess::Write))
     {
         return SLANG_E_NOT_AVAILABLE;
+    }
+
+    if (m_streamHandle.isNull())
+    {
+        // Writing to closed stream
+        return SLANG_FAIL;
     }
 
     DWORD numWritten = 0;

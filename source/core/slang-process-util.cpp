@@ -68,7 +68,7 @@ static String _getText(const ConstArrayView<Byte>& bytes)
     Stream* stdOutStream = process->getStream(Process::StreamType::StdOut);
     Stream* stdErrorStream = process->getStream(Process::StreamType::ErrorOut);
 
-    while (process->isTerminated())
+    while (!process->isTerminated())
     {
         const auto preCount = _getCount(outStdOut) + _getCount(outStdError);
 
