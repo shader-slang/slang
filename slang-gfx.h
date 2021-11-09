@@ -420,6 +420,22 @@ struct AccessFlag
     };
 };
 
+enum class InteropHandleAPI
+{
+    Unknown,
+    D3D12,
+    Vulkan,
+    CUDA,
+    Win32,
+    FileDescriptor
+};
+
+struct InteropHandle
+{
+    InteropHandleAPI api = InteropHandleAPI::Unknown;
+    uint64_t handleValue = 0;
+};
+
 class IResource: public ISlangUnknown
 {
 public:
@@ -445,13 +461,17 @@ public:
         ResourceState defaultState = ResourceState::Undefined;
         ResourceStateSet allowedStates = ResourceStateSet();
         int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
+        InteropHandle existingHandle = {};
+        bool isShared = false;
     };
 
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() = 0;
-
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) = 0;
+	
     virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) = 0;
-
     virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() = 0;
+
 };
 #define SLANG_UUID_IResource                                                           \
     {                                                                                  \
@@ -468,12 +488,8 @@ public:
         Format format = Format::Unknown;
     };
 
-    // Pointer to the buffer resource.
-    typedef uint64_t NativeHandle;
-
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -598,11 +614,7 @@ public:
         int64_t     strideZ;
     };
 
-    // A pointer to the resource if D3D12.
-    typedef uint64_t NativeHandle;
-
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
 };
 #define SLANG_UUID_ITextureResource                                                    \
     {                                                                                  \
@@ -1756,45 +1768,19 @@ public:
         SlangLineDirectiveMode lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
     };
 
-    struct NativeHandle
+    struct InteropHandles
     {
-    public:
-        // The following functions return a NativeHandle object containing the provided handles.
-        static NativeHandle fromVulkanHandles(uint64_t instance, uint64_t physicalDevice, uint64_t device)
-        {
-            NativeHandle handles = {};
-            handles.values[0] = instance;
-            handles.values[1] = physicalDevice;
-            handles.values[2] = device;
-            return handles;
-        }
-
-        static NativeHandle fromD3D12Handle(void* device)
-        {
-            NativeHandle handles = {};
-            handles.values[0] = (uint64_t)device;
-            return handles;
-        }
-
-        // The following functions provide a way of getting handles from values.
-        uint64_t getD3D12Device() const { return values[0]; }
-
-        uint64_t getVkInstance() const { return values[0]; }
-        uint64_t getVkPhysicalDevice() const { return values[1]; }
-        uint64_t getVkDevice() const { return values[2]; }
-
-    private:
-        // For D3D12, this only contains a single value for the ID3D12Device.
-        // For Vulkan, the first value is the VkInstance, the second is the VkPhysicalDevice, and the third is the VkDevice.
-        uint64_t values[3] = { 0 };
+        InteropHandle handles[3] = {};
     };
 
     struct Desc
     {
         // The underlying API/Platform of the device.
         DeviceType deviceType = DeviceType::Default;
-        // The device's handles (if they exist).
-        NativeHandle existingDeviceHandles = {};
+        // The device's handles (if they exist) and their associated API. For D3D12, this contains a single InteropHandle
+        // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
+        // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
+        InteropHandles existingDeviceHandles;
         // Name to identify the adapter to use
         const char* adapter = nullptr;
         // Number of required features.
@@ -1810,7 +1796,7 @@ public:
         SlangDesc slang = {};
     };
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) = 0;
 
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) = 0;
 
@@ -1868,6 +1854,11 @@ public:
         return resource;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) = 0;
+
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
@@ -1882,6 +1873,16 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(createBufferResource(desc, initData, resource.writeRef()));
         return resource;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) = 0;

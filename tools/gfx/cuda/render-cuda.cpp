@@ -186,6 +186,7 @@ public:
 
     uint64_t getBindlessHandle() { return (uint64_t)m_cudaMemory; }
 
+    void* m_cudaExternalMemory = nullptr;
     void* m_cudaMemory = nullptr;
 
     RefPtr<CUDAContext> m_cudaContext;
@@ -195,9 +196,10 @@ public:
         return (DeviceAddress)m_cudaMemory;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        *outHandle = getBindlessHandle();
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -242,9 +244,10 @@ public:
 
     RefPtr<CUDAContext> m_cudaContext;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        *outHandle = getBindlessHandle();
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -892,6 +895,13 @@ private:
     String m_adapterName;
 
 public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override
+    {
+        outHandles->handles[0].handleValue = (uint64_t)m_device;
+        outHandles->handles[0].api = InteropHandleAPI::CUDA;
+        return SLANG_OK;
+    }
+
     class CommandQueueImpl;
 
     class CommandBufferImpl
@@ -1332,6 +1342,8 @@ public:
 
         m_context = new CUDAContext();
 
+        int count = -1;
+        cuDeviceGetCount(&count);
         SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
 
         SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(
@@ -1810,6 +1822,59 @@ public:
         return SLANG_OK;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& desc,
+        IBufferResource** outResource) override
+    {
+        if (handle.handleValue == 0)
+        {
+            *outResource = nullptr;
+            return SLANG_OK;
+        }
+
+        RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource(desc);
+        resource->m_cudaContext = m_context;
+
+        // CUDA manages sharing of buffers through the idea of an
+        // "external memory" object, which represents the relationship
+        // with another API's objects. In order to create this external
+        // memory association, we first need to fill in a descriptor struct.
+        cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+        memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+        // TODO: Change according to the type of handle being passed in
+        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+        externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
+        externalMemoryHandleDesc.size = desc.sizeInBytes;
+        externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+
+        // Once we have filled in the descriptor, we can request
+        // that CUDA create the required association between the
+        // external buffer and its own memory.
+        cudaExternalMemory_t externalMemory;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
+        resource->m_cudaExternalMemory = externalMemory;
+
+        // The CUDA "external memory" handle is not itself a device
+        // pointer, so we need to query for a suitable device address
+        // for the buffer with another call.
+        //
+        // Just as for the external memory, we fill in a descriptor
+        // structure (although in this case we only need to specify
+        // the size).
+        cudaExternalMemoryBufferDesc bufferDesc;
+        memset(&bufferDesc, 0, sizeof(bufferDesc));
+        bufferDesc.size = desc.sizeInBytes;
+
+        // Finally, we can "map" the buffer to get a device address.
+        void* deviceAddress;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaExternalMemoryGetMappedBuffer(&deviceAddress, externalMemory, &bufferDesc));
+        resource->m_cudaMemory = deviceAddress;
+
+        returnComPtr(outResource, resource);
+        return SLANG_OK;
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override
     {
@@ -2157,7 +2222,7 @@ SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** ou
 {
     SLANG_UNUSED(desc);
     *outDevice = nullptr;
-    return SLANG_OK;
+    return SLANG_FAIL;
 }
 #endif
 

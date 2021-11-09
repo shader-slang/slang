@@ -76,10 +76,18 @@ IResource* BufferResource::getInterface(const Slang::Guid& guid)
 SLANG_NO_THROW IResource::Type SLANG_MCALL BufferResource::getType() { return m_type; }
 SLANG_NO_THROW IBufferResource::Desc* SLANG_MCALL BufferResource::getDesc() { return &m_desc; }
 
-Result BufferResource::getNativeHandle(NativeHandle* outHandle)
+Result BufferResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
-    *outHandle = NULL;
-    return SLANG_OK;
+    outHandle->handleValue = 0;
+    outHandle->api = InteropHandleAPI::Unknown;
+    return SLANG_FAIL;
+}
+
+Result BufferResource::getSharedHandle(InteropHandle* outHandle)
+{
+    outHandle->api = InteropHandleAPI::Unknown;
+    outHandle->handleValue = 0;
+    return SLANG_FAIL;
 }
 
 IResource* TextureResource::getInterface(const Slang::Guid& guid)
@@ -93,9 +101,17 @@ IResource* TextureResource::getInterface(const Slang::Guid& guid)
 SLANG_NO_THROW IResource::Type SLANG_MCALL TextureResource::getType() { return m_type; }
 SLANG_NO_THROW ITextureResource::Desc* SLANG_MCALL TextureResource::getDesc() { return &m_desc; }
 
-Result TextureResource::getNativeHandle(NativeHandle* outHandle)
+Result TextureResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
-    *outHandle = NULL;
+    outHandle->handleValue = 0;
+    outHandle->api = InteropHandleAPI::Unknown;
+    return SLANG_FAIL;
+}
+
+Result TextureResource::getSharedHandle(InteropHandle* outHandle)
+{
+    outHandle->api = InteropHandleAPI::Unknown;
+    outHandle->handleValue = 0;
     return SLANG_OK;
 }
 
@@ -275,9 +291,8 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeHandle(NativeHandle* outHandle)
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    *outHandle = {};
     return SLANG_OK;
 }
 
@@ -330,6 +345,38 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::getSlangSession(slang::ISession*
     *outSlangSession = slangContext.session.get();
     slangContext.session->addRef();
     return SLANG_OK;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromNativeHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    ITextureResource** outResource)
+{
+    SLANG_UNUSED(handle);
+    SLANG_UNUSED(srcDesc);
+    SLANG_UNUSED(outResource);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createBufferFromNativeHandle(
+    InteropHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_UNUSED(handle);
+    SLANG_UNUSED(srcDesc);
+    SLANG_UNUSED(outResource);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createBufferFromSharedHandle(
+    InteropHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_UNUSED(srcDesc);
+    SLANG_UNUSED(outResource);
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::createShaderObject(

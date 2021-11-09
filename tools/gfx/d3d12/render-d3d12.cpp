@@ -84,10 +84,19 @@ public:
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
@@ -149,7 +158,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override;
 
     ~D3D12Device();
 
@@ -215,6 +224,14 @@ public:
         {
         }
 
+        ~BufferResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
+        }
+
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
@@ -225,9 +242,29 @@ public:
             return (DeviceAddress)m_resource.getResource()->GetGPUVirtualAddress();
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
+        {   
+            outHandle->handleValue = (uint64_t)m_resource.getResource();
+            outHandle->api = InteropHandleAPI::D3D12;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_resource.getResource();
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
+            ComPtr<ID3D12Device> pDevice;
+            auto pResource = m_resource.getResource();
+            pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
+            SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::Win32;
+            sharedHandle = *outHandle;
             return SLANG_OK;
         }
     };
@@ -243,12 +280,31 @@ public:
         {
         }
 
+        ~TextureResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
+        }
+
         D3D12Resource m_resource;
         D3D12_RESOURCE_STATES m_defaultState;
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_resource.getResource();
+            outHandle->handleValue = (uint64_t)m_resource.getResource();
+            outHandle->api = InteropHandleAPI::D3D12;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
+        {
+            ComPtr<ID3D12Device> pDevice;
+            auto pResource = m_resource.getResource();
+            pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
+            SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::Win32;
             return SLANG_OK;
         }
     };
@@ -3810,7 +3866,8 @@ public:
         size_t srcDataSize,
         D3D12Resource& uploadResource,
         D3D12_RESOURCE_STATES finalState,
-        D3D12Resource& resourceOut);
+        D3D12Resource& resourceOut,
+        bool isShared = false);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
@@ -4080,7 +4137,7 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
@@ -4092,9 +4149,12 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
 
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, initialState, nullptr));
+        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
     }
 
     {
@@ -4228,9 +4288,10 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
+Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    *outHandle = NativeHandle::fromD3D12Handle(m_device);
+    outHandles->handles[0].handleValue = (uint64_t)m_device;
+    outHandles->handles[0].api = InteropHandleAPI::D3D12;
     return SLANG_OK;
 }
 
@@ -4409,7 +4470,7 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles.getD3D12Device() == 0)
+    if (desc.existingDeviceHandles.handles[0].handleValue == 0)
     {
         FlagCombiner combiner;
         // TODO: we should probably provide a command-line option
@@ -4442,7 +4503,7 @@ Result D3D12Device::initialize(const Desc& desc)
     else
     {
         // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
+        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.handles[0].handleValue;
     }
 
     // Set the device
@@ -4942,6 +5003,23 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     return SLANG_OK;
 }
 
+Result D3D12Device::createTextureFromNativeHandle(InteropHandle handle, const ITextureResource::Desc& srcDesc, ITextureResource** outResource)
+{
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
+
+    if (handle.api == InteropHandleAPI::D3D12)
+    {
+        texture->m_resource.setResource((ID3D12Resource*)handle.handleValue);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+
+    returnComPtr(outResource, texture);
+    return SLANG_OK;
+}
+
 Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
@@ -4960,7 +5038,24 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared));
+
+    returnComPtr(outResource, buffer);
+    return SLANG_OK;
+}
+
+Result D3D12Device::createBufferFromNativeHandle(InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
+{
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
+
+    if (handle.api == InteropHandleAPI::D3D12)
+    {
+        buffer->m_resource.setResource((ID3D12Resource*)handle.handleValue);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
