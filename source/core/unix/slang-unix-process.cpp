@@ -49,8 +49,8 @@ public:
     virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
     virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
     virtual bool isEnd() SLANG_OVERRIDE { return m_fd == 0; }
-    virtual bool canRead() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Read)) && m_fd; }
-    virtual bool canWrite() SLANG_OVERRIDE { return (Index(m_access) & Index(FileAccess::Write)) && m_fd; }
+    virtual bool canRead() SLANG_OVERRIDE { return _has(FileAccess::Read) && m_fd != 0; }
+    virtual bool canWrite() SLANG_OVERRIDE { return _has(FileAccess::Write) && m_fd != 0; }
     virtual void close() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
@@ -63,7 +63,7 @@ public:
     }
 
 protected:
-
+    bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
     
     bool m_isOwned;
     FileAccess m_access;
@@ -149,9 +149,13 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 {
     outReadBytes = 0;
 
-    if (!canRead())
+    if (!_has(FileAccess::Read))
     {
         return SLANG_E_NOT_AVAILABLE;
+    }
+    if (m_fd == 0)
+    {
+        return SLANG_OK;
     }
 
     pollfd pollInfo;
@@ -193,9 +197,14 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
 SlangResult UnixPipeStream::write(const void* buffer, size_t length)
 {
-    if (!canWrite())
+    if (!_has(FileAccess::Write))
     {
         return SLANG_E_NOT_AVAILABLE;
+    }
+    if (m_fd == 0)
+    {
+        // The pipe is closed
+        return SLANG_FAIL;
     }
 
     pollfd pollInfo;
