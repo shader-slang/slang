@@ -1,3 +1,5 @@
+#define SLANG_HANDLE_RESULT_FAIL(x)     printf("%s:%i\n", __FILE__, int(__LINE__))
+
 // slang-unix-process.cpp
 #include "../slang-process.h"
 
