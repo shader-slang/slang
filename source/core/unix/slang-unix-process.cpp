@@ -12,6 +12,8 @@
 //#include <dirent.h>
 #include <errno.h>
 #include <poll.h>
+#include <fcntl.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -60,6 +62,12 @@ public:
         m_isOwned(isOwned)
     {
         SLANG_ASSERT(fd);
+
+        if (_has(FileAccess::Read))
+        {
+            // Make non blocking, for read
+            fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+        }
     }
 
 protected:
@@ -158,40 +166,47 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_OK;
     }
 
-    pollfd pollInfo;
-    
-    pollInfo.fd = m_fd;
-    pollInfo.events = POLLIN | POLLHUP;
-    pollInfo.revents = 0;
+    auto count = ::read(m_fd, buffer, length);
 
-    // https://linux.die.net/man/2/poll
-
-    // Return immediately
-    const int pollTimeout = 0;
-
-    int pollResult = poll(&pollInfo, 1, pollTimeout);
-    if (pollResult < 0)
+    // If it's -1 it seems like an error
+    if (count == -1)
     {
+        const int err = errno;
+
+        // On non blocking pipe these indicate there could be more to come
+        if (err == EAGAIN || err == EWOULDBLOCK)
+        {
+            return SLANG_OK;
+        }
+
+        // Check if it's hung up.
+        pollfd pollInfo;
+
+        pollInfo.fd = m_fd;
+        pollInfo.events = /* POLLIN | */POLLHUP;
+        pollInfo.revents = 0;
+
+        // https://linux.die.net/man/2/poll
+
+        // Return immediately
+        const int pollTimeout = 0;
+
+        const int pollResult = ::poll(&pollInfo, 1, pollTimeout);
+        if (pollResult < 0)
+        {
+            return SLANG_FAIL;
+        }
+
+        if (pollInfo.revents & POLLHUP)
+        {
+            close();
+            return SLANG_OK;
+        }
+
         return SLANG_FAIL;
     }
 
-    if (pollResult == 0)
-    {
-        // There were no results, so we are done
-        return SLANG_OK;
-    }
-
-    if (pollInfo.revents & POLLIN)
-    {
-        auto count = ::read(m_fd, buffer, length);
-        outReadBytes = count;
-    }
-
-    if (pollInfo.revents & (POLLHUP | POLLERR))
-    {
-        close();
-    }
-
+    outReadBytes = size_t(count);
     return SLANG_OK;
 }
 
