@@ -157,11 +157,16 @@ void UnixPipeStream::close()
 
 SlangResult UnixPipeStream::flush()
 {
+#if 0
+    // https://stackoverflow.com/questions/43184035/flushing-pipe-without-closing-in-c
+    // Makes the case that flushing is not applicable with pipes.
     if (canWrite())
     {
         // We might want to use
         ::fsync(m_fd);
     }
+#endif
+    return SLANG_OK;
 }
 
 SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadBytes)
