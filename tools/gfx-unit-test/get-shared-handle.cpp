@@ -107,7 +107,6 @@ namespace gfx_test
         sharedHandleTestImpl(srcDevice, dstDevice, context);
     }
 
-    // Temporarily disabled due to inconsistent test results on TC
     SLANG_UNIT_TEST(sharedHandleD3D12ToCUDA)
     {
         sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
