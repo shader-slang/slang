@@ -8,7 +8,7 @@
 
 using namespace Slang;
 
-static SlangResult _countTest(UnitTestContext* context, Index size)
+static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
 {
     RefPtr<Process> process;
 
@@ -17,11 +17,22 @@ static SlangResult _countTest(UnitTestContext* context, Index size)
 
     {
         CommandLine cmdLine;
-        StringBuilder buf;
-        buf << size;
+        
         cmdLine.setExecutable(context->executableDirectory, "test-proxy");
         cmdLine.addArg("count");
+        
+        StringBuilder buf;
+        buf << size;
+
         cmdLine.addArg(buf);
+
+        if (crashIndex >= 0)
+        {
+            buf.Clear();
+            buf << crashIndex;
+            cmdLine.addArg(buf);
+        }
+
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
 
@@ -54,7 +65,9 @@ static SlangResult _countTest(UnitTestContext* context, Index size)
         v++;
     }
 
-    return v == size ? SLANG_OK : SLANG_FAIL;
+    const Index endIndex = (crashIndex >= 0) ? (crashIndex + 1) : size;
+
+    return v == endIndex ? SLANG_OK : SLANG_FAIL;
 }
 
 static SlangResult _countTests(UnitTestContext* context)
@@ -63,7 +76,11 @@ static SlangResult _countTests(UnitTestContext* context)
     for (auto size : sizes)
     {
         SLANG_RETURN_ON_FAIL(_countTest(context, size));
+
+        SLANG_RETURN_ON_FAIL(_countTest(context, size, size / 2));
     }
+
+
     return SLANG_OK;
 }
 
@@ -79,8 +96,6 @@ static SlangResult _reflectTest(UnitTestContext* context)
 
     // Write a bunch of stuff to the stream
     Stream* readStream = process->getStream(Process::StreamType::StdOut);
-
-#if 1
     Stream* writeStream = process->getStream(Process::StreamType::StdIn);
 
     List<Byte> readBuffer;
@@ -98,7 +113,6 @@ static SlangResult _reflectTest(UnitTestContext* context)
     const char end[] = "end\n";
     SLANG_RETURN_ON_FAIL(writeStream->write(end, SLANG_COUNT_OF(end) - 1));
     writeStream->flush();
-#endif
 
     SLANG_RETURN_ON_FAIL(StreamUtil::readAll(readStream, 0, readBuffer));
 

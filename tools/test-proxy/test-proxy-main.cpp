@@ -138,8 +138,22 @@ static SlangResult _appendBuffer(Stream* stream, List<Byte>& ioDst)
     return SLANG_OK;
 }
 
-static SlangResult _outputCount(Index count)
+static SlangResult _outputCount(int argc, const char* const* argv)
 {
+    if (argc < 3)
+    {
+        return SLANG_FAIL;
+    }
+    // Get the count
+    const Index count = StringToInt(argv[2]);
+
+    // If we want to crash
+    Index crashIndex = -1;
+    if (argc > 3)
+    {
+        crashIndex = StringToInt(argv[3]);
+    }
+
     FILE* fileOut = stdout;
 
     StringBuilder buf;
@@ -149,6 +163,17 @@ static SlangResult _outputCount(Index count)
         buf << i << "\n";
 
         fwrite(buf.getBuffer(), 1, buf.getLength(), fileOut);
+
+        if (crashIndex >= 0)
+        {
+            fflush(fileOut);
+        }
+
+        if (i == crashIndex)
+        {
+            SLANG_BREAKPOINT(0);
+            throw;
+        }
     }
 
     // NOTE! There is no flush here, we want to see if everything works if we just stream out.
@@ -235,12 +260,7 @@ static SlangResult execute(int argc, const char*const* argv)
 
     if (toolName == "count")
     {
-        if (argc < 3)
-        {
-            return SLANG_FAIL;
-        }
-        Index value = StringToInt(argv[2]);
-        return _outputCount(value);
+        return _outputCount(argc, argv);
     }
 
     {
