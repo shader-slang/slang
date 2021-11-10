@@ -166,7 +166,7 @@ static SlangResult _outputCount(int argc, const char* const* argv)
 
         if (crashIndex >= 0)
         {
-            fflush(fileOut);
+            //fflush(fileOut);
         }
 
         if (i == crashIndex)
@@ -242,6 +242,12 @@ static SlangResult _outputReflect()
 static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
+
+    // Make these streams unbuffered
+    {
+        setvbuf(stdout, nullptr, _IONBF, 0);
+        setvbuf(stderr, nullptr, _IONBF, 0);
+    }
 
     if (argc < 2)
     {
