@@ -31,13 +31,13 @@ public:
     virtual void waitForTermination() SLANG_OVERRIDE;
 
     UnixProcess(pid_t pid, Stream*const* streams);
-protected:
 
+protected:
         /// Returns true if terminated
     bool _updateTerminationState(int options);
 
-    bool m_isTerminated = false;
-    pid_t m_pid;
+    bool m_isTerminated = false;        ///< True if ths process is terminated
+    pid_t m_pid;                        ///< The process id
 };
 
 class UnixPipeStream : public Stream
@@ -62,23 +62,27 @@ public:
         m_isOwned(isOwned),
         m_isClosed(false)
     {
-#if 0
+    }
+
+protected:
+        /// This read file descriptor non blocking. Doing so will change the behavior of
+        /// read - it can fail and return an error indicating there is no data, instead of blocking.
+        /// Currently this mechanism isn't used, as checking via poll seemed to work.
+    void _setReadNonBlocking()
+    {
         // Makes non blocking
         if (_has(FileAccess::Read))
         {
             // Make non blocking, for read
-            fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+            fcntl(m_fd, F_SETFL, fcntl(m_fd, F_GETFL) | O_NONBLOCK);
         }
-#endif
     }
-
-protected:
     bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
 
-    bool m_isClosed;
-    bool m_isOwned;
-    FileAccess m_access;
-    int m_fd;
+    bool m_isClosed;        ///< If true this stream has been closed (ie cannot read/write to anymore)
+    bool m_isOwned;         ///< True if m_fd is owned by this object. 
+    FileAccess m_access;    ///< Access allowed to this stream - either Read or Write
+    int m_fd;               /// The 'file descriptor' for the pipe
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixProcess !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -105,6 +109,7 @@ bool UnixProcess::_updateTerminationState(int options)
         {
             // Guess we should just mark as terminated
             m_isTerminated = true;
+
             fprintf(stderr, "error: `waitpid` failed\n");
         }
         else if (terminatedPid == m_pid)
@@ -190,6 +195,7 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_FAIL;
     }
 
+    // If there is data read that first
     if (pollInfo.revents & POLLIN)
     {
         auto count = ::read(m_fd, buffer, length);
@@ -204,6 +210,8 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
             {
                 return SLANG_OK;
             }
+            // Okay - guess we have an error then 
+            return SLANG_FAIL;
         }
 
         outReadBytes = size_t(count);
@@ -306,21 +314,23 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         return SLANG_FAIL;
     }
 
-    pid_t childProcessID = fork();
-    if (childProcessID == -1)
+    pid_t childPid = fork();
+    if (childPid == -1)
     {
         fprintf(stderr, "error: `fork` failed\n");
         return SLANG_FAIL;
     }
 
-    if (childProcessID == 0)
+    if (childPid == 0)
     {
         // We are the child process.
 
+        // Duplicate into standard handles
         dup2(stdoutPipe[1], STDOUT_FILENO);
         dup2(stderrPipe[1], STDERR_FILENO);
         dup2(stdinPipe[0], STDIN_FILENO);
 
+        // Close all of the handles
         ::close(stdoutPipe[0]);
         ::close(stdoutPipe[1]);
 
@@ -333,7 +343,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
 
         // If we get here, then `exec` failed
+
+        // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
+        // the terminal but in the stderrPipe. 
         fprintf(stderr, "error: `exec` failed\n");
+
         return SLANG_FAIL;
     }
     else
@@ -350,7 +364,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         streams[Index(Process::StreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
         streams[Index(Process::StreamType::StdIn)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
 
-        outProcess = new UnixProcess(childProcessID, streams[0].readRef());
+        outProcess = new UnixProcess(childPid, streams[0].readRef());
         return SLANG_OK;
     }
 }

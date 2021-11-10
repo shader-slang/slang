@@ -23,10 +23,10 @@ void CommandLine::addPrefixPathArg(const char* prefix, const String& path, const
     addArg(builder.ProduceString());
 }
 
-void CommandLine::setExecutablePath(const String& dir, const String& exeName)
+void CommandLine::setExecutable(const String& dir, const String& name)
 {
     StringBuilder builder;
-    Path::combineIntoBuilder(dir.getUnownedSlice(), exeName.getUnownedSlice(), builder);
+    Path::combineIntoBuilder(dir.getUnownedSlice(), name.getUnownedSlice(), builder);
     builder << Process::getExecutableSuffix();
     setExecutablePath(builder.ProduceString());
 }

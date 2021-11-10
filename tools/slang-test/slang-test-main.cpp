@@ -570,8 +570,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
         testCmdLine.addArg(exeName);
         testCmdLine.m_args.addRange(cmdLine.m_args);
 
-        String testCmdLineString = testCmdLine.toString();
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLineString.getBuffer());
+        context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLine.toString().getBuffer());
     }
 
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
@@ -636,9 +635,7 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
 
     // Make the first arg the name of the tool to invoke
     cmdLine.m_args.insert(0, exeName);
-
-    auto exePath = Path::combine(Path::getParentDirectory(inCmdLine.m_executable), String("test-proxy") + Process::getExecutableSuffix());
-    cmdLine.setExecutablePath(exePath);
+    cmdLine.setExecutable(context->exeDirectoryPath, "test-proxy");
 
     const auto& options = context->options;
     if (options.shouldBeVerbose)
@@ -942,7 +939,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 }
                 // Try starting up the device
                 CommandLine cmdLine;
-                cmdLine.setExecutablePath(Path::combine(context->options.binDir,  String("render-test") + Process::getExecutableSuffix()));
+                cmdLine.setExecutable(context->options.binDir, "render-test");
                 _addRenderTestOptions(context->options, cmdLine);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
@@ -1086,7 +1083,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
-    ioCmdLine.setExecutablePath(Path::combine(context->options.binDir, String("slangc") + Process::getExecutableSuffix()));
+    ioCmdLine.setExecutable(context->options.binDir, "slangc");
 
     if (context->options.verbosePaths)
     {
@@ -1535,7 +1532,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
     
-    cmdLine.setExecutablePath(Path::combine(options.binDir, String("slang-reflection-test") + Process::getExecutableSuffix()));
+    cmdLine.setExecutable(options.binDir, "slang-reflection-test");
     cmdLine.addArg(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -2321,7 +2318,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + Process::getExecutableSuffix()));
+    cmdLine.setExecutable(context->options.binDir, "render-test");
     
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
@@ -2474,7 +2471,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	CommandLine cmdLine;
 
-    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + Process::getExecutableSuffix()));
+    cmdLine.setExecutable(context->options.binDir, "render-test");
     cmdLine.addArg(filePath999);
 
     _addRenderTestOptions(context->options, cmdLine);
@@ -2582,7 +2579,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutablePath(Path::combine(context->options.binDir, String("render-test") + Process::getExecutableSuffix()));
+    cmdLine.setExecutable(context->options.binDir, "render-test");
     cmdLine.addArg(filePath);
 
     _addRenderTestOptions(context->options, cmdLine);

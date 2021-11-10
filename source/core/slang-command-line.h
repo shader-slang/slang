@@ -12,7 +12,7 @@ struct CommandLine
     enum class ExecutableType
     {
         Unknown,                    ///< The executable is not specified 
-        Path,                       ///< The executable is set as a path
+        Path,                       ///< The executable is set as a path (ie won't be searched for)
         Filename,                   ///< The executable is set as a filename
     };
 
@@ -26,8 +26,10 @@ struct CommandLine
         /// Set the executable path.
         /// NOTE! On some targets the executable path *must* include an extension to be able to start as a process
     void setExecutablePath(const String& path) { m_executableType = ExecutableType::Path; m_executable = path; }
+
         /// Set the executable path from a base directory and an executable name (no suffix such as '.exe' needed)
-    void setExecutablePath(const String& dir, const String& exeName);
+    void setExecutable(const String& dir, const String& name);
+
         /// Set a filename (such that the path will be looked up
     void setExecutableFilename(const String& filename) { m_executableType = ExecutableType::Filename; m_executable = filename; }
 

@@ -19,7 +19,7 @@ static SlangResult _countTest(UnitTestContext* context, Index size)
         CommandLine cmdLine;
         StringBuilder buf;
         buf << size;
-        cmdLine.setExecutablePath(context->executableDirectory, "test-proxy");
+        cmdLine.setExecutable(context->executableDirectory, "test-proxy");
         cmdLine.addArg("count");
         cmdLine.addArg(buf);
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
@@ -72,7 +72,7 @@ static SlangResult _reflectTest(UnitTestContext* context)
     RefPtr<Process> process;
     {
         CommandLine cmdLine;
-        cmdLine.setExecutablePath(context->executableDirectory, "test-proxy");
+        cmdLine.setExecutable(context->executableDirectory, "test-proxy");
         cmdLine.addArg("reflect");
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
