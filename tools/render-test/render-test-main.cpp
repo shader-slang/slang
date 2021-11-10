@@ -63,7 +63,7 @@ using namespace Slang;
 static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
 {
     WriterHelper out = StdWriters::getOut();
-    double time = double(endTicks - startTicks) / ProcessUtil::getClockFrequency();
+    double time = double(endTicks - startTicks) / Process::getClockFrequency();
     out.print("profile-time=%g\n", time);
 }
 
@@ -991,7 +991,7 @@ Result RenderTestApp::update()
     }
     commandBuffer->close();
 
-    m_startTicks = ProcessUtil::getClockTick();
+    m_startTicks = Process::getClockTick();
     m_queue->executeCommandBuffer(commandBuffer);
     m_queue->wait();
 
@@ -1030,7 +1030,7 @@ Result RenderTestApp::update()
             // Note we don't do the same with screen rendering -> as that will do a lot of work, which may swamp any computation
             // so can only really profile compute shaders at the moment
 
-            const uint64_t endTicks = ProcessUtil::getClockTick();
+            const uint64_t endTicks = Process::getClockTick();
 
             _outputProfileTime(m_startTicks, endTicks);
         }
