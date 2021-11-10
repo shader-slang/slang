@@ -5454,8 +5454,6 @@ Result VKDevice::Buffer::init(
     VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
     if (isShared)
     {
-        //SECURITY_ATTRIBUTES winSecurityAttributes;
-
         exportMemoryWin32HandleInfo.pNext = nullptr;
         exportMemoryWin32HandleInfo.pAttributes = nullptr;
         exportMemoryWin32HandleInfo.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
