@@ -76,9 +76,7 @@ static SlangResult _countTests(UnitTestContext* context)
     for (auto size : sizes)
     {
         SLANG_RETURN_ON_FAIL(_countTest(context, size));
-
-        // TODO(JS): Disable for now as may break CI
-        //SLANG_RETURN_ON_FAIL(_countTest(context, size, size / 2));
+        SLANG_RETURN_ON_FAIL(_countTest(context, size, size / 2));
     }
 
     return SLANG_OK;

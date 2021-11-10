@@ -112,32 +112,6 @@ static SlangResult _createSlangSession(const char* exePath, int argc, const char
     return SLANG_OK;
 }
 
-static SlangResult _appendBuffer(FILE* file, List<Byte>& ioDst)
-{
-    const size_t expandSize = 1024;
-
-    const Index prevCount = ioDst.getCount();
-    ioDst.setCount(prevCount + expandSize);
-
-    const size_t readSize = fread(ioDst.getBuffer() + prevCount, 1, expandSize, file);
-
-    ioDst.setCount(prevCount + Index(readSize));
-}
-
-static SlangResult _appendBuffer(Stream* stream, List<Byte>& ioDst)
-{
-    const size_t expandSize = 1024;
-
-    const Index prevCount = ioDst.getCount();
-    ioDst.setCount(prevCount + expandSize);
-
-    size_t readSize;
-    SLANG_RETURN_ON_FAIL(stream->read(ioDst.getBuffer() + prevCount, expandSize, readSize));
-
-    ioDst.setCount(prevCount + Index(readSize));
-    return SLANG_OK;
-}
-
 static void _makeStdStreamsUnbuffered()
 {
     // Make these streams unbuffered
@@ -204,7 +178,7 @@ static SlangResult _outputReflect()
 
     while (true)
     {
-        SLANG_RETURN_ON_FAIL(_appendBuffer(stdinStream, buffer));
+        SLANG_RETURN_ON_FAIL(StreamUtil::read(stdinStream, 0, buffer));
 
         while (true)
         {
