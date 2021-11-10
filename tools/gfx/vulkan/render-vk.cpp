@@ -82,6 +82,10 @@ public:
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
@@ -6882,6 +6886,23 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         copyInfo.size = bufferSize;
         m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
         m_deviceQueue.flush();
+    }
+
+    returnComPtr(outResource, buffer);
+    return SLANG_OK;
+}
+
+Result VKDevice::createBufferFromNativeHandle(InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
+{
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc, this));
+
+    if (handle.api == InteropHandleAPI::Vulkan)
+    {
+        buffer->m_buffer.m_buffer = (VkBuffer)handle.handleValue;
+    }
+    else
+    {
+        return SLANG_FAIL;
     }
 
     returnComPtr(outResource, buffer);
