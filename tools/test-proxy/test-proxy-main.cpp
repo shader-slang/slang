@@ -138,6 +138,13 @@ static SlangResult _appendBuffer(Stream* stream, List<Byte>& ioDst)
     return SLANG_OK;
 }
 
+static void _makeStdStreamsUnbuffered()
+{
+    // Make these streams unbuffered
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
 static SlangResult _outputCount(int argc, const char* const* argv)
 {
     if (argc < 3)
@@ -151,6 +158,8 @@ static SlangResult _outputCount(int argc, const char* const* argv)
     Index crashIndex = -1;
     if (argc > 3)
     {
+        // When we crash, we want to make sure everything is flushed...
+        _makeStdStreamsUnbuffered();
         crashIndex = StringToInt(argv[3]);
     }
 
@@ -164,13 +173,9 @@ static SlangResult _outputCount(int argc, const char* const* argv)
 
         fwrite(buf.getBuffer(), 1, buf.getLength(), fileOut);
 
-        if (crashIndex >= 0)
-        {
-            //fflush(fileOut);
-        }
-
         if (i == crashIndex)
         {
+            // Use to simulate a crash.
             SLANG_BREAKPOINT(0);
             throw;
         }
@@ -192,12 +197,6 @@ static SlangResult _outputReflect()
 
     FILE* fileOut = stdout;
 
-    //fprintf(fileOut, "end\n");
-    //fflush(fileOut);
-    //return SLANG_OK;
-
-#if 1
-    
     List<Byte> buffer;
 
     Index lineCount = 0;
@@ -226,8 +225,7 @@ static SlangResult _outputReflect()
             // Write the text to the output stream
             fwrite(line.begin(), 1, line.getLength(), fileOut);
             fputc('\n', fileOut);
-            fflush(fileOut);
-
+            
             lineCount++;
 
             // Move the start index forward
@@ -236,19 +234,13 @@ static SlangResult _outputReflect()
             startIndex = newStartIndex;
         }
     }
-#endif
 }
 
 static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
-    // Make these streams unbuffered
-    {
-        setvbuf(stdout, nullptr, _IONBF, 0);
-        setvbuf(stderr, nullptr, _IONBF, 0);
-    }
-
+    
     if (argc < 2)
     {
         return SLANG_FAIL;
