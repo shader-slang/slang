@@ -40,7 +40,7 @@ struct HttpHeader
 
         /// Reads from stream until the buffer contains all of the header. The outEndIndex will point
         /// past the header termination.
-    static SlangResult read(BufferedReadStream* stream, Index& outEndIndex);
+    static SlangResult readHeaderText(BufferedReadStream* stream, Index& outEndIndex);
 
     static SlangResult parse(const UnownedStringSlice& slice, HttpHeader& out);
     

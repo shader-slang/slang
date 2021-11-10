@@ -21,7 +21,7 @@ void HttpHeader::reset()
     m_arena.deallocateAll();
 }
 
-/* static */SlangResult HttpHeader::read(BufferedReadStream* stream, Index& outEndIndex)
+/* static */SlangResult HttpHeader::readHeaderText(BufferedReadStream* stream, Index& outEndIndex)
 {
     // https://microsoft.github.io/language-server-protocol/specifications/specification-current/
     while (true)
@@ -124,11 +124,15 @@ void HttpHeader::reset()
 /* static */SlangResult HttpHeader::read(BufferedReadStream* stream, HttpHeader& out)
 {
     Index endIndex;
-    SLANG_RETURN_ON_FAIL(read(stream, endIndex));
+    SLANG_RETURN_ON_FAIL(readHeaderText(stream, endIndex));
 
+    // Get header into a slice
     UnownedStringSlice headerText((const char*)stream->getBuffer(), endIndex);
+
+    // Parse the slice into the out HttpHeader
     SLANG_RETURN_ON_FAIL(parse(headerText, out));
 
+    // Can consume these bytes from the stream.
     stream->consume(endIndex);
 
     return SLANG_OK;
@@ -136,8 +140,10 @@ void HttpHeader::reset()
 
 void HttpHeader::append(StringBuilder& out) const
 {
+    // Output the content length
     out << g_contentLength << ": " << m_contentLength << "\r\n";
 
+    // If either is set construct a content type
     if (m_mimeType.getLength() || m_encoding.getLength())
     {
         out << g_contentType << ": ";
@@ -153,10 +159,11 @@ void HttpHeader::append(StringBuilder& out) const
         out << "\r\n";
     }
 
+    // Output any other data
     for (auto pair : m_valuePairs)
     {
         auto key = pair.key;
-        // Ignore these types
+        // Ignore these types, as already output from data we already have
         if (key == g_contentType || key == g_contentLength)
         {
             continue;
