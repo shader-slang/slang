@@ -9,7 +9,7 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
+    void createBufferFromHandleTestImpl(IDevice* device, UnitTestContext* context)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -41,11 +41,16 @@ namespace gfx_test
         bufferDesc.defaultState = ResourceState::UnorderedAccess;
         bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
 
-        ComPtr<IBufferResource> numbersBuffer;
+        ComPtr<IBufferResource> originalNumbersBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
             bufferDesc,
             (void*)initialData,
-            numbersBuffer.writeRef()));
+            originalNumbersBuffer.writeRef()));
+
+        InteropHandle handle;
+        originalNumbersBuffer->getNativeResourceHandle(&handle);
+        ComPtr<IBufferResource> numbersBuffer;
+        GFX_CHECK_CALL_ABORT(device->createBufferFromNativeHandle(handle, bufferDesc, numbersBuffer.writeRef()));
 
         ComPtr<IResourceView> bufferView;
         IResourceView::Desc viewDesc = {};
@@ -65,7 +70,7 @@ namespace gfx_test
             auto rootObject = encoder->bindPipeline(pipelineState);
 
             ShaderCursor rootCursor(rootObject);
-            // Bind buffer view to the root.
+            // Bind buffer view to the entry point.
             rootCursor.getPath("buffer").setResource(bufferView);
 
             encoder->dispatchCompute(1, 1, 1);
@@ -81,71 +86,14 @@ namespace gfx_test
             Slang::makeArray<float>(1.0f, 2.0f, 3.0f, 4.0f));
     }
 
-    void existingDeviceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
+    SLANG_UNIT_TEST(createBufferFromHandleD3D12)
     {
-        if ((api & context->enabledApis) == 0)
-        {
-            SLANG_IGNORE_TEST;
-        }
-        Slang::ComPtr<IDevice> device;
-        IDevice::Desc deviceDesc = {};
-        switch (api)
-        {
-        case Slang::RenderApiFlag::D3D12:
-            deviceDesc.deviceType = gfx::DeviceType::DirectX12;
-            break;
-        case Slang::RenderApiFlag::Vulkan:
-            deviceDesc.deviceType = gfx::DeviceType::Vulkan;
-            break;
-        case Slang::RenderApiFlag::CUDA:
-            deviceDesc.deviceType = gfx::DeviceType::CUDA;
-            break;
-        default:
-            SLANG_IGNORE_TEST;
-        }
-        deviceDesc.slang.slangGlobalSession = context->slangGlobalSession;
-        const char* searchPaths[] = { "", "../../tools/gfx-unit-test", "tools/gfx-unit-test" };
-        deviceDesc.slang.searchPathCount = (SlangInt)SLANG_COUNT_OF(searchPaths);
-        deviceDesc.slang.searchPaths = searchPaths;
-        auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
-        if (SLANG_FAILED(createDeviceResult) || !device)
-        {
-            SLANG_IGNORE_TEST;
-        }
-
-        IDevice::InteropHandles handles;
-        GFX_CHECK_CALL_ABORT(device->getNativeDeviceHandles(&handles));
-        Slang::ComPtr<IDevice> testDevice;
-        IDevice::Desc testDeviceDesc = deviceDesc;
-        testDeviceDesc.existingDeviceHandles.handles[0] = handles.handles[0];
-        if (api == Slang::RenderApiFlag::Vulkan)
-        {
-            testDeviceDesc.existingDeviceHandles.handles[1] = handles.handles[1];
-            testDeviceDesc.existingDeviceHandles.handles[2] = handles.handles[2];
-        }
-        auto createTestDeviceResult = gfxCreateDevice(&testDeviceDesc, testDevice.writeRef());
-        if (SLANG_FAILED(createTestDeviceResult) || !device)
-        {
-            SLANG_IGNORE_TEST;
-        }
-
-        existingDeviceHandleTestImpl(device, context);
+        runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(existingDeviceHandleD3D12)
-    {
-        return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12);
-    }
+//     SLANG_UNIT_TEST(createBufferFromHandleVulkan)
+//     {
+//         runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+//     }
 
-    SLANG_UNIT_TEST(existingDeviceHandleVulkan)
-    {
-        return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
-    }
-#if 0
-    // Temporarily disabled due to inconsistent test results on TC
-    SLANG_UNIT_TEST(existingDeviceHandleCUDA)
-    {
-        return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::CUDA);
-    }
-#endif
 }

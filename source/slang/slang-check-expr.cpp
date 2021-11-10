@@ -101,24 +101,14 @@ namespace Slang
         // immutable temporary so that we can use
         // it directly.
         //
-        auto interfaceDecl = interfaceDeclRef.getDecl();
         return maybeMoveTemp(expr, [&](DeclRef<VarDeclBase> varDeclRef)
         {
             ExtractExistentialType* openedType = m_astBuilder->create<ExtractExistentialType>();
             openedType->declRef = varDeclRef;
+            openedType->originalInterfaceType = expr->type.type;
+            openedType->originalInterfaceDeclRef = interfaceDeclRef;
 
-            ExtractExistentialSubtypeWitness* openedWitness = m_astBuilder->create<ExtractExistentialSubtypeWitness>();
-            openedWitness->sub = openedType;
-            openedWitness->sup = expr->type.type;
-            openedWitness->declRef = varDeclRef;
-
-            ThisTypeSubstitution* openedThisType = m_astBuilder->create<ThisTypeSubstitution>();
-            openedThisType->outer = interfaceDeclRef.substitutions.substitutions;
-            openedThisType->interfaceDecl = interfaceDecl;
-            openedThisType->witness = openedWitness;
-
-            DeclRef<InterfaceDecl> substDeclRef = DeclRef<InterfaceDecl>(interfaceDecl, openedThisType);
-            openedType->interfaceDeclRef = substDeclRef;
+            DeclRef<InterfaceDecl> substDeclRef = openedType->getSpecializedInterfaceDeclRef();
 
             ExtractExistentialValueExpr* openedValue = m_astBuilder->create<ExtractExistentialValueExpr>();
             openedValue->declRef = varDeclRef;

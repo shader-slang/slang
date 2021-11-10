@@ -40,10 +40,13 @@ public:
 public:
     DebugDevice();
     IDevice* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override;
     virtual SLANG_NO_THROW bool SLANG_MCALL hasFeature(const char* feature) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getSlangSession(slang::ISession** outSlangSession) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
@@ -53,9 +56,21 @@ public:
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
+        IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
         IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
@@ -100,6 +115,8 @@ public:
         ShaderObjectContainerType container,
         IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc,
@@ -125,6 +142,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFence(const IFence::Desc& desc, IFence** outFence) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFences(IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout) override;
 };
 
 class DebugQueryPool : public DebugObject<IQueryPool>
@@ -148,7 +169,11 @@ public:
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override;
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>
@@ -160,7 +185,11 @@ public:
     ITextureResource* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Type SLANG_MCALL getType() override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override;
+    virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override;
 };
 
 class DebugResourceView : public DebugObject<IResourceView>
@@ -276,7 +305,11 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
 
 public:
@@ -290,6 +323,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootShaderObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setViewports(uint32_t count, const Viewport* viewports) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -307,6 +342,18 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex = 0) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+        uint32_t maxDrawCount,
+        IBufferResource* argBuffer,
+        uint64_t argOffset,
+        IBufferResource* countBuffer,
+        uint64_t countOffset) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+        uint32_t maxDrawCount,
+        IBufferResource* argBuffer,
+        uint64_t argOffset,
+        IBufferResource* countBuffer,
+        uint64_t countOffset) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
 
@@ -338,6 +385,23 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+        ITextureResource* dst,
+        ITextureResource::SubresourceRange dstSubresource,
+        ITextureResource::Offset3D dstOffset,
+        ITextureResource* src,
+        ITextureResource::SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+        ITextureResource* dst,
+        ITextureResource::SubresourceRange subResourceRange,
+        ITextureResource::Offset3D offset,
+        ITextureResource::Offset3D extent,
+        ITextureResource::SubresourceData* subResourceData,
+        size_t subResourceDataCount) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
@@ -374,6 +438,8 @@ public:
         AccessFlag::Enum destAccess) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
         const char* rayGenShaderName,
         int32_t width,
@@ -383,6 +449,17 @@ public:
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
+};
+
+class DebugFence : public DebugObject<IFence>
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    IFence* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW FenceStatus SLANG_MCALL getStatus() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL reset() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(uint64_t* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(void** outNativeHandle) override;
 };
 
 class DebugTransientResourceHeap;
@@ -434,7 +511,7 @@ public:
     ICommandQueue* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override;
+        executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override;
     virtual SLANG_NO_THROW void SLANG_MCALL wait() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };

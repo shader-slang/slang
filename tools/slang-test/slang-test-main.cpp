@@ -3687,7 +3687,7 @@ SlangResult innerMain(int argc, char** argv)
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, SpawnType::UseProxy, "gfx-unit-test-tool");
+                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "gfx-unit-test-tool");
             }
              
             TestReporter::set(nullptr);
