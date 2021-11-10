@@ -3,6 +3,7 @@
 
 #include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-entry-point-pass.h"
 
 #include "slang-mangle.h"
 
@@ -163,74 +164,6 @@ bool isVaryingParameter(IRVarLayout* varLayout)
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 
-// Our two passes have a fair amount in common in terms of
-// how they traverse the IR, so we will factor out the
-// shared logic into a base type.
-
-struct PerEntryPointPass
-{
-    // We'll hang on to the module we are processing,
-    // so that we can refer to it when setting up `IRBuilder`s.
-    //
-    IRModule* module;
-
-
-    SharedIRBuilder* m_sharedBuilder = nullptr;
-
-    // We will process a whole module by visiting all
-    // its global functions, looking for entry points.
-    //
-    void processModule()
-    {
-        SharedIRBuilder sharedBuilder(module);
-        m_sharedBuilder = &sharedBuilder;
-
-        // Note that we are only looking at true global-scope
-        // functions and not functions nested inside of
-        // IR generics. When using generic entry points, this
-        // pass should be run after the entry point(s) have
-        // been specialized to their generic type parameters.
-
-        for( auto inst : module->getGlobalInsts() )
-        {
-            // We are only interested in entry points.
-            //
-            // Every entry point must be a function.
-            //
-            auto func = as<IRFunc>(inst);
-            if( !func )
-                continue;
-
-            // Entry points will always have the `[entryPoint]`
-            // decoration to differentiate them from ordinary
-            // functions.
-            //
-            // TODO: we could make `IREntryPoint` a subclass of
-            // `IRFunc` if desired, to avoid having to attach
-            // an explicit decoration to identify them.
-            //
-            if( !func->findDecorationImpl(kIROp_EntryPointDecoration) )
-                continue;
-
-            // If we find a candidate entry point, then we
-            // will process it.
-            //
-            processEntryPoint(func);
-        }
-    }
-
-    void processEntryPoint(IRFunc* entryPointFunc)
-    {
-        m_entryPointFunc = entryPointFunc;
-        processEntryPointImpl(entryPointFunc);
-    }
-
-    IRFunc* m_entryPointFunc = nullptr;
-
-    virtual void processEntryPointImpl(IRFunc* entryPointFunc) = 0;
-};
-
-
 struct CollectEntryPointUniformParams : PerEntryPointPass
 {
     CollectEntryPointUniformParamsOptions m_options;
@@ -248,8 +181,10 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
     IRVarLayout* entryPointParamsLayout = nullptr;
     bool needConstantBuffer = false;
 
-    void processEntryPointImpl(IRFunc* entryPointFunc) SLANG_OVERRIDE
+    void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
+        auto entryPointFunc = info.func;
+
         // This pass object may be used across multiple entry points,
         // so we need to make sure to reset state that could have been
         // left over from a previous entry point.
@@ -449,7 +384,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
         // First we create the structure to hold the parameters.
         //
-        builder.setInsertBefore(m_entryPointFunc);
+        builder.setInsertBefore(m_entryPoint.func);
         paramStructType = builder.createStructType();
         builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
 
@@ -484,8 +419,10 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
 struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 {
-    void processEntryPointImpl(IRFunc* entryPointFunc) SLANG_OVERRIDE
+    void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
+        auto entryPointFunc = info.func;
+
         // We will set up an IR builder so that we are ready to generate code.
         //
         IRBuilder builderStorage(m_sharedBuilder);
@@ -561,17 +498,15 @@ void collectEntryPointUniformParams(
     CollectEntryPointUniformParamsOptions const&    options)
 {
     CollectEntryPointUniformParams context;
-    context.module = module;
     context.m_options = options;
-    context.processModule();
+    context.processModule(module);
 }
 
 void moveEntryPointUniformParamsToGlobalScope(
     IRModule*   module)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
-    context.module = module;
-    context.processModule();
+    context.processModule(module);
 }
 
 }
