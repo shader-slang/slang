@@ -17,6 +17,7 @@
 #include "../../source/core/slang-shared-library.h"
 
 #include "../../source/core/slang-test-tool-util.h"
+#include "../../source/core/slang-http.h"
 
 #include "tools/unit-test/slang-unit-test.h"
 
@@ -210,11 +211,34 @@ static SlangResult _outputReflect()
     }
 }
 
+static SlangResult _server(int argc, const char* const* argv)
+{
+    SLANG_UNUSED(argc);
+    SLANG_UNUSED(argv);
+
+    RefPtr<Stream> stdinStream;
+    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
+    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
+
+    
+    while (!readStream->isEnd())
+    {
+        HttpHeader header;
+        SLANG_RETURN_ON_FAIL(HttpHeader::read(readStream, header));
+
+        // We want to read until we have the specified amount of bytes
+        SLANG_RETURN_ON_FAIL(readStream->readUntilContains(header.m_contentLength));
+
+        // We need to decode and do something with this.
+    }
+
+    return SLANG_OK;
+}
+
 static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
-    
     if (argc < 2)
     {
         return SLANG_FAIL;
@@ -233,6 +257,11 @@ static SlangResult execute(int argc, const char*const* argv)
     if (toolName == "count")
     {
         return _outputCount(argc, argv);
+    }
+
+    if (toolName == "server")
+    {
+        return _server(argc, argv);
     }
 
     {

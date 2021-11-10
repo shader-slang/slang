@@ -3,6 +3,7 @@
 #include <share.h>
 #endif
 #include "slang-io.h"
+#include "slang-process.h"
 
 namespace Slang
 {
@@ -374,7 +375,7 @@ SlangResult OwnedMemoryStream::write(const void * buffer, size_t length)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BufferedReadStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void BufferedReadStream::_advanceStartIndex(Index byteCount)
+void BufferedReadStream::consume(Index byteCount)
 {
     SLANG_ASSERT(Index(getCount()) >= byteCount && byteCount >= 0);
     m_startIndex += byteCount;
@@ -409,7 +410,7 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
     }
 
     // We can just seek on the buffered data
-    _advanceStartIndex(Index(offset));
+    consume(Index(offset));
     return SLANG_OK;
 }
 
@@ -439,7 +440,7 @@ SlangResult BufferedReadStream::read(void* inBuffer, size_t length, size_t& outR
 
             ::memcpy(buffer, getBuffer(), readCount);
 
-            _advanceStartIndex(Index(readCount));
+            consume(Index(readCount));
             buffer += readCount;
             length -= readCount;
 
@@ -547,13 +548,36 @@ SlangResult BufferedReadStream::update()
 
         size_t readBytes = 0;
 
-        const  SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
+        const SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
 
         m_buffer.setCount(prevCount + Index(readBytes));
 
         return res;
     }
 }
+
+SlangResult BufferedReadStream::readUntilContains(size_t size)
+{
+    while (true)
+    {
+        if (size_t(getCount()) >= size)
+        {
+            return SLANG_OK;
+        }
+
+        const size_t preCount = size_t(getCount());
+
+        // Update buffer
+        SLANG_RETURN_ON_FAIL(update());
+
+        // If nothing was read yield
+        if (preCount == getCount())
+        {
+            Process::sleepCurrentThread(0);
+        }
+    }
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
