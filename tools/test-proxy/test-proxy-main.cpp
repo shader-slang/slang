@@ -12,6 +12,7 @@
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-writer.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-process-util.h"
 
 #include "../../source/core/slang-shared-library.h"
 
@@ -111,10 +112,109 @@ static SlangResult _createSlangSession(const char* exePath, int argc, const char
     return SLANG_OK;
 }
 
-static SlangResult execute(int argc, const char* const* argv)
+static void _makeStdStreamsUnbuffered()
+{
+    // Make these streams unbuffered
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
+static SlangResult _outputCount(int argc, const char* const* argv)
+{
+    if (argc < 3)
+    {
+        return SLANG_FAIL;
+    }
+    // Get the count
+    const Index count = StringToInt(argv[2]);
+
+    // If we want to crash
+    Index crashIndex = -1;
+    if (argc > 3)
+    {
+        // When we crash, we want to make sure everything is flushed...
+        _makeStdStreamsUnbuffered();
+        crashIndex = StringToInt(argv[3]);
+    }
+
+    FILE* fileOut = stdout;
+
+    StringBuilder buf;
+    for (Index i = 0; i < count; ++i)
+    {
+        buf.Clear();
+        buf << i << "\n";
+
+        fwrite(buf.getBuffer(), 1, buf.getLength(), fileOut);
+
+        if (i == crashIndex)
+        {
+            // Use to simulate a crash.
+            SLANG_BREAKPOINT(0);
+            throw;
+        }
+    }
+
+    // NOTE! There is no flush here, we want to see if everything works if we just stream out.
+    return SLANG_OK;
+}
+
+static SlangResult _outputReflect()
+{
+    // Read lines from std input.
+    // When hit line with just 'end', terminate
+
+    // Get in as Stream
+
+    RefPtr<Stream> stdinStream;
+    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
+
+    FILE* fileOut = stdout;
+
+    List<Byte> buffer;
+
+    Index lineCount = 0;
+    Index startIndex = 0; 
+
+    while (true)
+    {
+        SLANG_RETURN_ON_FAIL(StreamUtil::read(stdinStream, 0, buffer));
+
+        while (true)
+        {
+            UnownedStringSlice slice((const char*)buffer.begin() + startIndex, (const char*)buffer.end());
+            UnownedStringSlice line;
+
+            if (!StringUtil::extractLine(slice, line) || slice.begin() == nullptr)
+            {
+                break;
+            }
+
+            // Process the line
+            if (line == UnownedStringSlice::fromLiteral("end"))
+            {
+                return SLANG_OK;
+            }
+
+            // Write the text to the output stream
+            fwrite(line.begin(), 1, line.getLength(), fileOut);
+            fputc('\n', fileOut);
+            
+            lineCount++;
+
+            // Move the start index forward
+            const Index newStartIndex = slice.begin() ? Index(slice.begin() - (const char*)buffer.getBuffer()) : buffer.getCount();
+            SLANG_ASSERT(newStartIndex > startIndex);
+            startIndex = newStartIndex;
+        }
+    }
+}
+
+static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
+    
     if (argc < 2)
     {
         return SLANG_FAIL;
@@ -124,6 +224,16 @@ static SlangResult execute(int argc, const char* const* argv)
 
     // The 'exeName' of the tool. 
     const String toolName = argv[1];
+
+    if (toolName == "reflect")
+    {
+        return _outputReflect();
+    }
+
+    if (toolName == "count")
+    {
+        return _outputCount(argc, argv);
+    }
 
     {
         StringBuilder sharedLibToolBuilder;
@@ -203,6 +313,7 @@ static SlangResult execute(int argc, const char* const* argv)
         unitTestContext.slangGlobalSession = session;
         unitTestContext.workDirectory = "";
         unitTestContext.enabledApis = RenderApiFlags(enabledApis);
+        unitTestContext.executableDirectory = exePath.getBuffer();
 
         auto testCount = testModule->getTestCount();
         SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);

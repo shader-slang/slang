@@ -419,7 +419,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         case SLANG_EXECUTABLE:
         {
             outPath << options.modulePath;
-            outPath << ProcessUtil::getExecutableSuffix();
+            outPath << Process::getExecutableSuffix();
             return SLANG_OK;
         }
         case SLANG_OBJECT_CODE:
