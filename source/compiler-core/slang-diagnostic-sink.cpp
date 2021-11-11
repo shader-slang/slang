@@ -446,6 +446,15 @@ void DiagnosticSink::init(SourceManager* sourceManager, SourceLocationLexer sour
     }
 }
 
+void DiagnosticSink::reset()
+{
+    m_errorCount = 0;
+    m_internalErrorLocsNoted = 0;
+
+    outputBuffer.Clear();
+}
+
+
 void DiagnosticSink::noteInternalErrorLoc(SourceLoc const& loc)
 {
     // Don't consider invalid source locations.
