@@ -15,7 +15,10 @@
 
 namespace Slang {
 
-/// All of the contained UnownedStringSlice are stored in the m_header 
+/// All of the contained UnownedStringSlice can be stored in m_header. This can be checked via testing if
+/// the memory overlaps.
+///
+/// The m_arena can be used to store slices in an ad-hoc manner to keep in scope with the Header.
 struct HTTPHeader
 {
     struct Pair
@@ -45,7 +48,9 @@ struct HTTPHeader
         /// Returns the index of the end of the header (index of first byte *after* the header), or < if doesn't have an end
     static Index findHeaderEnd(BufferedReadStream* stream);
 
-        /// Parse the slice (holding a header) into out. 
+        /// Parse the slice (holding a header) into out.
+        /// Will allocate the slice on the array and store in m_header.
+        /// Slices will reference sections of m_header, that may be useful in some scenarios.
     static SlangResult parse(const UnownedStringSlice& slice, HTTPHeader& out);
 
         /// Read from buffered stream header, and place parsed header into out
@@ -74,6 +79,25 @@ Index HTTPHeader::indexOfKey(const UnownedStringSlice& slice) const
     return m_valuePairs.findFirstIndex([&](const HTTPHeader::Pair& pair) -> bool { return pair.key == slice; });
 }
 
+/// Implements a way to communicate over Streams via the HTTP *protocol*.
+///
+/// Allows for reading without blocking, via calls to 'update'. When a complete
+/// HTTP 'packet' (combination of header and content) is available, the ReadState will
+/// become 'Done'. For this to work without blocking it relies on the stream backing the BufferedReadStream
+/// to be non blocking.
+///
+/// If it is only necessary to respond on complete packets 'waitForContent' can be used.
+/// If this returns and ReadState is Done, then getHeader holds the current header, and getContent
+/// holds the content of the 'packet'.
+///
+/// Once the packet has been processed 'consumeContent' can be used. Once consumeContent is called
+/// both contents of getContent and getReadHeader will no longer be valid.
+///
+/// Ie using the slice returned from getContent *after* consumeContent is called is *undefined behavior*.
+/// 
+/// NOTE! that this does not implement HTTP over TCP/IP.
+/// That said it could be used to communicate via the HTTP protocol over TCP/IP
+/// if the Streams supplied were TCP/IP sockets.
 class HTTPPacketConnection : public RefObject
 {
 public:
@@ -104,13 +128,14 @@ public:
         /// Consume the content - so can read next content
     void consumeContent();
 
-        /// True if active
+        /// True if connection is active.
     bool isActive() const { return m_readState != ReadState::Error && m_readState != ReadState::Closed;  }
 
     bool hasHeader() const { return m_readState == ReadState::Content || m_readState == ReadState::Done;  }
         /// True if has content (implies has header)
     bool hasContent() const { return m_readState == ReadState::Done;  }
 
+        /// Ctor
     HTTPPacketConnection(BufferedReadStream* readStream, Stream* writeStream);
 
 protected:
