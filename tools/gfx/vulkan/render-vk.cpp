@@ -211,7 +211,9 @@ public:
         {
             if (sharedHandle.handleValue != 0)
             {
+#if SLANG_WINDOWS_FAMILY
                 CloseHandle((HANDLE)sharedHandle.handleValue);
+#endif
             }
         }
 
