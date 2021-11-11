@@ -262,6 +262,7 @@ void CPPSourceEmitter::emitTypeDefinition(IRType* inType)
             UnownedStringSlice typeName = _getTypeName(type);
             UnownedStringSlice rowTypeName = _getTypeName(vecType);
 
+            writer->emit("template<>\n");
             writer->emit("struct ");
             writer->emit(typeName);
             writer->emit("\n{\n");
