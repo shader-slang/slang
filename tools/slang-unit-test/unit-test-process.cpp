@@ -183,9 +183,9 @@ static SlangResult _reflectTest(UnitTestContext* context)
 
 SLANG_UNIT_TEST(CommandLineProcess)
 {
-    //SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
 
-    //SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
 
     SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
 }
