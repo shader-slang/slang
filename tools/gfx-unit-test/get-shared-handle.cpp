@@ -112,8 +112,10 @@ namespace gfx_test
         sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
     }
 
+#if SLANG_WINDOWS_FAMILY
     SLANG_UNIT_TEST(sharedHandleVulkanToCUDA)
     {
         sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
     }
+#endif
 }

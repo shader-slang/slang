@@ -40,7 +40,7 @@
 #undef None
 #endif
 
-#ifdef VK_USE_PLATFORM_WIN32_KHR
+#if SLANG_WINDOWS_FAMILY
 #include <dxgi1_2.h>
 #endif
 
@@ -247,6 +247,7 @@ public:
             }
             
             // If a shared handle doesn't exist, create one and store it.
+#if SLANG_WINDOWS_FAMILY
             VkMemoryGetWin32HandleInfoKHR info = {};
             info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
             info.pNext = nullptr;
@@ -261,6 +262,7 @@ public:
                 return SLANG_FAIL;
             }
             SLANG_RETURN_ON_FAIL(vkCreateSharedHandle(api->m_device, &info, (HANDLE*)&outHandle->handleValue) != VK_SUCCESS);
+#endif
             outHandle->api = InteropHandleAPI::Vulkan;
             return SLANG_OK;
         }
@@ -5449,7 +5451,7 @@ Result VKDevice::Buffer::init(
     VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
-
+#if SLANG_WINDOWS_FAMILY
     VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
     VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
     if (isShared)
@@ -5466,7 +5468,7 @@ Result VKDevice::Buffer::init(
         exportMemoryAllocateInfo.handleTypes = extMemHandleType;
         allocateInfo.pNext = &exportMemoryAllocateInfo;
     }
-
+#endif
     VkMemoryAllocateFlagsInfo flagInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
     if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
     {
@@ -5991,9 +5993,29 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             m_features.add("inline-uniform-block");
         }
 
-        deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
-        deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
-        m_features.add("external-memory");
+        uint32_t extensionCount = 0;
+        m_api.vkEnumerateDeviceExtensionProperties(m_api.m_physicalDevice, NULL, &extensionCount, NULL);
+        Slang::List<VkExtensionProperties> extensions;
+        extensions.setCount(extensionCount);
+        m_api.vkEnumerateDeviceExtensionProperties(m_api.m_physicalDevice, NULL, &extensionCount, extensions.getBuffer());
+
+        HashSet<String> extensionNames;
+        for (const auto& e : extensions)
+        {
+            extensionNames.Add(e.extensionName);
+        }
+
+        if (extensionNames.Contains("VK_KHR_external_memory"))
+        {
+            deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+#if SLANG_WINDOWS_FAMILY
+            if (extensionNames.Contains("VK_KHR_external_memory_win32"))
+            {
+                deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+            }
+#endif
+            m_features.add("external-memory");
+        }
     }
     if (m_api.m_module->isSoftware())
     {

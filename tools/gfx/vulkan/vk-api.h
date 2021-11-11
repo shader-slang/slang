@@ -9,6 +9,7 @@ namespace gfx {
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
     x(vkEnumerateInstanceLayerProperties) \
+    x(vkEnumerateDeviceExtensionProperties) \
     x(vkDestroyInstance) \
     /* */
 
