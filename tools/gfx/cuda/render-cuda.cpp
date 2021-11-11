@@ -35,6 +35,8 @@ namespace gfx
 #ifdef GFX_ENABLE_CUDA
 using namespace Slang;
 
+int bad[-1];
+
 SLANG_FORCE_INLINE static bool _isError(CUresult result) { return result != 0; }
 SLANG_FORCE_INLINE static bool _isError(cudaError_t result) { return result != 0; }
 
