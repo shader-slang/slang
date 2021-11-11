@@ -223,7 +223,13 @@ public:
     }
 
 protected:
-    
+
+    void _resetBuffer()
+    {
+        m_startIndex = 0;
+        m_buffer.setCount(0);
+    }
+
     size_t m_defaultReadSize = 1024;   ///< When initiating a read the default read size
     List<Byte> m_buffer;        ///< Holds the characters
     Index m_startIndex;         ///< The start index

@@ -2,13 +2,17 @@
 
 #include "slang-string-util.h"
 
+#include "slang-process.h"
+
 namespace Slang {
 
 static const UnownedStringSlice g_headerEnd = UnownedStringSlice::fromLiteral("\r\n\r\n");
 static const UnownedStringSlice g_contentLength = UnownedStringSlice::fromLiteral("Content-Length");
 static const UnownedStringSlice g_contentType = UnownedStringSlice::fromLiteral("Content-Type");
 
-void HttpHeader::reset()
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HTTPHeader !!!!!!!!!!!!!!!!!!!!!!! */
+
+void HTTPHeader::reset()
 {
     const UnownedStringSlice empty;
 
@@ -21,39 +25,52 @@ void HttpHeader::reset()
     m_arena.deallocateAll();
 }
 
-/* static */SlangResult HttpHeader::readHeaderText(BufferedReadStream* stream, Index& outEndIndex)
+/* static */SlangResult HTTPHeader::readHeaderText(BufferedReadStream* stream, Index& outEndIndex)
 {
     // https://microsoft.github.io/language-server-protocol/specifications/specification-current/
-    while (true)
+
+    while(true)
     {
         SLANG_RETURN_ON_FAIL(stream->update());
 
-        // This could be more efficient - it just searches until there are enough bytes to have termination
-        auto bytes = stream->getView();
-        UnownedStringSlice input((const char*)bytes.begin(), (const char*)bytes.end());
-
-        const Index index = input.indexOf(g_headerEnd);
+        const Index index = findHeaderEnd(stream);
         if (index >= 0)
         {
-            outEndIndex = index + g_headerEnd.getLength();
+            outEndIndex = index;
             return SLANG_OK;
         }
+
+        if (stream->isEnd())
+        {
+            return SLANG_FAIL;
+        }
+
+        Process::sleepCurrentThread(0);
     }
 }
 
-/* static */SlangResult HttpHeader::parse(const UnownedStringSlice& inSlice, HttpHeader& out)
+/* static */Index HTTPHeader::findHeaderEnd(BufferedReadStream* stream)
+{
+    // This could be more efficient - it just searches until there are enough bytes to have termination
+    auto bytes = stream->getView();
+    UnownedStringSlice input((const char*)bytes.begin(), (const char*)bytes.end());
+
+    const Index index = input.indexOf(g_headerEnd);
+    return (index >= 0) ? (index + g_headerEnd.getLength()) : index;
+}
+
+/* static */SlangResult HTTPHeader::parse(const UnownedStringSlice& inSlice, HTTPHeader& out)
 {
     out.reset();
 
-    if (!inSlice.endsWith(g_headerEnd))
     {
-        return SLANG_FAIL;
-    }
-
-    {
-        // Strip the end
-        auto slice = inSlice.head(inSlice.getLength() - g_headerEnd.getLength());
-        // Store a copy in the header
+        auto slice = inSlice;
+        // If has termination at end, remove so we don't have empty lines
+        if (slice.endsWith(g_headerEnd))
+        {
+            slice = slice.head(slice.getLength() - g_headerEnd.getLength());
+        }
+        // Allocate on on the arena, so when we reference other slices, they are part of this allocation.
         out.m_header = UnownedStringSlice(out.m_arena.allocateString(slice.begin(), slice.getLength()), slice.getLength());
     }
 
@@ -121,7 +138,7 @@ void HttpHeader::reset()
     return SLANG_OK;
 }
 
-/* static */SlangResult HttpHeader::read(BufferedReadStream* stream, HttpHeader& out)
+/* static */SlangResult HTTPHeader::read(BufferedReadStream* stream, HTTPHeader& out)
 {
     Index endIndex;
     SLANG_RETURN_ON_FAIL(readHeaderText(stream, endIndex));
@@ -138,7 +155,7 @@ void HttpHeader::reset()
     return SLANG_OK;
 }
 
-void HttpHeader::append(StringBuilder& out) const
+void HTTPHeader::append(StringBuilder& out) const
 {
     // Output the content length
     out << g_contentLength << ": " << m_contentLength << "\r\n";
@@ -174,6 +191,150 @@ void HttpHeader::append(StringBuilder& out) const
 
     // Add termination
     out << "\r\n";
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HTTPPacketConnection !!!!!!!!!!!!!!!!!!!!!!! */
+
+HTTPPacketConnection::HTTPPacketConnection(BufferedReadStream* readStream, Stream* writeStream) :
+    m_readStream(readStream),
+    m_writeStream(writeStream),
+    m_readState(ReadState::Header),
+    m_readResult(SLANG_OK)
+{
+}
+
+SlangResult HTTPPacketConnection::_handleHeader()
+{
+    SLANG_ASSERT(m_readState == ReadState::Header);
+
+    const Index index = HTTPHeader::findHeaderEnd(m_readStream);
+    if (index < 0)
+    {
+        // Don't have the full header yet
+        return SLANG_OK;
+    }
+
+    // Okay we can parse the header
+    UnownedStringSlice slice((const char*)m_readStream->getBuffer(), size_t(index));
+    SLANG_RETURN_ON_FAIL(_updateReadResult(HTTPHeader::parse(slice, m_readHeader)));
+
+    // Consume the header
+    m_readStream->consume(index);
+
+    // We are now consuming content
+    m_readState = ReadState::Content;
+    return SLANG_OK;
+}
+
+SlangResult HTTPPacketConnection::_handleContent()
+{
+    SLANG_ASSERT(m_readState == ReadState::Content);
+    // Do we have enough content, mark as done
+    if (m_readStream->getCount() >= m_readHeader.m_contentLength)
+    {
+        m_readState = ReadState::Done;
+    }
+    return SLANG_OK;
+}
+
+SlangResult HTTPPacketConnection::update()
+{
+    switch (m_readState)
+    {
+        case ReadState::Closed: return SLANG_OK;
+        case ReadState::Error: return m_readResult;
+        default: break;
+    }
+    
+    SLANG_RETURN_ON_FAIL(_updateReadResult(m_readStream->update()));
+
+    // Note will only indicate end if the buffer *and* backing stream are end/empty
+    if (m_readStream->isEnd())
+    {
+        if (m_readState == ReadState::Header)
+        {
+            m_readState = ReadState::Closed;
+        }
+        else
+        {
+            // Closed without completing
+            m_readState = ReadState::Error;
+            m_readResult = SLANG_FAIL;
+        }
+        return SLANG_OK;
+    }
+
+    switch (m_readState)
+    {
+        case ReadState::Header:
+        {
+            SLANG_RETURN_ON_FAIL(_handleHeader());
+            // We might be able to progress through content, if we have the header
+            if (m_readState == ReadState::Content)
+            {
+                _handleContent();
+            }
+            break;
+        }
+        case ReadState::Content:
+        {
+            _handleContent();
+            break;
+        }
+        default: break;
+    }
+
+    return m_readResult;
+}
+
+SlangResult HTTPPacketConnection::waitForContent()
+{
+    while (m_readState == ReadState::Header ||
+        m_readState == ReadState::Content)
+    {
+        const auto prevCount = m_readStream->getCount();
+
+        SLANG_RETURN_ON_FAIL(update());
+
+        if (prevCount == m_readStream->getCount())
+        {
+            // Yield if it appears nothing was read.
+            Process::sleepCurrentThread(0);
+        }
+    }
+
+    return m_readResult;
+}
+
+void HTTPPacketConnection::consumeContent()
+{
+    SLANG_ASSERT(m_readState == ReadState::Done);
+    if (m_readState == ReadState::Done)
+    {
+        // Consume the content
+        m_readStream->consume(Index(m_readHeader.m_contentLength));
+        // Back looking for the header again
+        m_readState = ReadState::Header;
+    }
+}
+
+SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
+{
+    // Write the header
+    {
+        HTTPHeader header;
+        header.m_contentLength = sizeInBytes;
+
+        StringBuilder buf;
+        header.append(buf);
+
+        SLANG_RETURN_ON_FAIL(m_writeStream->write(buf.getBuffer(), buf.getLength()));
+    }
+
+    // Write the content
+    SLANG_RETURN_ON_FAIL(m_writeStream->write(content, sizeInBytes));
+
+    return SLANG_OK;
 }
 
 } // namespace Slang

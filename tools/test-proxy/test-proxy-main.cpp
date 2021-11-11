@@ -211,25 +211,44 @@ static SlangResult _outputReflect()
     }
 }
 
-static SlangResult _server(int argc, const char* const* argv)
+static SlangResult _httpReflect(int argc, const char* const* argv)
 {
     SLANG_UNUSED(argc);
     SLANG_UNUSED(argv);
 
-    RefPtr<Stream> stdinStream;
+    RefPtr<Stream> stdinStream, stdoutStream;
+
     Process::getStdStream(Process::StreamType::StdIn, stdinStream);
+    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
+
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
-    
-    while (!readStream->isEnd())
+    RefPtr<HTTPPacketConnection> packetConnection = new HTTPPacketConnection(readStream, stdoutStream);
+
+    while (packetConnection->isActive())
     {
-        HttpHeader header;
-        SLANG_RETURN_ON_FAIL(HttpHeader::read(readStream, header));
+        // Block waiting for content (or error/closed)
+        SLANG_RETURN_ON_FAIL(packetConnection->waitForContent());
 
-        // We want to read until we have the specified amount of bytes
-        SLANG_RETURN_ON_FAIL(readStream->readUntilContains(header.m_contentLength));
+        // If we have content do something with it
+        if (packetConnection->hasContent())
+        {
+            auto content = packetConnection->getContent();
 
-        // We need to decode and do something with this.
+            // If it just holds 'end' then we are done
+            const UnownedStringSlice slice((const char*)content.begin(), content.getCount());
+
+            if (slice == UnownedStringSlice::fromLiteral("end"))
+            {
+                break;
+            }
+
+            // Else reflect it back
+            SLANG_RETURN_ON_FAIL(packetConnection->write(content.begin(), content.getCount()));
+
+            // Consume that content/packet
+            packetConnection->consumeContent();
+        }
     }
 
     return SLANG_OK;
@@ -259,9 +278,9 @@ static SlangResult execute(int argc, const char*const* argv)
         return _outputCount(argc, argv);
     }
 
-    if (toolName == "server")
+    if (toolName == "http-reflect")
     {
-        return _server(argc, argv);
+        return _httpReflect(argc, argv);
     }
 
     {

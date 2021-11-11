@@ -381,7 +381,7 @@ void BufferedReadStream::consume(Index byteCount)
     m_startIndex += byteCount;
     if (getCount() == 0)
     {
-        m_startIndex = 0;
+        _resetBuffer();
     }
 }
 
@@ -403,8 +403,7 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
     if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 || offset >= Int64(getCount()))
     {
         // Empty the buffer
-        m_startIndex = 0;
-        m_buffer.setCount(0);
+        _resetBuffer();
         // Seek on underlying stream
         return m_stream->seek(origin, offset);
     }
@@ -511,35 +510,37 @@ SlangResult BufferedReadStream::update()
         return SLANG_OK;
     }
 
+    // Repeat until we have enough space
+    for (;;)
     {
         // How much buffer space do we have. We need at least m_defaultReadSize
         const size_t remainingCount = size_t(m_buffer.getCapacity() - m_buffer.getCount());
 
-        // Repeat until we have enough space
-        while (remainingCount < m_defaultReadSize)
+        if (remainingCount >= m_defaultReadSize)
         {
-            // If there is anything in the buffer shift it all down
-            if (m_startIndex > 0)
-            {
-                Byte* buffer = m_buffer.getBuffer();
-                const Index count = getCount();
-                if (count > 0)
-                {
-                    ::memmove(buffer, buffer + m_startIndex, count);
-                }
-
-                m_buffer.setCount(count);
-                m_startIndex = 0;
-            }
-            else
-            {
-                // Make sure we have the space 
-                const Index prevCount = m_buffer.getCount();
-                m_buffer.setCount(prevCount + m_defaultReadSize);
-                m_buffer.setCount(prevCount);
-            }
+            break;
         }
-        SLANG_ASSERT(size_t(m_buffer.getCapacity() - m_buffer.getCount()) >= m_defaultReadSize);
+
+        // If there is anything in the buffer shift it all down
+        if (m_startIndex > 0)
+        {
+            Byte* buffer = m_buffer.getBuffer();
+            const Index count = getCount();
+            if (count > 0)
+            {
+                ::memmove(buffer, buffer + m_startIndex, count);
+            }
+
+            m_buffer.setCount(count);
+            m_startIndex = 0;
+        }
+        else
+        {
+            // Make sure we have the space 
+            const Index prevCount = m_buffer.getCount();
+            m_buffer.setCount(prevCount + m_defaultReadSize);
+            m_buffer.setCount(prevCount);
+        }
     }
     
     {
