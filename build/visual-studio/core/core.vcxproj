@@ -285,6 +285,7 @@
     <ClInclude Include="..\..\..\source\core\slang-char-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-chunked-list.h" />
     <ClInclude Include="..\..\..\source\core\slang-com-object.h" />
+    <ClInclude Include="..\..\..\source\core\slang-command-line.h" />
     <ClInclude Include="..\..\..\source\core\slang-common.h" />
     <ClInclude Include="..\..\..\source\core\slang-compression-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-deflate-compression-system.h" />
@@ -304,6 +305,7 @@
     <ClInclude Include="..\..\..\source\core\slang-offset-container.h" />
     <ClInclude Include="..\..\..\source\core\slang-platform.h" />
     <ClInclude Include="..\..\..\source\core\slang-process-util.h" />
+    <ClInclude Include="..\..\..\source\core\slang-process.h" />
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h" />
     <ClInclude Include="..\..\..\source\core\slang-render-api-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff-file-system.h" />
@@ -337,6 +339,7 @@
     <ClCompile Include="..\..\..\source\core\slang-byte-encode-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-encode.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-command-line.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-free-list.cpp" />
@@ -346,6 +349,7 @@
     <ClCompile Include="..\..\..\source\core\slang-memory-arena.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-offset-container.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-process-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-render-api-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-riff-file-system.cpp" />
@@ -367,7 +371,7 @@
     <ClCompile Include="..\..\..\source\core\slang-uint-set.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-writer.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-zip-file-system.cpp" />
-    <ClCompile Include="..\..\..\source\core\windows\slang-win-process-util.cpp" />
+    <ClCompile Include="..\..\..\source\core\windows\slang-win-process.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\..\source\core\core.natvis" />

@@ -78,6 +78,9 @@ struct StringUtil
         /// Create a blob from a string
     static ComPtr<ISlangBlob> createStringBlob(const String& string);
 
+        /// Given input text outputs with standardized line endings. Ie \n\r -> \n
+    static void appendStandardLines(const UnownedStringSlice& text, StringBuilder& out);
+
         /// Extracts a line and stores the remaining text in ioText, and the line in outLine. Returns true if has a line. 
         /// 
         /// As well as indicating end of text with the return value, at the end of all the text a 'special' null UnownedStringSlice with a null 'begin'
