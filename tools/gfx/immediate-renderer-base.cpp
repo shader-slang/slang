@@ -355,7 +355,7 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL close() override { }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getNativeHandle(NativeHandle* outHandle)
+        getNativeHandle(NativeHandle* outHandle) override
     {
         *outHandle = 0;
         return SLANG_OK;

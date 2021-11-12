@@ -9,6 +9,7 @@ namespace gfx {
     x(vkGetInstanceProcAddr) \
     x(vkCreateInstance) \
     x(vkEnumerateInstanceLayerProperties) \
+    x(vkEnumerateDeviceExtensionProperties) \
     x(vkDestroyInstance) \
     /* */
 
@@ -154,7 +155,18 @@ namespace gfx {
     x(vkAcquireNextImageKHR) \
     /* */
 
+#if SLANG_WINDOWS_FAMILY
+#   define VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \
+    x(vkGetMemoryWin32HandleKHR) \
+    /* */
+#else
+#   define VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \
+    x(vkGetMemoryFdKHR) \
+    /* */
+#endif
+
 #define VK_API_DEVICE_OPT_PROCS(x) \
+    VK_API_DEVICE_PLATFORM_OPT_PROCS(x) \
     x(vkCmdSetPrimitiveTopologyEXT) \
     x(vkGetBufferDeviceAddress) \
     x(vkGetBufferDeviceAddressKHR) \

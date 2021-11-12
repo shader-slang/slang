@@ -427,7 +427,7 @@ enum class InteropHandleAPI
     Vulkan,
     CUDA,
     Win32,
-    FileDescriptor
+    FileDescriptor,
 };
 
 struct InteropHandle
