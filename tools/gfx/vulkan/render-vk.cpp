@@ -3709,13 +3709,6 @@ public:
                 return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
             {
@@ -3958,13 +3951,6 @@ public:
                 bindPipeline(IPipelineState* pipelineState, IShaderObject** outRootObject) override
             {
                 return setPipelineStateImpl(pipelineState, outRootObject);
-            }
-
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -4551,14 +4537,6 @@ public:
                 SLANG_UNUSED(outRootObject);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNUSED(state);
-                SLANG_UNUSED(rootObject);
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 const char* rayGenShaderName,
                 int32_t width,
@@ -4707,7 +4685,7 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
             // TODO: implement fence signaling.
             assert(fence == nullptr);
