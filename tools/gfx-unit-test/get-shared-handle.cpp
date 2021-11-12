@@ -38,6 +38,9 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(srcBuffer->getSharedHandle(&sharedHandle));
         ComPtr<IBufferResource> dstBuffer;
         GFX_CHECK_CALL_ABORT(dstDevice->createBufferFromSharedHandle(sharedHandle, bufferDesc, dstBuffer.writeRef()));
+        // Reading back the buffer from srcDevice to make sure it's been filled in before reading anything back from dstDevice
+        // TODO: Implement actual synchronization (and not this hacky solution)
+        compareComputeResult(srcDevice, srcBuffer, Slang::makeArray<float>(0.0f, 1.0f, 2.0f, 3.0f));
 
         InteropHandle testHandle;
         GFX_CHECK_CALL_ABORT(dstBuffer->getNativeResourceHandle(&testHandle));
@@ -106,16 +109,17 @@ namespace gfx_test
 
         sharedHandleTestImpl(srcDevice, dstDevice, context);
     }
-
+#if SLANG_WIN64
     SLANG_UNIT_TEST(sharedHandleD3D12ToCUDA)
     {
         sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
     }
 
-#if SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY // TODO: Remove when Linux support is added
     SLANG_UNIT_TEST(sharedHandleVulkanToCUDA)
     {
         sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
     }
+#endif
 #endif
 }
