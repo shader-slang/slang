@@ -28,8 +28,9 @@ class UnixProcess : public Process
 public:
     // Process 
     virtual bool isTerminated() SLANG_OVERRIDE;
-    virtual void waitForTermination() SLANG_OVERRIDE;
+    virtual bool waitForTermination(Int timeInMs) SLANG_OVERRIDE;
     virtual void terminate(int32_t returnValue) SLANG_OVERRIDE;
+    virtual void kill(int32_t returnValue) SLANG_OVERRIDE;
 
     UnixProcess(pid_t pid, Stream*const* streams);
 
@@ -134,51 +135,65 @@ bool UnixProcess::isTerminated()
     return _updateTerminationState(WNOHANG);
 }
 
-void UnixProcess::waitForTermination()
+bool UnixProcess::waitForTermination(Int timeInMs)
 {
-    while (!_updateTerminationState(0));
+    // If < 0 we will wait blocking until terminated
+    if (timeInMs < 0)
+    {
+        while (!_updateTerminationState(0));
+        return true;
+    }
+
+    // Note that the amount of time waiting is very approximate (we are relying on sleeps time and don't take into
+    // account time outside of sleeping)
+
+    // How often to test
+    const Int checkRateMs = 100;            /// Check every 0.1 seconds
+
+    while (timeInMs > 0)
+    {
+        if (_updateTerminationState(WNOHANG))
+        {
+            return true;
+        }
+
+        // Work out how long to sleep for
+        const Int sleepMs = (timeInMs >= checkRateMs) ? checkRateMs : timeInMs;
+
+        // Sleep
+        sleepCurrentThread(sleepMs);
+
+        timeInMs -= sleepMs;
+    }
+
+    return _updateTerminationState(WNOHANG);
 }
 
 void UnixProcess::terminate(int32_t returnValue)
 {
-    if (isTerminated())
+    // Using this mechanism, we can't set a returnValue so just ignore
+    SLANG_UNUSED(returnValue);
+
+    if (!isTerminated())
     {
-        return;
+        // Request the process terminates
+        ::kill(m_pid, SIGTERM);
     }
-
-    // Set the return value
-    m_returnValue = returnValue;
-    // Mark as terminated
-    m_isTerminated = true;
-
-    // We may want to terminate with SIGKILL. For now well try the less aggressive termination.
-    ::kill(m_pid, SIGTERM);
-    
-    // Wait time
-    Index waitMs = 5000;            /// 5 seconds
-    Index sleepMs = 100;            /// Check every 0.1 seconds
-
-    while (waitMs > 0)
-    {
-        // Is it dead yet?
-        int childStatus;
-        const pid_t terminatedPid = waitpid(m_pid, &childStatus, WNOHANG);
-
-        // Confirm that the child terminated
-        if (terminatedPid == m_pid)
-        {
-            return;
-        }
-
-        // Wait before we test again
-        sleepCurrentThread(sleepMs);
-        waitMs -= sleepMs;
-    }
-
-    // We waited, lets just terminate with kill
-    ::kill(m_pid, SIGKILL);
 }
 
+void UnixProcess::kill(int32_t returnValue)
+{
+    if (!isTerminated())
+    {
+        // We waited, lets just terminate with kill
+        ::kill(m_pid, SIGKILL);
+
+        // Set the return value
+        m_returnValue = returnValue;
+        // Mark as terminated
+        m_isTerminated = true;
+    }
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixPipeStream !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -428,14 +443,19 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     return uint64_t(now.tv_sec) * 1000000000 + now.tv_nsec;
 }
 
-/* static */void Process::sleepCurrentThread(Index timeInMs)
+/* static */void Process::sleepCurrentThread(Int timeInMs)
 {
     struct timespec timeSpec;
 
-    if (timeInMs > 0)
+    if (timeInMs >= 1000)
     {
         timeSpec.tv_sec = timeInMs / 1000;
         timeSpec.tv_nsec = (timeInMs % 1000) * 1000 * 1000;
+    }
+    else if (timeInMs > 0)
+    {
+        timeSpec.tv_sec = 0;
+        timeSpec.tv_nsec = timeInMs * 1000 * 1000;
     }
     else
     {
