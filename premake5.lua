@@ -763,6 +763,12 @@ end
  
      links { "compiler-core", "core", "slang" }
  
+ tool "test-server"
+     uuid "23149706-C12F-4329-B6AA-8266407C32D3"
+     includedirs { "." }
+ 
+     links { "compiler-core", "core", "slang" }
+ 
  --
  -- `slang-generate` is a tool we use for source code generation on
  -- the compiler. It depends on the `core` library, so we need to
