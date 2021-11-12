@@ -287,7 +287,7 @@ SlangResult HTTPPacketConnection::update()
     return m_readResult;
 }
 
-SlangResult HTTPPacketConnection::waitForContent()
+SlangResult HTTPPacketConnection::waitForResult()
 {
     while (m_readState == ReadState::Header ||
         m_readState == ReadState::Content)
