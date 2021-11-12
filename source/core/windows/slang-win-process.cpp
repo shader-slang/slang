@@ -111,8 +111,10 @@ class WinProcess : public Process
 {
 public:
 
+    // Process
     virtual bool isTerminated() SLANG_OVERRIDE;
     virtual void waitForTermination() SLANG_OVERRIDE;
+    virtual void terminate(int32_t returnCode) SLANG_OVERRIDE;
 
     WinProcess(HANDLE handle, Stream* const* streams) :
         m_processHandle(handle)
@@ -337,6 +339,20 @@ bool WinProcess::isTerminated()
     }
     _hasTerminated();
     return true;
+}
+
+void WinProcess::terminate(int32_t returnCode)
+{
+    if (isTerminated())
+    {
+        return;
+    }
+
+    // https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess
+    ::TerminateProcess(m_processHandle, UINT32(returnCode));
+
+    m_returnValue = returnCode;
+    m_processHandle.setNull();
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

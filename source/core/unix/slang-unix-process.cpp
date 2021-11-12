@@ -29,6 +29,7 @@ public:
     // Process 
     virtual bool isTerminated() SLANG_OVERRIDE;
     virtual void waitForTermination() SLANG_OVERRIDE;
+    virtual void terminate(int32_t returnValue) SLANG_OVERRIDE;
 
     UnixProcess(pid_t pid, Stream*const* streams);
 
@@ -137,6 +138,47 @@ void UnixProcess::waitForTermination()
 {
     while (!_updateTerminationState(0));
 }
+
+void UnixProcess::terminate(int32_t returnValue)
+{
+    if (isTerminated())
+    {
+        return;
+    }
+
+    // Set the return value
+    m_returnValue = returnValue;
+    // Mark as terminated
+    m_isTerminated = true;
+
+    // We may want to terminate with SIGKILL. For now well try the less aggressive termination.
+    ::kill(m_pid, SIGTERM);
+    
+    // Wait time
+    Index waitMs = 5000;            /// 5 seconds
+    Index sleepMs = 100;            /// Check every 0.1 seconds
+
+    while (waitMs > 0)
+    {
+        // Is it dead yet?
+        int childStatus;
+        const pid_t terminatedPid = waitpid(m_pid, &childStatus, WNOHANG);
+
+        // Confirm that the child terminated
+        if (terminatedPid == m_pid)
+        {
+            return;
+        }
+
+        // Wait before we test again
+        sleepCurrentThread(sleepMs);
+        waitMs -= sleepMs;
+    }
+
+    // We waited, lets just terminate with kill
+    ::kill(m_pid, SIGKILL);
+}
+
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixPipeStream !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 

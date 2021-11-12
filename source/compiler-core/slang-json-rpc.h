@@ -13,36 +13,15 @@
 namespace Slang {
 
 /// Send and receive messages as JSON
-class JSONConnection : public RefObject
+class JSONRPCUtil
 {
 public:
-
-    bool hasContent() const { return m_connection->hasContent();  }
-
-        /// Only valid if has content
-    SlangResult readJSONContent(JSONContainer* container, JSONValue& outValue);
-        /// Will wait for content
-    SlangResult waitForReadJSONContent(JSONContainer* container, JSONValue& outValue);
-
+    
         /// Parse slice into JSONContainer. outValue is the root of the hierarchy.
-    SlangResult parseJSON(const UnownedStringSlice& slice, JSONContainer* container, JSONValue& outValue);
+    static SlangResult parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
 
-        /// Get the diagnostic sink
-    DiagnosticSink* getDiagnosticSink() { return &m_diagnosticSink;  }
-        /// Get the underlying protocol connection
-    HTTPPacketConnection* getConnection() { return m_connection;  }
-        /// Get the source manager
-    SourceManager* getSourceManager() { return &m_sourceManager;  }
-
-        /// Ctor
-    JSONConnection(HTTPPacketConnection* connection);
-
-protected:
-
-    RefPtr<HTTPPacketConnection> m_connection;
-
-    SourceManager m_sourceManager;
-    DiagnosticSink m_diagnosticSink;
+        /// Parse content from stream, and consume the packet
+    static SlangResult parseJSONAndConsume(HTTPPacketConnection* connection, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
 };
 
 } // namespace Slang

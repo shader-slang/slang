@@ -42,6 +42,8 @@ public:
         /// Blocks until the process has completed
     virtual void waitForTermination() = 0;
 
+        /// Terminate the process
+    virtual void terminate(int32_t returnCode) = 0;
 
         /// The quoting style used for the command line on this target. Currently just uses Space,
         /// but in future may take into account platform sec
