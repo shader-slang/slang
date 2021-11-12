@@ -26,6 +26,8 @@
 #include "../../source/compiler-core/slang-json-rpc.h"
 #include "../../source/compiler-core/slang-json-value.h"
 
+#include "test-server-diagnostics.h"
+
 #include "tools/unit-test/slang-unit-test.h"
 
 namespace TestServer
@@ -58,14 +60,15 @@ public:
 
         /// Can return nullptr if cannot create the session
     slang::IGlobalSession* getGlobalSession();
+
         /// Can return nullptr if cannot load the tool
-    ISlangSharedLibrary* loadSharedLibrary(const String& name);
+    ISlangSharedLibrary* loadSharedLibrary(const String& name, DiagnosticSink* sink = nullptr);
 
         /// Get a unit test module. Returns nullptr if not found.
-    IUnitTestModule* getUnitTestModule(const String& name);
+    IUnitTestModule* getUnitTestModule(const String& name, DiagnosticSink* sink = nullptr);
 
         /// Given a tool name return it's function pointer. Or nullptr on failure.
-    InnerMainFunc getToolFunction(const String& name);
+    InnerMainFunc getToolFunction(const String& name, DiagnosticSink* sink = nullptr);
 
         /// Execute the server
     SlangResult execute();
@@ -137,12 +140,12 @@ slang::IGlobalSession* TestServer::getGlobalSession()
     return m_session;
 }
 
-ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name)
+ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, DiagnosticSink* sink)
 {
-    auto keyPtr = m_sharedLibraryMap.TryGetValue(name);
-    if (keyPtr)
+    ComPtr<ISlangSharedLibrary> lib;
+    if (m_sharedLibraryMap.TryGetValue(name, lib))
     {
-        return *keyPtr;
+        return lib;
     }
 
     auto loader = DefaultSharedLibraryLoader::getSingleton();
@@ -152,6 +155,11 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name)
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     if (SLANG_FAILED(loader->loadSharedLibrary(toolPath.getBuffer(), sharedLibrary.writeRef())))
     {
+        if (sink)
+        {
+            sink->diagnose(SourceLoc(), ServerDiagnostics::unableToLoadSharedLibrary, name);
+        }
+
         return nullptr;
     }
 
@@ -159,7 +167,7 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name)
     return sharedLibrary;
 }
 
-IUnitTestModule* TestServer::getUnitTestModule(const String& name)
+IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSink* sink)
 {
     auto unitTestModulePtr = m_unitTestModules.TryGetValue(name);
     if (unitTestModulePtr)
@@ -167,38 +175,60 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name)
         return *unitTestModulePtr;
     }
 
-    ISlangSharedLibrary* sharedLibrary = loadSharedLibrary(name);
+    ISlangSharedLibrary* sharedLibrary = loadSharedLibrary(name, sink);
     if (!sharedLibrary)
     {
         return nullptr;
     }
 
+    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("slangUnitTestGetModule");
+
     // get the unit test export name
-    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName("slangUnitTestGetModule");
+    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName.begin());
     if (!getModuleFunc)
+    {
+        if (sink)
+        {
+            sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
+        }
         return nullptr;
+    }
 
     IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
+    {
+        if (sink)
+        {
+            sink->diagnose(SourceLoc(), ServerDiagnostics::unableToGetUnitTestModule);
+        }
         return nullptr;
+    }
 
     m_unitTestModules.Add(name, testModule);
     return testModule;
 }
 
-TestServer::InnerMainFunc TestServer::getToolFunction(const String& name)
+TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, DiagnosticSink* sink)
 {
     StringBuilder sharedLibToolBuilder;
     sharedLibToolBuilder.append(name);
     sharedLibToolBuilder.append("-tool");
 
-    ISlangSharedLibrary* sharedLibrary = loadSharedLibrary(sharedLibToolBuilder);
+    ISlangSharedLibrary* sharedLibrary = loadSharedLibrary(sharedLibToolBuilder, sink);
     if (!sharedLibrary)
     {
         return nullptr;
     }
 
-    return (InnerMainFunc)sharedLibrary->findFuncByName("innerMain");
+    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("innerMain");
+
+    auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName.begin());
+    if (!func && sink)
+    {
+        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
+    }
+    
+    return func;
 }
 
 SlangResult TestServer::_executeSingle()
@@ -275,7 +305,7 @@ SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONVal
     String testName;
     Int enabledApis = 0;
 
-    IUnitTestModule* testModule = getUnitTestModule(moduleName);
+    IUnitTestModule* testModule = getUnitTestModule(moduleName, &m_diagnosticSink);
     if (!testModule)
     {
         return SLANG_FAIL;
@@ -284,6 +314,7 @@ SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONVal
     Index testIndex = _findTestIndex(testModule, moduleName);
     if (testIndex < 0)
     {
+        m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, testName);
         return SLANG_FAIL;
     }
 
@@ -338,10 +369,17 @@ SlangResult TestServer::_executeTool(JSONContainer* container, const JSONValue& 
 {
     String toolName;
 
-    auto func = getToolFunction(toolName);
+    auto func = getToolFunction(toolName, &m_diagnosticSink);
     if (!func)
     {
         // Write out to diagnostics
+        return SLANG_FAIL;
+    }
+
+    // Assume we will used the shared session
+    slang::IGlobalSession* session = getGlobalSession();
+    if (!session)
+    {
         return SLANG_FAIL;
     }
 
