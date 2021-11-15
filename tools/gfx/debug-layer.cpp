@@ -764,10 +764,10 @@ Result DebugDevice::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result DebugDevice::waitForFences(
-    IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout)
+    uint32_t fenceCount, IFence** fences, uint64_t* values , bool waitForAll, uint64_t timeout)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->waitForFences(fences, fenceCount, waitForAll, timeout);
+    return baseObject->waitForFences(fenceCount, fences, values, waitForAll, timeout);
 }
 
 IResource::Type DebugBufferResource::getType()
@@ -1001,13 +1001,6 @@ Result DebugComputeCommandEncoder::bindPipeline(
     return result;
 }
 
-Result DebugComputeCommandEncoder::bindPipelineAndRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->bindPipelineAndRootObject(getInnerObj(state), getInnerObj(rootObject));
-}
-
 void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
 {
     SLANG_GFX_API_FUNC;
@@ -1047,13 +1040,6 @@ Result DebugRenderCommandEncoder::bindPipeline(
     commandBuffer->rootObject.baseObject.attach(innerRootObject);
     *outRootShaderObject = &commandBuffer->rootObject;
     return result;
-}
-
-Result DebugRenderCommandEncoder::bindPipelineAndRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->bindPipelineAndRootObject(getInnerObj(state), getInnerObj(rootObject));
 }
 
 void DebugRenderCommandEncoder::setViewports(uint32_t count, const Viewport* viewports)
@@ -1361,13 +1347,6 @@ void DebugRayTracingCommandEncoder::bindPipeline(
     *outRootObject = &commandBuffer->rootObject;
 }
 
-void DebugRayTracingCommandEncoder::bindPipelineAndRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
-{
-    SLANG_GFX_API_FUNC;
-    baseObject->bindPipelineAndRootObject(getInnerObj(state), getInnerObj(rootObject));
-}
-
 void DebugRayTracingCommandEncoder::dispatchRays(
     const char* rayGenShaderName,
     int32_t width,
@@ -1384,7 +1363,7 @@ const ICommandQueue::Desc& DebugCommandQueue::getDesc()
     return baseObject->getDesc();
 }
 
-void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence)
+void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
 {
     SLANG_GFX_API_FUNC;
     List<ICommandBuffer*> innerCommandBuffers;
@@ -1410,7 +1389,7 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
             }
         }
     }
-    baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence));
+    baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
 }
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
@@ -1615,12 +1594,14 @@ Result DebugShaderObject::setSpecializationArgs(
     const slang::SpecializationArg* args,
     uint32_t count)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 Result DebugShaderObject::getCurrentVersion(
     ITransientResourceHeap* transientHeap, IShaderObject** outObject)
 {
+    SLANG_GFX_API_FUNC;
     ComPtr<IShaderObject> innerObject;
     SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
     RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
@@ -1628,6 +1609,12 @@ Result DebugShaderObject::getCurrentVersion(
     debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
     returnComPtr(outObject, debugShaderObject);
     return SLANG_OK;
+}
+
+Result DebugShaderObject::copyFrom(IShaderObject* other)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->copyFrom(getInnerObj(other));
 }
 
 DebugObjectBase::DebugObjectBase()
@@ -1685,28 +1672,28 @@ IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
     return baseObject->getViewDesc();
 }
 
-IFence::FenceStatus DebugFence::getStatus()
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->getStatus();
-}
-
-Result DebugFence::reset()
-{
-    SLANG_GFX_API_FUNC;
-    return baseObject->reset();
-}
-
-Result DebugFence::getSharedHandle(uint64_t* outHandle)
+Result DebugFence::getSharedHandle(InteropHandle* outHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getSharedHandle(outHandle);
 }
 
-Result DebugFence::getNativeHandle(void** outNativeHandle)
+Result DebugFence::getNativeHandle(InteropHandle* outNativeHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outNativeHandle);
+}
+
+Result DebugFence::getCurrentValue(uint64_t* outValue)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getCurrentValue(outValue);
+}
+
+Result DebugFence::setCurrentValue(uint64_t value)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setCurrentValue(value);
 }
 
 } // namespace gfx

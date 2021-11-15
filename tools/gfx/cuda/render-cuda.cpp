@@ -956,13 +956,6 @@ public:
                 return SLANG_OK;
             }
 
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 m_writer->bindRootShaderObject(m_rootObject);
@@ -1141,8 +1134,9 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
+            SLANG_UNUSED(valueToSignal);
             // TODO: implement fence.
             assert(fence == nullptr);
             for (uint32_t i = 0; i < count; i++)
