@@ -20,6 +20,50 @@ static const auto g_message = UnownedStringSlice::fromLiteral("message");
 static const auto g_result = UnownedStringSlice::fromLiteral("result");
 static const auto g_data = UnownedStringSlice::fromLiteral("data");
 
+/* static */const RttiInfo* JSONRPCErrorResponse::Error::createRttiInfo()
+{
+    JSONRPCErrorResponse::Error obj;
+    StructRttiBuilder builder(&obj, "JSONRPCErrorResponse::Error", nullptr);
+    builder.addField("code", &obj.code);
+    builder.addField("message", &obj.message);
+    return builder.construct();
+}
+
+/* static */const RttiInfo* JSONRPCErrorResponse::createRttiInfo()
+{
+    JSONRPCErrorResponse obj;
+    StructRttiBuilder builder(&obj, "JSONRPCErrorResponse", nullptr);
+
+    builder.addField("error", &obj.error);
+    builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+
+    return builder.construct();
+}
+
+/* static */const RttiInfo* JSONRPCCall::createRttiInfo()
+{
+    JSONRPCCall obj;
+    StructRttiBuilder builder(&obj, "JSONRPCCall", nullptr);
+
+    builder.addField("method", &obj.method);
+    builder.addField("params", &obj.params, StructRttiInfo::Flag::Optional);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+
+    return builder.construct();
+}
+
+/* static */const RttiInfo* JSONResultResponse::createRttiInfo()
+{
+    JSONResultResponse obj;
+    StructRttiBuilder builder(&obj, "JSONResultResponse", nullptr);
+
+    builder.addField("result", &obj.result);
+    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+
+    return builder.construct();
+}
+
 /* static */JSONValue JSONRPCUtil::createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id)
 {
     const Index maxPairs = 4;

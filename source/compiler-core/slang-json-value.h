@@ -9,6 +9,8 @@
 
 #include "slang-json-parser.h"
 
+#include "../core/slang-rtti-info.h"
+
 namespace Slang {
 
 typedef uint32_t JSONKey;
@@ -111,7 +113,12 @@ struct JSONValue
     };
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
+
+    static const RttiInfo g_rttiInfo;
 };
+
+template <>
+struct GetRttiInfo<JSONValue> { static const RttiInfo* get() { return &JSONValue::g_rttiInfo; } };
 
 struct JSONKeyValue
 {

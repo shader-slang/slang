@@ -26,6 +26,8 @@ namespace Slang {
     JSONValue::Kind::Object,            // Object,
 };
 
+/* static */const RttiInfo JSONValue::g_rttiInfo = RttiInfo{ RttiInfo::Kind::Other };
+
 static JSONKeyValue _makeInvalidKeyValue()
 {
     JSONKeyValue keyValue;
