@@ -1842,8 +1842,17 @@ public:
         // memory association, we first need to fill in a descriptor struct.
         cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
         memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
-        // TODO: Change according to the type of handle being passed in
-        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+        switch (handle.api)
+        {
+        case InteropHandleAPI::D3D12:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+            break;
+        case InteropHandleAPI::Vulkan:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+            break;
+        default:
+            return SLANG_FAIL;
+        }
         externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
         externalMemoryHandleDesc.size = desc.sizeInBytes;
         externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;

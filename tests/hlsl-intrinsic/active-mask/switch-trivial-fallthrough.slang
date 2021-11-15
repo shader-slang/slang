@@ -4,10 +4,19 @@
 // that exhibits "trivial fall-through" from one `case`
 // to another.
 
+// We've ended up having to disable this test everywhere,
+// which really speaks to the way that the "active mask" concept
+// in D3D and Vulkan was never really specified to a level
+// that makes it meaningful.
+//
+// Even if the specs get fixed at some point down the line,
+// we can't really re-enable these tests because they'd fail on way
+// too many GPUs and driver versions.
+
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -xslang -DHACK -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
 
 // Note: this test is currently disabled on the CUDA
 // target because we do not synthesize the active
