@@ -188,6 +188,7 @@ public:
     x(R8G8_UNORM, 2, 1) \
     x(R8_UNORM, 1, 1) \
     x(B8G8R8A8_UNORM, 4, 1) \
+    x(B8G8R8A8_UNORM_SRGB, 4, 1) \
     \
     x(R16G16B16A16_SNORM, 8, 1) \
     x(R16G16_SNORM, 4, 1) \
@@ -292,6 +293,7 @@ enum class Format
     R8G8_UNORM,
     R8_UNORM,
     B8G8R8A8_UNORM,
+    B8G8R8A8_UNORM_SRGB,
 
     R16G16B16A16_SNORM,
     R16G16_SNORM,
