@@ -240,6 +240,12 @@ JSONKey JSONContainer::getKey(const UnownedStringSlice& slice)
     return JSONKey(m_slicePool.add(slice));
 }
 
+JSONKey JSONContainer::findKey(const UnownedStringSlice& slice) const
+{
+    const Index index = m_slicePool.findIndex(slice);
+    return (index < 0) ? JSONKey(0) : JSONKey(index);
+}
+
 ConstArrayView<JSONValue> JSONContainer::getArray(const JSONValue& in) const
 {
     SLANG_ASSERT(in.type == JSONValue::Type::Array);
@@ -391,6 +397,19 @@ double JSONContainer::asFloat(const JSONValue& value)
         }
         default:                                return value.asFloat();
     }
+}
+
+Index JSONContainer::findObjectIndex(const JSONValue& obj, JSONKey key) const
+{
+    auto pairs = getObject(obj);
+    return pairs.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
+}
+
+JSONValue JSONContainer::findObjectValue(const JSONValue& obj, JSONKey key) const
+{
+    auto pairs = getObject(obj);
+    const Index index = pairs.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
+    return (index >= 0) ? pairs[index].value : JSONValue::makeInvalid();
 }
 
 JSONValue& JSONContainer::getAt(const JSONValue& array, Index index)
@@ -740,6 +759,11 @@ bool JSONContainer::areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index
 
         return _areEqualOrderedKeys(sortedAs.getBuffer(), sortedBs.getBuffer(), count);
     }
+}
+
+bool JSONContainer::areEqual(const JSONValue& a, const UnownedStringSlice& slice)
+{
+    return a.getKind() == JSONValue::Kind::String && getString(a) == slice;
 }
 
 bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)

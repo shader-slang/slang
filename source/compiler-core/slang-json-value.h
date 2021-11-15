@@ -129,6 +129,11 @@ struct JSONKeyValue
     SourceLoc keyLoc;
     JSONValue value;
 
+    static JSONKeyValue make(JSONKey inKey, JSONValue inValue, SourceLoc inKeyLoc = SourceLoc())
+    {
+        return JSONKeyValue{ inKey, inKeyLoc, inValue };
+    }
+
     static JSONKeyValue g_invalid;
 };
 
@@ -154,6 +159,11 @@ public:
 
         /// Get the value at the index in the array
     JSONValue& getAt(const JSONValue& array, Index index);
+
+        /// Returns the index of key in obj, or -1 if not found
+    Index findObjectIndex(const JSONValue& obj, JSONKey key) const;
+        /// Get the value in the object at key. REturns invalid if not found.
+    JSONValue findObjectValue(const JSONValue& obj, JSONKey key) const;
 
         /// Returns the index 
     Index findKeyGlobalIndex(const JSONValue& obj, JSONKey key);
@@ -184,6 +194,8 @@ public:
 
         /// Get a key for a name
     JSONKey getKey(const UnownedStringSlice& slice);
+        /// Returns JSONKey(0) if not found
+    JSONKey findKey(const UnownedStringSlice& slice) const;
         /// Get the string from the key
     UnownedStringSlice getStringFromKey(JSONKey key) const { return m_slicePool.getSlice(StringSlicePool::Handle(key)); }
 
@@ -193,6 +205,8 @@ public:
     bool areEqual(const JSONValue& a, const JSONValue& b);
     bool areEqual(const JSONValue* a, const JSONValue* b, Index count);
     bool areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+
+    bool areEqual(const JSONValue& a, const UnownedStringSlice& slice);
 
         /// Destroy value
     void destroy(JSONValue& value);

@@ -1,11 +1,276 @@
 #include "slang-json-rpc.h"
 
+#include "../../slang-com-helper.h"
+
 namespace Slang {
 
 // https://www.jsonrpc.org/specification
 
 //    m_sourceManager.initialize(nullptr, nullptr);
 //    m_diagnosticSink.init(&m_sourceManager, &JSONLexer::calcLexemeLocation);
+
+static const auto g_jsonRpc = UnownedStringSlice::fromLiteral("jsonrpc");
+static const auto g_jsonRpcVersion = UnownedStringSlice::fromLiteral("2.0");
+static const auto g_method = UnownedStringSlice::fromLiteral("method");
+static const auto g_id = UnownedStringSlice::fromLiteral("id");
+static const auto g_params = UnownedStringSlice::fromLiteral("params");
+static const auto g_code = UnownedStringSlice::fromLiteral("code");
+static const auto g_error = UnownedStringSlice::fromLiteral("error");
+static const auto g_message = UnownedStringSlice::fromLiteral("message");
+static const auto g_result = UnownedStringSlice::fromLiteral("result");
+static const auto g_data = UnownedStringSlice::fromLiteral("data");
+
+/* static */JSONValue JSONRPCUtil::createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id)
+{
+    const Index maxPairs = 4;
+    JSONKeyValue pairs[maxPairs];
+
+    Index i = 0;
+
+    // Version number is a string
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_jsonRpc), container->createString(g_jsonRpcVersion));
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_method), container->createString(method));
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_params), params);
+
+    if (id >= 0)
+    {
+        pairs[i++] = JSONKeyValue::make(container->getKey(g_id), JSONValue::makeInt(id));
+    }
+
+    return container->createObject(pairs, i);
+}
+
+/* static */JSONValue JSONRPCUtil::createCall(JSONContainer* container, const UnownedStringSlice& method, Int id)
+{
+    const Index maxPairs = 3;
+    JSONKeyValue pairs[maxPairs];
+    Index i = 0;
+    // Version number is a string
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_jsonRpc), container->createString(g_jsonRpcVersion));
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_method), container->createString(method));
+
+    if (id >= 0)
+    {
+        pairs[i++] = JSONKeyValue::make(container->getKey(g_id), JSONValue::makeInt(id));
+    }
+
+    return container->createObject(pairs, i);
+}
+
+/* static */JSONValue JSONRPCUtil::createErrorResponse(JSONContainer* container, Index code, const UnownedStringSlice& message, const JSONValue& data, Int id)
+{
+    // Set up the error value
+    JSONValue errorValue;
+    {
+        const Index maxPairs = 2;
+        JSONKeyValue pairs[maxPairs];
+        Index i = 0;
+
+        if (code != 0)
+        {
+            pairs[i++] = JSONKeyValue::make(container->getKey(g_code), JSONValue::makeInt(code));
+        }
+        if (message.getLength() > 0)
+        {
+            pairs[i++] = JSONKeyValue::make(container->getKey(g_message), container->createString(message));
+        }
+        errorValue = container->createObject(pairs, i);
+    }
+
+    const Index maxPairs = 4;
+    JSONKeyValue pairs[maxPairs];
+    Index i = 0;
+
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_jsonRpc), container->createString(g_jsonRpcVersion));
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_error), errorValue);
+
+    if (data.isValid())
+    {
+        pairs[i++] = JSONKeyValue::make(container->getKey(g_data), data);
+    }
+
+    if (id >= 0)
+    {
+        pairs[i++] = JSONKeyValue::make(container->getKey(g_id), JSONValue::makeInt(id));
+    }
+
+    return container->createObject(pairs, i);
+}
+
+/* static */JSONValue JSONRPCUtil::createResultResponse(JSONContainer* container, const JSONValue& resultValue, Int id)
+{
+    const Index maxPairs = 3;
+    JSONKeyValue pairs[maxPairs];
+    Index i = 0;
+
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_jsonRpc), container->createString(g_jsonRpcVersion));
+    pairs[i++] = JSONKeyValue::make(container->getKey(g_result), resultValue);
+
+    if (id >= 0)
+    {
+        pairs[i++] = JSONKeyValue::make(container->getKey(g_id), JSONValue::makeInt(id));
+    }
+
+    return container->createObject(pairs, i);
+}
+
+/* static */ JSONRPCUtil::ResponseType JSONRPCUtil::getResponseType(JSONContainer* container, const JSONValue& response)
+{
+    const JSONKey resultKey = container->findKey(g_result);
+    const JSONKey errorKey = container->findKey(g_error);
+
+    auto pairs = container->getObject(response);
+
+    for (const auto& pair : pairs)
+    {
+        if (pair.key == resultKey)
+        {
+            return ResponseType::Result;
+        }
+        else if (pair.key == errorKey)
+        {
+            return ResponseType::Error;
+        }
+    }
+
+    return ResponseType::Error;
+}
+
+static SlangResult _parseError(JSONContainer* container, const JSONValue& error, JSONRPCUtil::ErrorResponse& out)
+{
+    const auto pairs = container->getObject(error);
+
+    const JSONKey messageKey = container->findKey(g_message);
+    const JSONKey codeKey = container->findKey(g_code);
+    const JSONKey dataKey = container->findKey(g_data);
+
+    Int fieldBits = 0;
+
+    for (auto const& pair : pairs)
+    {
+        if (pair.key == messageKey)
+        {
+            if (pair.value.getKind() != JSONValue::Kind::String)
+            {
+                return SLANG_FAIL;
+            }
+            out.message = container->getString(pair.value);
+            fieldBits |= 0x1;
+        }
+        else if (pair.key == codeKey)
+        {
+            if (pair.value.getKind() != JSONValue::Kind::Integer)
+            {
+                return SLANG_FAIL;
+            }
+            out.code = Index(pair.value.asInteger());
+            fieldBits |= 0x2;
+        }
+        else if (pair.key == dataKey)
+        {
+            out.data = pair.value;
+            fieldBits |= 0x4;
+        }
+        else
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    // Check all required fields are set
+    return (fieldBits & 0x3) == 0x3 ? SLANG_OK : SLANG_FAIL;
+}
+
+/* static */SlangResult JSONRPCUtil::parseError(JSONContainer* container, const JSONValue& response, ErrorResponse& out)
+{
+    const auto pairs = container->getObject(response);
+
+    const JSONKey jsonRpcKey = container->findKey(g_jsonRpc);
+    const JSONKey errorKey = container->findKey(g_error);
+    const JSONKey idKey = container->findKey(g_id);
+
+    Int fieldBits = 0;
+
+    for (auto const& pair : pairs)
+    {
+        if (pair.key == jsonRpcKey)
+        {
+            if (!container->areEqual(pair.value, g_jsonRpcVersion))
+            {
+                return SLANG_FAIL;
+            }
+            fieldBits |= 0x1;
+        }
+        else if (pair.key == errorKey)
+        {
+            // We need to decode the error 
+            SLANG_RETURN_ON_FAIL(_parseError(container, pair.value, out));
+            fieldBits |= 0x2;
+        }
+        else if (pair.key == idKey)
+        {
+            if (pair.value.getKind() != JSONValue::Kind::Integer)
+            {
+                return SLANG_FAIL;
+            }
+            out.id = pair.value.asInteger();
+            fieldBits |= 0x4;
+        }
+        else
+        {
+            // Unknown key
+            return SLANG_FAIL;
+        }
+    }
+
+    // Check all the required bits are set
+    return ((fieldBits & 0x3) == 0x3) ? SLANG_OK : SLANG_FAIL;
+}
+
+/* static */SlangResult JSONRPCUtil::parseResult(JSONContainer* container, const JSONValue& response, ResultResponse& out)
+{
+    const auto pairs = container->getObject(response);
+
+    const JSONKey jsonRpcKey = container->findKey(g_jsonRpc);
+    const JSONKey resultKey = container->findKey(g_result);
+    const JSONKey idKey = container->findKey(g_id);
+
+    Int fieldBits = 0;
+
+    for (auto const& pair : pairs)
+    {
+        if (pair.key == jsonRpcKey)
+        {
+            if (!container->areEqual(pair.value, g_jsonRpcVersion))
+            {
+                return SLANG_FAIL;
+            }
+            fieldBits |= 0x1;
+        }
+        else if (pair.key == resultKey)
+        {
+            out.result = pair.value;
+            fieldBits |= 0x2;
+        }
+        else if (pair.key == idKey)
+        {
+            if (pair.value.getKind() != JSONValue::Kind::Integer)
+            {
+                return SLANG_FAIL;
+            }
+            out.id = pair.value.asInteger();
+            fieldBits |= 0x4;
+        }
+        else
+        {
+            // Unknown key
+            return SLANG_FAIL;
+        }
+    }
+
+    // Check all the required bits are set
+    return ((fieldBits & 0x3) == 0x3) ? SLANG_OK : SLANG_FAIL;
+}
 
 /* static */SlangResult JSONRPCUtil::parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
 {
