@@ -80,6 +80,7 @@ protected:
     SlangResult _executeSingle();
     SlangResult _executeUnitTest(JSONContainer* container, const JSONValue& root);
     SlangResult _executeTool(JSONContainer* container, const JSONValue& root);
+    SlangResult _writeResponse(JSONContainer* containers, const JSONValue& root);
 
     bool m_quit = false;
 
@@ -231,6 +232,15 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     return func;
 }
 
+SlangResult TestServer::_writeResponse(JSONContainer* container, const JSONValue& root)
+{
+    // TODO(JS): We may want a non indented style, to reduce size 
+    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+    container->traverseRecursively(root, &writer);
+    const StringBuilder& builder = writer.getBuilder();
+    return m_connection->write(builder.getBuffer(), builder.getLength());
+}
+
 SlangResult TestServer::_executeSingle()
 {
     // Block waiting for content (or error/closed)
@@ -259,10 +269,23 @@ SlangResult TestServer::_executeSingle()
         SlangResult res = JSONRPCUtil::parseJSON(slice, &container, &m_diagnosticSink, root);
         // Consume that content/packet
         m_connection->consumeContent();
-        SLANG_RETURN_ON_FAIL(res);
+
+        if (SLANG_FAILED(res))
+        {
+            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, JSONRPCUtil::ErrorCode::InvalidRequest, UnownedStringSlice::fromLiteral("Unable to parse JSON")));
+        }
     }
 
-    String method;
+    JSONRPCUtil::Call call;
+    {
+        SlangResult res = JSONRPCUtil::parseCall(&container, root, call);
+        if (SLANG_FAILED(res))
+        {
+            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, Index(JSONRPCUtil::ErrorCode::InvalidRequest), UnownedStringSlice::fromLiteral("Cannot parse call")));
+        }
+    }
+
+    const auto& method = call.method;
 
     // Do different things
     if (method == "quit")

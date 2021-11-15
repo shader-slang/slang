@@ -12,6 +12,12 @@
 
 namespace Slang {
 
+struct JSONParam
+{
+    UnownedStringSlice name;
+    JSONValue::Kind kind;
+};
+
 /// Send and receive messages as JSON
 ///
 /// Strictly speaking should support ids, as strings or ids. Currently just supports with integer ids.
@@ -54,6 +60,13 @@ public:
         Int id = -1;                        ///< Id of initiating method or -1 if not set
     };
 
+    struct Call
+    {
+        UnownedStringSlice method;          ///< The name of the method
+        JSONValue params;                   ///< Can be invalid/array/object
+        Int id = -1;                        ///< Id associated with this request, or -1 if not set
+    };
+
         /// Parameters can be either named or via index.
     static JSONValue createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id = -1);
         /// Parameters can be either named or via index.
@@ -61,7 +74,8 @@ public:
 
         /// Create an error response
         /// Code should typically be something in the ErrorCode range
-    static JSONValue createErrorResponse(JSONContainer* container, Index code, const UnownedStringSlice& message, const JSONValue& data, Int id = -1);
+    static JSONValue createErrorResponse(JSONContainer* container, Index code, const UnownedStringSlice& message, const JSONValue& data = JSONValue(), Int id = -1);
+    static JSONValue createErrorResponse(JSONContainer* container, ErrorCode code, const UnownedStringSlice& message, const JSONValue& data = JSONValue(), Int id = -1);
         /// Create a result response
     static JSONValue createResultResponse(JSONContainer* container, const JSONValue& resultValue, Int id = -1);
 
@@ -71,6 +85,8 @@ public:
     static SlangResult parseError(JSONContainer* container, const JSONValue& response, ErrorResponse& out);
 
     static SlangResult parseResult(JSONContainer* container, const JSONValue& response, ResultResponse& out);
+
+    static SlangResult parseCall(JSONContainer* container, const JSONValue& value, Call& out);
 
         /// Parse slice into JSONContainer. outValue is the root of the hierarchy.
     static SlangResult parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
