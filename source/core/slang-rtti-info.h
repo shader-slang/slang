@@ -9,6 +9,110 @@
 
 namespace Slang {
 
+struct RttiInfo;
+
+template <size_t ALIGNMENT>
+struct GetTypeBySize;
+
+template <> struct GetTypeBySize<1> { typedef uint8_t Type; };
+template <> struct GetTypeBySize<2> { typedef uint16_t Type; };
+template <> struct GetTypeBySize<4> { typedef uint32_t Type; };
+template <> struct GetTypeBySize<8> { typedef uint64_t Type; };
+
+template <typename T, size_t SIZE>
+struct SizedType
+{
+    T values[SIZE];
+};
+
+template <size_t ALIGNMENT, size_t SIZE>
+struct GetSizedType
+{
+    typedef typename GetTypeBySize<ALIGNMENT>::Type ElementType;
+    typedef typename SizedType<ElementType, SIZE / sizeof(ElementType)> Type;
+};
+
+template <typename T>
+void* newDynamicArray(Index count) { return new T[count]; }
+template <typename T>
+void deleteDynamicArray(void* arr) { delete [] (T*)arr; }
+
+struct RttiDynamicArrayFuncs
+{
+    typedef void* (*NewFunc)(Index count);
+    typedef void (*DeleteFunc)(void* dynArray);
+
+    bool isValid() const { return newFunc && deleteFunc;  }
+
+    NewFunc newFunc;
+    DeleteFunc deleteFunc;
+};
+
+template <typename T>
+static RttiDynamicArrayFuncs getDynamicArrayFuncsForType()
+{
+    // NOTE! By design the new'd arrays *contents* is uninitialized
+    typedef typename GetSizedType< SLANG_ALIGN_OF(T), sizeof(T)> SizedType;
+    RttiDynamicArrayFuncs funcs;
+    funcs.deleteFunc = deleteDynamicArray<SizedType>;
+    funcs.newFunc = newDynamicArray<SizedType>;
+    return funcs;
+}
+
+struct RttiTypeFuncs
+{
+    typedef void (*CtorArray)(const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (*DtorArray)(const RttiInfo* rttiInfo, void* dst, Index count);
+    typedef void (*CopyArray)(const RttiInfo* rttiInfo, void* dst, const void* src, Index count);
+
+    bool isValid() const { return ctorArray && dtorArray && copyArray;  }
+
+    CtorArray ctorArray;
+    DtorArray dtorArray;
+    CopyArray copyArray;
+};
+
+template <typename T>
+struct GetRttiTypeFuncs
+{
+    static void ctorArray(const RttiInfo* rttiInfo, void* in, Index count)
+    {
+        SLANG_UNUSED(rttiInfo);
+        T* dst = (T*)in;
+        for (Index i = 0; i < count; ++i)
+        {
+            new (dst + i) T;
+        }
+    }
+    static void dtorArray(const RttiInfo* rttiInfo, void* in, Index count)
+    {
+        SLANG_UNUSED(rttiInfo);
+        T* dst = (T*)in;
+        for (Index i = 0; i < count; ++i)
+        {
+            (dst + i)->~T();
+        }
+    }
+    static void copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    {
+        SLANG_UNUSED(rttiInfo);
+        T* dst = (T*)inDst;
+        const T* src = (T*)inSrc;
+        for (Index i = 0; i < count; ++i)
+        {
+            dst[i] = src[i];
+        }
+    }
+    static RttiTypeFuncs getFuncs()
+    {
+        RttiTypeFuncs funcs;
+        funcs.copyArray = &copyArray;
+        funcs.dtorArray = &dtorArray;
+        funcs.ctorArray = &ctorArray;
+        return funcs;
+    }
+};
+
 struct RttiInfo
 {
     typedef uint8_t AlignmentType;
@@ -48,7 +152,27 @@ struct RttiInfo
         /// Will be freed at shutdown (via global dtor)
     static void* allocate(size_t size);
 
+    static void addDynamicArrayFuncs(size_t alignment, size_t size, const RttiDynamicArrayFuncs& funcs);
+    static RttiDynamicArrayFuncs getDynamicArrayFuncs(size_t alignment, size_t size);
+
+    template <typename T>
+    static void addDynamicArrayFuncs()
+    {
+        addDynamicArrayFuncs(SLANG_ALIGN_OF(T), sizeof(T), getDynamicArrayFuncsForType<T>());
+    }
+
     static const RttiInfo g_basicTypes[Index(Kind::CountOf)];
+};
+
+// Can combine into flags on a field. Could store default value with a field,
+// but this works fine for most purposes
+enum class RttiDefaultValue : uint8_t
+{
+    Normal,             ///< Zero for integral/float types/false for bool
+    One,
+    MinusOne,
+
+    Mask = 0x7,
 };
 
 struct StructRttiInfo : public RttiInfo
@@ -58,7 +182,8 @@ struct StructRttiInfo : public RttiInfo
     {
         enum Enum : Flags
         {
-            Optional = 0x1,
+            // We use low bits for 'RttiDefaultValue' value
+            Optional = 0x8,
         };
     };
 
@@ -77,6 +202,11 @@ struct StructRttiInfo : public RttiInfo
     const Field* m_fields;              ///< Fields
 };
 
+SLANG_FORCE_INLINE StructRttiInfo::Flags combine(StructRttiInfo::Flags flags, RttiDefaultValue defaultValue)
+{
+    return StructRttiInfo::Flags(defaultValue) | flags;
+}
+
 struct ListRttiInfo : public RttiInfo
 {
     RttiInfo* m_elementType;
@@ -86,6 +216,13 @@ struct DictionaryRttiInfo : public RttiInfo
 {
     RttiInfo* m_keyType;
     RttiInfo* m_valueType;
+};
+
+struct OtherRttiInfo : public RttiInfo
+{
+    typedef bool (*IsDefaultFunc)(const RttiInfo* rttiInfo, const void* in);
+    IsDefaultFunc m_isDefaultFunc;
+    RttiTypeFuncs m_typeFuncs;
 };
 
 template <typename T>

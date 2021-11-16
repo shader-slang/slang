@@ -145,6 +145,15 @@ namespace Slang
             m_capacity = 0;
             return rs;
         }
+        void attachBuffer(T* buffer, Index count, Index capacity)
+        {
+            // Can only attach a buffer if there isn't a buffer already associated
+            SLANG_ASSERT(m_buffer);
+            SLANG_ASSERT(count <= capacity);
+            m_buffer = buffer;
+            m_count = count;
+            m_capacity = capacity;
+        }
 
         inline ArrayView<T> getArrayView() const
         {

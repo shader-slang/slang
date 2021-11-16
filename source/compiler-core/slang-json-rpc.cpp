@@ -36,7 +36,7 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
 
     builder.addField("error", &obj.error);
     builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
-    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
     return builder.construct();
 }
@@ -48,7 +48,7 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
 
     builder.addField("method", &obj.method);
     builder.addField("params", &obj.params, StructRttiInfo::Flag::Optional);
-    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
     return builder.construct();
 }
@@ -59,10 +59,12 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
     StructRttiBuilder builder(&obj, "JSONResultResponse", nullptr);
 
     builder.addField("result", &obj.result);
-    builder.addField("id", &obj.id, StructRttiInfo::Flag::Optional);
+    builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
     return builder.construct();
 }
+
+
 
 /* static */JSONValue JSONRPCUtil::createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id)
 {

@@ -26,7 +26,23 @@ namespace Slang {
     JSONValue::Kind::Object,            // Object,
 };
 
-/* static */const RttiInfo JSONValue::g_rttiInfo = RttiInfo{ RttiInfo::Kind::Other };
+static bool _isDefault(const RttiInfo* type, const void* in)
+{
+    SLANG_UNUSED(type)
+    const JSONValue& value = *(const JSONValue*)in;
+    return value.getKind() == JSONValue::Kind::Invalid;
+}
+
+static OtherRttiInfo _getJSONValueRttiInfo()
+{
+    OtherRttiInfo info;
+    info.init<JSONValue>(RttiInfo::Kind::Other);
+    info.m_isDefaultFunc = _isDefault;
+    info.m_typeFuncs = GetRttiTypeFuncs<JSONValue>::getFuncs();
+    return info;
+}
+
+/* static */const OtherRttiInfo JSONValue::g_rttiInfo = _getJSONValueRttiInfo();
 
 static JSONKeyValue _makeInvalidKeyValue()
 {

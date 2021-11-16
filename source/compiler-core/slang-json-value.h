@@ -114,7 +114,7 @@ struct JSONValue
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
 
-    static const RttiInfo g_rttiInfo;
+    static const OtherRttiInfo g_rttiInfo;
 };
 
 template <>
