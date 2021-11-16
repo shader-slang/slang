@@ -449,6 +449,9 @@ struct SourceManager
         /// Get the source views
     const List<SourceView*>& getSourceViews() const { return m_sourceViews; }
 
+        /// Resets state. Will release all views/source 
+    void reset();
+
     SourceManager() :
         m_memoryArena(2048),
         m_slicePool(StringSlicePool::Style::Default)
@@ -456,6 +459,9 @@ struct SourceManager
     ~SourceManager();
 
     protected:
+
+    void _resetLoc();
+    void _resetSource();
 
     // The first location available to this source manager
     // (may not be the first location of all, because we might

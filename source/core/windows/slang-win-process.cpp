@@ -111,8 +111,11 @@ class WinProcess : public Process
 {
 public:
 
+    // Process
     virtual bool isTerminated() SLANG_OVERRIDE;
-    virtual void waitForTermination() SLANG_OVERRIDE;
+    virtual bool waitForTermination(Int timeInMs) SLANG_OVERRIDE;
+    virtual void terminate(int32_t returnCode) SLANG_OVERRIDE;
+    virtual void kill(int32_t returnCode) SLANG_OVERRIDE;
 
     WinProcess(HANDLE handle, Stream* const* streams) :
         m_processHandle(handle)
@@ -300,7 +303,7 @@ void WinProcess::_hasTerminated()
         // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
 
         DWORD childExitCode = 0;
-        if (GetExitCodeProcess(m_processHandle, &childExitCode))
+        if (::GetExitCodeProcess(m_processHandle, &childExitCode))
         {
             m_returnValue = int32_t(childExitCode);
         }
@@ -308,35 +311,54 @@ void WinProcess::_hasTerminated()
     }
 }
 
-void WinProcess::waitForTermination()
-{
-    if (m_processHandle.isNull())
-    {
-        return;
-    }
-
-    // wait for the process to exit
-    // TODO: set a timeout as a safety measure...
-    WaitForSingleObject(m_processHandle, INFINITE);
-
-    _hasTerminated();
-}
-
-bool WinProcess::isTerminated()
+bool WinProcess::waitForTermination(Int timeInMs)
 {
     if (m_processHandle.isNull())
     {
         return true;
     }
 
-    auto res = WaitForSingleObject(m_processHandle, 0);
+    const DWORD timeOutTime = (timeInMs < 0) ? INFINITE : DWORD(timeInMs);
+
+    // wait for the process to exit
+    // TODO: set a timeout as a safety measure...
+    auto res = ::WaitForSingleObject(m_processHandle, timeOutTime);
 
     if (res == WAIT_TIMEOUT)
     {
         return false;
     }
+
     _hasTerminated();
     return true;
+}
+
+bool WinProcess::isTerminated()
+{
+    return waitForTermination(0);
+}
+
+void WinProcess::terminate(int32_t returnCode)
+{
+    if (!isTerminated())
+    {
+        // If it's not terminated, try terminating.
+        // Might take time, so use isTerminated to check
+        ::TerminateProcess(m_processHandle, UINT32(returnCode));
+    }
+}
+
+void WinProcess::kill(int32_t returnCode)
+{
+    if (!isTerminated())
+    {
+        // https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-terminateprocess
+        ::TerminateProcess(m_processHandle, UINT32(returnCode));
+
+        // Just assume it's done and set the return code
+        m_returnValue = returnCode;
+        m_processHandle.setNull();
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -505,7 +527,7 @@ bool WinProcess::isTerminated()
     return SLANG_OK;
 }
 
-/* static */void Process::sleepCurrentThread(Index timeInMs)
+/* static */void Process::sleepCurrentThread(Int timeInMs)
 {
     ::Sleep(DWORD(timeInMs));
 }
