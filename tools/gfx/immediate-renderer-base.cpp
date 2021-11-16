@@ -183,6 +183,17 @@ public:
             SLANG_UNUSED(countOffset);
             SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::drawIndirect");
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+            uint32_t samplesPerPixel,
+            uint32_t pixelCount,
+            const SamplePosition* samplePositions) override
+        {
+            SLANG_UNUSED(samplesPerPixel);
+            SLANG_UNUSED(pixelCount);
+            SLANG_UNUSED(samplePositions);
+            return SLANG_E_NOT_AVAILABLE;
+        }
     };
 
     RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -334,6 +345,17 @@ public:
             SLANG_UNUSED(subResourceData);
             SLANG_UNUSED(subResourceDataCount);
             SLANG_UNIMPLEMENTED_X("uploadTextureData");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+            IResourceView* view,
+            ClearValue* clearValue,
+            ClearResourceViewFlags::Enum flags) override
+        {
+            SLANG_UNUSED(view);
+            SLANG_UNUSED(clearValue);
+            SLANG_UNUSED(flags);
+            SLANG_UNIMPLEMENTED_X("clearResourceView");
         }
     };
 

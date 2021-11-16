@@ -1361,6 +1361,23 @@ struct IndirectDrawIndexedArguments
     uint32_t StartInstanceLocation;
 };
 
+struct SamplePosition
+{
+    int8_t x;
+    int8_t y;
+};
+
+struct ClearResourceViewFlags
+{
+    enum Enum : uint32_t
+    {
+        None = 0,
+        ClearDepth = 1,
+        ClearStencil = 2,
+        FloatClearValues = 4
+    };
+};
+
 class IRenderCommandEncoder : public ICommandEncoder
 {
 public:
@@ -1423,6 +1440,8 @@ public:
         IBufferResource* countBuffer,
         uint64_t countOffset) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+        uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
 };
 
 class IComputeCommandEncoder : public ICommandEncoder
@@ -1483,6 +1502,8 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+        IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
 };
 
 enum class AccelerationStructureCopyMode

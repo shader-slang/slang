@@ -223,17 +223,17 @@ static SlangResult _httpReflect(int argc, const char* const* argv)
 
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
-    RefPtr<HTTPPacketConnection> packetConnection = new HTTPPacketConnection(readStream, stdoutStream);
+    RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, stdoutStream);
 
-    while (packetConnection->isActive())
+    while (connection->isActive())
     {
         // Block waiting for content (or error/closed)
-        SLANG_RETURN_ON_FAIL(packetConnection->waitForContent());
+        SLANG_RETURN_ON_FAIL(connection->waitForResult());
 
         // If we have content do something with it
-        if (packetConnection->hasContent())
+        if (connection->hasContent())
         {
-            auto content = packetConnection->getContent();
+            auto content = connection->getContent();
 
             // If it just holds 'end' then we are done
             const UnownedStringSlice slice((const char*)content.begin(), content.getCount());
@@ -244,10 +244,10 @@ static SlangResult _httpReflect(int argc, const char* const* argv)
             }
 
             // Else reflect it back
-            SLANG_RETURN_ON_FAIL(packetConnection->write(content.begin(), content.getCount()));
+            SLANG_RETURN_ON_FAIL(connection->write(content.begin(), content.getCount()));
 
             // Consume that content/packet
-            packetConnection->consumeContent();
+            connection->consumeContent();
         }
     }
 

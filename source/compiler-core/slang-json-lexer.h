@@ -66,6 +66,9 @@ public:
         /// Must be called before use
     SlangResult init(SourceView* sourceView, DiagnosticSink* sink);
 
+        /// Determines the first token from text. Useful for diagnostics on DiagnosticSink
+    static UnownedStringSlice calcLexemeLocation(const UnownedStringSlice& text);
+
 protected:
     struct LexResult
     {

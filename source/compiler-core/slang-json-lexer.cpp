@@ -10,6 +10,34 @@ https://www.json.org/json-en.html
 
 namespace Slang {
 
+/* static */UnownedStringSlice JSONLexer::calcLexemeLocation(const UnownedStringSlice& text)
+{
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink;
+    sink.init(&sourceManager, nullptr);
+
+    String contents(text);
+    SourceFile* sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+    JSONLexer lexer;
+
+    lexer.init(sourceView, &sink);
+
+    if (lexer.peekType() != JSONTokenType::Invalid)
+    {
+        // Get the start offset
+        auto offset = sourceView->getRange().getOffset(lexer.peekLoc());
+
+        return text.subString(offset, lexer.peekLexeme().getLength());
+    }
+    else
+    {
+        return text.head(0);
+    }
+}
+
 SlangResult JSONLexer::init(SourceView* sourceView, DiagnosticSink* sink) 
 {
     m_sourceView = sourceView;

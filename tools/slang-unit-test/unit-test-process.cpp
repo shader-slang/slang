@@ -48,10 +48,17 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
         SLANG_RETURN_ON_FAIL(connection->write(buf.getBuffer(), size_t(size)));
 
         // Wait for the response
-        SLANG_RETURN_ON_FAIL(connection->waitForContent());
+        SLANG_RETURN_ON_FAIL(connection->waitForResult());
 
+        // If we don't have content then something has gone wrong
+        if (!connection->hasContent())
+        {
+            finalRes = SLANG_FAIL;
+            break;
+        }
+
+        // Check the content is the same
         auto readContent = connection->getContent();
-
         if (readContent != buf.getArrayView())
         {
             finalRes = SLANG_FAIL;

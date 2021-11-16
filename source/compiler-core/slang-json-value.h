@@ -66,6 +66,7 @@ struct JSONValue
     static JSONValue makeEmptyArray(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Array; value.loc = loc; value.rangeIndex = 0; return value; }
     static JSONValue makeEmptyObject(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Object; value.loc = loc; value.rangeIndex = 0; return value; }
 
+    static JSONValue makeInvalid(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Invalid; value.loc = loc; return value; }
     // The following functions only work if the value is stored directly NOT as a lexeme. Use the methods on the container
     // to access values if it is potentially stored as a lexeme
 
@@ -203,6 +204,11 @@ public:
 
         /// Returns the source manager used. 
     SourceManager* getSourceManager() const { return m_sourceManager; } 
+        /// Set the source manager
+    void setSourceManager(SourceManager* sourceManger) { m_sourceManager = sourceManger;  }
+
+        /// Reset the state
+    void reset();
 
         // Ctor
     JSONContainer(SourceManager* sourceManger);

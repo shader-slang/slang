@@ -137,6 +137,17 @@ JSONContainer::JSONContainer(SourceManager* sourceManager):
     _addRange(Range::Type::None, 0, 0);
 }
 
+void JSONContainer::reset()
+{
+    m_slicePool.clear();
+
+    m_freeRangeIndices.clear();
+    m_arrayValues.clear();
+    m_objectValues.clear();
+
+    _addRange(Range::Type::None, 0, 0);
+}
+
 /* static */bool JSONContainer::areKeysUnique(const JSONKeyValue* keyValues, Index keyValueCount)
 {
     for (Index i = 1; i < keyValueCount; ++i)
