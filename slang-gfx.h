@@ -889,20 +889,19 @@ public:
 class IFence : public ISlangUnknown
 {
 public:
-    enum class FenceStatus
-    {
-        Completed,
-        NotReady,
-        DeviceLost
-    };
     struct Desc
     {
-        bool initiallySignaled = false;
+        uint64_t initialValue = 0;
     };
-    virtual SLANG_NO_THROW FenceStatus SLANG_MCALL getStatus() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL reset() = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(uint64_t* outHandle) = 0;
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(void** outNativeHandle) = 0;
+
+    /// Returns the currently signaled value on the device.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentValue(uint64_t* outValue) = 0;
+
+    /// Signals the fence from the host with the specified value.
+    virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
 #define SLANG_UUID_IFence                                                             \
     {                                                                                 \
@@ -981,6 +980,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap,
         IShaderObject** outObject) = 0;
+
+        /// Copies contents from another shader object to this object.
+    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \
@@ -1376,12 +1378,6 @@ public:
         return rootObject;
     }
 
-    // Sets the pipeline state with a mutable root object. The root object is allowed to change
-    // between this call and future draw calls.
-    virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineAndRootObject(
-        IPipelineState* state,
-        IShaderObject* rootObject) = 0;
-
     virtual SLANG_NO_THROW void
         SLANG_MCALL setViewports(uint32_t count, const Viewport* viewports) = 0;
     virtual SLANG_NO_THROW void
@@ -1445,12 +1441,6 @@ public:
         SLANG_RETURN_NULL_ON_FAIL(bindPipeline(state, &rootObject));
         return rootObject;
     }
-
-    // Sets the pipeline state with a mutable root object. The root object is allowed to change
-    // between this call and future dispatch calls.
-    virtual SLANG_NO_THROW Result SLANG_MCALL bindPipelineAndRootObject(
-        IPipelineState* state,
-        IShaderObject* rootObject) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchComputeIndirect(IBufferResource* cmdBuffer, uint64_t offset) = 0;
@@ -1537,11 +1527,6 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
-
-    // Binds pipeline with a mutable root object. The root object is allowed to change
-    // between this call and dispatchRays calls.
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        bindPipelineAndRootObject(IPipelineState* state, IShaderObject* mutableRootObject) = 0;
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
     /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for
@@ -1633,11 +1618,15 @@ public:
 
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() = 0;
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-        executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fenceToSignal) = 0;
-    inline void executeCommandBuffer(ICommandBuffer* commandBuffer, IFence* fenceToSignal = nullptr)
+    virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
+        uint32_t count,
+        ICommandBuffer* const* commandBuffers,
+        IFence* fenceToSignal,
+        uint64_t newFenceValue) = 0;
+    inline void executeCommandBuffer(
+        ICommandBuffer* commandBuffer, IFence* fenceToSignal = nullptr, uint64_t newFenceValue = 0)
     {
-        executeCommandBuffers(1, &commandBuffer, fenceToSignal);
+        executeCommandBuffers(1, &commandBuffer, fenceToSignal, newFenceValue);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL wait() = 0;
@@ -2061,8 +2050,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFence(const IFence::Desc& desc, IFence** outFence) = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
+        uint32_t fenceCount,
+        IFence** fences,
+        uint64_t* values,
+        bool waitForAll,
+        uint64_t timeout) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \

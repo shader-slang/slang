@@ -154,13 +154,6 @@ public:
             m_writer->writeTimestamp(pool, index);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-        {
-            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::bindPipelineAndRootObject");
-            return SLANG_E_NOT_AVAILABLE;
-        }
-
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
             uint32_t maxDrawCount,
             IBufferResource* argBuffer,
@@ -231,13 +224,6 @@ public:
                 stateImpl->m_program, m_commandBuffer->m_rootShaderObject.writeRef()));
             *outRootObject = m_commandBuffer->m_rootShaderObject.Ptr();
             return SLANG_OK;
-        }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-        {
-            SLANG_UNIMPLEMENTED_X("ImmediateRenderBase::bindPipelineAndRootObject");
-            return SLANG_E_NOT_AVAILABLE;
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -494,7 +480,7 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override { return m_desc; }
 
     virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-        uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+        uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
     {
         // TODO: implement fence signal.
         assert(fence == nullptr);

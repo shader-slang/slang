@@ -536,6 +536,12 @@ public:
         SLANG_UNUSED(outObject);
         return SLANG_E_NOT_AVAILABLE;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override
+    {
+        SLANG_UNUSED(other);
+        return SLANG_E_NOT_AVAILABLE;
+    }
 };
 
 template<typename TShaderObjectImpl, typename TShaderObjectLayoutImpl, typename TShaderObjectData>
@@ -1233,7 +1239,7 @@ public:
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout) override;
+        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
 
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,
