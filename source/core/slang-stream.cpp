@@ -3,6 +3,7 @@
 #include <share.h>
 #endif
 #include "slang-io.h"
+#include "slang-process.h"
 
 namespace Slang
 {
@@ -374,13 +375,13 @@ SlangResult OwnedMemoryStream::write(const void * buffer, size_t length)
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! BufferedReadStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void BufferedReadStream::_advanceStartIndex(Index byteCount)
+void BufferedReadStream::consume(Index byteCount)
 {
     SLANG_ASSERT(Index(getCount()) >= byteCount && byteCount >= 0);
     m_startIndex += byteCount;
     if (getCount() == 0)
     {
-        m_startIndex = 0;
+        _resetBuffer();
     }
 }
 
@@ -402,14 +403,13 @@ SlangResult BufferedReadStream::seek(SeekOrigin origin, Int64 offset)
     if (origin == SeekOrigin::End || origin == SeekOrigin::Start || offset < 0 || offset >= Int64(getCount()))
     {
         // Empty the buffer
-        m_startIndex = 0;
-        m_buffer.setCount(0);
+        _resetBuffer();
         // Seek on underlying stream
         return m_stream->seek(origin, offset);
     }
 
     // We can just seek on the buffered data
-    _advanceStartIndex(Index(offset));
+    consume(Index(offset));
     return SLANG_OK;
 }
 
@@ -439,7 +439,7 @@ SlangResult BufferedReadStream::read(void* inBuffer, size_t length, size_t& outR
 
             ::memcpy(buffer, getBuffer(), readCount);
 
-            _advanceStartIndex(Index(readCount));
+            consume(Index(readCount));
             buffer += readCount;
             length -= readCount;
 
@@ -510,35 +510,37 @@ SlangResult BufferedReadStream::update()
         return SLANG_OK;
     }
 
+    // Repeat until we have enough space
+    for (;;)
     {
         // How much buffer space do we have. We need at least m_defaultReadSize
         const size_t remainingCount = size_t(m_buffer.getCapacity() - m_buffer.getCount());
 
-        // Repeat until we have enough space
-        while (remainingCount < m_defaultReadSize)
+        if (remainingCount >= m_defaultReadSize)
         {
-            // If there is anything in the buffer shift it all down
-            if (m_startIndex > 0)
-            {
-                Byte* buffer = m_buffer.getBuffer();
-                const Index count = getCount();
-                if (count > 0)
-                {
-                    ::memmove(buffer, buffer + m_startIndex, count);
-                }
-
-                m_buffer.setCount(count);
-                m_startIndex = 0;
-            }
-            else
-            {
-                // Make sure we have the space 
-                const Index prevCount = m_buffer.getCount();
-                m_buffer.setCount(prevCount + m_defaultReadSize);
-                m_buffer.setCount(prevCount);
-            }
+            break;
         }
-        SLANG_ASSERT(size_t(m_buffer.getCapacity() - m_buffer.getCount()) >= m_defaultReadSize);
+
+        // If there is anything in the buffer shift it all down
+        if (m_startIndex > 0)
+        {
+            Byte* buffer = m_buffer.getBuffer();
+            const Index count = getCount();
+            if (count > 0)
+            {
+                ::memmove(buffer, buffer + m_startIndex, count);
+            }
+
+            m_buffer.setCount(count);
+            m_startIndex = 0;
+        }
+        else
+        {
+            // Make sure we have the space 
+            const Index prevCount = m_buffer.getCount();
+            m_buffer.setCount(prevCount + m_defaultReadSize);
+            m_buffer.setCount(prevCount);
+        }
     }
     
     {
@@ -547,13 +549,36 @@ SlangResult BufferedReadStream::update()
 
         size_t readBytes = 0;
 
-        const  SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
+        const SlangResult res = m_stream->read(m_buffer.getBuffer() + prevCount, m_defaultReadSize, readBytes);
 
         m_buffer.setCount(prevCount + Index(readBytes));
 
         return res;
     }
 }
+
+SlangResult BufferedReadStream::readUntilContains(size_t size)
+{
+    while (true)
+    {
+        if (size_t(getCount()) >= size)
+        {
+            return SLANG_OK;
+        }
+
+        const size_t preCount = size_t(getCount());
+
+        // Update buffer
+        SLANG_RETURN_ON_FAIL(update());
+
+        // If nothing was read yield
+        if (preCount == getCount())
+        {
+            Process::sleepCurrentThread(0);
+        }
+    }
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! StreamUtil !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

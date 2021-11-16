@@ -103,6 +103,7 @@ protected:
     FileAccess m_access = FileAccess::None;
     WinHandle m_streamHandle;
     bool m_isOwned;
+    bool m_isPipe;          
 };
 
 
@@ -135,10 +136,17 @@ WinPipeStream::WinPipeStream(HANDLE handle, FileAccess access, bool isOwned) :
     m_access(access),
     m_isOwned(isOwned)
 {
-    // It might be handy to get information about the handle
-    // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
 
+    // On Win32 a HANDLE has to be handled differently if it's a PIPE or FILE, so first determine
+    // if it really is a pipe.
+    // http://msdn.microsoft.com/en-us/library/aa364960(VS.85).aspx
+    m_isPipe = ::GetFileType(handle) == FILE_TYPE_PIPE;
+
+    if (m_isPipe)
     {
+        // It might be handy to get information about the handle
+        // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-getnamedpipeinfo
+
         DWORD flags, outBufferSize, inBufferSize, maxInstances;
         // It appears that by default windows pipe buffer size is 4k.
         if (GetNamedPipeInfo(handle, &flags, &outBufferSize, &inBufferSize, &maxInstances))
@@ -181,31 +189,40 @@ SlangResult WinPipeStream::read(void* buffer, size_t length, size_t& outReadByte
         return SLANG_OK;
     }
 
+    DWORD bytesRead = 0;
+
     // Check if there is any data, so won't block
+    if (m_isPipe)
     {
-        DWORD bytesRead = 0;
-        DWORD totalBytes = 0;
-        DWORD remainingBytes = 0;
+        DWORD pipeBytesRead = 0;
+        DWORD pipeTotalBytesAvailable = 0;
+        DWORD pipeRemainingBytes = 0;
 
         // Works on anonymous pipes too
         // https://docs.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe
 
-        SLANG_RETURN_ON_FAIL(_updateState(PeekNamedPipe(m_streamHandle, nullptr, DWORD(0), &bytesRead, &totalBytes, &remainingBytes)));
+        SLANG_RETURN_ON_FAIL(_updateState(::PeekNamedPipe(m_streamHandle, nullptr, DWORD(0), &pipeBytesRead, &pipeTotalBytesAvailable, &pipeRemainingBytes)));
         // If there is nothing to read we are done
         // If we don't do this ReadFile will *block* if there is nothing available
-        if (totalBytes == 0)
+        if (pipeTotalBytesAvailable == 0)
         {
             return SLANG_OK;
         }
-    }
 
+        SLANG_RETURN_ON_FAIL(_updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+    }
+    else
     {
-        DWORD bytesRead = 0;
-        SLANG_RETURN_ON_FAIL(_updateState(ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
+        SLANG_RETURN_ON_FAIL(_updateState(::ReadFile(m_streamHandle, buffer, DWORD(length), &bytesRead, nullptr)));
 
-        outReadBytes = size_t(bytesRead);
+        // If it's not a pipe, and there is nothing left, then we are done.
+        if (length > 0 && bytesRead == 0)
+        {
+            close();
+        }
     }
 
+    outReadBytes = size_t(bytesRead);
     return SLANG_OK;
 }
 
@@ -223,9 +240,23 @@ SlangResult WinPipeStream::write(const void* buffer, size_t length)
     }
 
     DWORD numWritten = 0;
-    BOOL writeResult = WriteFile(m_streamHandle, buffer, DWORD(length), &numWritten, nullptr);
+    BOOL writeResult = ::WriteFile(m_streamHandle, buffer, DWORD(length), &numWritten, nullptr);
 
-    if (!writeResult || numWritten != length)
+    if (!writeResult)
+    {
+        auto err = ::GetLastError();
+
+        if (err == ERROR_BROKEN_PIPE)
+        {
+            close();
+            return SLANG_FAIL;
+        }
+            
+        SLANG_UNUSED(err);
+        return SLANG_FAIL;
+    }
+
+    if (numWritten != length)
     {
         return SLANG_FAIL;
     }
@@ -251,8 +282,7 @@ SlangResult WinPipeStream::flush()
     }
 
     // https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers
-
-    if (!FlushFileBuffers(m_streamHandle))
+    if (!::FlushFileBuffers(m_streamHandle))
     {
         auto err = GetLastError();
         SLANG_UNUSED(err);
@@ -327,8 +357,17 @@ bool WinProcess::isTerminated()
     {
         case StreamType::StdIn:
         {
-            const HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
-            out = new WinPipeStream(stdinHandle, FileAccess::Read, false);
+            out = new WinPipeStream(GetStdHandle(STD_INPUT_HANDLE), FileAccess::Read, false);
+            return SLANG_OK;
+        }
+        case StreamType::StdOut:
+        {
+            out = new WinPipeStream(GetStdHandle(STD_OUTPUT_HANDLE), FileAccess::Write, false);
+            return SLANG_OK;
+        }
+        case StreamType::ErrorOut:
+        {
+            out = new WinPipeStream(GetStdHandle(STD_ERROR_HANDLE), FileAccess::Write, false);
             return SLANG_OK;
         }
     }

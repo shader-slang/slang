@@ -201,16 +201,34 @@ public:
         /// Will read assuming backing stream is 
     SlangResult update();
 
+        /// Consume bytes in the buffer.
+    void consume(Index byteCount);
+
     Byte* getBuffer() { return m_buffer.getBuffer() + m_startIndex; }
     const Byte* getBuffer() const { return m_buffer.getBuffer() + m_startIndex; }
 
     size_t getCount() const { return m_buffer.getCount() - m_startIndex; }
 
+        /// Read until the buffer contains the specified amount of bytes
+    SlangResult readUntilContains(size_t size);
+
     ConstArrayView<Byte> getView() const { return ConstArrayView<Byte>(getBuffer(), Index(getCount())); }
     ArrayView<Byte> getView() { return ArrayView<Byte>(getBuffer(), Index(getCount())); }
 
+    BufferedReadStream(Stream* stream) :
+        m_stream(stream),
+        m_startIndex(0)
+    {
+
+    }
+
 protected:
-    void _advanceStartIndex(Index byteCount);
+
+    void _resetBuffer()
+    {
+        m_startIndex = 0;
+        m_buffer.setCount(0);
+    }
 
     size_t m_defaultReadSize = 1024;   ///< When initiating a read the default read size
     List<Byte> m_buffer;        ///< Holds the characters
