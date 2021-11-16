@@ -11,6 +11,9 @@ namespace Slang {
 
 struct RttiInfo
 {
+    typedef uint8_t AlignmentType;
+    typedef uint16_t SizeType;
+
     enum class Kind : uint8_t
     {
         Invalid,
@@ -32,8 +35,18 @@ struct RttiInfo
     };
 
     Kind m_kind;
+    AlignmentType m_alignment;
+    SizeType m_size;
 
-    static MemoryArena& getMemoryArena();
+    void init(Kind kind, size_t alignment, size_t size) { m_kind = kind; m_alignment = AlignmentType(alignment); m_size = SizeType(size); }
+
+    template <typename T>
+    void init(Kind kind) { init(kind, SLANG_ALIGN_OF(T), sizeof(T)); }
+    
+        /// Allocate memory for RttiInfo types.
+        /// Is thread safe, and doesn't require the memory to be freed explicitly
+        /// Will be freed at shutdown (via global dtor)
+    static void* allocate(size_t size);
 
     static const RttiInfo g_basicTypes[Index(Kind::CountOf)];
 };
@@ -62,8 +75,6 @@ struct StructRttiInfo : public RttiInfo
 
     Index m_fieldCount;                 ///< Amount of fields
     const Field* m_fields;              ///< Fields
-
-    uint32_t m_sizeInBytes;             ///< Total size in bytes
 };
 
 struct ListRttiInfo : public RttiInfo
@@ -95,8 +106,8 @@ struct GetRttiInfo<List<T>>
 {
     static const RttiInfo* _create()
     {
-        auto info = RttiInfo::getMemoryArena().allocate<ListRttiInfo>();
-        info->m_kind = RttiInfo::Kind::List;
+        auto info = (ListRttiInfo*)RttiInfo::allocate(sizeof(ListRttiInfo));
+        info->init<List<Byte>>(RttiInfo::Kind::List);
         info->m_elementType = GetRttiInfo<T>::get();
         return info;
     }
@@ -115,8 +126,8 @@ struct GetRttiInfo<Dictionary<K, V>>
 {
     static const RttiInfo* _create()
     {
-        auto info = RttiInfo::getMemoryArena().allocate<DictionaryRttiInfo>();
-        info->m_kind = RttiInfo::Kind::Dictionary;
+        auto info = (DictionaryRttiInfo*)allocate(sizeof(DictionaryRttiInfo)); 
+        info->init<Dictionary<Byte, Byte>>(RttiInfo::Kind::Dictionary);
         info->m_keyType = GetRttiInfo<K>::get();
         info->m_valueType = GetRttiInfo<V>::get();
         return info;

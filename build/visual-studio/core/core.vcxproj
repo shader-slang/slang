@@ -312,6 +312,7 @@
     <ClInclude Include="..\..\..\source\core\slang-riff-file-system.h" />
     <ClInclude Include="..\..\..\source\core\slang-riff.h" />
     <ClInclude Include="..\..\..\source\core\slang-rtti-info.h" />
+    <ClInclude Include="..\..\..\source\core\slang-rtti-util.h" />
     <ClInclude Include="..\..\..\source\core\slang-secure-crt.h" />
     <ClInclude Include="..\..\..\source\core\slang-semantic-version.h" />
     <ClInclude Include="..\..\..\source\core\slang-shared-library.h" />
@@ -358,6 +359,7 @@
     <ClCompile Include="..\..\..\source\core\slang-riff-file-system.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-riff.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-rtti-info.cpp" />
+    <ClCompile Include="..\..\..\source\core\slang-rtti-util.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-semantic-version.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-shared-library.cpp" />
     <ClCompile Include="..\..\..\source\core\slang-signal.cpp" />
