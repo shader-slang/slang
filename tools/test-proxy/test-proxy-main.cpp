@@ -17,6 +17,7 @@
 #include "../../source/core/slang-shared-library.h"
 
 #include "../../source/core/slang-test-tool-util.h"
+#include "../../source/core/slang-http.h"
 
 #include "tools/unit-test/slang-unit-test.h"
 
@@ -210,11 +211,53 @@ static SlangResult _outputReflect()
     }
 }
 
+static SlangResult _httpReflect(int argc, const char* const* argv)
+{
+    SLANG_UNUSED(argc);
+    SLANG_UNUSED(argv);
+
+    RefPtr<Stream> stdinStream, stdoutStream;
+
+    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
+    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
+
+    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
+
+    RefPtr<HTTPPacketConnection> packetConnection = new HTTPPacketConnection(readStream, stdoutStream);
+
+    while (packetConnection->isActive())
+    {
+        // Block waiting for content (or error/closed)
+        SLANG_RETURN_ON_FAIL(packetConnection->waitForContent());
+
+        // If we have content do something with it
+        if (packetConnection->hasContent())
+        {
+            auto content = packetConnection->getContent();
+
+            // If it just holds 'end' then we are done
+            const UnownedStringSlice slice((const char*)content.begin(), content.getCount());
+
+            if (slice == UnownedStringSlice::fromLiteral("end"))
+            {
+                break;
+            }
+
+            // Else reflect it back
+            SLANG_RETURN_ON_FAIL(packetConnection->write(content.begin(), content.getCount()));
+
+            // Consume that content/packet
+            packetConnection->consumeContent();
+        }
+    }
+
+    return SLANG_OK;
+}
+
 static SlangResult execute(int argc, const char*const* argv)
 {
     typedef Slang::TestToolUtil::InnerMainFunc InnerMainFunc;
 
-    
     if (argc < 2)
     {
         return SLANG_FAIL;
@@ -233,6 +276,11 @@ static SlangResult execute(int argc, const char*const* argv)
     if (toolName == "count")
     {
         return _outputCount(argc, argv);
+    }
+
+    if (toolName == "http-reflect")
+    {
+        return _httpReflect(argc, argv);
     }
 
     {
