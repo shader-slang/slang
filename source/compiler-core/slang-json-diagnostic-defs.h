@@ -36,4 +36,9 @@ DIAGNOSTIC(20006, Error, expectingValueName, "expecting value name [null, true, 
 DIAGNOSTIC(20007, Error, unexpectedTokenExpectedTokenType, "unexpected '$0', expected '$1'")
 DIAGNOSTIC(20008, Error, unexpectedToken, "unexpected '$0'")
 
+DIAGNOSTIC(20009, Error, unableToConvertField, "unable to convert field '$0' in type '$1'")
+DIAGNOSTIC(20010, Error, fieldNotFound, "field '$0' not found in type '$1'")
+DIAGNOSTIC(20011, Error, fieldNotDefinedOnType, "field '$0' not defined on type '$1'")
+DIAGNOSTIC(20011, Error, fieldRequiredOnType, "field '$0' required on '$1'")
+
 #undef DIAGNOSTIC
