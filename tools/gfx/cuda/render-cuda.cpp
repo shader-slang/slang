@@ -1066,6 +1066,17 @@ public:
                 SLANG_UNUSED(subResourceDataCount);
                 SLANG_UNIMPLEMENTED_X("uploadTextureData");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+                IResourceView* view,
+                ClearValue* clearValue,
+                ClearResourceViewFlags::Enum flags) override
+            {
+                SLANG_UNUSED(view);
+                SLANG_UNUSED(clearValue);
+                SLANG_UNUSED(flags);
+                SLANG_UNIMPLEMENTED_X("clearResourceView");
+            }
         };
 
         ResourceCommandEncoderImpl m_resourceCommandEncoder;

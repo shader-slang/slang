@@ -357,6 +357,10 @@ public:
         uint64_t countOffset) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+        uint32_t samplesPerPixel,
+        uint32_t pixelCount,
+        const SamplePosition* samplePositions) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
@@ -402,6 +406,11 @@ public:
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+        IResourceView* view,
+        ClearValue* clearValue,
+        ClearResourceViewFlags::Enum flags) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
