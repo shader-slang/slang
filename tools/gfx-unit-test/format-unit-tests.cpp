@@ -744,6 +744,14 @@ namespace gfx_test
                 floatResults,
                 Slang::makeArray<float>(0.0f, 0.0f, 0.0f, 1.0f, 0.498039216f, 0.498039216f, 0.498039216f, 1.0f,
                                         1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f));
+
+            texView = createTexView(device, size, gfx::Format::B8G8R8A8_UNORM_SRGB, &subData);
+            setUpAndRunTest(device, texView, floatBufferView, "copyTexFloat4");
+            compareComputeResult(
+                device,
+                floatResults,
+                Slang::makeArray<float>(0.0f, 0.0f, 0.0f, 1.0f, 0.211914062f, 0.211914062f, 0.211914062f,
+                                        1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f));
         }
 
         {

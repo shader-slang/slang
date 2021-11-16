@@ -69,6 +69,7 @@ namespace gfx {
         case Format::R8G8_UNORM:                return VK_FORMAT_R8G8_UNORM;
         case Format::R8_UNORM:                  return VK_FORMAT_R8_UNORM;
         case Format::B8G8R8A8_UNORM:            return VK_FORMAT_B8G8R8A8_UNORM;
+        case Format::B8G8R8A8_UNORM_SRGB:       return VK_FORMAT_B8G8R8A8_SRGB;
 
         case Format::R16G16B16A16_SNORM:        return VK_FORMAT_R16G16B16A16_SNORM;
         case Format::R16G16_SNORM:              return VK_FORMAT_R16G16_SNORM;
