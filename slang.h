@@ -857,6 +857,8 @@ extern "C"
 #define SLANG_E_INTERNAL_FAIL               SLANG_MAKE_CORE_ERROR(6)
     //! Could not complete because some underlying feature (hardware or software) was not available 
 #define SLANG_E_NOT_AVAILABLE               SLANG_MAKE_CORE_ERROR(7)
+        //! Could not complete because the operation times out. 
+#define SLANG_E_TIME_OUT                    SLANG_MAKE_CORE_ERROR(8)
 
     /** A "Universally Unique Identifier" (UUID)
 

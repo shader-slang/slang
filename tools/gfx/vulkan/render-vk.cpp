@@ -40,6 +40,10 @@
 #undef None
 #endif
 
+#if SLANG_WINDOWS_FAMILY
+#include <dxgi1_2.h>
+#endif
+
 namespace gfx {
 using namespace Slang;
 
@@ -77,6 +81,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
+        IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
         IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
@@ -149,7 +157,13 @@ public:
     {
         public:
             /// Initialize a buffer with specified size, and memory props
-        Result init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties);
+        Result init(
+            const VulkanApi& api,
+            size_t bufferSize,
+            VkBufferUsageFlags usage,
+            VkMemoryPropertyFlags reqMemoryProperties,
+            bool isShared = false,
+            VkExternalMemoryHandleTypeFlagsKHR extMemHandleType = 0);
 
             /// Returns true if has been initialized
         bool isInitialized() const { return m_api != nullptr; }
@@ -193,6 +207,16 @@ public:
             assert(renderer);
         }
 
+        ~BufferResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+#if SLANG_WINDOWS_FAMILY
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+#endif
+            }
+        }
+
         RefPtr<VKDevice> m_renderer;
         Buffer m_buffer;
         Buffer m_uploadBuffer;
@@ -217,8 +241,31 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+            
+            // If a shared handle doesn't exist, create one and store it.
+#if SLANG_WINDOWS_FAMILY
+            VkMemoryGetWin32HandleInfoKHR info = {};
+            info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+            info.pNext = nullptr;
+            info.memory = m_buffer.m_memory;
+            info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+            auto api = m_buffer.m_api;
+            PFN_vkGetMemoryWin32HandleKHR vkCreateSharedHandle;
+            vkCreateSharedHandle = api->vkGetMemoryWin32HandleKHR;
+            if (!vkCreateSharedHandle)
+            {
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(vkCreateSharedHandle(api->m_device, &info, (HANDLE*)&outHandle->handleValue) != VK_SUCCESS);
+#endif
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = 0;
             return SLANG_OK;
         }
     };
@@ -3709,13 +3756,6 @@ public:
                 return setPipelineStateImpl(pipelineState, outRootObject);
             }
 
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
             {
@@ -3958,13 +3998,6 @@ public:
                 bindPipeline(IPipelineState* pipelineState, IShaderObject** outRootObject) override
             {
                 return setPipelineStateImpl(pipelineState, outRootObject);
-            }
-
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
@@ -4551,14 +4584,6 @@ public:
                 SLANG_UNUSED(outRootObject);
             }
 
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNUSED(state);
-                SLANG_UNUSED(rootObject);
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 const char* rayGenShaderName,
                 int32_t width,
@@ -4707,7 +4732,7 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
             // TODO: implement fence signaling.
             assert(fence == nullptr);
@@ -5368,7 +5393,13 @@ Result VKDevice::PipelineCommandEncoder::bindRootShaderObjectImpl(
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VKDevice::Buffer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferUsageFlags usage, VkMemoryPropertyFlags reqMemoryProperties)
+Result VKDevice::Buffer::init(
+    const VulkanApi& api,
+    size_t bufferSize,
+    VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags reqMemoryProperties,
+    bool isShared,
+    VkExternalMemoryHandleTypeFlagsKHR extMemHandleType)
 {
     assert(!isInitialized());
 
@@ -5379,8 +5410,17 @@ Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferU
     VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
-    SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+    bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
+    VkExternalMemoryBufferCreateInfo externalMemoryBufferCreateInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO };
+    if (isShared)
+    {
+        externalMemoryBufferCreateInfo.handleTypes = extMemHandleType;
+        bufferCreateInfo.pNext = &externalMemoryBufferCreateInfo;
+    }
+
+    SLANG_VK_CHECK(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+    
     VkMemoryRequirements memoryReqs = {};
     api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
 
@@ -5388,15 +5428,34 @@ Result VKDevice::Buffer::init(const VulkanApi& api, size_t bufferSize, VkBufferU
     assert(memoryTypeIndex >= 0);
 
     VkMemoryPropertyFlags actualMemoryProperites = api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-
     VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
+#if SLANG_WINDOWS_FAMILY
+    VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
+    VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
+    if (isShared)
+    {
+        exportMemoryWin32HandleInfo.pNext = nullptr;
+        exportMemoryWin32HandleInfo.pAttributes = nullptr;
+        exportMemoryWin32HandleInfo.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+        exportMemoryWin32HandleInfo.name = NULL;
+
+        exportMemoryAllocateInfo.pNext =
+            extMemHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+            ? &exportMemoryWin32HandleInfo
+            : NULL;
+        exportMemoryAllocateInfo.handleTypes = extMemHandleType;
+        allocateInfo.pNext = &exportMemoryAllocateInfo;
+    }
+#endif
     VkMemoryAllocateFlagsInfo flagInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
     if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
     {
         flagInfo.deviceMask = 1;
         flagInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
+        flagInfo.pNext = allocateInfo.pNext;
         allocateInfo.pNext = &flagInfo;
     }
  
@@ -5546,9 +5605,10 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         applicationInfo.engineVersion = 1;
         applicationInfo.applicationVersion = 1;
 
-        Array<const char*, 4> instanceExtensions;
+        Array<const char*, 5> instanceExtensions;
 
         instanceExtensions.add(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+        instanceExtensions.add(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
 
         // Software (swiftshader) implementation currently does not support surface extension,
         // so only use it with a hardware implementation.
@@ -5789,7 +5849,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         deviceFeatures2.pNext = &extendedFeatures.atomicFloatFeatures;
 
         m_api.vkGetPhysicalDeviceFeatures2(m_api.m_physicalDevice, &deviceFeatures2);
-
+        
         if (deviceFeatures2.features.shaderResourceMinLod)
         {
             m_features.add("shader-resource-min-lod");
@@ -5911,6 +5971,30 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
             deviceCreateInfo.pNext = &extendedFeatures.inlineUniformBlockFeatures;
             deviceExtensions.add(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
             m_features.add("inline-uniform-block");
+        }
+
+        uint32_t extensionCount = 0;
+        m_api.vkEnumerateDeviceExtensionProperties(m_api.m_physicalDevice, NULL, &extensionCount, NULL);
+        Slang::List<VkExtensionProperties> extensions;
+        extensions.setCount(extensionCount);
+        m_api.vkEnumerateDeviceExtensionProperties(m_api.m_physicalDevice, NULL, &extensionCount, extensions.getBuffer());
+
+        HashSet<String> extensionNames;
+        for (const auto& e : extensions)
+        {
+            extensionNames.Add(e.extensionName);
+        }
+
+        if (extensionNames.Contains("VK_KHR_external_memory"))
+        {
+            deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+#if SLANG_WINDOWS_FAMILY
+            if (extensionNames.Contains("VK_KHR_external_memory_win32"))
+            {
+                deviceExtensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+            }
+#endif
+            m_features.add("external-memory");
         }
     }
     if (m_api.m_module->isSoftware())
@@ -6770,7 +6854,14 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     }
 
     RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(desc, this));
-    SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
+    if (desc.isShared)
+    {
+        SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties, desc.isShared, VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
+    }
 
     if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
     {
@@ -6795,6 +6886,23 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         copyInfo.size = bufferSize;
         m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
         m_deviceQueue.flush();
+    }
+
+    returnComPtr(outResource, buffer);
+    return SLANG_OK;
+}
+
+Result VKDevice::createBufferFromNativeHandle(InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
+{
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc, this));
+
+    if (handle.api == InteropHandleAPI::Vulkan)
+    {
+        buffer->m_buffer.m_buffer = (VkBuffer)handle.handleValue;
+    }
+    else
+    {
+        return SLANG_FAIL;
     }
 
     returnComPtr(outResource, buffer);

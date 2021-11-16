@@ -51,6 +51,7 @@ namespace gfx_test
         originalNumbersBuffer->getNativeResourceHandle(&handle);
         ComPtr<IBufferResource> numbersBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferFromNativeHandle(handle, bufferDesc, numbersBuffer.writeRef()));
+        compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(0.0f, 1.0f, 2.0f, 3.0f));
 
         ComPtr<IResourceView> bufferView;
         IResourceView::Desc viewDesc = {};
@@ -91,9 +92,9 @@ namespace gfx_test
         runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-//     SLANG_UNIT_TEST(createBufferFromHandleVulkan)
-//     {
-//         runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//     }
+    SLANG_UNIT_TEST(createBufferFromHandleVulkan)
+    {
+        runTestImpl(createBufferFromHandleTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
 
 }
