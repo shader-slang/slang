@@ -1135,6 +1135,13 @@ void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
     baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
 }
 
+Result DebugRenderCommandEncoder::setSamplePositions(
+    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
+}
+
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
@@ -1235,6 +1242,13 @@ void DebugResourceCommandEncoder::uploadTextureData(
     SLANG_GFX_API_FUNC;
     baseObject->uploadTextureData(
         getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
+}
+
+void DebugResourceCommandEncoder::clearResourceView(
+    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
