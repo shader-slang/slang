@@ -263,7 +263,7 @@ public:
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
-            outHandle->api = InteropHandleAPI::Win32;
+            outHandle->api = InteropHandleAPI::D3D12;
             sharedHandle = *outHandle;
             return SLANG_OK;
         }
@@ -3157,13 +3157,6 @@ public:
             {
                 return bindPipelineImpl(state, outRootObject);
             }
-                        
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setViewports(uint32_t count, const Viewport* viewports) override
@@ -3454,13 +3447,6 @@ public:
                 return bindPipelineImpl(state, outRootObject);
             }
 
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 // Submit binding for compute
@@ -3632,8 +3618,6 @@ public:
                 AccessFlag::Enum destAccess) override;
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
-            virtual SLANG_NO_THROW void SLANG_MCALL bindPipelineAndRootObject(
-                IPipelineState* state, IShaderObject* rootObject) override;
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 const char* rayGenShaderName,
                 int32_t width,
@@ -3725,7 +3709,7 @@ public:
         }
         
         virtual SLANG_NO_THROW void SLANG_MCALL
-            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
             // TODO: implement fence signal.
             assert(fence == nullptr);
@@ -6160,12 +6144,6 @@ void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipeline(
     IPipelineState* state, IShaderObject** outRootObject)
 {
     bindPipelineImpl(state, outRootObject);
-}
-
-void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::bindPipelineAndRootObject(
-    IPipelineState* state, IShaderObject* rootObject)
-{
-    SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
 }
 
 void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::dispatchRays(

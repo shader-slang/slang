@@ -956,13 +956,6 @@ public:
                 return SLANG_OK;
             }
 
-            virtual SLANG_NO_THROW Result SLANG_MCALL
-                bindPipelineAndRootObject(IPipelineState* state, IShaderObject* rootObject) override
-            {
-                SLANG_UNIMPLEMENTED_X("bindPipelineAndRootObject");
-                return SLANG_E_NOT_AVAILABLE;
-            }
-
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 m_writer->bindRootShaderObject(m_rootObject);
@@ -1141,8 +1134,9 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence) override
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
+            SLANG_UNUSED(valueToSignal);
             // TODO: implement fence.
             assert(fence == nullptr);
             for (uint32_t i = 0; i < count; i++)
@@ -1842,8 +1836,17 @@ public:
         // memory association, we first need to fill in a descriptor struct.
         cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
         memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
-        // TODO: Change according to the type of handle being passed in
-        externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+        switch (handle.api)
+        {
+        case InteropHandleAPI::D3D12:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+            break;
+        case InteropHandleAPI::Vulkan:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+            break;
+        default:
+            return SLANG_FAIL;
+        }
         externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
         externalMemoryHandleDesc.size = desc.sizeInBytes;
         externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;

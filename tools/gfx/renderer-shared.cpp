@@ -440,10 +440,11 @@ Result RendererBase::createFence(const IFence::Desc& desc, IFence** outFence)
 }
 
 Result RendererBase::waitForFences(
-    IFence** fences, uint32_t fenceCount, bool waitForAll, uint64_t timeout)
+    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
-    SLANG_UNUSED(fences);
     SLANG_UNUSED(fenceCount);
+    SLANG_UNUSED(fences);
+    SLANG_UNUSED(fenceValues);
     SLANG_UNUSED(waitForAll);
     SLANG_UNUSED(timeout);
     return SLANG_E_NOT_AVAILABLE;

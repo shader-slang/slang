@@ -141,8 +141,7 @@ namespace gfx_test
     {
         return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-#if 0
-    // Temporarily disabled due to inconsistent test results on TC
+#if SLANG_WIN64
     SLANG_UNIT_TEST(existingDeviceHandleCUDA)
     {
         return existingDeviceHandleTestAPI(unitTestContext, Slang::RenderApiFlag::CUDA);
