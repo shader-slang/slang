@@ -251,14 +251,10 @@ struct ListFuncs
             if (srcCount > dstList.getCount())
             {
                 // Allocate new memory
-
-                auto dynamicArrayFuncs = RttiInfo::getDynamicArrayFuncs(elementType->m_alignment, elementType->m_size);
-                SLANG_ASSERT(dynamicArrayFuncs.isValid());
-
                 const Index dstCapacity = dstList.getCapacity();
                 void* oldBuffer = dstList.detachBuffer();
 
-                void* newBuffer = dynamicArrayFuncs.newFunc(count);
+                void* newBuffer = ::malloc(count * elementType->m_size);
                 // Initialize it all first
                 typeFuncs.ctorArray(elementType, newBuffer, count);
                 typeFuncs.copyArray(elementType, newBuffer, oldBuffer, count);
@@ -270,7 +266,8 @@ struct ListFuncs
                 if (oldBuffer)
                 {
                     typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
-                    dynamicArrayFuncs.deleteFunc(oldBuffer);
+
+                    ::free(oldBuffer);
                 }
             }
             else
@@ -287,9 +284,6 @@ struct ListFuncs
         const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
 
         const auto elementType = listRttiInfo->m_elementType;
-
-        auto dynamicArrayFuncs = RttiInfo::getDynamicArrayFuncs(elementType->m_alignment, elementType->m_size);
-        SLANG_ASSERT(dynamicArrayFuncs.isValid());
 
         // We need to get the type funcs
         auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
@@ -308,7 +302,7 @@ struct ListFuncs
             if (buffer)
             {
                 typeFuncs.dtorArray(elementType, buffer, capacity);
-                dynamicArrayFuncs.deleteFunc(buffer);
+                ::free(buffer);
             }
         }
     }
@@ -366,10 +360,9 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     }
 
     // Get funcs needed
-    const auto dynamicArrayFuncs = RttiInfo::getDynamicArrayFuncs(elementType->m_alignment, elementType->m_size);
     const auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
 
-    if (!dynamicArrayFuncs.isValid() || !typeFuncs.isValid())
+    if (!typeFuncs.isValid())
     {
         return SLANG_FAIL;
     }
@@ -377,7 +370,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     const Index dstCapacity = dstList.getCapacity();
     void* oldBuffer = dstList.detachBuffer();
 
-    void* newBuffer = dynamicArrayFuncs.newFunc(count);
+    void* newBuffer = ::malloc(count * elementType->m_size);
     // Initialize it all first
     typeFuncs.ctorArray(elementType, newBuffer, count);
 
@@ -390,7 +383,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     if (oldBuffer)
     {
         typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
-        dynamicArrayFuncs.deleteFunc(oldBuffer);
+        ::free(oldBuffer);
     }
 
     return SLANG_OK;

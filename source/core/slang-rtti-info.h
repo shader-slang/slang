@@ -11,54 +11,6 @@ namespace Slang {
 
 struct RttiInfo;
 
-template <size_t ALIGNMENT>
-struct GetTypeBySize;
-
-template <> struct GetTypeBySize<1> { typedef uint8_t Type; };
-template <> struct GetTypeBySize<2> { typedef uint16_t Type; };
-template <> struct GetTypeBySize<4> { typedef uint32_t Type; };
-template <> struct GetTypeBySize<8> { typedef uint64_t Type; };
-
-template <typename T, size_t SIZE>
-struct SizedType
-{
-    T values[SIZE];
-};
-
-template <size_t ALIGNMENT, size_t SIZE>
-struct GetSizedType
-{
-    typedef typename GetTypeBySize<ALIGNMENT>::Type ElementType;
-    typedef SizedType<ElementType, SIZE / sizeof(ElementType)> Type;
-};
-
-template <typename T>
-void* newDynamicArray(Index count) { return new T[count]; }
-template <typename T>
-void deleteDynamicArray(void* arr) { delete [] (T*)arr; }
-
-struct RttiDynamicArrayFuncs
-{
-    typedef void* (*NewFunc)(Index count);
-    typedef void (*DeleteFunc)(void* dynArray);
-
-    bool isValid() const { return newFunc && deleteFunc;  }
-
-    NewFunc newFunc;
-    DeleteFunc deleteFunc;
-};
-
-template <typename T>
-static RttiDynamicArrayFuncs getDynamicArrayFuncsForType()
-{
-    // NOTE! By design the new'd arrays *contents* is uninitialized
-    typedef typename GetSizedType< SLANG_ALIGN_OF(T), sizeof(T)>::Type SizedType;
-    RttiDynamicArrayFuncs funcs;
-    funcs.deleteFunc = deleteDynamicArray<SizedType>;
-    funcs.newFunc = newDynamicArray<SizedType>;
-    return funcs;
-}
-
 struct RttiTypeFuncs
 {
     typedef void (*CtorArray)(const RttiInfo* rttiInfo, void* dst, Index count);
@@ -155,15 +107,6 @@ struct RttiInfo
         /// Is thread safe, and doesn't require the memory to be freed explicitly
         /// Will be freed at shutdown (via global dtor)
     static void* allocate(size_t size);
-
-    static void addDynamicArrayFuncs(size_t alignment, size_t size, const RttiDynamicArrayFuncs& funcs);
-    static RttiDynamicArrayFuncs getDynamicArrayFuncs(size_t alignment, size_t size);
-
-    template <typename T>
-    static void addDynamicArrayFuncs()
-    {
-        addDynamicArrayFuncs(SLANG_ALIGN_OF(T), sizeof(T), getDynamicArrayFuncsForType<T>());
-    }
 
     static bool isIntegral(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::I32) && Index(kind) <= Index(RttiInfo::Kind::U64); }
     static bool isFloat(RttiInfo::Kind kind) { return kind == RttiInfo::Kind::F32 || kind == RttiInfo::Kind::F64; }

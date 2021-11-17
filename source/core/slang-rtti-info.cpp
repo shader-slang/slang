@@ -40,58 +40,6 @@ struct RttiInfoManager
         return m_arena.allocate(size);
     }
 
-    void addDynamicArrayFuncs(size_t alignment, size_t size, const RttiDynamicArrayFuncs& funcs)
-    {
-        SLANG_UNUSED(alignment);
-        // 1, 2, 4, 8
-
-        switch (size)
-        {
-            case 1:
-            case 2:
-            case 4:
-            case 8:
-            {
-                return;
-            }
-        }
-
-        {
-            std::lock_guard<std::recursive_mutex> guard(m_mutex);
-            m_dynamicArrayFuncsMap.TryGetValueOrAdd(size, funcs);
-        }
-    }
-
-    RttiDynamicArrayFuncs getDynamicArrayFuncs(size_t alignment, size_t size)
-    {
-        SLANG_UNUSED(alignment);
-        switch (size)
-        {
-            case 1:     return m_builtInFuncs[0];
-            case 2:     return m_builtInFuncs[1];
-            case 4:     return m_builtInFuncs[2];
-            case 8:     return m_builtInFuncs[3];
-        }
-
-        {
-            std::lock_guard<std::recursive_mutex> guard(m_mutex);
-
-            auto ptr = m_dynamicArrayFuncsMap.TryGetValue(size);
-            if (ptr)
-            {
-                return *ptr;
-            }
-            RttiDynamicArrayFuncs empty{};
-            return empty;
-        }
-    }
-
-    template <typename T>
-    void addDynamicArrayFuncs()
-    {
-        addDynamicArrayFuncs(SLANG_ALIGN_OF(T), sizeof(T), getDynamicArrayFuncsForType<T>());
-    }
-
     static RttiInfoManager& getSingleton()
     {
         static RttiInfoManager g_manager;
@@ -102,19 +50,7 @@ protected:
     RttiInfoManager() :
         m_arena(1024)
     {
-        m_builtInFuncs[0] = getDynamicArrayFuncsForType<uint8_t>();
-        m_builtInFuncs[1] = getDynamicArrayFuncsForType<uint16_t>();
-        m_builtInFuncs[2] = getDynamicArrayFuncsForType<uint32_t>();
-        m_builtInFuncs[3] = getDynamicArrayFuncsForType<uint64_t>();
-
-        addDynamicArrayFuncs<String>();
-        addDynamicArrayFuncs<UnownedStringSlice>();
-        addDynamicArrayFuncs<List<Byte>>();
-        addDynamicArrayFuncs<Dictionary<Byte, Byte>>();
     }
-
-    RttiDynamicArrayFuncs m_builtInFuncs[4];
-    Dictionary<size_t, RttiDynamicArrayFuncs> m_dynamicArrayFuncsMap;
 
     std::recursive_mutex m_mutex;             ///< We need a mutex to guard access to m_arena
     MemoryArena m_arena;
@@ -123,16 +59,6 @@ protected:
 /* static */void* RttiInfo::allocate(size_t size)
 {
     return RttiInfoManager::getSingleton().allocate(size);
-}
-
-/* static */void RttiInfo::addDynamicArrayFuncs(size_t alignment, size_t size, const RttiDynamicArrayFuncs& funcs)
-{
-    RttiInfoManager::getSingleton().addDynamicArrayFuncs(alignment, size, funcs);
-}
-
-/* static */RttiDynamicArrayFuncs RttiInfo::getDynamicArrayFuncs(size_t alignment, size_t size)
-{
-    return RttiInfoManager::getSingleton().getDynamicArrayFuncs(alignment, size);
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

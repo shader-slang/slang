@@ -98,10 +98,16 @@ static SlangResult _check()
     {
         JSONToNativeConverter converter(container, &sink);
 
-        SomeStruct readS;
-        SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<SomeStruct>::get(), &readS));
+        {
+            SomeStruct readS;
+            SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<SomeStruct>::get(), &readS));
 
-        SLANG_CHECK(readS == s);
+            SLANG_CHECK(readS == s);
+        }
+
+        int z = 0;
+        z++;
+
     }
 
 

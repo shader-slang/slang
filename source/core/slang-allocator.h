@@ -66,16 +66,13 @@ namespace Slang
 
     // Helper utilties for calling allocators.
     template<typename T, int isPOD>
-    class Initializer
-    {
-
-    };
+    class Initializer;
 
     template<typename T>
     class Initializer<T, 0>
     {
     public:
-        static void initialize(T* buffer, int size)
+        static void initialize(T* buffer, Index size)
         {
             for (int i = 0; i < size; i++)
                 new (buffer + i) T();
@@ -85,8 +82,10 @@ namespace Slang
     class Initializer<T, 1>
     {
     public:
-        static void initialize(T* buffer, int size)
+        static void initialize(T* buffer, Index size)
         {
+            SLANG_UNUSED(buffer);
+            SLANG_UNUSED(size);
             // It's pod so no initialization required
             //for (int i = 0; i < size; i++)
             //    new (buffer + i) T;
@@ -116,6 +115,7 @@ namespace Slang
         }
     };
 
+#if 0
     template<typename T>
     class AllocateMethod<T, StandardAllocator>
     {
@@ -129,6 +129,7 @@ namespace Slang
             delete[] ptr;
         }
     };
+#endif
 }
 
 #endif
