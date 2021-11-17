@@ -639,7 +639,7 @@ uint32_t D3DUtil::getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect)
 {
     switch (aspect)
     {
-    case TextureAspect::None:
+    case TextureAspect::Default:
     case TextureAspect::Color:
         return 0;
     case TextureAspect::Depth:

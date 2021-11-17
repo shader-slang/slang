@@ -27,6 +27,10 @@
 #    define SLANG_GFX_API
 #endif
 
+// Needed for building on cygwin with gcc
+#undef Always
+#undef None
+
 namespace gfx {
 
 using Slang::ComPtr;
@@ -522,7 +526,7 @@ struct BufferRange
 
 enum class TextureAspect : uint32_t
 {
-    None = 0,
+    Default = 0,
     Color = 0x00000001,
     Depth = 0x00000002,
     Stencil = 0x00000004,
@@ -630,9 +634,6 @@ public:
         0xcf88a31c, 0x6187, 0x46c5, { 0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 } \
     }
 
-// Needed for building on cygwin with gcc
-#undef Always
-#undef None
 
 enum class ComparisonFunc : uint8_t
 {
@@ -826,7 +827,7 @@ public:
     {
         // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
         // and VkGeometryInstanceFlagBitsKHR.
-        enum Enum : uint32_t
+        enum Enum : uint8_t
         {
             None = 0,
             TriangleFacingCullDisable = 0x00000001,
