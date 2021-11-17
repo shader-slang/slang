@@ -280,10 +280,11 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-shared-handle.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>

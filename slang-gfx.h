@@ -1948,6 +1948,11 @@ public:
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) = 0;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) = 0;
+
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,

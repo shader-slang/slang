@@ -302,11 +302,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
             ComPtr<ID3D12Device> pDevice;
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
-            outHandle->api = InteropHandleAPI::Win32;
+            outHandle->api = InteropHandleAPI::D3D12;
             return SLANG_OK;
         }
     };

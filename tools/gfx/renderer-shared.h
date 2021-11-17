@@ -1202,6 +1202,11 @@ public:
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) SLANG_OVERRIDE;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) SLANG_OVERRIDE;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
         InteropHandle handle,
         const IBufferResource::Desc& srcDesc,

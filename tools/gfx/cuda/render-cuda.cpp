@@ -242,6 +242,8 @@ public:
     CUarray m_cudaArray = CUarray();
     CUmipmappedArray m_cudaMipMappedArray = CUmipmappedArray();
 
+    void* m_cudaExternalMemory = nullptr;
+
     RefPtr<CUDAContext> m_cudaContext;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
@@ -1940,6 +1942,80 @@ public:
         void* deviceAddress;
         SLANG_CUDA_RETURN_ON_FAIL(cudaExternalMemoryGetMappedBuffer(&deviceAddress, externalMemory, &bufferDesc));
         resource->m_cudaMemory = deviceAddress;
+
+        returnComPtr(outResource, resource);
+        return SLANG_OK;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& desc,
+        ITextureResource** outResource) override
+    {
+        if (handle.handleValue == 0)
+        {
+            *outResource = nullptr;
+            return SLANG_OK;
+        }
+
+        RefPtr<TextureCUDAResource> resource = new TextureCUDAResource(desc);
+        resource->m_cudaContext = m_context;
+
+        // CUDA manages sharing of buffers through the idea of an
+        // "external memory" object, which represents the relationship
+        // with another API's objects. In order to create this external
+        // memory association, we first need to fill in a descriptor struct.
+        CUDA_EXTERNAL_MEMORY_HANDLE_DESC externalMemoryHandleDesc;
+        memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+        switch (handle.api)
+        {
+        case InteropHandleAPI::D3D12:
+            externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE;
+            break;
+        case InteropHandleAPI::Vulkan:
+            externalMemoryHandleDesc.type = CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32;
+            break;
+        default:
+            return SLANG_FAIL;
+        }
+        externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
+        externalMemoryHandleDesc.size = ; // Need resource allocation info for size in bytes
+        externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+
+        CUexternalMemory externalMemory;
+        SLANG_CUDA_RETURN_ON_FAIL(cuImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
+        resource->m_cudaExternalMemory = externalMemory;
+
+        FormatInfo formatInfo;
+        SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc.format, &formatInfo));
+        CUDA_ARRAY3D_DESCRIPTOR arrayDesc;
+        arrayDesc.Depth = desc.size.depth;
+        arrayDesc.Height = desc.size.height;
+        arrayDesc.Width = desc.size.width;
+        arrayDesc.NumChannels = formatInfo.channelCount;
+        arrayDesc.Format = ; // One of uint8/16/32, int8/16/32, half or float - TODO: conversion function from Format to CUarray_format
+        arrayDesc.Flags = ; // CUDA_ARRAY_LAYERED/SURFACE_LDST/CUBEMAP/TEXTURE_GATHER
+
+        CUDA_EXTERNAL_MEMORY_MIPMAPPED_ARRAY_DESC externalMemoryMipDesc;
+        externalMemoryMipDesc.offset = ;
+        externalMemoryMipDesc.arrayDesc = arrayDesc;
+        externalMemoryMipDesc.numLevels = desc.numMipLevels;
+
+        CUmipmappedArray mipArray;
+        SLANG_CUDA_RETURN_ON_FAIL(cuExternalMemoryGetMappedMipmappedArray(&mipArray, externalMemory, &externalMemoryMipDesc));
+        resource->m_cudaMipMappedArray = mipArray;
+
+        CUarray cuArray;
+        SLANG_CUDA_RETURN_ON_FAIL(cuMipmappedArrayGetLevel(&cuArray, mipArray, 0));
+        resource->m_cudaArray = cuArray;
+
+        CUDA_RESOURCE_DESC surfDesc;
+        surfDesc.resType = CU_RESOURCE_TYPE_ARRAY;
+        surfDesc.res.array.hArray = cuArray;
+
+        CUsurfObject surface;
+        SLANG_CUDA_RETURN_ON_FAIL(cuSurfObjectCreate(&surface, &surfDesc));
+        resource->m_cudaSurfObj = surface;
 
         returnComPtr(outResource, resource);
         return SLANG_OK;
