@@ -1220,10 +1220,10 @@ void DebugResourceCommandEncoder::bufferBarrier(
 
 void DebugResourceCommandEncoder::copyTexture(
     ITextureResource* dst,
-    ITextureResource::SubresourceRange dstSubresource,
+    SubresourceRange dstSubresource,
     ITextureResource::Offset3D dstOffset,
     ITextureResource* src,
-    ITextureResource::SubresourceRange srcSubresource,
+    SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Size extent)
 {
@@ -1240,7 +1240,7 @@ void DebugResourceCommandEncoder::copyTexture(
 
 void DebugResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
-    ITextureResource::SubresourceRange subResourceRange,
+    SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
     ITextureResource::Offset3D extent,
     ITextureResource::SubresourceData* subResourceData,

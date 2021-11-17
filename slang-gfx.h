@@ -514,29 +514,36 @@ struct ClearValue
     DepthStencilClearValue depthStencil;
 };
 
+struct BufferRange
+{
+    uint32_t firstElement;
+    uint32_t elementCount;
+};
+
+enum class TextureAspect : uint32_t
+{
+    None = 0,
+    Color = 0x00000001,
+    Depth = 0x00000002,
+    Stencil = 0x00000004,
+    MetaData = 0x00000008,
+    Plane0 = 0x00000010,
+    Plane1 = 0x00000020,
+    Plane2 = 0x00000040,
+};
+
+struct SubresourceRange
+{
+    TextureAspect aspectMask;
+    uint32_t mipLevel;
+    uint32_t mipLevelCount;
+    uint32_t baseArrayLayer; // For Texture3D, this is WSlice.
+    uint32_t layerCount; // For cube maps, this is a multiple of 6.
+};
 
 class ITextureResource: public IResource
 {
 public:
-    enum class Aspect : uint32_t
-    {
-        Color = 0x00000001,
-        Depth = 0x00000002,
-        Stencil = 0x00000004,
-        MetaData = 0x00000008,
-        Plane0 = 0x00000010,
-        Plane1 = 0x00000020,
-        Plane2 = 0x00000040,
-    };
-
-    struct SubresourceRange
-    {
-        Aspect aspectMask;
-        uint32_t mipLevel;
-        uint32_t baseArrayLayer;
-        uint32_t layerCount;
-    };
-
     struct Offset3D
     {
         uint32_t x = 0;
@@ -718,6 +725,8 @@ public:
 
         // Fields for `RenderTarget` and `DepthStencil` views.
         RenderTargetDesc renderTarget;
+        SubresourceRange subresourceRange;
+        BufferRange bufferRange;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
@@ -1483,15 +1492,15 @@ public:
         size_t size) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange dstSubresource,
+        SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
-        ITextureResource::SubresourceRange srcSubresource,
+        SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange subResourceRange,
+        SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,

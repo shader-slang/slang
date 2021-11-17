@@ -398,16 +398,16 @@ public:
         ResourceState dst) override;
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange dstSubresource,
+        SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
-        ITextureResource::SubresourceRange srcSubresource,
+        SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange subResourceRange,
+        SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,

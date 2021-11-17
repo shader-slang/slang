@@ -96,6 +96,8 @@ class D3DUtil
 
     static int getShaderModelFromProfileName(const char* profile);
 
+    static uint32_t getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect);
+
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
