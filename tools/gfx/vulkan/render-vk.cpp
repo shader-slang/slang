@@ -4374,6 +4374,19 @@ public:
                 SLANG_UNUSED(flags);
                 SLANG_UNIMPLEMENTED_X("clearResourceView");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+                ITextureResource* source,
+                SubresourceRange sourceRange,
+                ITextureResource* dest,
+                SubresourceRange destRange) override
+            {
+                SLANG_UNUSED(source);
+                SLANG_UNUSED(sourceRange);
+                SLANG_UNUSED(dest);
+                SLANG_UNUSED(destRange);
+                SLANG_UNIMPLEMENTED_X("resolveResource");
+            }
         };
 
         RefPtr<ResourceCommandEncoder> m_resourceCommandEncoder;

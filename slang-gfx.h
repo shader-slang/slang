@@ -1520,6 +1520,11 @@ public:
         ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+        ITextureResource* source,
+        SubresourceRange sourceRange,
+        ITextureResource* dest,
+        SubresourceRange destRange) = 0;
 };
 
 enum class AccelerationStructureCopyMode

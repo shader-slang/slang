@@ -3603,6 +3603,19 @@ public:
                 SLANG_UNUSED(flags);
                 SLANG_UNIMPLEMENTED_X("clearResourceView");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+                ITextureResource* source,
+                SubresourceRange sourceRange,
+                ITextureResource* dest,
+                SubresourceRange destRange) override
+            {
+                SLANG_UNUSED(source);
+                SLANG_UNUSED(sourceRange);
+                SLANG_UNUSED(dest);
+                SLANG_UNUSED(destRange);
+                SLANG_UNIMPLEMENTED_X("resolveResource");
+            }
         };
 
         ResourceCommandEncoderImpl m_resourceCommandEncoder;
@@ -5255,6 +5268,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_desc = desc;
+    bool isArray = resourceImpl->getDesc()->arraySize != 0;
     switch (desc.type)
     {
     default:
@@ -5269,13 +5283,27 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             switch (desc.renderTarget.shape)
             {
             case IResource::Type::Texture1D:
-                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE1D;
+                rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY
+                                                : D3D12_RTV_DIMENSION_TEXTURE1D;
                 rtvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
                 break;
             case IResource::Type::Texture2D:
-                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-                rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
-                rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                if (resourceImpl->getDesc()->sampleDesc.numSamples > 1)
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2DMS;
+                    rtvDesc.Texture2DMSArray.ArraySize = desc.renderTarget.arraySize;
+                    rtvDesc.Texture2DMSArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
+                else
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2D;
+                    rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
+                    rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                    rtvDesc.Texture2DArray.ArraySize = desc.renderTarget.arraySize;
+                    rtvDesc.Texture2DArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
                 break;
             case IResource::Type::Texture3D:
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;

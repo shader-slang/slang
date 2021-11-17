@@ -1258,6 +1258,16 @@ void DebugResourceCommandEncoder::clearResourceView(
     baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
+void DebugResourceCommandEncoder::resolveResource(
+    ITextureResource* source,
+    SubresourceRange sourceRange,
+    ITextureResource* dest,
+    SubresourceRange destRange)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->resolveResource(getInnerObj(source), sourceRange, getInnerObj(dest), destRange);
+}
+
 void DebugRayTracingCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;

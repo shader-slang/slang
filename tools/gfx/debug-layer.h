@@ -418,6 +418,12 @@ public:
         ClearValue* clearValue,
         ClearResourceViewFlags::Enum flags) override;
 
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+        ITextureResource* source,
+        SubresourceRange sourceRange,
+        ITextureResource* dest,
+        SubresourceRange destRange) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
