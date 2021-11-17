@@ -132,6 +132,7 @@ struct RttiInfo
         UnownedStringSlice,
         Ptr,
         RefPtr,
+        FixedArray,
         Struct,
         Enum,
         List,
@@ -230,6 +231,12 @@ struct RefPtrRttiInfo : public RttiInfo
     const RttiInfo* m_targetType;
 };
 
+struct FixedArrayRttiInfo : public RttiInfo
+{
+    const RttiInfo* m_elementType;
+    size_t m_elementCount;
+};
+
 struct OtherRttiInfo : public RttiInfo
 {
     typedef bool (*IsDefaultFunc)(const RttiInfo* rttiInfo, const void* in);
@@ -312,6 +319,22 @@ struct GetRttiInfo<RefPtr<TARGET>>
         return info;
     }
     static const RttiInfo* get() { static const RefPtrRttiInfo g_info = _make(); return &g_info; }
+};
+
+template <typename T, size_t COUNT>
+struct GetRttiInfo<T[COUNT]>
+{
+    static const FixedArrayRttiInfo _make()
+    {
+        FixedArrayRttiInfo info;
+        info.m_kind = RttiInfo::Kind::FixedArray;
+        info.m_alignment = RttiInfo::AlignmentType(SLANG_ALIGN_OF(T));
+        info.m_size = RttiInfo::SizeType(sizeof(T) * COUNT);
+        info.m_elementType = GetRttiInfo<T>::get();
+        info.m_elementCount = COUNT;
+        return info;
+    }
+    static const RttiInfo* get() { static const FixedArrayRttiInfo g_info = _make(); return &g_info; }
 };
 
 struct StructRttiBuilder
