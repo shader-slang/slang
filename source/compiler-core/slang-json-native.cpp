@@ -107,11 +107,11 @@ SlangResult JSONToNativeConverter::_structToNative(const ConstArrayView<JSONKeyV
 
 SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* rttiInfo, void* out)
 {
-    if (RttiUtil::isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         return RttiUtil::setInt(in.asInteger(), rttiInfo, out);
     }
-    else if (RttiUtil::isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         return RttiUtil::setFromDouble(in.asFloat(), rttiInfo, out);
     }
@@ -259,19 +259,25 @@ SlangResult NativeToJSONConverter::_structToJSON(const StructRttiInfo* structRtt
 
 SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void* in, JSONValue& out)
 {
-    if (RttiUtil::isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         out = JSONValue::makeInt(RttiUtil::getInt64(rttiInfo, in));
+        return SLANG_OK;
     }
-    else if (RttiUtil::isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         out = JSONValue::makeFloat(RttiUtil::asDouble(rttiInfo, in));
+        return SLANG_OK;
     }
 
     switch (rttiInfo->m_kind)
     {
         case RttiInfo::Kind::Invalid:   return SLANG_FAIL;
-        case RttiInfo::Kind::Bool:      out = JSONValue::makeBool(RttiUtil::asBool(rttiInfo, in)); break;
+        case RttiInfo::Kind::Bool:
+        {
+            out = JSONValue::makeBool(RttiUtil::asBool(rttiInfo, in));
+            return SLANG_OK;
+        }
         case RttiInfo::Kind::String:
         {
             const String& str = *(const String*)in;
@@ -294,7 +300,7 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
             return SLANG_OK;
         }
         case RttiInfo::Kind::Enum:
-        {
+        {   
             return SLANG_E_NOT_IMPLEMENTED;
         }
         case RttiInfo::Kind::List:
@@ -334,7 +340,7 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
             // We can *only* serialize this into a straight JSON object iff the key is a string-like type
             // We could turn into (say) an array of keys and values
 
-            return SLANG_E_NOT_IMPLEMENTED;
+            break;
         }
         case RttiInfo::Kind::Other:
         {
@@ -347,12 +353,12 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
                 out = src;
                 return SLANG_OK;
             }
-            return SLANG_FAIL;
+            break;
         }
-        default: return SLANG_FAIL;
+        default: break;
     }
 
-    return SLANG_OK;
+    return SLANG_E_NOT_IMPLEMENTED;
 }
 
 } // namespace Slang

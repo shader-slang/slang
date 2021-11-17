@@ -24,7 +24,7 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
 // TODO(JS): This is a little verbose, and could be improved on with something like
 // * Tool that automatically generated from C++ (say via the C++ extractor)
 // * Macro magic to simplify the construction
-static const StructRttiInfo _makeJSONRPCErrorResponse_Error()
+static const StructRttiInfo _makeJSONRPCErrorResponse_ErrorRtti()
 {
     JSONRPCErrorResponse::Error obj;
     StructRttiBuilder builder(&obj, "JSONRPCErrorResponse::Error", nullptr);
@@ -32,9 +32,9 @@ static const StructRttiInfo _makeJSONRPCErrorResponse_Error()
     builder.addField("message", &obj.message);
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCErrorResponse::Error::g_rttiInfo = _makeJSONRPCErrorResponse_Error();
+/* static */const StructRttiInfo JSONRPCErrorResponse::Error::g_rttiInfo = _makeJSONRPCErrorResponse_ErrorRtti();
 
-static const StructRttiInfo _makeJSONRPCErrorResponse()
+static const StructRttiInfo _makeJSONRPCErrorResponseRtti()
 {
     JSONRPCErrorResponse obj;
     StructRttiBuilder builder(&obj, "JSONRPCErrorResponse", nullptr);
@@ -45,9 +45,9 @@ static const StructRttiInfo _makeJSONRPCErrorResponse()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCErrorResponse::g_rttiInfo = _makeJSONRPCErrorResponse();
+/* static */const StructRttiInfo JSONRPCErrorResponse::g_rttiInfo = _makeJSONRPCErrorResponseRtti();
 
-static const StructRttiInfo _makeJSONRPCCallResponse()
+static const StructRttiInfo _makeJSONRPCCallResponseRtti()
 {
     JSONRPCCall obj;
     StructRttiBuilder builder(&obj, "JSONRPCCall", nullptr);
@@ -58,9 +58,9 @@ static const StructRttiInfo _makeJSONRPCCallResponse()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONRPCCall::g_rttiInfo = _makeJSONRPCCallResponse();
+/* static */const StructRttiInfo JSONRPCCall::g_rttiInfo = _makeJSONRPCCallResponseRtti();
 
-static const StructRttiInfo _makeJSONResultResponseResponse()
+static const StructRttiInfo _makeJSONResultResponseResponseRtti()
 {
     JSONResultResponse obj;
     StructRttiBuilder builder(&obj, "JSONResultResponse", nullptr);
@@ -70,9 +70,7 @@ static const StructRttiInfo _makeJSONResultResponseResponse()
 
     return builder.make();
 }
-/* static */const StructRttiInfo JSONResultResponse::g_rttiInfo = _makeJSONResultResponseResponse();
-
-
+/* static */const StructRttiInfo JSONResultResponse::g_rttiInfo = _makeJSONResultResponseResponseRtti();
 
 
 /* static */JSONValue JSONRPCUtil::createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id)

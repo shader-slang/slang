@@ -37,11 +37,11 @@ static OtherRttiInfo _getJSONValueRttiInfo()
 {
     OtherRttiInfo info;
     info.init<JSONValue>(RttiInfo::Kind::Other);
+    info.m_name = "JSONValue";
     info.m_isDefaultFunc = _isDefault;
     info.m_typeFuncs = GetRttiTypeFuncs<JSONValue>::getFuncs();
     return info;
 }
-
 /* static */const OtherRttiInfo JSONValue::g_rttiInfo = _getJSONValueRttiInfo();
 
 static JSONKeyValue _makeInvalidKeyValue()

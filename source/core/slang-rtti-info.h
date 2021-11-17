@@ -134,10 +134,11 @@ struct RttiInfo
         RefPtr,
         FixedArray,
         Struct,
+        Other,
         Enum,
         List,
         Dictionary,
-        Other,
+     
         CountOf,
     };
 
@@ -164,6 +165,18 @@ struct RttiInfo
         addDynamicArrayFuncs(SLANG_ALIGN_OF(T), sizeof(T), getDynamicArrayFuncsForType<T>());
     }
 
+    static bool isIntegral(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::I32) && Index(kind) <= Index(RttiInfo::Kind::U64); }
+    static bool isFloat(RttiInfo::Kind kind) { return kind == RttiInfo::Kind::F32 || kind == RttiInfo::Kind::F64; }
+    static bool isBuiltIn(RttiInfo::Kind kind) { return kind == RttiInfo::Kind::I32 || kind == RttiInfo::Kind::Bool; }
+    static bool isNamed(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::Struct) && Index(kind) <= Index(RttiInfo::Kind::Enum); }
+
+    bool isIntegral() const { return isIntegral(m_kind); }
+    bool isFloat() const { return isFloat(m_kind); }
+    bool isBuiltIn() const { return isBuiltIn(m_kind); }
+    bool isNamed() const { return isNamed(m_kind); }
+
+    static void append(const RttiInfo* info, StringBuilder& out);
+
     static const RttiInfo g_basicTypes[Index(Kind::CountOf)];
 };
 
@@ -178,7 +191,12 @@ enum class RttiDefaultValue : uint8_t
     Mask = 0x7,
 };
 
-struct StructRttiInfo : public RttiInfo
+struct NamedRttiInfo : public RttiInfo
+{
+    const char* m_name;                 ///< Name
+};
+
+struct StructRttiInfo : public NamedRttiInfo
 {
     typedef uint8_t Flags;
     struct Flag
@@ -198,11 +216,15 @@ struct StructRttiInfo : public RttiInfo
         Flags m_flags;                  ///< Field flags
     };
 
-    const char* m_name;                 ///< Name
     const StructRttiInfo* m_super;      ///< Super class or nullptr if not defined
 
     Index m_fieldCount;                 ///< Amount of fields
     const Field* m_fields;              ///< Fields
+};
+
+struct EnumRttiInfo : public NamedRttiInfo
+{
+    // TODO(JS):
 };
 
 SLANG_FORCE_INLINE StructRttiInfo::Flags combine(StructRttiInfo::Flags flags, RttiDefaultValue defaultValue)
@@ -237,7 +259,7 @@ struct FixedArrayRttiInfo : public RttiInfo
     size_t m_elementCount;
 };
 
-struct OtherRttiInfo : public RttiInfo
+struct OtherRttiInfo : public NamedRttiInfo
 {
     typedef bool (*IsDefaultFunc)(const RttiInfo* rttiInfo, const void* in);
     IsDefaultFunc m_isDefaultFunc;

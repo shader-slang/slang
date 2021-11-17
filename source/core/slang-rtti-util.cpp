@@ -4,7 +4,7 @@ namespace Slang {
 
 /* static */SlangResult RttiUtil::setInt(int64_t value, const RttiInfo* rttiInfo, void* dst)
 {
-    SLANG_ASSERT(isIntegral(rttiInfo));
+    SLANG_ASSERT(rttiInfo->isIntegral());
 
     // We could check ranges are appropriate, but for now we just write.
     // Passing in rttiInfo allows for other more complex types to be econverted
@@ -21,7 +21,7 @@ namespace Slang {
 
 /* static */int64_t RttiUtil::getInt64(const RttiInfo* rttiInfo, const void* src)
 {
-    SLANG_ASSERT(isIntegral(rttiInfo));
+    SLANG_ASSERT(rttiInfo->isIntegral());
 
     switch (rttiInfo->m_kind)
     {
@@ -38,11 +38,11 @@ namespace Slang {
 
 /* static */double RttiUtil::asDouble(const RttiInfo* rttiInfo, const void* src)
 {
-    if (isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         return (double)getInt64(rttiInfo, src);
     }
-    else if (isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         switch (rttiInfo->m_kind)
         {
@@ -58,11 +58,11 @@ namespace Slang {
 
 /* static */SlangResult RttiUtil::setFromDouble(double v, const RttiInfo* rttiInfo, void* dst)
 {
-    if (isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         return setInt(int64_t(v), rttiInfo, dst);
     }
-    else if (isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         switch (rttiInfo->m_kind)
         {
@@ -82,11 +82,11 @@ namespace Slang {
         return *(const bool*)src;
     }
 
-    if (isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         return getInt64(rttiInfo, src) != 0;
     }
-    else if (isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         return asDouble(rttiInfo, src) != 0.0;
     }
@@ -136,12 +136,12 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
 
 /* static */bool RttiUtil::isDefault(RttiDefaultValue defaultValue, const RttiInfo* rttiInfo, const void* src)
 {
-    if (isIntegral(rttiInfo))
+    if (rttiInfo->isIntegral())
     {
         const auto value = getInt64(rttiInfo, src);
         return _getIntDefaultValue(defaultValue) == value;
     }
-    else if (isFloat(rttiInfo))
+    else if (rttiInfo->isFloat())
     {
         const auto value = asDouble(rttiInfo, src);
         return _getIntDefaultValue(defaultValue) == value;
@@ -325,7 +325,7 @@ struct ListFuncs
 
 RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
 {
-    if (isBuiltIn(rttiInfo))
+    if (rttiInfo->isBuiltIn())
     {
         switch (rttiInfo->m_size)
         {
