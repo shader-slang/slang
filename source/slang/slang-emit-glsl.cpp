@@ -447,6 +447,12 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             case BaseType::Half:    m_writer->emit("16f");  break;
             case BaseType::UInt:    m_writer->emit("32ui"); break;
             case BaseType::Int:     m_writer->emit("32i"); break;
+            case BaseType::Int8:    m_writer->emit("8i"); break;
+            case BaseType::Int16:   m_writer->emit("16i"); break;
+            case BaseType::Int64:   m_writer->emit("64i"); break;
+            case BaseType::UInt8:   m_writer->emit("8ui"); break;
+            case BaseType::UInt16:  m_writer->emit("16ui"); break;
+            case BaseType::UInt64:  m_writer->emit("64ui"); break;
 
                 // TODO: Here are formats that are available in GLSL,
                 // but that are not handled by the above cases.
@@ -468,20 +474,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
                 // r16_snorm
                 // r8_snorm
                 //
-                // rgba16i
-                // rgba8i
-                // rg16i
-                // rg8i
-                // r16i
-                // r8i
-                //
-                // rgba16ui
                 // rgb10_a2ui
-                // rgba8ui
-                // rg16ui
-                // rg8ui
-                // r16ui
-                // r8ui
         }
         m_writer->emit(")\n");
     }
