@@ -193,10 +193,14 @@ public:
         /// Returns string as a key
     JSONKey getStringKey(const JSONValue& in);
 
-        /// Get as a string. 
+        /// Get as a string. The slice may used backing lexeme (ie will only last
+        /// as long as the backing JSON text, or be decoded and be transitory).
+    UnownedStringSlice getTransientString(const JSONValue& in);
+
+        /// Get as a string. The contents will stay in scope as long as the container
     UnownedStringSlice getString(const JSONValue& in);
 
-        /// Gets the lexeme
+    /// Gets the lexeme
     UnownedStringSlice getLexeme(const JSONValue& in);
 
         /// Get a key for a name
@@ -303,7 +307,8 @@ public:
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
-    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addQuotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
@@ -351,6 +356,8 @@ protected:
 
     JSONKeyValue m_keyValue;
     JSONValue m_rootValue;
+
+    StringBuilder m_work;
 };
 
 } // namespace Slang

@@ -277,6 +277,7 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-compression.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-find-type-by-name.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp" />
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-memory-arena.cpp" />
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-path.cpp" />

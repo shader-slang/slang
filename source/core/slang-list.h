@@ -148,7 +148,7 @@ namespace Slang
         void attachBuffer(T* buffer, Index count, Index capacity)
         {
             // Can only attach a buffer if there isn't a buffer already associated
-            SLANG_ASSERT(m_buffer);
+            SLANG_ASSERT(m_buffer == nullptr);
             SLANG_ASSERT(count <= capacity);
             m_buffer = buffer;
             m_count = count;

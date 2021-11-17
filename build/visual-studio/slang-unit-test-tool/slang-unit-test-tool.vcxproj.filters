@@ -32,6 +32,9 @@
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-free-list.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json-native.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\slang-unit-test\unit-test-json.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -222,7 +222,7 @@ JSONValue JSONContainer::createArray(const JSONValue* values, Index valuesCount,
     JSONValue value;
     value.type = JSONValue::Type::Array;
     value.loc = loc;
-    value.rangeIndex = _addRange(Range::Type::Array, m_objectValues.getCount(), valuesCount);
+    value.rangeIndex = _addRange(Range::Type::Array, m_arrayValues.getCount(), valuesCount);
 
     m_arrayValues.addRange(values, valuesCount);
     return value;
@@ -295,6 +295,8 @@ ArrayView<JSONValue> JSONContainer::getArray(const JSONValue& in)
         return ArrayView<JSONValue>((JSONValue*)nullptr, 0);
     }
     const Range& range = m_ranges[in.rangeIndex];
+    SLANG_ASSERT(range.startIndex <= m_arrayValues.getCount() && range.startIndex + range.count <= m_arrayValues.getCount());
+
     return ArrayView<JSONValue>(m_arrayValues.getBuffer() + range.startIndex, range.count);
 }
 
@@ -335,9 +337,29 @@ UnownedStringSlice JSONContainer::getLexeme(const JSONValue& in)
 
 UnownedStringSlice JSONContainer::getString(const JSONValue& in)
 {
+    if (in.type == JSONValue::Type::StringValue)
+    {
+        return getStringFromKey(in.stringKey);
+    }
+    else if (in.type == JSONValue::Type::StringLexeme)
+    {
+        auto slice = getTransientString(in);
+        auto handle = m_slicePool.add(slice);
+        return m_slicePool.getSlice(handle);
+    }
+
+    SLANG_ASSERT(!"Not a string type");
+    return UnownedStringSlice();
+}
+
+UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
+{
     switch (in.type)
     {
-        case JSONValue::Type::StringValue:  return getStringFromKey(in.stringKey);
+        case JSONValue::Type::StringValue:
+        {
+            return getStringFromKey(in.stringKey);
+        }
         case JSONValue::Type::StringLexeme:
         {
             StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
@@ -364,7 +386,7 @@ UnownedStringSlice JSONContainer::getString(const JSONValue& in)
 
 JSONKey JSONContainer::getStringKey(const JSONValue& in)
 {
-    return (in.type == JSONValue::Type::StringValue) ? in.stringKey : getKey(getString(in));
+    return (in.type == JSONValue::Type::StringValue) ? in.stringKey : getKey(getTransientString(in));
 }
  
 bool JSONContainer::asBool(const JSONValue& value)
@@ -781,7 +803,7 @@ bool JSONContainer::areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index
 
 bool JSONContainer::areEqual(const JSONValue& a, const UnownedStringSlice& slice)
 {
-    return a.getKind() == JSONValue::Kind::String && getString(a) == slice;
+    return a.getKind() == JSONValue::Kind::String && getTransientString(a) == slice;
 }
 
 bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
@@ -906,7 +928,7 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
             {
                 // Emit the key
                 const auto keyString = getStringFromKey(objKeyValue.key);
-                listener->addKey(keyString, objKeyValue.keyLoc);
+                listener->addUnquotedKey(keyString, objKeyValue.keyLoc);
 
                 // Emit the value associated with the key
                 traverseRecursively(objKeyValue.value, listener);
@@ -1077,7 +1099,16 @@ void JSONBuilder::endArray(SourceLoc loc)
     _add(value);
 }
 
-void JSONBuilder::addKey(const UnownedStringSlice& key, SourceLoc loc)
+void JSONBuilder::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
+{
+    // We need to decode
+    m_work.Clear();
+    StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+    StringEscapeUtil::appendUnquoted(handler, key, m_work);
+    addUnquotedKey(m_work.getUnownedSlice(), loc);
+}
+
+void JSONBuilder::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_ASSERT(m_keyValue.key == JSONKey(0));
     m_keyValue.key = m_container->getKey(key);

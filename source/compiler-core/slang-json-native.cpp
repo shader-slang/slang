@@ -109,18 +109,18 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
 {
     if (rttiInfo->isIntegral())
     {
-        return RttiUtil::setInt(in.asInteger(), rttiInfo, out);
+        return RttiUtil::setInt(m_container->asInteger(in), rttiInfo, out);
     }
     else if (rttiInfo->isFloat())
     {
-        return RttiUtil::setFromDouble(in.asFloat(), rttiInfo, out);
+        return RttiUtil::setFromDouble(m_container->asFloat(in), rttiInfo, out);
     }
 
     switch (rttiInfo->m_kind)
     {
         case RttiInfo::Kind::Bool:
         {
-            *(bool*)out = in.asBool();
+            *(bool*)out = m_container->asBool(in);
             return SLANG_OK;
         }
         case RttiInfo::Kind::Struct:
@@ -160,6 +160,19 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
         case RttiInfo::Kind::Enum:
         {
             return SLANG_E_NOT_IMPLEMENTED;
+        }
+        case RttiInfo::Kind::String:
+        {
+            *(String*)out = m_container->getTransientString(in);
+            return SLANG_OK;
+        }
+        case RttiInfo::Kind::UnownedStringSlice:
+        {
+            // Problem -> if the slice is a lexeme, then when we decode with getString, it will lose scope.
+            // So we do something a bit odd and place the decoding string
+
+            *(UnownedStringSlice*)out = m_container->getString(in);
+            return SLANG_OK;
         }
         case RttiInfo::Kind::List:
         {

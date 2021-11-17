@@ -6,6 +6,8 @@
 
 using namespace Slang;
 
+namespace { // anonymous 
+
 struct SomeStruct
 {
     int a = 0;
@@ -15,6 +17,8 @@ struct SomeStruct
 
     static const StructRttiInfo g_rttiInfo;
 };
+
+} // anonymous
 
 static const StructRttiInfo _makeSomeStructRtti()
 {

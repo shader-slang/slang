@@ -354,12 +354,12 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
     
     List<Byte>& dstList = *(List<Byte>*)dst;
-    const Index dstCount = dstList.getCount();
-    if (dstCount == count)
+    const Index oldCount = dstList.getCount();
+    if (oldCount == count)
     {
         return SLANG_OK;
     }
-    if (count < dstCount)
+    if (count < oldCount)
     {
         dstList.unsafeShrinkToCount(count);
         return SLANG_OK;
@@ -380,7 +380,8 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     void* newBuffer = dynamicArrayFuncs.newFunc(count);
     // Initialize it all first
     typeFuncs.ctorArray(elementType, newBuffer, count);
-    typeFuncs.copyArray(elementType, newBuffer, oldBuffer, count);
+
+    typeFuncs.copyArray(elementType, newBuffer, oldBuffer, oldCount);
 
     // Attach the new buffer
     dstList.attachBuffer((Byte*)newBuffer, count, count);

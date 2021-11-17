@@ -21,7 +21,8 @@ public:
 
 
         /// Add the key. Must be followed by addXXXValue.
-    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
+    virtual void addQuotedKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
+    virtual void addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc) = 0;
         /// Can be performed in an array or after an addLexemeKey in an object
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) = 0;
 
@@ -93,7 +94,8 @@ public:
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
-    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addQuotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
