@@ -19,18 +19,15 @@ struct JSONRPCErrorResponse
         Index code = 0;                     ///< Value from ErrorCode
         UnownedStringSlice message;         ///< Error message
 
-        static const RttiInfo* createRttiInfo();
+        static const StructRttiInfo g_rttiInfo;
     };
 
     Error error;
     JSONValue data;                 
     Int id = -1;                        ///< Id of initiating method or -1 if not set
 
-    static const RttiInfo* createRttiInfo();
+    static const StructRttiInfo g_rttiInfo;
 };
-
-SLANG_STRUCT_RTTI_INFO(JSONRPCErrorResponse::Error)
-SLANG_STRUCT_RTTI_INFO(JSONRPCErrorResponse)
 
 struct JSONRPCCall
 {
@@ -38,20 +35,16 @@ struct JSONRPCCall
     JSONValue params;                   ///< Can be invalid/array/object
     Int id = -1;                        ///< Id associated with this request, or -1 if not set
 
-    static const RttiInfo* createRttiInfo();
+    static const StructRttiInfo g_rttiInfo;
 };
-
-SLANG_STRUCT_RTTI_INFO(JSONRPCCall)
 
 struct JSONResultResponse
 {
     JSONValue result;                   ///< The result value
     Int id = -1;                        ///< Id of initiating method or -1 if not set
 
-    static const RttiInfo* createRttiInfo();
+    static const StructRttiInfo g_rttiInfo;
 };
-
-SLANG_STRUCT_RTTI_INFO(JSONResultResponse)
 
 /// Send and receive messages as JSON
 ///

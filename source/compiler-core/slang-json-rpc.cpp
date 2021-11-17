@@ -20,16 +20,21 @@ static const auto g_message = UnownedStringSlice::fromLiteral("message");
 static const auto g_result = UnownedStringSlice::fromLiteral("result");
 static const auto g_data = UnownedStringSlice::fromLiteral("data");
 
-/* static */const RttiInfo* JSONRPCErrorResponse::Error::createRttiInfo()
+// Add the fields.
+// TODO(JS): This is a little verbose, and could be improved on with something like
+// * Tool that automatically generated from C++ (say via the C++ extractor)
+// * Macro magic to simplify the construction
+static const StructRttiInfo _makeJSONRPCErrorResponse_Error()
 {
     JSONRPCErrorResponse::Error obj;
     StructRttiBuilder builder(&obj, "JSONRPCErrorResponse::Error", nullptr);
     builder.addField("code", &obj.code);
     builder.addField("message", &obj.message);
-    return builder.construct();
+    return builder.make();
 }
+/* static */const StructRttiInfo JSONRPCErrorResponse::Error::g_rttiInfo = _makeJSONRPCErrorResponse_Error();
 
-/* static */const RttiInfo* JSONRPCErrorResponse::createRttiInfo()
+static const StructRttiInfo _makeJSONRPCErrorResponse()
 {
     JSONRPCErrorResponse obj;
     StructRttiBuilder builder(&obj, "JSONRPCErrorResponse", nullptr);
@@ -38,10 +43,11 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
     builder.addField("data", &obj.data, StructRttiInfo::Flag::Optional);
     builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
-    return builder.construct();
+    return builder.make();
 }
+/* static */const StructRttiInfo JSONRPCErrorResponse::g_rttiInfo = _makeJSONRPCErrorResponse();
 
-/* static */const RttiInfo* JSONRPCCall::createRttiInfo()
+static const StructRttiInfo _makeJSONRPCCallResponse()
 {
     JSONRPCCall obj;
     StructRttiBuilder builder(&obj, "JSONRPCCall", nullptr);
@@ -50,10 +56,11 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
     builder.addField("params", &obj.params, StructRttiInfo::Flag::Optional);
     builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
-    return builder.construct();
+    return builder.make();
 }
+/* static */const StructRttiInfo JSONRPCCall::g_rttiInfo = _makeJSONRPCCallResponse();
 
-/* static */const RttiInfo* JSONResultResponse::createRttiInfo()
+static const StructRttiInfo _makeJSONResultResponseResponse()
 {
     JSONResultResponse obj;
     StructRttiBuilder builder(&obj, "JSONResultResponse", nullptr);
@@ -61,8 +68,10 @@ static const auto g_data = UnownedStringSlice::fromLiteral("data");
     builder.addField("result", &obj.result);
     builder.addField("id", &obj.id, combine(StructRttiInfo::Flag::Optional, RttiDefaultValue::MinusOne));
 
-    return builder.construct();
+    return builder.make();
 }
+/* static */const StructRttiInfo JSONResultResponse::g_rttiInfo = _makeJSONResultResponseResponse();
+
 
 
 

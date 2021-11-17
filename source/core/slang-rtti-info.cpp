@@ -134,30 +134,30 @@ protected:
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-StructRttiInfo* StructRttiBuilder::construct()
+void StructRttiBuilder::_init(const char* name, const StructRttiInfo* super, const Byte* base)
+{
+    m_rttiInfo.m_name = name;
+    m_rttiInfo.m_super = super;
+    m_base = base;
+
+    m_rttiInfo.m_fieldCount = 0;
+    m_rttiInfo.m_fields = nullptr;
+}
+
+StructRttiInfo StructRttiBuilder::make()
 {
     const Index fieldCount = m_fields.getCount();
 
-    StructRttiInfo* info = (StructRttiInfo*)RttiInfo::allocate(sizeof(StructRttiInfo) + sizeof(StructRttiInfo::Field) * fieldCount);
-
-    info->init(RttiInfo::Kind::Struct, m_alignment, m_sizeInBytes);
-
-    info->m_super = m_super;
-    info->m_name = m_name;
-
-    info->m_fieldCount = uint32_t(fieldCount);
-
     if (fieldCount)
     {
-        StructRttiInfo::Field* dstFields = (StructRttiInfo::Field*)(info + 1);
+        StructRttiInfo::Field* dstFields = (StructRttiInfo::Field*)RttiInfo::allocate(sizeof(StructRttiInfo::Field) * fieldCount);
         ::memcpy(dstFields, m_fields.getBuffer(), sizeof(StructRttiInfo::Field) * fieldCount);
-    }
-    else
-    {
-        info->m_fields = nullptr;
+
+        m_rttiInfo.m_fields = dstFields;
+        m_rttiInfo.m_fieldCount = fieldCount;
     }
 
-    return info;
+    return m_rttiInfo;
 }
 
 } // namespace Slang

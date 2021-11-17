@@ -225,8 +225,12 @@ struct OtherRttiInfo : public RttiInfo
     RttiTypeFuncs m_typeFuncs;
 };
 
+// The default is to just get the info from a global held inside the type.
 template <typename T>
-struct GetRttiInfo;
+struct GetRttiInfo
+{
+    SLANG_FORCE_INLINE static const RttiInfo* get() { return &T::g_rttiInfo; }
+};
 
 template <> struct GetRttiInfo<bool> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::Bool)];} };
 template <> struct GetRttiInfo<int32_t> { static const RttiInfo* get() { return &RttiInfo::g_basicTypes[Index(RttiInfo::Kind::I32)]; } };
@@ -248,7 +252,7 @@ struct GetRttiInfo<List<T>>
         info->m_elementType = GetRttiInfo<T>::get();
         return info;
     }
-    static const RttiInfo* get() { static const RttiInfo* g_info = _create(); return g_info; }
+    static const RttiInfo* get() { static const RttiInfo* g_info = _create(); return &g_info; }
 };
 
 // Strip const
@@ -275,13 +279,10 @@ struct GetRttiInfo<Dictionary<K, V>>
 struct StructRttiBuilder
 {
     template <typename T>
-    StructRttiBuilder(T* obj, const char* name, const StructRttiInfo* super) :
-        m_base((const Byte*)obj),
-        m_super(super),
-        m_sizeInBytes(uint32_t(sizeof(T))),
-        m_name(name)
+    StructRttiBuilder(T* obj, const char* name, const StructRttiInfo* super) 
     {
-        m_alignment = uint8_t(SLANG_ALIGN_OF(T));
+        m_rttiInfo.init<T>(RttiInfo::Kind::Struct);
+        _init(name, super, (const Byte*)obj);
     }
 
     template <typename T>
@@ -296,26 +297,16 @@ struct StructRttiBuilder
         m_fields.add(field);
     }
 
-    StructRttiInfo* construct();
+    StructRttiInfo make();
 
-    const char* m_name; 
-    const StructRttiInfo* m_super = nullptr;
+    void _init(const char* name, const StructRttiInfo* super, const Byte* base);
+
+    StructRttiInfo m_rttiInfo;
+
     List<StructRttiInfo::Field> m_fields;
     const Byte* m_base;
-    uint32_t m_sizeInBytes;
-    uint8_t m_alignment;
 };
 
-#define SLANG_STRUCT_RTTI_INFO(x) \
-template <> \
-struct GetRttiInfo<x> \
-{ \
-    static const RttiInfo* get() \
-    { \
-        const RttiInfo* g_info = x::createRttiInfo(); \
-        return g_info; \
-    } \
-};
 
 } // namespace Slang
 
