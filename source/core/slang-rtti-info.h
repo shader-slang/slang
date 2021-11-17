@@ -29,7 +29,7 @@ template <size_t ALIGNMENT, size_t SIZE>
 struct GetSizedType
 {
     typedef typename GetTypeBySize<ALIGNMENT>::Type ElementType;
-    typedef typename SizedType<ElementType, SIZE / sizeof(ElementType)> Type;
+    typedef SizedType<ElementType, SIZE / sizeof(ElementType)> Type;
 };
 
 template <typename T>
@@ -52,7 +52,7 @@ template <typename T>
 static RttiDynamicArrayFuncs getDynamicArrayFuncsForType()
 {
     // NOTE! By design the new'd arrays *contents* is uninitialized
-    typedef typename GetSizedType< SLANG_ALIGN_OF(T), sizeof(T)> SizedType;
+    typedef typename GetSizedType< SLANG_ALIGN_OF(T), sizeof(T)>::Type SizedType;
     RttiDynamicArrayFuncs funcs;
     funcs.deleteFunc = deleteDynamicArray<SizedType>;
     funcs.newFunc = newDynamicArray<SizedType>;
@@ -130,6 +130,8 @@ struct RttiInfo
         Bool,
         String,
         UnownedStringSlice,
+        Ptr,
+        RefPtr,
         Struct,
         Enum,
         List,
@@ -209,13 +211,23 @@ SLANG_FORCE_INLINE StructRttiInfo::Flags combine(StructRttiInfo::Flags flags, Rt
 
 struct ListRttiInfo : public RttiInfo
 {
-    RttiInfo* m_elementType;
+    const RttiInfo* m_elementType;
 };
 
 struct DictionaryRttiInfo : public RttiInfo
 {
-    RttiInfo* m_keyType;
-    RttiInfo* m_valueType;
+    const RttiInfo* m_keyType;
+    const RttiInfo* m_valueType;
+};
+
+struct PtrRttiInfo : public RttiInfo
+{
+    const RttiInfo* m_targetType;
+};
+
+struct RefPtrRttiInfo : public RttiInfo
+{
+    const RttiInfo* m_targetType;
 };
 
 struct OtherRttiInfo : public RttiInfo
@@ -245,14 +257,14 @@ template <> struct GetRttiInfo<UnownedStringSlice> { static const RttiInfo* get(
 template <typename T>
 struct GetRttiInfo<List<T>>
 {
-    static const RttiInfo* _create()
+    static const ListRttiInfo _make()
     {
-        auto info = (ListRttiInfo*)RttiInfo::allocate(sizeof(ListRttiInfo));
-        info->init<List<Byte>>(RttiInfo::Kind::List);
-        info->m_elementType = GetRttiInfo<T>::get();
+        ListRttiInfo info;
+        info.init<List<Byte>>(RttiInfo::Kind::List);
+        info.m_elementType = GetRttiInfo<T>::get();
         return info;
     }
-    static const RttiInfo* get() { static const RttiInfo* g_info = _create(); return &g_info; }
+    static const RttiInfo* get() { static const ListRttiInfo g_info = _make(); return &g_info; }
 };
 
 // Strip const
@@ -265,15 +277,41 @@ struct GetRttiInfo<const T>
 template <typename K, typename V>
 struct GetRttiInfo<Dictionary<K, V>>
 {
-    static const RttiInfo* _create()
+    static const DictionaryRttiInfo _make()
     {
-        auto info = (DictionaryRttiInfo*)allocate(sizeof(DictionaryRttiInfo)); 
-        info->init<Dictionary<Byte, Byte>>(RttiInfo::Kind::Dictionary);
-        info->m_keyType = GetRttiInfo<K>::get();
-        info->m_valueType = GetRttiInfo<V>::get();
+        DictionaryRttiInfo info;
+        info.init<Dictionary<Byte, Byte>>(RttiInfo::Kind::Dictionary);
+        info.m_keyType = GetRttiInfo<K>::get();
+        info.m_valueType = GetRttiInfo<V>::get();
         return info;
     }
-    static const RttiInfo* get() { static const RttiInfo* g_info = _create(); return g_info; }
+    static const RttiInfo* get() { static const DictionaryRttiInfo g_info = _make(); return &g_info; }
+};
+
+template <typename TARGET>
+struct GetRttiInfo<TARGET*>
+{
+    static const PtrRttiInfo _make()
+    {
+        PtrRttiInfo info;
+        info.init<void*>(RttiInfo::Kind::Ptr);
+        info.m_targetType = GetRttiInfo<TARGET>::get();
+        return info;
+    }
+    static const RttiInfo* get() { static const PtrRttiInfo g_info = _make(); return &g_info; }
+};
+
+template <typename TARGET>
+struct GetRttiInfo<RefPtr<TARGET>>
+{
+    static const RefPtrRttiInfo _make()
+    {
+        RefPtrRttiInfo info;
+        info.init<RefPtr<StringRepresentation>>(RttiInfo::Kind::RefPtr);
+        info.m_targetType = GetRttiInfo<TARGET>::get();
+        return info;
+    }
+    static const RttiInfo* get() { static const RefPtrRttiInfo g_info = _make(); return &g_info; }
 };
 
 struct StructRttiBuilder

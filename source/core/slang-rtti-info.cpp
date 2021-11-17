@@ -22,6 +22,8 @@ namespace Slang {
     SLANG_RTTI_INFO_BASIC(Bool, bool),
     SLANG_RTTI_INFO_BASIC(String, String),
     SLANG_RTTI_INFO_BASIC(UnownedStringSlice, UnownedStringSlice),
+    SLANG_RTTI_INFO_BASIC(Ptr, void*),
+    SLANG_RTTI_INFO_BASIC(RefPtr, RefPtr<StringRepresentation>),
     SLANG_RTTI_INFO_INVALID(Struct),
     SLANG_RTTI_INFO_INVALID(Enum),
     SLANG_RTTI_INFO_INVALID(List),
