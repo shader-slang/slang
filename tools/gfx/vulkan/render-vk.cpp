@@ -140,7 +140,11 @@ public:
         const IAccelerationStructure::CreateDesc& desc,
         IAccelerationStructure** outView) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL VKDevice::getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment);
+
     void waitForGpu();
+
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -2343,6 +2347,16 @@ public:
         {
             *outEntryPoint = nullptr;
             return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.getBuffer();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
         }
 
         SLANG_NO_THROW Result SLANG_MCALL
@@ -6603,6 +6617,86 @@ size_t calcNumRows(Format format, int height)
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
     return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+}
+
+Result VKDevice::getTextureAllocationInfo(
+    const ITextureResource::Desc& descIn, size_t* outSize, size_t* outAlignment)
+{
+    TextureResource::Desc desc = fixupTextureDesc(descIn);
+
+    const VkFormat format = VulkanUtil::getVkFormat(desc.format);
+    if (format == VK_FORMAT_UNDEFINED)
+    {
+        assert(!"Unhandled image format");
+        return SLANG_FAIL;
+    }
+    const int arraySize = calcEffectiveArraySize(desc);
+
+    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    switch (desc.type)
+    {
+    case IResource::Type::Texture1D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_1D;
+            imageInfo.extent = VkExtent3D{uint32_t(descIn.size.width), 1, 1};
+            break;
+        }
+    case IResource::Type::Texture2D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent =
+                VkExtent3D{uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1};
+            break;
+        }
+    case IResource::Type::TextureCube:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent =
+                VkExtent3D{uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1};
+            imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+            break;
+        }
+    case IResource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
+
+            imageInfo.imageType = VK_IMAGE_TYPE_3D;
+            imageInfo.extent = VkExtent3D{
+                uint32_t(descIn.size.width),
+                uint32_t(descIn.size.height),
+                uint32_t(descIn.size.depth)};
+            break;
+        }
+    default:
+        {
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
+        }
+    }
+
+    imageInfo.mipLevels = desc.numMipLevels;
+    imageInfo.arrayLayers = arraySize;
+
+    imageInfo.format = format;
+
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, nullptr);
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkImage image;
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &image));
+
+    VkMemoryRequirements memRequirements;
+    m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
+
+    *outSize = memRequirements.size;
+    *outAlignment = memRequirements.alignment;
+
+    m_api.vkDestroyImage(m_device, image, nullptr);
+    return SLANG_OK;
 }
 
 Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)

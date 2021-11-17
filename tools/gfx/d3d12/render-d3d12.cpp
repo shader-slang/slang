@@ -80,6 +80,8 @@ public:
         WindowHandle window,
         ISwapchain** outSwapchain) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
@@ -2077,6 +2079,16 @@ public:
         {
             *outEntryPoint = nullptr;
             return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.getBuffer();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
         }
 
         SLANG_NO_THROW Result SLANG_MCALL
@@ -4789,13 +4801,8 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
     }
 }
 
-Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+Result setupResourceDesc(D3D12_RESOURCE_DESC& resourceDesc, const ITextureResource::Desc& srcDesc)
 {
-    // Description of uploading on Dx12
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
-
-    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
-
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
     {
@@ -4811,10 +4818,6 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     }
 
     const int numMipMaps = srcDesc.numMipLevels;
-
-    // Setup desc
-    D3D12_RESOURCE_DESC resourceDesc;
-
     resourceDesc.Dimension = dimension;
     resourceDesc.Format = pixelFormat;
     resourceDesc.Width = srcDesc.size.width;
@@ -4831,6 +4834,33 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     resourceDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     resourceDesc.Alignment = 0;
+
+    return SLANG_OK;
+}
+
+Result D3D12Device::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    TextureResource::Desc srcDesc = fixupTextureDesc(desc);
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    setupResourceDesc(resourceDesc, srcDesc);
+    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    *outSize = allocInfo.SizeInBytes;
+    *outAlignment = allocInfo.Alignment;
+    return SLANG_OK;
+}
+
+Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+{
+    // Description of uploading on Dx12
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
+
+    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    setupResourceDesc(resourceDesc, srcDesc);
+    const int arraySize = calcEffectiveArraySize(srcDesc);
+    const int numMipMaps = srcDesc.numMipLevels;
 
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
 
@@ -4851,7 +4881,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         {
             clearValuePtr = nullptr;
         }
-        clearValue.Format = pixelFormat;
+        clearValue.Format = resourceDesc.Format;
         memcpy(clearValue.Color, &descIn.optimalClearValue.color, sizeof(clearValue.Color));
         clearValue.DepthStencil.Depth = descIn.optimalClearValue.depthStencil.depth;
         clearValue.DepthStencil.Stencil = descIn.optimalClearValue.depthStencil.stencil;
@@ -4870,13 +4900,21 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
     layouts.setCount(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
-    mipRowSizeInBytes.setCount(numMipMaps);
+    mipRowSizeInBytes.setCount(srcDesc.numMipLevels);
     List<UInt32> mipNumRows;
     mipNumRows.setCount(numMipMaps);
 
     // NOTE! This is just the size for one array upload -> not for the whole texture
     UInt64 requiredSize = 0;
-    m_device->GetCopyableFootprints(&resourceDesc, 0, numMipMaps, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
+    m_device->GetCopyableFootprints(
+        &resourceDesc,
+        0,
+        srcDesc.numMipLevels,
+        0,
+        layouts.begin(),
+        mipNumRows.begin(),
+        mipRowSizeInBytes.begin(),
+        &requiredSize);
 
     // Sub resource indexing
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing

@@ -557,6 +557,17 @@ public:
         *outEntryPoint = nullptr;
         return SLANG_OK;
     }
+
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+    {
+        return m_data.getBuffer();
+    }
+
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+    {
+        return (size_t)m_data.getCount();
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setData(ShaderOffset const& offset, void const* data, size_t size) override
     {

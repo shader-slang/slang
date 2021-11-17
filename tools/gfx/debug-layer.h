@@ -150,6 +150,8 @@ public:
         uint64_t* values,
         bool waitForAll,
         uint64_t timeout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 };
 
 class DebugQueryPool : public DebugObject<IQueryPool>
@@ -279,6 +281,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override;
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setConstantBufferOverride(IBufferResource* constantBuffer) override;
 
 public:
     Slang::String m_typeName;
