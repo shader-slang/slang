@@ -542,6 +542,16 @@ public:
         SLANG_UNUSED(other);
         return SLANG_E_NOT_AVAILABLE;
     }
+
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+    {
+        return nullptr;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL setConstantBufferOverride(IBufferResource* outBuffer) override
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
 };
 
 template<typename TShaderObjectImpl, typename TShaderObjectLayoutImpl, typename TShaderObjectData>
@@ -1240,6 +1250,10 @@ public:
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
     virtual SLANG_NO_THROW Result SLANG_MCALL
         waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 
     Result getShaderObjectLayout(
         slang::TypeReflection*      type,

@@ -770,6 +770,13 @@ Result DebugDevice::waitForFences(
     return baseObject->waitForFences(fenceCount, fences, values, waitForAll, timeout);
 }
 
+Result DebugDevice::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);
+}
+
 IResource::Type DebugBufferResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -1629,6 +1636,24 @@ Result DebugShaderObject::copyFrom(IShaderObject* other)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->copyFrom(getInnerObj(other));
+}
+
+const void* DebugShaderObject::getRawData()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getRawData();
+}
+
+size_t DebugShaderObject::getSize()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSize();
+}
+
+Result DebugShaderObject::setConstantBufferOverride(IBufferResource* constantBuffer)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setConstantBufferOverride(getInnerObj(constantBuffer));
 }
 
 DebugObjectBase::DebugObjectBase()

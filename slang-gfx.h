@@ -983,6 +983,13 @@ public:
 
         /// Copies contents from another shader object to this object.
     virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) = 0;
+
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() = 0;
+
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() = 0;
+
+        /// Use the provided constant buffer instead of the internally created one.
+    virtual SLANG_NO_THROW Result SLANG_MCALL setConstantBufferOverride(IBufferResource* constantBuffer) = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \
@@ -2077,6 +2084,9 @@ public:
         uint64_t* values,
         bool waitForAll,
         uint64_t timeout) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \
