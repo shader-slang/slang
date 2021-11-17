@@ -140,8 +140,8 @@ public:
         const IAccelerationStructure::CreateDesc& desc,
         IAccelerationStructure** outView) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL VKDevice::getTextureAllocationInfo(
-        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 
     void waitForGpu();
 
@@ -4227,7 +4227,7 @@ public:
                 size_t count,
                 ITextureResource* const* textures,
                 ResourceState src,
-                ResourceState dst)
+                ResourceState dst) override
             {
                 List<VkImageMemoryBarrier> barriers;
                 barriers.setCount(count);
@@ -4242,7 +4242,12 @@ public:
                     barrier.image = image->m_image;
                     barrier.oldLayout = translateImageLayout(src);
                     barrier.newLayout = translateImageLayout(dst);
-                    barrier.subresourceRange.aspectMask;
+                    if (VulkanUtil::isDepthFormat(image->m_vkformat))
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    if (VulkanUtil::isStencilFormat(image->m_vkformat))
+                        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+                    if (barrier.subresourceRange.aspectMask == 0)
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     barrier.subresourceRange.baseArrayLayer = 0;
                     barrier.subresourceRange.baseMipLevel = 0;
                     barrier.subresourceRange.layerCount = desc->arraySize;
@@ -4262,7 +4267,7 @@ public:
                 size_t count,
                 IBufferResource* const* buffers,
                 ResourceState src,
-                ResourceState dst)
+                ResourceState dst) override
             {
                 List<VkBufferMemoryBarrier> barriers;
                 barriers.reserve(count);
@@ -6469,32 +6474,6 @@ static VkImageUsageFlags _calcImageUsageFlags(
     return usage;
 }
 
-bool isDepthFormat(VkFormat format)
-{
-    switch (format)
-    {
-    case VK_FORMAT_D16_UNORM:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_X8_D24_UNORM_PACK32:
-    case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    }
-    return false;
-}
-
-bool isStencilFormat(VkFormat format)
-{
-    switch (format)
-    {
-    case VK_FORMAT_S8_UINT:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    }
-    return false;
-}
-
 void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier barrier = {};
@@ -6505,9 +6484,9 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
 
-    if (isDepthFormat(format))
+    if (VulkanUtil::isDepthFormat(format))
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (isStencilFormat(format))
+    if (VulkanUtil::isStencilFormat(format))
         barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     if (barrier.subresourceRange.aspectMask == 0)
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
