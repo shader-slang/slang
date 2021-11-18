@@ -9,6 +9,8 @@
 
 #include "slang-json-parser.h"
 
+#include "../core/slang-rtti-info.h"
+
 namespace Slang {
 
 typedef uint32_t JSONKey;
@@ -111,7 +113,12 @@ struct JSONValue
     };
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
+
+    static const OtherRttiInfo g_rttiInfo;
 };
+
+template <>
+struct GetRttiInfo<JSONValue> { static const RttiInfo* get() { return &JSONValue::g_rttiInfo; } };
 
 struct JSONKeyValue
 {
@@ -128,6 +135,11 @@ struct JSONKeyValue
     JSONKey key;
     SourceLoc keyLoc;
     JSONValue value;
+
+    static JSONKeyValue make(JSONKey inKey, JSONValue inValue, SourceLoc inKeyLoc = SourceLoc())
+    {
+        return JSONKeyValue{ inKey, inKeyLoc, inValue };
+    }
 
     static JSONKeyValue g_invalid;
 };
@@ -155,6 +167,11 @@ public:
         /// Get the value at the index in the array
     JSONValue& getAt(const JSONValue& array, Index index);
 
+        /// Returns the index of key in obj, or -1 if not found
+    Index findObjectIndex(const JSONValue& obj, JSONKey key) const;
+        /// Get the value in the object at key. REturns invalid if not found.
+    JSONValue findObjectValue(const JSONValue& obj, JSONKey key) const;
+
         /// Returns the index 
     Index findKeyGlobalIndex(const JSONValue& obj, JSONKey key);
     Index findKeyGlobalIndex(const JSONValue& obj, const UnownedStringSlice& slice);
@@ -176,14 +193,20 @@ public:
         /// Returns string as a key
     JSONKey getStringKey(const JSONValue& in);
 
-        /// Get as a string. 
+        /// Get as a string. The slice may used backing lexeme (ie will only last
+        /// as long as the backing JSON text, or be decoded and be transitory).
+    UnownedStringSlice getTransientString(const JSONValue& in);
+
+        /// Get as a string. The contents will stay in scope as long as the container
     UnownedStringSlice getString(const JSONValue& in);
 
-        /// Gets the lexeme
+    /// Gets the lexeme
     UnownedStringSlice getLexeme(const JSONValue& in);
 
         /// Get a key for a name
     JSONKey getKey(const UnownedStringSlice& slice);
+        /// Returns JSONKey(0) if not found
+    JSONKey findKey(const UnownedStringSlice& slice) const;
         /// Get the string from the key
     UnownedStringSlice getStringFromKey(JSONKey key) const { return m_slicePool.getSlice(StringSlicePool::Handle(key)); }
 
@@ -193,6 +216,8 @@ public:
     bool areEqual(const JSONValue& a, const JSONValue& b);
     bool areEqual(const JSONValue* a, const JSONValue* b, Index count);
     bool areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+
+    bool areEqual(const JSONValue& a, const UnownedStringSlice& slice);
 
         /// Destroy value
     void destroy(JSONValue& value);
@@ -282,7 +307,8 @@ public:
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
-    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addQuotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
@@ -330,6 +356,8 @@ protected:
 
     JSONKeyValue m_keyValue;
     JSONValue m_rootValue;
+
+    StringBuilder m_work;
 };
 
 } // namespace Slang
