@@ -45,7 +45,8 @@ struct SomeStruct
             s == rhs.s &&
             list == rhs.list &&
             boolValue == rhs.boolValue &&
-            structList == rhs.structList;
+            structList == rhs.structList &&
+            makeConstArrayView(fixedArray) == makeConstArrayView(rhs.fixedArray);
     }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
@@ -56,6 +57,8 @@ struct SomeStruct
     bool boolValue = false;
 
     List<OtherStruct> structList;
+
+    int fixedArray[2] = { 0, 0 };
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -71,6 +74,7 @@ static const StructRttiInfo _makeSomeStructRtti()
     builder.addField("list", &obj.list);
     builder.addField("boolValue", &obj.boolValue);
     builder.addField("structList", &obj.structList);
+    builder.addField("fixedArray", &obj.fixedArray);
 
     return builder.make();
 }
@@ -93,6 +97,8 @@ static SlangResult _check()
     o.value = "This works!";
 
     s.structList.add(o);
+    s.fixedArray[1] = 8;
+    s.fixedArray[0] = -1;
 
     // Try serializing it out
 
