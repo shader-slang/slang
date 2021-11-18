@@ -102,14 +102,10 @@ static SlangResult _check()
             SomeStruct readS;
             SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<SomeStruct>::get(), &readS));
 
+            // Should be equal
             SLANG_CHECK(readS == s);
         }
-
-        int z = 0;
-        z++;
-
     }
-
 
     return SLANG_OK;
 }
