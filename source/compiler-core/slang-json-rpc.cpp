@@ -284,7 +284,7 @@ static SlangResult _parseError(JSONContainer* container, const JSONValue& error,
             {
                 return SLANG_FAIL;
             }
-            out.id = pair.value.asInteger();
+            out.id = Int(pair.value.asInteger());
             fieldBits |= 0x4;
         }
         else
@@ -334,7 +334,7 @@ static SlangResult _parseError(JSONContainer* container, const JSONValue& error,
             {
                 return SLANG_FAIL;
             }
-            out.id = pair.value.asInteger();
+            out.id = Int(pair.value.asInteger());
             fieldBits |= 0x4;
         }
         else
@@ -389,7 +389,7 @@ static SlangResult _parseError(JSONContainer* container, const JSONValue& error,
             {
                 return SLANG_FAIL;
             }
-            out.id = pair.value.asInteger();
+            out.id = Int(pair.value.asInteger());
             fieldBits |= 0x4;
         }
         else if (pair.key == paramsKey)
