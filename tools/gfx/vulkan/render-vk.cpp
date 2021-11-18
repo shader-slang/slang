@@ -7230,8 +7230,12 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     createInfo.subresourceRange.baseArrayLayer = desc.subresourceRange.baseArrayLayer;
     createInfo.subresourceRange.baseMipLevel = desc.subresourceRange.mipLevel;
-    createInfo.subresourceRange.layerCount = desc.subresourceRange.layerCount;
-    createInfo.subresourceRange.levelCount = desc.subresourceRange.mipLevelCount;
+    createInfo.subresourceRange.layerCount = desc.subresourceRange.layerCount == 0
+                                                 ? VK_REMAINING_ARRAY_LAYERS
+                                                 : desc.subresourceRange.layerCount;
+    createInfo.subresourceRange.levelCount = desc.subresourceRange.mipLevelCount == 0
+                                                 ? VK_REMAINING_MIP_LEVELS
+                                                 : desc.subresourceRange.mipLevelCount;
     switch (desc.type)
     {
     case IResourceView::Type::DepthStencil:
