@@ -398,16 +398,16 @@ public:
         ResourceState dst) override;
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange dstSubresource,
+        SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
-        ITextureResource::SubresourceRange srcSubresource,
+        SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange subResourceRange,
+        SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
@@ -417,6 +417,27 @@ public:
         IResourceView* view,
         ClearValue* clearValue,
         ClearResourceViewFlags::Enum flags) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+        ITextureResource* source,
+        SubresourceRange sourceRange,
+        ITextureResource* dest,
+        SubresourceRange destRange) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        size_t dstSize,
+        ITextureResource* src,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
+        ResourceState src,
+        ResourceState dst) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
