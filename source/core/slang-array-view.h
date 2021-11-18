@@ -132,7 +132,7 @@ namespace Slang
     }
 
     template<typename T, size_t N>
-    ConstArrayView<T> makeConstArrayView(const T arr[N])
+    ConstArrayView<T> makeConstArrayView(const T (&arr)[N])
     {
         return ConstArrayView<T>(arr, Index(N));
     }
@@ -184,7 +184,7 @@ namespace Slang
     }
 
     template<typename T, size_t N>
-    ArrayView<T> makeArrayView(T arr[N])
+    ArrayView<T> makeArrayView(T (&arr)[N])
     {
         return ArrayView<T>(arr, Index(N));
     }
