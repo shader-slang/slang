@@ -211,11 +211,11 @@ struct ListFuncs
 {
     static void ctorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
     {
+        SLANG_UNUSED(rttiInfo);
         SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
-        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
 
         // We don't care about the element type, as we can just initialize them all as List<Byte>
-
+        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
         typedef List<Byte> Type;
 
         Type* dst = (Type*)inDst;

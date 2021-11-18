@@ -33,8 +33,9 @@ namespace Slang
     // TODO(JS): It looks like Index is actually 64 bit on 64 bit targets(!)
     // Previous discussions landed on Index being int32_t.
 
-    // Type used for indexing, in arrays/views etc
+    // Type used for indexing, in arrays/views etc. Signed.
     typedef Int Index;
+    typedef UInt UIndex;
 
     static const Index kMaxIndex = kMaxInt;
 

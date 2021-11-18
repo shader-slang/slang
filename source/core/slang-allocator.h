@@ -19,11 +19,9 @@ namespace Slang
 #elif defined(__CYGWIN__)
         return aligned_alloc(alignment, size);
 #else
-		void * rs = 0;
+		void* rs = nullptr;
 		int succ = posix_memalign(&rs, alignment, size);
-		if (succ!=0)
-			rs = 0;
-		return rs;
+        return (succ == 0) ? rs : nullptr;
 #endif
 	}
 
@@ -74,7 +72,7 @@ namespace Slang
     public:
         static void initialize(T* buffer, Index size)
         {
-            for (int i = 0; i < size; i++)
+            for (Index i = 0; i < size; i++)
                 new (buffer + i) T();
         }
     };

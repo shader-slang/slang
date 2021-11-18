@@ -333,7 +333,9 @@ namespace Slang
 
         void reserve(Index size)
         {
-            if(size > m_capacity)
+            // The cast for this comparison is needed, otherwise some compilers erroneously detect
+            // the possiblity of a zero sized allocation (possible if m_capacity is assumed to be negative).
+            if(UIndex(size) > UIndex(m_capacity))
             {
                 T* newBuffer = _allocate(size);
                 if (m_capacity)
