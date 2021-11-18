@@ -4387,6 +4387,38 @@ public:
                 SLANG_UNUSED(destRange);
                 SLANG_UNIMPLEMENTED_X("resolveResource");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                size_t dstSize,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(dstSize);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+                ITextureResource* texture,
+                SubresourceRange subresourceRange,
+                ResourceState src,
+                ResourceState dst) override
+            {
+                SLANG_UNUSED(texture);
+                SLANG_UNUSED(subresourceRange);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(dst);
+                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
+            }
         };
 
         RefPtr<ResourceCommandEncoder> m_resourceCommandEncoder;

@@ -1268,6 +1268,30 @@ void DebugResourceCommandEncoder::resolveResource(
     baseObject->resolveResource(getInnerObj(source), sourceRange, getInnerObj(dest), destRange);
 }
 
+void DebugResourceCommandEncoder::copyTextureToBuffer(
+    IBufferResource* dst,
+    size_t dstOffset,
+    size_t dstSize,
+    ITextureResource* src,
+    SubresourceRange srcSubresource,
+    ITextureResource::Offset3D srcOffset,
+    ITextureResource::Size extent)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->copyTextureToBuffer(
+        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcSubresource, srcOffset, extent);
+}
+
+void DebugResourceCommandEncoder::textureSubresourceBarrier(
+    ITextureResource* texture,
+    SubresourceRange subresourceRange,
+    ResourceState src,
+    ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->textureSubresourceBarrier(getInnerObj(texture), subresourceRange, src, dst);
+}
+
 void DebugRayTracingCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;

@@ -370,6 +370,7 @@ enum class PrimitiveTopology
 enum class ResourceState
 {
     Undefined,
+    General,
     PreInitialized,
     VertexBuffer,
     IndexBuffer,
@@ -548,6 +549,8 @@ struct SubresourceRange
 class ITextureResource: public IResource
 {
 public:
+    static const uint32_t kTexturePitchAlignment = 256;
+
     struct Offset3D
     {
         uint32_t x = 0;
@@ -937,6 +940,21 @@ struct ShaderOffset
     {
         return !this->operator==(other);
     }
+    bool operator<(const ShaderOffset& other) const
+    {
+        if (bindingRangeIndex < other.bindingRangeIndex)
+            return true;
+        if (bindingRangeIndex > other.bindingRangeIndex)
+            return false;
+        if (bindingArrayIndex < other.bindingArrayIndex)
+            return true;
+        if (bindingArrayIndex > other.bindingArrayIndex)
+            return false;
+        return uniformOffset < other.uniformOffset;
+    }
+    bool operator<=(const ShaderOffset& other) const { return (*this == other) || (*this) < other; }
+    bool operator>(const ShaderOffset& other) const { return other < *this; }
+    bool operator>=(const ShaderOffset& other) const { return other <= *this; }
 };
 
 enum class ShaderObjectContainerType
@@ -1499,6 +1517,16 @@ public:
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
+
+    /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        size_t dstSize,
+        ITextureResource* src,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
         SubresourceRange subResourceRange,
@@ -1512,6 +1540,11 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL textureBarrier(
         size_t count,
         ITextureResource* const* textures,
+        ResourceState src,
+        ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
         ResourceState src,
         ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(

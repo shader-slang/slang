@@ -424,6 +424,21 @@ public:
         ITextureResource* dest,
         SubresourceRange destRange) override;
 
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        size_t dstSize,
+        ITextureResource* src,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
+        ResourceState src,
+        ResourceState dst) override;
+
 public:
     DebugCommandBuffer* commandBuffer;
     bool isOpen = false;
