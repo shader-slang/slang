@@ -830,7 +830,7 @@ public:
     {
         // The enum values are kept consistent with D3D12_RAYTRACING_INSTANCE_FLAGS
         // and VkGeometryInstanceFlagBitsKHR.
-        enum Enum : uint8_t
+        enum Enum : uint32_t
         {
             None = 0,
             TriangleFacingCullDisable = 0x00000001,
