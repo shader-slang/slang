@@ -317,6 +317,142 @@ struct ListFuncs
     }
 };
 
+struct StructFuncs
+{
+    
+
+    static void ctorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_UNUSED(rttiInfo);
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+
+        // We don't care about the element type, as we can just initialize them all as List<Byte>
+        //const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            new (dst + i) Type;
+        }
+    }
+    static void copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        // We need a type that we can get information from the list from - List<Byte> gives us the functions we need.
+        typedef List<Byte> Type;
+
+        Type* dst = (Type*)inDst;
+        const Type* src = (const Type*)inSrc;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+            auto& srcList = src[i];
+
+            const Index srcCount = srcList.getCount();
+
+            if (srcCount > dstList.getCount())
+            {
+                // Allocate new memory
+                const Index dstCapacity = dstList.getCapacity();
+                void* oldBuffer = dstList.detachBuffer();
+
+                void* newBuffer = ::malloc(count * elementType->m_size);
+                // Initialize it all first
+                typeFuncs.ctorArray(elementType, newBuffer, count);
+                typeFuncs.copyArray(elementType, newBuffer, oldBuffer, count);
+
+                // Attach the new buffer
+                dstList.attachBuffer((Byte*)newBuffer, count, count);
+
+                // Free the old buffer
+                if (oldBuffer)
+                {
+                    typeFuncs.dtorArray(elementType, oldBuffer, dstCapacity);
+
+                    ::free(oldBuffer);
+                }
+            }
+            else
+            {
+                typeFuncs.copyArray(elementType, dstList.getBuffer(), srcList.getBuffer(), srcCount);
+                dstList.unsafeShrinkToCount(srcCount);
+            }
+        }
+    }
+
+    static void dtorArray(const RttiInfo* rttiInfo, void* inDst, Index count)
+    {
+        SLANG_ASSERT(rttiInfo->m_kind == RttiInfo::Kind::List);
+        const ListRttiInfo* listRttiInfo = static_cast<const ListRttiInfo*>(rttiInfo);
+
+        const auto elementType = listRttiInfo->m_elementType;
+
+        // We need to get the type funcs
+        auto typeFuncs = RttiUtil::getTypeFuncs(elementType);
+        SLANG_ASSERT(typeFuncs.isValid());
+
+        typedef List<Byte> Type;
+        Type* dst = (Type*)inDst;
+
+        for (Index i = 0; i < count; ++i)
+        {
+            auto& dstList = dst[i];
+
+            const Index capacity = dstList.getCapacity();
+            Byte* buffer = dstList.detachBuffer();
+
+            if (buffer)
+            {
+                typeFuncs.dtorArray(elementType, buffer, capacity);
+                ::free(buffer);
+            }
+        }
+    }
+
+    static RttiTypeFuncs getFuncs()
+    {
+        RttiTypeFuncs funcs;
+        funcs.copyArray = &copyArray;
+        funcs.dtorArray = &dtorArray;
+        funcs.ctorArray = &ctorArray;
+        return funcs;
+    }
+};
+
+static void _ctorStructArray(const RttiInfo* rttiInfo, void* inDst, Index count)
+{
+    RttiUtil::ctorArray(rttiInfo, inDst, rttiInfo->m_size, count);
+}
+
+static void _copyStructArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, Index count)
+{
+    RttiUtil::copyArray(rttiInfo, inDst, inSrc, rttiInfo->m_size, count);
+}
+
+static void _dtorStructArray(const RttiInfo* rttiInfo, void* inDst, Index count)
+{
+    RttiUtil::dtorArray(rttiInfo, inDst, rttiInfo->m_size, count);
+}
+
+static RttiTypeFuncs _getStructTypeFuncs()
+{
+    RttiTypeFuncs funcs;
+    funcs.copyArray = _copyStructArray;
+    funcs.dtorArray = _dtorStructArray;
+    funcs.ctorArray = _ctorStructArray;
+    return funcs;
+}
+
 RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
 {
     if (rttiInfo->isBuiltIn())
@@ -336,6 +472,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         case RttiInfo::Kind::String:                return GetRttiTypeFuncs<String>::getFuncs();
         case RttiInfo::Kind::UnownedStringSlice:    return GetRttiTypeFuncs<UnownedStringSlice>::getFuncs();
         case RttiInfo::Kind::List:                  return ListFuncs::getFuncs();
+        case RttiInfo::Kind::Struct:                return _getStructTypeFuncs();
         default: break;
     }
 
@@ -387,6 +524,458 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
     }
 
     return SLANG_OK;
+}
+
+/* static */bool RttiUtil::canMemCpy(const RttiInfo* type)
+{
+    switch (type->m_kind)
+    {
+        case RttiInfo::Kind::RefPtr:
+        case RttiInfo::Kind::String:
+        case RttiInfo::Kind::Invalid:
+        {
+            return false;
+        }
+        case RttiInfo::Kind::UnownedStringSlice:
+        case RttiInfo::Kind::Ptr:
+        case RttiInfo::Kind::Enum:
+        {
+            return true;
+        }
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            return canMemCpy(fixedArrayRttiInfo->m_elementType);
+        }
+        case RttiInfo::Kind::Other:
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        {
+            return false;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    if (!canMemCpy(field.m_type))
+                    {
+                        return false;
+                    }
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while (structRttiInfo);
+
+            return true;
+        }
+        default:
+        {
+            return type->isBuiltIn();
+        }
+    }
+}
+
+/* static */bool RttiUtil::canZeroInit(const RttiInfo* type)
+{
+    switch (type->m_kind)
+    {
+        case RttiInfo::Kind::Invalid:
+        {
+            return true;
+        }
+        case RttiInfo::Kind::String:
+        {
+            // As it stands we can zero init String, but if impl changes that might not
+            // be true
+            return true;
+        }
+        case RttiInfo::Kind::UnownedStringSlice:
+        case RttiInfo::Kind::Ptr:
+        case RttiInfo::Kind::RefPtr:
+        case RttiInfo::Kind::Enum:
+        {
+            return true;
+        }
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            return canZeroInit(fixedArrayRttiInfo->m_elementType);
+        }
+        case RttiInfo::Kind::Other:
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        {
+            return false;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    if (!canZeroInit(field.m_type))
+                    {
+                        return false;
+                    }
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while (structRttiInfo);
+
+            return true;
+        }
+        default:
+        {
+            return type->isBuiltIn();
+        }
+    }
+}
+
+/* static */bool RttiUtil::hasDtor(const RttiInfo* type)
+{
+    switch (type->m_kind)
+    {
+        case RttiInfo::Kind::Invalid:
+        {
+            return false;
+        }
+        case RttiInfo::Kind::String:
+        case RttiInfo::Kind::RefPtr:
+        {
+            return true;
+        }
+        case RttiInfo::Kind::UnownedStringSlice:
+        case RttiInfo::Kind::Ptr:
+        case RttiInfo::Kind::Enum:
+        {
+            return false;
+        }
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(type);
+            return hasDtor(fixedArrayRttiInfo->m_elementType);
+        }
+        case RttiInfo::Kind::Other:
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        {
+            return true;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(type);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    if (hasDtor(field.m_type))
+                    {
+                        return true;
+                    }
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while (structRttiInfo);
+            return false;
+        }
+        default:
+        {
+            return !type->isBuiltIn();
+        }
+    }
+}
+
+/* static */void RttiUtil::ctorArray(const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+{
+    if (count <= 0)
+    {
+        return;
+    }
+
+    Byte* dst = (Byte*)inDst;
+    if (canZeroInit(rttiInfo))
+    {
+        if (stride == rttiInfo->m_size)
+        {
+            ::memset(dst, 0, count * stride);
+        }
+        else
+        {
+            const size_t size = rttiInfo->m_size;
+            for (Index i = 0; i < count; ++i, dst += stride)
+            {
+                ::memset(dst, 0, size);
+            }
+        }
+        return;
+    }
+
+    switch (rttiInfo->m_kind)
+    {
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+
+            if (fixedArrayRttiInfo->m_size == stride)
+            {
+                // It's contiguous do in one go
+                ctorArray(fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount * count);
+            }
+            else
+            {
+                // Do it in array runs
+                for (Index i = 0; i < count; ++i, dst += stride)
+                {
+                    ctorArray(fixedArrayRttiInfo->m_elementType, dst, fixedArrayRttiInfo->m_elementType->m_size, fixedArrayRttiInfo->m_elementCount);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        case RttiInfo::Kind::Other:
+        {
+            auto funcs = getTypeFuncs(rttiInfo);
+
+            const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
+            if (otherRttiInfo->m_size == stride)
+            {
+                funcs.ctorArray(rttiInfo, dst, count);
+            }
+            else
+            {
+                // Do it in array runs
+                for (Index i = 0; i < count; ++i, dst += stride)
+                {
+                    funcs.ctorArray(rttiInfo, dst, 1);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    ctorArray(field.m_type, dst + field.m_offset, stride, count);
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while(structRttiInfo);
+
+            return;
+        }
+    }
+    
+    SLANG_ASSERT(!"Unexpected");
+}
+
+/* static */void RttiUtil::copyArray(const RttiInfo* rttiInfo, void* inDst, const void* inSrc, ptrdiff_t stride, Index count)
+{
+    if (count <= 0)
+    {
+        return;
+    }
+
+    const size_t size = rttiInfo->m_size;
+
+    Byte* dst = (Byte*)inDst;
+    const Byte* src = (const Byte*)inSrc;
+    if (canMemCpy(rttiInfo))
+    {
+        if (stride == ptrdiff_t(size))
+        {
+            ::memcpy(dst, src, count * stride);
+        }
+        else
+        {
+            
+            for (Index i = 0; i < count; ++i, dst += stride, src += stride)
+            {
+                ::memcpy(dst, src, size);
+            }
+        }
+        return;
+    }
+
+    switch (rttiInfo->m_kind)
+    {
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const auto elementType = fixedArrayRttiInfo->m_elementType;
+            const auto elementSize = elementType->m_size;
+            const auto elementCount = fixedArrayRttiInfo->m_elementCount;
+
+            if (ptrdiff_t(size) == stride)
+            {
+                // It's contiguous do in one go
+                copyArray(elementType, dst, src, elementSize, elementCount * count);
+            }
+            else
+            {
+                // Do it in array runs
+                for (Index i = 0; i < count; ++i, dst += stride, src += stride)
+                {
+                    copyArray(elementType, dst, src, elementSize, elementCount);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        case RttiInfo::Kind::Other:
+        {
+            auto funcs = getTypeFuncs(rttiInfo);
+
+            const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
+            if (otherRttiInfo->m_size == stride)
+            {
+                funcs.copyArray(rttiInfo, dst, src, count);
+            }
+            else
+            {
+                for (Index i = 0; i < count; ++i, dst += stride, src += stride)
+                {
+                    funcs.copyArray(rttiInfo, dst, src, 1);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    copyArray(field.m_type, dst + field.m_offset, src + field.m_offset, stride, count);
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while (structRttiInfo);
+
+            return;
+        }
+    }
+
+    SLANG_ASSERT(!"Unexpected");
+}
+
+/* static */void RttiUtil::dtorArray(const RttiInfo* rttiInfo, void* inDst, ptrdiff_t stride, Index count)
+{
+    if (count <= 0 || !hasDtor(rttiInfo))
+    {
+        return;
+    }
+
+    const size_t size = rttiInfo->m_size;
+    Byte* dst = (Byte*)inDst;
+
+    switch (rttiInfo->m_kind)
+    {
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const auto elementType = fixedArrayRttiInfo->m_elementType;
+            const auto elementSize = elementType->m_size;
+            const auto elementCount = fixedArrayRttiInfo->m_elementCount;
+
+            if (ptrdiff_t(size) == stride)
+            {
+                // It's contiguous do in one go
+                dtorArray(elementType, dst, elementSize, elementCount * count);
+            }
+            else
+            {
+                // Do it in array runs
+                for (Index i = 0; i < count; ++i, dst += stride)
+                {
+                    dtorArray(elementType, dst, elementSize, elementCount);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::List:
+        case RttiInfo::Kind::Dictionary:
+        case RttiInfo::Kind::Other:
+        {
+            auto funcs = getTypeFuncs(rttiInfo);
+
+            const OtherRttiInfo* otherRttiInfo = static_cast<const OtherRttiInfo*>(rttiInfo);
+            if (otherRttiInfo->m_size == stride)
+            {
+                funcs.dtorArray(rttiInfo, dst, count);
+            }
+            else
+            {
+                for (Index i = 0; i < count; ++i, dst += stride)
+                {
+                    funcs.dtorArray(rttiInfo, dst, 1);
+                }
+            }
+            return;
+        }
+        case RttiInfo::Kind::Struct:
+        {
+            const StructRttiInfo* structRttiInfo = static_cast<const StructRttiInfo*>(rttiInfo);
+
+            do
+            {
+                // If all the fields can be zero inited, struct can be
+                const auto fieldCount = structRttiInfo->m_fieldCount;
+                const auto fields = structRttiInfo->m_fields;
+
+                for (Index i = 0; i < fieldCount; ++i)
+                {
+                    const auto& field = fields[i];
+                    dtorArray(field.m_type, dst + field.m_offset, stride, count);
+                }
+                structRttiInfo = structRttiInfo->m_super;
+            }
+            while (structRttiInfo);
+
+            return;
+        }
+    }
+
+    SLANG_ASSERT(!"Unexpected");
 }
 
 } // namespace Slang

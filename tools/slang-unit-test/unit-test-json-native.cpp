@@ -11,13 +11,41 @@ using namespace Slang;
 
 namespace { // anonymous 
 
+struct OtherStruct
+{
+    typedef OtherStruct ThisType;
+
+    bool operator==(const ThisType& rhs) const { return f == rhs.f && value == rhs.value;  }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    float f = 1.0f;
+    String value;
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+static const StructRttiInfo _makeOtherStructRtti()
+{
+    OtherStruct obj;
+    StructRttiBuilder builder(&obj, "OtherStruct", nullptr);
+    builder.addField("f", &obj.f);
+    builder.addField("value", &obj.value);
+    return builder.make();
+}
+/* static */const StructRttiInfo OtherStruct::g_rttiInfo = _makeOtherStructRtti();
+
 struct SomeStruct
 {
     typedef SomeStruct ThisType;
 
     bool operator==(const ThisType& rhs) const
     {
-        return a == rhs.a && b == rhs.b && s == rhs.s && list == rhs.list;
+        return a == rhs.a &&
+            b == rhs.b &&
+            s == rhs.s &&
+            list == rhs.list &&
+            boolValue == rhs.boolValue &&
+            structList == rhs.structList;
     }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
@@ -25,11 +53,12 @@ struct SomeStruct
     float b = 2.0f;
     String s;
     List<String> list;
+    bool boolValue = false;
+
+    List<OtherStruct> structList;
 
     static const StructRttiInfo g_rttiInfo;
 };
-
-} // anonymous
 
 static const StructRttiInfo _makeSomeStructRtti()
 {
@@ -40,10 +69,15 @@ static const StructRttiInfo _makeSomeStructRtti()
     builder.addField("b", &obj.b);
     builder.addField("s", &obj.s);
     builder.addField("list", &obj.list);
+    builder.addField("boolValue", &obj.boolValue);
+    builder.addField("structList", &obj.structList);
 
     return builder.make();
 }
 /* static */const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
+
+} // anonymous
+
 
 static SlangResult _check()
 {
@@ -52,6 +86,13 @@ static SlangResult _check()
     SomeStruct s;
     s.list.add("Hello!");
     s.s = "There";
+    s.boolValue = true;
+
+    OtherStruct o;
+    o.f = 27.5f;
+    o.value = "This works!";
+
+    s.structList.add(o);
 
     // Try serializing it out
 

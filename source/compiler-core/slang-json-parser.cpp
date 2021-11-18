@@ -308,6 +308,8 @@ void JSONWriter::endObject(SourceLoc loc)
 
     m_state = m_stack.getLast();
     m_stack.removeLast();
+
+    _postValue();
 }
 
 void JSONWriter::startArray(SourceLoc loc)
@@ -343,6 +345,8 @@ void JSONWriter::endArray(SourceLoc loc)
 
     m_state = m_stack.getLast();
     m_stack.removeLast();
+
+    _postValue();
 }
 
 void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)

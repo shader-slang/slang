@@ -334,9 +334,15 @@ protected:
             Object,
             Array,
         };
+        void setKey(JSONKey key, SourceLoc loc) { m_key = key; m_keyLoc = loc; }
+        void resetKey() { m_key = JSONKey(0); m_keyLoc = SourceLoc(); }
+        bool hasKey() const { return m_key != JSONKey(0); }
+
         Kind m_kind;
         Index m_startIndex;
         SourceLoc m_loc;
+        JSONKey m_key;
+        SourceLoc m_keyLoc;
     };
 
     void _popState();
@@ -353,8 +359,6 @@ protected:
     State m_state;
 
     JSONContainer* m_container;
-
-    JSONKeyValue m_keyValue;
     JSONValue m_rootValue;
 
     StringBuilder m_work;
