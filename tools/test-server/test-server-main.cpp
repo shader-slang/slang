@@ -25,6 +25,7 @@
 #include "../../source/compiler-core/slang-json-parser.h"
 #include "../../source/compiler-core/slang-json-rpc.h"
 #include "../../source/compiler-core/slang-json-value.h"
+#include "../../source/compiler-core/slang-json-native.h"
 
 #include "test-server-diagnostics.h"
 
@@ -80,7 +81,14 @@ protected:
     SlangResult _executeSingle();
     SlangResult _executeUnitTest(JSONContainer* container, const JSONValue& root);
     SlangResult _executeTool(JSONContainer* container, const JSONValue& root);
-    SlangResult _writeResponse(JSONContainer* containers, const JSONValue& root);
+
+    SlangResult _writeResponse(JSONContainer* container, const RttiInfo* info, const void* data);
+
+    template <typename T>
+    SlangResult _writeResponse(JSONContainer* container, const T* data)
+    {
+        return _writeResponse(container, GetRttiInfo<T>::get(), (const void*)data);
+    }
 
     bool m_quit = false;
 
@@ -232,14 +240,20 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     return func;
 }
 
-SlangResult TestServer::_writeResponse(JSONContainer* container, const JSONValue& root)
+SlangResult TestServer::_writeResponse(JSONContainer* container, const RttiInfo* rttiInfo, const void* data)
 {
-    // TODO(JS): We may want a non indented style, to reduce size 
+    // Convert to JSON
+    NativeToJSONConverter converter(container, &m_diagnosticSink);
+    JSONValue value;
+    SLANG_RETURN_ON_FAIL(converter.convert(rttiInfo, data, value));
+
+    // Convert to text
     JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-    container->traverseRecursively(root, &writer);
+    container->traverseRecursively(value, &writer);
     const StringBuilder& builder = writer.getBuilder();
     return m_connection->write(builder.getBuffer(), builder.getLength());
 }
+
 
 SlangResult TestServer::_executeSingle()
 {
@@ -272,33 +286,40 @@ SlangResult TestServer::_executeSingle()
 
         if (SLANG_FAILED(res))
         {
-            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, JSONRPCUtil::ErrorCode::InvalidRequest, UnownedStringSlice::fromLiteral("Unable to parse JSON")));
+            JSONRPCErrorResponse errorResponse;
+            errorResponse.error.code = Int(JSONRPC::ErrorCode::ParseError);
+            errorResponse.error.message = m_diagnosticSink.outputBuffer.getUnownedSlice();
+
+            // We can't set the id, as we couldn't parse, so just return this
+            return _writeResponse(&container, &errorResponse);
         }
     }
 
-    JSONRPCUtil::Call call;
+    // Get the call
+    JSONRPCCall call;
+    if (SLANG_FAILED(JSONRPCUtil::convertToNative(&container, root, &m_diagnosticSink, call)) || !call.isValid())
     {
-        SlangResult res = JSONRPCUtil::parseCall(&container, root, call);
-        if (SLANG_FAILED(res))
-        {
-            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, Index(JSONRPCUtil::ErrorCode::InvalidRequest), UnownedStringSlice::fromLiteral("Cannot parse call")));
-        }
-    }
+        JSONRPCErrorResponse errorResponse;
+        errorResponse.error.code = Int(JSONRPC::ErrorCode::InvalidRequest);
+        errorResponse.error.message = m_diagnosticSink.outputBuffer.getUnownedSlice();
 
-    const auto& method = call.method;
+        errorResponse.id = JSONRPCUtil::getId(&container, root);
+
+        return _writeResponse(&container, &errorResponse);
+    }
 
     // Do different things
-    if (method == "quit")
+    if (call.method == "quit")
     {
         m_quit = true;
         return SLANG_OK;
     }
-    else if (method == "unitTest")
+    else if (call.method == "unitTest")
     {
         SLANG_RETURN_ON_FAIL(_executeUnitTest(&container, root));
         return SLANG_OK;
     }
-    else if (method == "tool")
+    else if (call.method == "tool")
     {
         SLANG_RETURN_ON_FAIL(_executeTool(&container, root));
         return SLANG_OK;
