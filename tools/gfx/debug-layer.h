@@ -150,6 +150,8 @@ public:
         uint64_t* values,
         bool waitForAll,
         uint64_t timeout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 };
 
 class DebugQueryPool : public DebugObject<IQueryPool>
@@ -279,6 +281,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override;
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        setConstantBufferOverride(IBufferResource* constantBuffer) override;
 
 public:
     Slang::String m_typeName;
@@ -357,6 +363,10 @@ public:
         uint64_t countOffset) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) override;
     virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+        uint32_t samplesPerPixel,
+        uint32_t pixelCount,
+        const SamplePosition* samplePositions) override;
 
 public:
     DebugCommandBuffer* commandBuffer;
@@ -402,6 +412,11 @@ public:
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+        IResourceView* view,
+        ClearValue* clearValue,
+        ClearResourceViewFlags::Enum flags) override;
 
 public:
     DebugCommandBuffer* commandBuffer;

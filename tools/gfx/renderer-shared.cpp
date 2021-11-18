@@ -450,6 +450,15 @@ Result RendererBase::waitForFences(
     return SLANG_E_NOT_AVAILABLE;
 }
 
+Result RendererBase::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    SLANG_UNUSED(desc);
+    *outSize = 0;
+    *outAlignment = 0;
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 Result RendererBase::getShaderObjectLayout(
     slang::TypeReflection* type,
     ShaderObjectContainerType container,

@@ -188,6 +188,7 @@ public:
     x(R8G8_UNORM, 2, 1) \
     x(R8_UNORM, 1, 1) \
     x(B8G8R8A8_UNORM, 4, 1) \
+    x(B8G8R8A8_UNORM_SRGB, 4, 1) \
     \
     x(R16G16B16A16_SNORM, 8, 1) \
     x(R16G16_SNORM, 4, 1) \
@@ -292,6 +293,7 @@ enum class Format
     R8G8_UNORM,
     R8_UNORM,
     B8G8R8A8_UNORM,
+    B8G8R8A8_UNORM_SRGB,
 
     R16G16B16A16_SNORM,
     R16G16_SNORM,
@@ -981,6 +983,13 @@ public:
 
         /// Copies contents from another shader object to this object.
     virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) = 0;
+
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() = 0;
+
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() = 0;
+
+        /// Use the provided constant buffer instead of the internally created one.
+    virtual SLANG_NO_THROW Result SLANG_MCALL setConstantBufferOverride(IBufferResource* constantBuffer) = 0;
 };
 #define SLANG_UUID_IShaderObject                                                       \
     {                                                                                 \
@@ -1359,6 +1368,23 @@ struct IndirectDrawIndexedArguments
     uint32_t StartInstanceLocation;
 };
 
+struct SamplePosition
+{
+    int8_t x;
+    int8_t y;
+};
+
+struct ClearResourceViewFlags
+{
+    enum Enum : uint32_t
+    {
+        None = 0,
+        ClearDepth = 1,
+        ClearStencil = 2,
+        FloatClearValues = 4
+    };
+};
+
 class IRenderCommandEncoder : public ICommandEncoder
 {
 public:
@@ -1421,6 +1447,8 @@ public:
         IBufferResource* countBuffer,
         uint64_t countOffset) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+        uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
 };
 
 class IComputeCommandEncoder : public ICommandEncoder
@@ -1481,6 +1509,8 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+        IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
 };
 
 enum class AccelerationStructureCopyMode
@@ -2054,6 +2084,9 @@ public:
         uint64_t* values,
         bool waitForAll,
         uint64_t timeout) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) = 0;
 };
 
 #define SLANG_UUID_IDevice                                                               \

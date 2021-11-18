@@ -770,6 +770,13 @@ Result DebugDevice::waitForFences(
     return baseObject->waitForFences(fenceCount, fences, values, waitForAll, timeout);
 }
 
+Result DebugDevice::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);
+}
+
 IResource::Type DebugBufferResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -1135,6 +1142,13 @@ void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
     baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
 }
 
+Result DebugRenderCommandEncoder::setSamplePositions(
+    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
+}
+
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
@@ -1235,6 +1249,13 @@ void DebugResourceCommandEncoder::uploadTextureData(
     SLANG_GFX_API_FUNC;
     baseObject->uploadTextureData(
         getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
+}
+
+void DebugResourceCommandEncoder::clearResourceView(
+    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
@@ -1615,6 +1636,24 @@ Result DebugShaderObject::copyFrom(IShaderObject* other)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->copyFrom(getInnerObj(other));
+}
+
+const void* DebugShaderObject::getRawData()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getRawData();
+}
+
+size_t DebugShaderObject::getSize()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSize();
+}
+
+Result DebugShaderObject::setConstantBufferOverride(IBufferResource* constantBuffer)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setConstantBufferOverride(getInnerObj(constantBuffer));
 }
 
 DebugObjectBase::DebugObjectBase()

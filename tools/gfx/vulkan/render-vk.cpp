@@ -140,7 +140,11 @@ public:
         const IAccelerationStructure::CreateDesc& desc,
         IAccelerationStructure** outView) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+
     void waitForGpu();
+
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -2345,6 +2349,16 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.getBuffer();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
+        }
+
         SLANG_NO_THROW Result SLANG_MCALL
             setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
         {
@@ -3966,6 +3980,17 @@ public:
                 SLANG_UNUSED(countOffset);
                 SLANG_UNIMPLEMENTED_X("drawIndirect");
             }
+
+            virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+                uint32_t samplesPerPixel,
+                uint32_t pixelCount,
+                const SamplePosition* samplePositions) override
+            {
+                SLANG_UNUSED(samplesPerPixel);
+                SLANG_UNUSED(pixelCount);
+                SLANG_UNUSED(samplePositions);
+                SLANG_UNIMPLEMENTED_X("setSamplePositions");
+            }
         };
 
         RefPtr<RenderCommandEncoder> m_renderCommandEncoder;
@@ -4202,7 +4227,7 @@ public:
                 size_t count,
                 ITextureResource* const* textures,
                 ResourceState src,
-                ResourceState dst)
+                ResourceState dst) override
             {
                 List<VkImageMemoryBarrier> barriers;
                 barriers.setCount(count);
@@ -4217,7 +4242,12 @@ public:
                     barrier.image = image->m_image;
                     barrier.oldLayout = translateImageLayout(src);
                     barrier.newLayout = translateImageLayout(dst);
-                    barrier.subresourceRange.aspectMask;
+                    if (VulkanUtil::isDepthFormat(image->m_vkformat))
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    if (VulkanUtil::isStencilFormat(image->m_vkformat))
+                        barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+                    if (barrier.subresourceRange.aspectMask == 0)
+                        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
                     barrier.subresourceRange.baseArrayLayer = 0;
                     barrier.subresourceRange.baseMipLevel = 0;
                     barrier.subresourceRange.layerCount = desc->arraySize;
@@ -4237,7 +4267,7 @@ public:
                 size_t count,
                 IBufferResource* const* buffers,
                 ResourceState src,
-                ResourceState dst)
+                ResourceState dst) override
             {
                 List<VkBufferMemoryBarrier> barriers;
                 barriers.reserve(count);
@@ -4332,6 +4362,17 @@ public:
                 SLANG_UNUSED(subResourceData);
                 SLANG_UNUSED(subResourceDataCount);
                 SLANG_UNIMPLEMENTED_X("uploadTextureData");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+                IResourceView* view,
+                ClearValue* clearValue,
+                ClearResourceViewFlags::Enum flags) override
+            {
+                SLANG_UNUSED(view);
+                SLANG_UNUSED(clearValue);
+                SLANG_UNUSED(flags);
+                SLANG_UNIMPLEMENTED_X("clearResourceView");
             }
         };
 
@@ -6433,32 +6474,6 @@ static VkImageUsageFlags _calcImageUsageFlags(
     return usage;
 }
 
-bool isDepthFormat(VkFormat format)
-{
-    switch (format)
-    {
-    case VK_FORMAT_D16_UNORM:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_X8_D24_UNORM_PACK32:
-    case VK_FORMAT_D32_SFLOAT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    }
-    return false;
-}
-
-bool isStencilFormat(VkFormat format)
-{
-    switch (format)
-    {
-    case VK_FORMAT_S8_UINT:
-    case VK_FORMAT_D24_UNORM_S8_UINT:
-    case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        return true;
-    }
-    return false;
-}
-
 void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
     VkImageMemoryBarrier barrier = {};
@@ -6469,9 +6484,9 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
 
-    if (isDepthFormat(format))
+    if (VulkanUtil::isDepthFormat(format))
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-    if (isStencilFormat(format))
+    if (VulkanUtil::isStencilFormat(format))
         barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     if (barrier.subresourceRange.aspectMask == 0)
         barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -6581,6 +6596,86 @@ size_t calcNumRows(Format format, int height)
     FormatInfo sizeInfo;
     gfxGetFormatInfo(format, &sizeInfo);
     return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+}
+
+Result VKDevice::getTextureAllocationInfo(
+    const ITextureResource::Desc& descIn, size_t* outSize, size_t* outAlignment)
+{
+    TextureResource::Desc desc = fixupTextureDesc(descIn);
+
+    const VkFormat format = VulkanUtil::getVkFormat(desc.format);
+    if (format == VK_FORMAT_UNDEFINED)
+    {
+        assert(!"Unhandled image format");
+        return SLANG_FAIL;
+    }
+    const int arraySize = calcEffectiveArraySize(desc);
+
+    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    switch (desc.type)
+    {
+    case IResource::Type::Texture1D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_1D;
+            imageInfo.extent = VkExtent3D{uint32_t(descIn.size.width), 1, 1};
+            break;
+        }
+    case IResource::Type::Texture2D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent =
+                VkExtent3D{uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1};
+            break;
+        }
+    case IResource::Type::TextureCube:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent =
+                VkExtent3D{uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1};
+            imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+            break;
+        }
+    case IResource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
+
+            imageInfo.imageType = VK_IMAGE_TYPE_3D;
+            imageInfo.extent = VkExtent3D{
+                uint32_t(descIn.size.width),
+                uint32_t(descIn.size.height),
+                uint32_t(descIn.size.depth)};
+            break;
+        }
+    default:
+        {
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
+        }
+    }
+
+    imageInfo.mipLevels = desc.numMipLevels;
+    imageInfo.arrayLayers = arraySize;
+
+    imageInfo.format = format;
+
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, nullptr);
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkImage image;
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &image));
+
+    VkMemoryRequirements memRequirements;
+    m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
+
+    *outSize = memRequirements.size;
+    *outAlignment = memRequirements.alignment;
+
+    m_api.vkDestroyImage(m_device, image, nullptr);
+    return SLANG_OK;
 }
 
 Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
