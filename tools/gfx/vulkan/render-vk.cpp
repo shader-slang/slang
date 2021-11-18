@@ -4330,10 +4330,10 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
                 ITextureResource* dst,
-                ITextureResource::SubresourceRange dstSubresource,
+                SubresourceRange dstSubresource,
                 ITextureResource::Offset3D dstOffset,
                 ITextureResource* src,
-                ITextureResource::SubresourceRange srcSubresource,
+                SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
@@ -4349,7 +4349,7 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
                 ITextureResource* dst,
-                ITextureResource::SubresourceRange subResourceRange,
+                SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
                 ITextureResource::Offset3D extend,
                 ITextureResource::SubresourceData* subResourceData,
@@ -4373,6 +4373,51 @@ public:
                 SLANG_UNUSED(clearValue);
                 SLANG_UNUSED(flags);
                 SLANG_UNIMPLEMENTED_X("clearResourceView");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+                ITextureResource* source,
+                SubresourceRange sourceRange,
+                ITextureResource* dest,
+                SubresourceRange destRange) override
+            {
+                SLANG_UNUSED(source);
+                SLANG_UNUSED(sourceRange);
+                SLANG_UNUSED(dest);
+                SLANG_UNUSED(destRange);
+                SLANG_UNIMPLEMENTED_X("resolveResource");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                size_t dstSize,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(dstSize);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+                ITextureResource* texture,
+                SubresourceRange subresourceRange,
+                ResourceState src,
+                ResourceState dst) override
+            {
+                SLANG_UNUSED(texture);
+                SLANG_UNUSED(subresourceRange);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(dst);
+                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
             }
         };
 
@@ -7183,10 +7228,14 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
         break;
     }
     createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    createInfo.subresourceRange.baseArrayLayer = 0;
-    createInfo.subresourceRange.baseMipLevel = 0;
-    createInfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-    createInfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    createInfo.subresourceRange.baseArrayLayer = desc.subresourceRange.baseArrayLayer;
+    createInfo.subresourceRange.baseMipLevel = desc.subresourceRange.mipLevel;
+    createInfo.subresourceRange.layerCount = desc.subresourceRange.layerCount == 0
+                                                 ? VK_REMAINING_ARRAY_LAYERS
+                                                 : desc.subresourceRange.layerCount;
+    createInfo.subresourceRange.levelCount = desc.subresourceRange.mipLevelCount == 0
+                                                 ? VK_REMAINING_MIP_LEVELS
+                                                 : desc.subresourceRange.mipLevelCount;
     switch (desc.type)
     {
     case IResourceView::Type::DepthStencil:
@@ -7236,8 +7285,24 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
     // TODO: These should come from the `ResourceView::Desc`
-    VkDeviceSize offset = 0;
-    VkDeviceSize size = resourceImpl->getDesc()->sizeInBytes;
+    auto stride = resourceImpl->getDesc()->elementSize;
+    if (stride == 0)
+    {
+        if (desc.format == Format::Unknown)
+        {
+            stride = 1;
+        }
+        else
+        {
+            FormatInfo info;
+            gfxGetFormatInfo(desc.format, &info);
+            stride = info.blockSizeInBytes;
+            assert(info.pixelsPerBlock == 1);
+        }
+    }
+    VkDeviceSize offset = (VkDeviceSize)desc.bufferRange.firstElement * stride;
+    VkDeviceSize size = desc.bufferRange.elementCount == 0 ? resourceImpl->getDesc()->sizeInBytes
+                                                           : (VkDeviceSize)desc.bufferRange.elementCount * stride;
 
     // There are two different cases we need to think about for buffers.
     //
@@ -7274,7 +7339,7 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
             // require a view in Vulkan.
             RefPtr<PlainBufferResourceViewImpl> viewImpl = new PlainBufferResourceViewImpl(this);
             viewImpl->m_buffer = resourceImpl;
-            viewImpl->offset = 0;
+            viewImpl->offset = offset;
             viewImpl->size = size;
             viewImpl->m_desc = desc;
 
