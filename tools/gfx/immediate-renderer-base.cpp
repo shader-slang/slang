@@ -313,10 +313,10 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
             ITextureResource* dst,
-            ITextureResource::SubresourceRange dstSubresource,
+            SubresourceRange dstSubresource,
             ITextureResource::Offset3D dstOffset,
             ITextureResource* src,
-            ITextureResource::SubresourceRange srcSubresource,
+            SubresourceRange srcSubresource,
             ITextureResource::Offset3D srcOffset,
             ITextureResource::Size extent) override
         {
@@ -332,7 +332,7 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
             ITextureResource* dst,
-            ITextureResource::SubresourceRange subResourceRange,
+            SubresourceRange subResourceRange,
             ITextureResource::Offset3D offset,
             ITextureResource::Offset3D extend,
             ITextureResource::SubresourceData* subResourceData,
@@ -356,6 +356,51 @@ public:
             SLANG_UNUSED(clearValue);
             SLANG_UNUSED(flags);
             SLANG_UNIMPLEMENTED_X("clearResourceView");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+            ITextureResource* source,
+            SubresourceRange sourceRange,
+            ITextureResource* dest,
+            SubresourceRange destRange) override
+        {
+            SLANG_UNUSED(source);
+            SLANG_UNUSED(sourceRange);
+            SLANG_UNUSED(dest);
+            SLANG_UNUSED(destRange);
+            SLANG_UNIMPLEMENTED_X("resolveResource");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+            IBufferResource* dst,
+            size_t dstOffset,
+            size_t dstSize,
+            ITextureResource* src,
+            SubresourceRange srcSubresource,
+            ITextureResource::Offset3D srcOffset,
+            ITextureResource::Size extent) override
+        {
+            SLANG_UNUSED(dst);
+            SLANG_UNUSED(dstOffset);
+            SLANG_UNUSED(dstSize);
+            SLANG_UNUSED(src);
+            SLANG_UNUSED(srcSubresource);
+            SLANG_UNUSED(srcOffset);
+            SLANG_UNUSED(extent);
+            SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+        }
+
+        virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+            ITextureResource* texture,
+            SubresourceRange subresourceRange,
+            ResourceState src,
+            ResourceState dst) override
+        {
+            SLANG_UNUSED(texture);
+            SLANG_UNUSED(subresourceRange);
+            SLANG_UNUSED(src);
+            SLANG_UNUSED(dst);
+            SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
         }
     };
 

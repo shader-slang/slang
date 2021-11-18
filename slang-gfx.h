@@ -27,6 +27,10 @@
 #    define SLANG_GFX_API
 #endif
 
+// Needed for building on cygwin with gcc
+#undef Always
+#undef None
+
 namespace gfx {
 
 using Slang::ComPtr;
@@ -366,6 +370,7 @@ enum class PrimitiveTopology
 enum class ResourceState
 {
     Undefined,
+    General,
     PreInitialized,
     VertexBuffer,
     IndexBuffer,
@@ -514,28 +519,37 @@ struct ClearValue
     DepthStencilClearValue depthStencil;
 };
 
+struct BufferRange
+{
+    uint32_t firstElement;
+    uint32_t elementCount;
+};
+
+enum class TextureAspect : uint32_t
+{
+    Default = 0,
+    Color = 0x00000001,
+    Depth = 0x00000002,
+    Stencil = 0x00000004,
+    MetaData = 0x00000008,
+    Plane0 = 0x00000010,
+    Plane1 = 0x00000020,
+    Plane2 = 0x00000040,
+};
+
+struct SubresourceRange
+{
+    TextureAspect aspectMask;
+    uint32_t mipLevel;
+    uint32_t mipLevelCount;
+    uint32_t baseArrayLayer; // For Texture3D, this is WSlice.
+    uint32_t layerCount; // For cube maps, this is a multiple of 6.
+};
 
 class ITextureResource: public IResource
 {
 public:
-    enum class Aspect : uint32_t
-    {
-        Color = 0x00000001,
-        Depth = 0x00000002,
-        Stencil = 0x00000004,
-        MetaData = 0x00000008,
-        Plane0 = 0x00000010,
-        Plane1 = 0x00000020,
-        Plane2 = 0x00000040,
-    };
-
-    struct SubresourceRange
-    {
-        Aspect aspectMask;
-        uint32_t mipLevel;
-        uint32_t baseArrayLayer;
-        uint32_t layerCount;
-    };
+    static const uint32_t kTexturePitchAlignment = 256;
 
     struct Offset3D
     {
@@ -623,9 +637,6 @@ public:
         0xcf88a31c, 0x6187, 0x46c5, { 0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 } \
     }
 
-// Needed for building on cygwin with gcc
-#undef Always
-#undef None
 
 enum class ComparisonFunc : uint8_t
 {
@@ -718,6 +729,8 @@ public:
 
         // Fields for `RenderTarget` and `DepthStencil` views.
         RenderTargetDesc renderTarget;
+        SubresourceRange subresourceRange;
+        BufferRange bufferRange;
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
@@ -927,6 +940,21 @@ struct ShaderOffset
     {
         return !this->operator==(other);
     }
+    bool operator<(const ShaderOffset& other) const
+    {
+        if (bindingRangeIndex < other.bindingRangeIndex)
+            return true;
+        if (bindingRangeIndex > other.bindingRangeIndex)
+            return false;
+        if (bindingArrayIndex < other.bindingArrayIndex)
+            return true;
+        if (bindingArrayIndex > other.bindingArrayIndex)
+            return false;
+        return uniformOffset < other.uniformOffset;
+    }
+    bool operator<=(const ShaderOffset& other) const { return (*this == other) || (*this) < other; }
+    bool operator>(const ShaderOffset& other) const { return other < *this; }
+    bool operator>=(const ShaderOffset& other) const { return other <= *this; }
 };
 
 enum class ShaderObjectContainerType
@@ -1483,15 +1511,25 @@ public:
         size_t size) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange dstSubresource,
+        SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
-        ITextureResource::SubresourceRange srcSubresource,
+        SubresourceRange srcSubresource,
+        ITextureResource::Offset3D srcOffset,
+        ITextureResource::Size extent) = 0;
+
+    /// Copies texture to a buffer. Each row is aligned to kTexturePitchAlignment.
+    virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+        IBufferResource* dst,
+        size_t dstOffset,
+        size_t dstSize,
+        ITextureResource* src,
+        SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
         ITextureResource* dst,
-        ITextureResource::SubresourceRange subResourceRange,
+        SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
         ITextureResource::Offset3D extent,
         ITextureResource::SubresourceData* subResourceData,
@@ -1504,6 +1542,11 @@ public:
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+        ITextureResource* texture,
+        SubresourceRange subresourceRange,
+        ResourceState src,
+        ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
         size_t count,
         IBufferResource* const* buffers,
@@ -1511,6 +1554,11 @@ public:
         ResourceState dst) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+        ITextureResource* source,
+        SubresourceRange sourceRange,
+        ITextureResource* dest,
+        SubresourceRange destRange) = 0;
 };
 
 enum class AccelerationStructureCopyMode

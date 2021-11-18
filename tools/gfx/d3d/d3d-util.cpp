@@ -635,6 +635,36 @@ int D3DUtil::getShaderModelFromProfileName(const char* name)
     return 0;
 }
 
+uint32_t D3DUtil::getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect)
+{
+    switch (aspect)
+    {
+    case TextureAspect::Default:
+    case TextureAspect::Color:
+        return 0;
+    case TextureAspect::Depth:
+        return 0;
+    case TextureAspect::Stencil:
+        switch (format)
+        {
+        case DXGI_FORMAT_D24_UNORM_S8_UINT:
+        case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+            return 1;
+        default:
+            return 0;
+        }
+    case TextureAspect::Plane0:
+        return 0;
+    case TextureAspect::Plane1:
+        return 1;
+    case TextureAspect::Plane2:
+        return 2;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown texture aspect.");
+        return 0;
+    }
+}
+
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     Slang::String lowerAdapterName = Slang::String(adapterName).toLower();

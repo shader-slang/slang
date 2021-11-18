@@ -1220,10 +1220,10 @@ void DebugResourceCommandEncoder::bufferBarrier(
 
 void DebugResourceCommandEncoder::copyTexture(
     ITextureResource* dst,
-    ITextureResource::SubresourceRange dstSubresource,
+    SubresourceRange dstSubresource,
     ITextureResource::Offset3D dstOffset,
     ITextureResource* src,
-    ITextureResource::SubresourceRange srcSubresource,
+    SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Size extent)
 {
@@ -1240,7 +1240,7 @@ void DebugResourceCommandEncoder::copyTexture(
 
 void DebugResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
-    ITextureResource::SubresourceRange subResourceRange,
+    SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
     ITextureResource::Offset3D extent,
     ITextureResource::SubresourceData* subResourceData,
@@ -1256,6 +1256,40 @@ void DebugResourceCommandEncoder::clearResourceView(
 {
     SLANG_GFX_API_FUNC;
     baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
+}
+
+void DebugResourceCommandEncoder::resolveResource(
+    ITextureResource* source,
+    SubresourceRange sourceRange,
+    ITextureResource* dest,
+    SubresourceRange destRange)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->resolveResource(getInnerObj(source), sourceRange, getInnerObj(dest), destRange);
+}
+
+void DebugResourceCommandEncoder::copyTextureToBuffer(
+    IBufferResource* dst,
+    size_t dstOffset,
+    size_t dstSize,
+    ITextureResource* src,
+    SubresourceRange srcSubresource,
+    ITextureResource::Offset3D srcOffset,
+    ITextureResource::Size extent)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->copyTextureToBuffer(
+        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcSubresource, srcOffset, extent);
+}
+
+void DebugResourceCommandEncoder::textureSubresourceBarrier(
+    ITextureResource* texture,
+    SubresourceRange subresourceRange,
+    ResourceState src,
+    ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->textureSubresourceBarrier(getInnerObj(texture), subresourceRange, src, dst);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
