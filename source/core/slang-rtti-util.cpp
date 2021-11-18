@@ -328,7 +328,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
             case 4: return GetRttiTypeFuncsForBuiltIn<uint32_t>::getFuncs();
             case 8: return GetRttiTypeFuncsForBuiltIn<uint64_t>::getFuncs();
         }
-        return RttiTypeFuncs{};
+        return RttiTypeFuncs::makeEmpty();
     }
 
     switch (rttiInfo->m_kind)
@@ -339,7 +339,7 @@ RttiTypeFuncs RttiUtil::getTypeFuncs(const RttiInfo* rttiInfo)
         default: break;
     }
 
-    return RttiTypeFuncs{};
+    return RttiTypeFuncs::makeEmpty();
 }
 
 /* static */SlangResult RttiUtil::setListCount(const RttiInfo* elementType, void* dst, Index count)

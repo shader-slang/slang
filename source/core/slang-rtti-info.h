@@ -19,6 +19,8 @@ struct RttiTypeFuncs
 
     bool isValid() const { return ctorArray && dtorArray && copyArray;  }
 
+    static RttiTypeFuncs makeEmpty() { return RttiTypeFuncs{ nullptr, nullptr, nullptr }; }
+
     CtorArray ctorArray;
     DtorArray dtorArray;
     CopyArray copyArray;
