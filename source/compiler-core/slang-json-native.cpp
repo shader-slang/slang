@@ -218,7 +218,7 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
 
             if (srcArray.getCount() > elementCount)
             {
-                m_sink->diagnose(in.loc, JSONDiagnostics::arrayIsTooLarge, srcArray.getCount(), elementCount);
+                m_sink->diagnose(in.loc, JSONDiagnostics::tooManyElementsForArray, srcArray.getCount(), elementCount);
                 return SLANG_FAIL;
             }
 
