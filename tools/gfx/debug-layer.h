@@ -367,6 +367,18 @@ public:
         uint32_t samplesPerPixel,
         uint32_t pixelCount,
         const SamplePosition* samplePositions) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+        UInt vertexCount,
+        UInt instanceCount,
+        UInt startVertex,
+        UInt startInstanceLocation) override;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) override;
 
 public:
     DebugCommandBuffer* commandBuffer;

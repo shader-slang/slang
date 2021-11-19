@@ -3423,6 +3423,34 @@ public:
                 SLANG_UNUSED(samplePositions);
                 SLANG_UNIMPLEMENTED_X("setSamplePositions");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+                UInt vertexCount,
+                UInt instanceCount,
+                UInt startVertex,
+                UInt startInstanceLocation) override
+            {
+                SLANG_UNUSED(vertexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startVertex);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawInstanced");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+                uint32_t indexCount,
+                uint32_t instanceCount,
+                uint32_t startIndexLocation,
+                int32_t baseVertexLocation,
+                uint32_t startInstanceLocation) override
+            {
+                SLANG_UNUSED(indexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startIndexLocation);
+                SLANG_UNUSED(baseVertexLocation);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+            }
         };
 
         RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -5669,10 +5697,10 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
         dstEle.SemanticName = semanticName;
         dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
         dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
-        dstEle.InputSlot = 0;
+        dstEle.InputSlot = (UINT)srcEle.bufferSlotIndex;
         dstEle.AlignedByteOffset = (UINT)srcEle.offset;
-        dstEle.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-        dstEle.InstanceDataStepRate = 0;
+        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcEle.slotClass);
+        dstEle.InstanceDataStepRate = (UINT)srcEle.instanceDataStepRate;
     }
 
     returnComPtr(outLayout, layout);
@@ -5871,10 +5899,15 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         if (framebufferLayout->m_hasDepthStencil)
         {
             psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
+            psoDesc.SampleDesc.Count = framebufferLayout->m_depthStencil.sampleCount;
         }
         else
         {
             psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+            if (framebufferLayout->m_renderTargets.getCount())
+            {
+                psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
+            }
         }
         psoDesc.NumRenderTargets = numRenderTargets;
         for (Int i = 0; i < numRenderTargets; i++)
@@ -5883,43 +5916,57 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
                 D3DUtil::getMapFormat(framebufferLayout->m_renderTargets[i].format);
         }
 
-        psoDesc.SampleDesc.Count = 1;
         psoDesc.SampleDesc.Quality = 0;
-
         psoDesc.SampleMask = UINT_MAX;
     }
 
     {
         auto& rs = psoDesc.RasterizerState;
-        rs.FillMode = D3D12_FILL_MODE_SOLID;
-        rs.CullMode = D3D12_CULL_MODE_NONE;
-        rs.FrontCounterClockwise = FALSE;
-        rs.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        rs.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        rs.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        rs.DepthClipEnable = TRUE;
-        rs.MultisampleEnable = FALSE;
-        rs.AntialiasedLineEnable = FALSE;
-        rs.ForcedSampleCount = 0;
-        rs.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+        rs.FillMode = D3DUtil::getFillMode(desc.rasterizer.fillMode);
+        rs.CullMode = D3DUtil::getCullMode(desc.rasterizer.cullMode);
+        rs.FrontCounterClockwise =
+            desc.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise ? TRUE : FALSE;
+        rs.DepthBias = desc.rasterizer.depthBias;
+        rs.DepthBiasClamp = desc.rasterizer.depthBiasClamp;
+        rs.SlopeScaledDepthBias = desc.rasterizer.slopeScaledDepthBias;
+        rs.DepthClipEnable = desc.rasterizer.depthClipEnable ? TRUE : FALSE;
+        rs.MultisampleEnable = desc.rasterizer.multisampleEnable ? TRUE : FALSE;
+        rs.AntialiasedLineEnable = desc.rasterizer.antialiasedLineEnable ? TRUE : FALSE;
+        rs.ForcedSampleCount = desc.rasterizer.forcedSampleCount;
+        rs.ConservativeRaster = desc.rasterizer.enableConservativeRasterization
+                                    ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+                                    : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
     }
 
     {
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
-
-        blend.AlphaToCoverageEnable = FALSE;
         blend.IndependentBlendEnable = FALSE;
-        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
+        blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
-            FALSE,FALSE,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL,
-        };
-        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+            auto& d3dDesc = blend.RenderTarget[i];
+            d3dDesc.BlendEnable = desc.blend.targets[i].enableBlend ? TRUE : FALSE;
+            d3dDesc.BlendOp = D3DUtil::getBlendOp(desc.blend.targets[i].color.op);
+            d3dDesc.BlendOpAlpha = D3DUtil::getBlendOp(desc.blend.targets[i].alpha.op);
+            d3dDesc.DestBlend = D3DUtil::getBlendFactor(desc.blend.targets[i].color.dstFactor);
+            d3dDesc.DestBlendAlpha = D3DUtil::getBlendFactor(desc.blend.targets[i].alpha.dstFactor);
+            d3dDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+            d3dDesc.LogicOpEnable = FALSE;
+            d3dDesc.RenderTargetWriteMask = desc.blend.targets[i].writeMask;
+            d3dDesc.SrcBlend = D3DUtil::getBlendFactor(desc.blend.targets[i].color.srcFactor);
+            d3dDesc.SrcBlendAlpha = D3DUtil::getBlendFactor(desc.blend.targets[i].alpha.srcFactor);
+        }
+        for (uint32_t i = 1; i < desc.blend.targetCount; i++)
         {
-            blend.RenderTarget[i] = defaultRenderTargetBlendDesc;
+            if (memcmp(&desc.blend.targets[i], &desc.blend.targets[0], sizeof(desc.blend.targets[0])) != 0)
+            {
+                blend.IndependentBlendEnable = TRUE;
+                break;
+            }
+        }
+        for (uint32_t i = (uint32_t)desc.blend.targetCount; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        {
+            blend.RenderTarget[i] = blend.RenderTarget[0];
         }
     }
 

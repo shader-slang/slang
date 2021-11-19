@@ -3991,6 +3991,34 @@ public:
                 SLANG_UNUSED(samplePositions);
                 SLANG_UNIMPLEMENTED_X("setSamplePositions");
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+                UInt vertexCount,
+                UInt instanceCount,
+                UInt startVertex,
+                UInt startInstanceLocation) override
+            {
+                SLANG_UNUSED(vertexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startVertex);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawInstanced");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+                uint32_t indexCount,
+                uint32_t instanceCount,
+                uint32_t startIndexLocation,
+                int32_t baseVertexLocation,
+                uint32_t startInstanceLocation) override
+            {
+                SLANG_UNUSED(indexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startIndexLocation);
+                SLANG_UNUSED(baseVertexLocation);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+            }
         };
 
         RefPtr<RenderCommandEncoder> m_renderCommandEncoder;
