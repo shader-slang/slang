@@ -1089,7 +1089,7 @@ struct DepthStencilDesc
 struct RasterizerDesc
 {
     FillMode fillMode = FillMode::Solid;
-    CullMode cullMode = CullMode::Back;
+    CullMode cullMode = CullMode::None;
     FrontFaceMode frontFace = FrontFaceMode::CounterClockwise;
     int32_t depthBias = 0;
     float depthBiasClamp = 0.0f;
