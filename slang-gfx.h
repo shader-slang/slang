@@ -1358,6 +1358,7 @@ enum class QueryType
     Timestamp,
     AccelerationStructureCompactedSize,
     AccelerationStructureSerializedSize,
+    AccelerationStructureCurrentSize,
 };
 
 class IQueryPool : public ISlangUnknown
