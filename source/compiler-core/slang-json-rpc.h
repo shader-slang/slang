@@ -86,10 +86,19 @@ struct JSONResultResponse
     bool isValid() const { return jsonrpc == JSONRPC::jsonRpcVersion && JSONRPC::isIdOk(id); }
 
     UnownedStringSlice jsonrpc = JSONRPC::jsonRpcVersion;
-    JSONValue result;                   ///< The result value
-    JSONValue id;                       ///< Id associated with this request
+    JSONValue result;                           ///< The result value
+    JSONValue id;                               ///< Id associated with this request 
 
     static const StructRttiInfo g_rttiInfo;
+};
+
+enum class JSONRPCMessageType
+{
+    Invalid,
+    Result,
+    Call,
+    Error,
+    CountOf,
 };
 
 /// Send and receive messages as JSON
@@ -97,16 +106,8 @@ class JSONRPCUtil
 {
 public:
 
-    // 
-    enum class ResponseType
-    {
-        Invalid,
-        Error,
-        Result
-    };
-
         /// Determine the response type
-    static ResponseType getResponseType(JSONContainer* container, const JSONValue& response);
+    static JSONRPCMessageType getMessageType(JSONContainer* container, const JSONValue& value);
 
         /// Parse slice into JSONContainer. outValue is the root of the hierarchy.
         /// NOTE! Uses and *assumes* there is a source manager on the sink. outValue is likely only usable whilst the sourceManger is in scope
@@ -127,7 +128,7 @@ public:
         return convertToJSON(GetRttiInfo<T>::get(), (const void*)in, sink, out);
     }
 
-        /// Get an id directly from root (assumed id: is in root object definition)
+        /// Get an id directly from root (assumed id: is in root object definition).
     static JSONValue getId(JSONContainer* container, const JSONValue& root);
 };
 

@@ -27,6 +27,7 @@
 #include "../../source/compiler-core/slang-json-value.h"
 #include "../../source/compiler-core/slang-json-native.h"
 #include "../../source/compiler-core/slang-json-rpc.h"
+#include "../../source/compiler-core/slang-json-rpc-connection.h"
 
 #include "../../source/compiler-core/slang-test-server-protocol.h"
 
@@ -87,44 +88,6 @@ protected:
     SlangResult _executeUnitTest(const JSONRPCCall& call);
     SlangResult _executeTool(const JSONRPCCall& root);
 
-    SlangResult _writeResponse(const RttiInfo* info, const void* data);
-
-    template <typename T>
-    SlangResult _writeResponse(const T* data)
-    {
-        return _writeResponse(GetRttiInfo<T>::get(), (const void*)data);
-    }
-
-        /// Will write response on fail
-    SlangResult _toNativeOrRespond(const JSONValue& value, const RttiInfo* info, void* dst);
-    template <typename T>
-    SlangResult _toNativeOrRespond(const JSONValue& value, T* data)
-    {
-        return _toNativeOrRespond(value, GetRttiInfo<T>::get(), data);
-    }
-    template <typename T>
-    SlangResult _toValidNativeOrRespond(const JSONValue& value, T* data)
-    {
-        const RttiInfo* rttiInfo = GetRttiInfo<T>::get();
-
-        SLANG_RETURN_ON_FAIL(_toNativeOrRespond(value, rttiInfo, (void*)data));
-        if (!data->isValid())
-        {
-            // If it has a name add validation info
-            if (rttiInfo->isNamed())
-            {
-                const NamedRttiInfo* namedRttiInfo = static_cast<const NamedRttiInfo*>(rttiInfo);
-                m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::argsAreInvalid, namedRttiInfo->m_name);
-            }
-
-            return _respondWithError(JSONRPC::ErrorCode::InvalidRequest);
-        }
-        return SLANG_OK;
-    }
-
-    SlangResult _respondWithError(JSONRPC::ErrorCode code);
-    SlangResult _respondWithErrorMessage(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg);
-
     bool m_quit = false;
 
     ComPtr<slang::IGlobalSession> m_session;
@@ -134,19 +97,12 @@ protected:
 
     String m_exePath;                                               ///< Path to executable
 
-    DiagnosticSink m_diagnosticSink;
-    SourceManager m_sourceManager;
-    JSONContainer m_container;
-
-    JSONValue m_jsonRoot;
-
-    RefPtr<HTTPPacketConnection> m_connection;
+    RefPtr<JSONRPCConnection> m_connection;
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-TestServer::TestServer() :
-    m_container(nullptr)
+TestServer::TestServer()
 {
 }
 
@@ -154,19 +110,8 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = Path::getParentDirectory(argv[0]);
 
-    RefPtr<Stream> stdinStream, stdoutStream;
-
-    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
-    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
-
-    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
-
-    m_connection = new HTTPPacketConnection(readStream, stdoutStream);
-
-    m_sourceManager.initialize(nullptr, nullptr);
-    m_diagnosticSink.init(&m_sourceManager, &JSONLexer::calcLexemeLocation);
-    m_container.setSourceManager(&m_sourceManager);
-
+    m_connection = new JSONRPCConnection;
+    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams());
     return SLANG_OK;
 }
 
@@ -284,102 +229,54 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     return func;
 }
 
-SlangResult TestServer::_writeResponse(const RttiInfo* rttiInfo, const void* data)
-{
-    // Convert to JSON
-    NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
-    JSONValue value;
-    SLANG_RETURN_ON_FAIL(converter.convert(rttiInfo, data, value));
-
-    // Convert to text
-    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-    m_container.traverseRecursively(value, &writer);
-    const StringBuilder& builder = writer.getBuilder();
-    return m_connection->write(builder.getBuffer(), builder.getLength());
-}
-
-SlangResult TestServer::_respondWithError(JSONRPC::ErrorCode code)
-{
-    JSONRPCErrorResponse errorResponse;
-    errorResponse.error.code = Int(JSONRPC::ErrorCode::InvalidRequest);
-    errorResponse.error.message = m_diagnosticSink.outputBuffer.getUnownedSlice();
-    errorResponse.id = JSONRPCUtil::getId(&m_container, m_jsonRoot);
-    return _writeResponse(&errorResponse);
-}
-
-SlangResult TestServer::_respondWithErrorMessage(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg)
-{
-    JSONRPCErrorResponse errorResponse;
-    errorResponse.error.code = Int(JSONRPC::ErrorCode::InvalidRequest);
-    errorResponse.error.message = msg;
-    errorResponse.id = JSONRPCUtil::getId(&m_container, m_jsonRoot);
-    return _writeResponse(&errorResponse);
-}
-
-SlangResult TestServer::_toNativeOrRespond(const JSONValue& value, const RttiInfo* info, void* dst)
-{
-    m_diagnosticSink.outputBuffer.Clear();
-    if (SLANG_FAILED(JSONRPCUtil::convertToNative(&m_container, value, &m_diagnosticSink, info, dst)))
-    {
-        return _respondWithError(JSONRPC::ErrorCode::InvalidRequest);
-    }
-    return SLANG_OK;
-}
-
 SlangResult TestServer::_executeSingle()
 {
     // Block waiting for content (or error/closed)
     SLANG_RETURN_ON_FAIL(m_connection->waitForResult());
 
-    // If we don't have content, we can quit for now
-    if (!m_connection->hasContent())
+    // If we don't have a message, we can quit for now
+    if (!m_connection->hasMessage())
     {
         return SLANG_OK;
     }
 
-    auto content = m_connection->getContent();
-    UnownedStringSlice slice((const char*)content.begin(), content.getCount());
+    const JSONRPCMessageType msgType = m_connection->getMessageType();
 
-    // Reset for parse
-    m_sourceManager.reset();
-    m_diagnosticSink.reset();
-    m_container.reset();
-    m_jsonRoot.reset();
-
+    switch (msgType)
     {
-        const SlangResult res = JSONRPCUtil::parseJSON(slice, &m_container, &m_diagnosticSink, m_jsonRoot);
-
-        // Consume that content/packet
-        m_connection->consumeContent();
-
-        if (SLANG_FAILED(res))
+        case JSONRPCMessageType::Call:
         {
-            return _respondWithError(JSONRPC::ErrorCode::ParseError);
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(m_connection->getMessageOrSendError(&call));
+
+            // Do different things
+            if (call.method == "quit")
+            {
+                m_quit = true;
+                return SLANG_OK;
+            }
+            else if (call.method == "unitTest")
+            {
+                SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
+                return SLANG_OK;
+            }
+            else if (call.method == "tool")
+            {
+                SLANG_RETURN_ON_FAIL(_executeTool(call));
+                break;
+            }
+            else
+            {
+                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound);
+            }
+        }
+        default:
+        {
+            return m_connection->sendError(JSONRPC::ErrorCode::ParseError);
         }
     }
 
-    // Get the call
-    JSONRPCCall call;
-    SLANG_RETURN_ON_FAIL(_toValidNativeOrRespond(m_jsonRoot, &call));
-
-    // Do different things
-    if (call.method == "quit")
-    {
-        m_quit = true;
-        return SLANG_OK;
-    }
-    else if (call.method == "unitTest")
-    {
-        SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
-        return SLANG_OK;
-    }
-    else if (call.method == "tool")
-    {
-        SLANG_RETURN_ON_FAIL(_executeTool(call));
-        return SLANG_OK;
-    }
-
-    return _respondWithError(JSONRPC::ErrorCode::MethodNotFound);
+    return SLANG_OK;
 }
 
 static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
@@ -400,20 +297,22 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
 SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
     TestServerProtocol::ExecuteUnitTestArgs args;
-    SLANG_RETURN_ON_FAIL(_toNativeOrRespond(call.params, &args));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
 
-    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, &m_diagnosticSink);
+    auto sink = m_connection->getSink();
+
+    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, m_connection->getSink());
     if (!testModule)
     {
-        m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
-        return _respondWithError(JSONRPC::ErrorCode::InvalidParams);
+        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
     const Index testIndex = _findTestIndex(testModule, args.testName);
     if (testIndex < 0)
     {
-        m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
-        return _respondWithError(JSONRPC::ErrorCode::InvalidParams);
+        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
     TestReporter testReporter;
@@ -461,18 +360,21 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return _writeResponse(&result);
+    return m_connection->sendResult(&result, m_connection->getMessageId());
 }
 
 SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
     TestServerProtocol::ExecuteToolTestArgs args;
-    SLANG_RETURN_ON_FAIL(_toNativeOrRespond(call.params, &args));
+    
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
 
-    auto func = getToolFunction(args.toolName, &m_diagnosticSink);
+    auto sink = m_connection->getSink();
+
+    auto func = getToolFunction(args.toolName, sink);
     if (!func)
     {
-        return _respondWithError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
     // Assume we will used the shared session
@@ -513,7 +415,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.stdOut = stdOut;
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return _writeResponse(&result);
+    return m_connection->sendResult(&result);
 }
 
 SlangResult TestServer::execute()

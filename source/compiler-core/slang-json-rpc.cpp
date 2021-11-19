@@ -13,9 +13,9 @@ namespace Slang {
 /* static */const UnownedStringSlice JSONRPC::jsonRpcVersion = UnownedStringSlice::fromLiteral("2.0");
 /* static */const UnownedStringSlice JSONRPC::id = UnownedStringSlice::fromLiteral("id");
 
-
 static const auto g_result = UnownedStringSlice::fromLiteral("result");
 static const auto g_error = UnownedStringSlice::fromLiteral("error");
+static const auto g_method = UnownedStringSlice::fromLiteral("method");
 
 // Add the fields.
 // TODO(JS): This is a little verbose, and could be improved on with something like
@@ -72,29 +72,34 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
 }
 /* static */const StructRttiInfo JSONResultResponse::g_rttiInfo = _makeJSONResultResponseResponseRtti();
 
-/* static */ JSONRPCUtil::ResponseType JSONRPCUtil::getResponseType(JSONContainer* container, const JSONValue& response)
+/* static */JSONRPCMessageType JSONRPCUtil::getMessageType(JSONContainer* container, const JSONValue& value)
 {
-    if (response.getKind() == JSONValue::Kind::Object)
+    if (value.getKind() == JSONValue::Kind::Object)
     {
         const JSONKey resultKey = container->findKey(g_result);
         const JSONKey errorKey = container->findKey(g_error);
+        const JSONKey methodKey = container->findKey(g_method);
 
-        auto pairs = container->getObject(response);
+        auto pairs = container->getObject(value);
 
         for (const auto& pair : pairs)
         {
             if (pair.key == resultKey)
             {
-                return ResponseType::Result;
+                return JSONRPCMessageType::Result;
             }
             else if (pair.key == errorKey)
             {
-                return ResponseType::Error;
+                return JSONRPCMessageType::Error;
+            }
+            else if (pair.key == methodKey)
+            {
+                return JSONRPCMessageType::Call;
             }
         }
     }
 
-    return ResponseType::Invalid;
+    return JSONRPCMessageType::Invalid;
 }
 
 /* static */SlangResult JSONRPCUtil::parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue)
