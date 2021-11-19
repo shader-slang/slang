@@ -1435,6 +1435,32 @@ public:
         return SLANG_OK;
     }
 
+    Result getCUDAFormat(Format format, CUarray_format* outFormat)
+    {
+        // TODO: Expand to cover all available formats that can be supported in CUDA
+        switch (format)
+        {
+        case Format::R32G32B32A32_FLOAT:
+        case Format::R32G32B32_FLOAT:
+        case Format::R32G32_FLOAT:
+        case Format::R32_FLOAT:
+        case Format::D32_FLOAT:
+            *outFormat = CU_AD_FORMAT_FLOAT;
+            return SLANG_OK;
+        case Format::R16G16B16A16_FLOAT:
+        case Format::R16G16_FLOAT:
+        case Format::R16_FLOAT:
+            *outFormat = CU_AD_FORMAT_HALF;
+            return SLANG_OK;
+        case Format::R8G8B8A8_UNORM:
+            *outFormat = CU_AD_FORMAT_UNSIGNED_INT8;
+            return SLANG_OK;
+        default:
+            SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");
+            return SLANG_FAIL;
+        }
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
@@ -1485,45 +1511,34 @@ public:
         {
             CUarray_format format = CU_AD_FORMAT_FLOAT;
             int numChannels = 0;
-            
-            switch (desc.format)
+
+            SLANG_RETURN_ON_FAIL(getCUDAFormat(desc.format, &format));
+            FormatInfo info;
+            gfxGetFormatInfo(desc.format, &info);
+            numChannels = info.channelCount;
+
+            switch (format)
             {
-            case Format::R32G32B32A32_FLOAT:
-            case Format::R32G32B32_FLOAT:
-            case Format::R32G32_FLOAT:
-            case Format::R32_FLOAT:
-            case Format::D32_FLOAT:
-                {
-                    FormatInfo info;
-                    gfxGetFormatInfo(desc.format, &info);
-                    format = CU_AD_FORMAT_FLOAT;
-                    numChannels = info.channelCount;
-                    elementSize = sizeof(float) * numChannels;
-                    break;
-                }
-            case Format::R16G16B16A16_FLOAT:
-            case Format::R16G16_FLOAT:
-            case Format::R16_FLOAT:
-                {
-                    FormatInfo info;
-                    gfxGetFormatInfo(desc.format, &info);
-                    format = CU_AD_FORMAT_HALF;
-                    numChannels = info.channelCount;
-                    elementSize = sizeof(uint16_t) * numChannels;
-                    break;
-                }
-            case Format::R8G8B8A8_UNORM:
-                {
-                    format = CU_AD_FORMAT_UNSIGNED_INT8;
-                    numChannels = 4;
-                    elementSize = sizeof(uint32_t);
-                    break;
-                }
+            case CU_AD_FORMAT_FLOAT:
+            {
+                elementSize = sizeof(float) * numChannels;
+                break;
+            }
+            case CU_AD_FORMAT_HALF:
+            {
+                elementSize = sizeof(uint16_t) * numChannels;
+                break;
+            }
+            case CU_AD_FORMAT_UNSIGNED_INT8:
+            {
+                elementSize = sizeof(uint32_t) * numChannels;
+                break;
+            }
             default:
-                {
-                    SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");
-                    return SLANG_FAIL;
-                }
+            {
+                SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");
+                return SLANG_FAIL;
+            }
             }
 
             if (desc.numMipLevels > 1)
@@ -1950,6 +1965,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
         InteropHandle handle,
         const ITextureResource::Desc& desc,
+        const size_t size,
         ITextureResource** outResource) override
     {
         if (handle.handleValue == 0)
@@ -1979,7 +1995,7 @@ public:
             return SLANG_FAIL;
         }
         externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
-        externalMemoryHandleDesc.size = ; // Need resource allocation info for size in bytes
+        externalMemoryHandleDesc.size = size;
         externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
 
         CUexternalMemory externalMemory;
@@ -1993,11 +2009,12 @@ public:
         arrayDesc.Height = desc.size.height;
         arrayDesc.Width = desc.size.width;
         arrayDesc.NumChannels = formatInfo.channelCount;
-        arrayDesc.Format = ; // One of uint8/16/32, int8/16/32, half or float - TODO: conversion function from Format to CUarray_format
-        arrayDesc.Flags = ; // CUDA_ARRAY_LAYERED/SURFACE_LDST/CUBEMAP/TEXTURE_GATHER
+        getCUDAFormat(desc.format, &arrayDesc.Format);
+        arrayDesc.Flags = 0; // TODO: Flags? CUDA_ARRAY_LAYERED/SURFACE_LDST/CUBEMAP/TEXTURE_GATHER
 
         CUDA_EXTERNAL_MEMORY_MIPMAPPED_ARRAY_DESC externalMemoryMipDesc;
-        externalMemoryMipDesc.offset = ;
+        memset(&externalMemoryMipDesc, 0, sizeof(externalMemoryMipDesc));
+        externalMemoryMipDesc.offset = 0;
         externalMemoryMipDesc.arrayDesc = arrayDesc;
         externalMemoryMipDesc.numLevels = desc.numMipLevels;
 
@@ -2010,6 +2027,7 @@ public:
         resource->m_cudaArray = cuArray;
 
         CUDA_RESOURCE_DESC surfDesc;
+        memset(&surfDesc, 0, sizeof(surfDesc));
         surfDesc.resType = CU_RESOURCE_TYPE_ARRAY;
         surfDesc.res.array.hArray = cuArray;
 
@@ -2253,12 +2271,36 @@ public:
         size_t* outRowPitch,
         size_t* outPixelSize) override
     {
-        SLANG_UNUSED(texture);
-        SLANG_UNUSED(outBlob);
-        SLANG_UNUSED(outRowPitch);
-        SLANG_UNUSED(outPixelSize);
+        auto textureImpl = static_cast<TextureCUDAResource*>(texture);
+        RefPtr<ListBlob> blob = new ListBlob();
 
-        return SLANG_E_NOT_AVAILABLE;
+        auto desc = textureImpl->getDesc();
+        auto width = desc->size.width;
+        auto height = desc->size.height;
+        FormatInfo sizeInfo;
+        SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
+        size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
+        size_t rowPitch = width * pixelSize;
+        size_t size = height * rowPitch;
+        blob->m_data.setCount((Index)size);
+
+        CUDA_MEMCPY2D copyParam;
+        memset(&copyParam, 0, sizeof(copyParam));
+
+        copyParam.srcMemoryType = CU_MEMORYTYPE_ARRAY;
+        copyParam.srcArray = textureImpl->m_cudaArray;
+
+        copyParam.dstMemoryType = CU_MEMORYTYPE_HOST;
+        copyParam.dstHost = blob->m_data.getBuffer();
+        copyParam.dstPitch = rowPitch;
+        copyParam.WidthInBytes = copyParam.dstPitch;
+        copyParam.Height = height;
+        SLANG_CUDA_RETURN_ON_FAIL(cuMemcpy2D(&copyParam));
+
+        *outRowPitch = rowPitch;
+        *outPixelSize = pixelSize;
+        returnComPtr(outBlob, blob);
+        return SLANG_OK;
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL readBufferResource(

@@ -76,5 +76,8 @@
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

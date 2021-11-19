@@ -370,6 +370,22 @@ Result DebugDevice::createTextureFromNativeHandle(
     return result;
 }
 
+Result DebugDevice::createTextureFromSharedHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    const size_t size,
+    ITextureResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
+    auto result = baseObject->createTextureFromSharedHandle(handle, srcDesc, size, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,

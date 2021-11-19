@@ -1951,6 +1951,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
+        const size_t size,
         ITextureResource** outResource) = 0;
 
         /// Create a buffer resource

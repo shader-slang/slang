@@ -293,6 +293,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

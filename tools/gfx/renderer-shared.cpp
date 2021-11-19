@@ -361,10 +361,12 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromNativeHandle(
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromSharedHandle(
     InteropHandle handle,
     const ITextureResource::Desc& srcDesc,
+    const size_t size,
     ITextureResource** outResource)
 {
     SLANG_UNUSED(handle);
     SLANG_UNUSED(srcDesc);
+    SLANG_UNUSED(size);
     SLANG_UNUSED(outResource);
     return SLANG_E_NOT_AVAILABLE;
 }

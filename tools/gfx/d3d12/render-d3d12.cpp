@@ -4939,10 +4939,11 @@ Result setupResourceDesc(D3D12_RESOURCE_DESC& resourceDesc, const ITextureResour
 Result D3D12Device::getTextureAllocationInfo(
     const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
 {
+    auto count = m_device->GetNodeCount();
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
-    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
     *outSize = allocInfo.SizeInBytes;
     *outAlignment = allocInfo.Alignment;
     return SLANG_OK;
@@ -4972,6 +4973,9 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (descIn.isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         D3D12_CLEAR_VALUE clearValue;
         D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
@@ -4986,7 +4990,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
-            D3D12_HEAP_FLAG_NONE,
+            flags,
             resourceDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             clearValuePtr));
