@@ -310,10 +310,10 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
             {
                 ScissorRect rect =
                 {
-                    (Int)(command->ClipRect.x - pos.x),
-                    (Int)(command->ClipRect.y - pos.y),
-                    (Int)(command->ClipRect.z - pos.x),
-                    (Int)(command->ClipRect.w - pos.y)
+                    (uint32_t)(command->ClipRect.x - pos.x),
+                    (uint32_t)(command->ClipRect.y - pos.y),
+                    (uint32_t)(command->ClipRect.z - pos.x),
+                    (uint32_t)(command->ClipRect.w - pos.y)
                 };
                 renderEncoder->setScissorRects(1, &rect);
 
