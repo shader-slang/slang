@@ -13,35 +13,41 @@
 
 namespace Slang {
 
+/* TODO(JS):
+
+It's not really clear here, how to handle id handling. If a server can receive multiple messages, and then later send responses we need
+a way to queue up ids. This is complicated by JSONValue is only valid whilst the backing JSONContainer holds it.
+
+We probably want to create some kind of Variant that can hold all of these values that can hold state independently.
+*/
 class JSONRPCConnection : public RefObject
 {
 public:
 
-    SlangResult init(HTTPPacketConnection* connection, Process* process);
+        /// An init function must be called before use
+        /// If a process is implementing the server it should be passed in if the process needs to shut down if the connection does
+    SlangResult init(HTTPPacketConnection* connection, Process* process = nullptr);
 
+        /// Initialize using stdin/out streams for input/output. 
     SlangResult initWithStdStreams(Process* process = nullptr);
 
         /// Disconnect. May block while server shuts down
     void disconnect();
 
-    /// Will write response on fail
+        /// Convert value to dst. Will write response on fails
     SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst);
-
     template <typename T>
     SlangResult toNativeOrSendError(const JSONValue& value, T* data) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data); }
 
     template <typename T>
-    SlangResult toValidNativeOrRespond(const JSONValue& value, T* data);
+    SlangResult toValidNativeOrSendError(const JSONValue& value, T* data);
 
-        /// Send a RPC type response
+        /// Send a RPC response (ie should only be one of the JSONRPC classes)
     SlangResult sendRPC(const RttiInfo* info, const void* data);
-
     template <typename T>
-    SlangResult sendRPC(const T* data)
-    {
-        return sendRPC(GetRttiInfo<T>::get(), (const void*)data);
-    }
+    SlangResult sendRPC(const T* data) { return sendRPC(GetRttiInfo<T>::get(), (const void*)data);  }
 
+        /// Send an error
     SlangResult sendError(JSONRPC::ErrorCode code);
     SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg);
 
@@ -66,7 +72,7 @@ public:
         /// If we have an JSON-RPC message m_jsonRoot the root.
     bool hasMessage() const { return m_jsonRoot.isValid(); }
 
-        /// if has a message returns kind of JSON RPC message
+        /// If there is a message returns kind of JSON RPC message
     JSONRPCMessageType getMessageType();
 
         /// Get JSON-RPC message (ie one of JSONRPC classes)
@@ -74,11 +80,12 @@ public:
     SlangResult getMessage(T* out) { return getMessage(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessage(const RttiInfo* rttiInfo, void* out);
 
-        /// Get JSON-RPC message (ie one of JSONRPC classes)
+        /// Get JSON-RPC message (ie one of JSONRPC prefixed classes)
         /// If there is a message and there is a failure, will send an error response
     template <typename T>
     SlangResult getMessageOrSendError(T* out) { return getMessageOrSendError(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessageOrSendError(const RttiInfo* rttiInfo, void* out);
+
 
         /// Clears all the internal buffers (for JSON/Source/etc).
         /// Happens automatically on tryReadMessage/readMessage
@@ -118,7 +125,7 @@ protected:
 
 // ---------------------------------------------------------------------------
 template <typename T>
-SlangResult JSONRPCConnection::toValidNativeOrRespond(const JSONValue& value, T* data)
+SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, T* data)
 {
     const RttiInfo* rttiInfo = GetRttiInfo<T>::get();
 
@@ -132,7 +139,7 @@ SlangResult JSONRPCConnection::toValidNativeOrRespond(const JSONValue& value, T*
             m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::argsAreInvalid, namedRttiInfo->m_name);
         }
 
-        return send_respondWithError(JSONRPC::ErrorCode::InvalidRequest);
+        return respondWithError(JSONRPC::ErrorCode::InvalidRequest);
     }
     return SLANG_OK;
 }
