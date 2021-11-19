@@ -148,6 +148,7 @@ public:
         Parent(flags),
         m_builder(builder)
     {}
+    ~StringWriter() {}
 
 protected:
     StringBuilder* m_builder;

@@ -128,7 +128,7 @@ public:
     }
 
         /// Get an id directly from root (assumed id: is in root object definition)
-    static JSONValue getId(JSONContainer* container, JSONValue& root);
+    static JSONValue getId(JSONContainer* container, const JSONValue& root);
 };
 
 } // namespace Slang

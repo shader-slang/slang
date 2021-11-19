@@ -143,7 +143,7 @@ static const StructRttiInfo _makeJSONResultResponseResponseRtti()
     return SLANG_OK;
 }
 
-/* static */JSONValue JSONRPCUtil::getId(JSONContainer* container, JSONValue& root)
+/* static */JSONValue JSONRPCUtil::getId(JSONContainer* container, const JSONValue& root)
 {
     if (root.getKind() == JSONValue::Kind::Object)
     {
