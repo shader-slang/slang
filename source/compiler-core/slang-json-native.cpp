@@ -203,6 +203,33 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
 
             return SLANG_OK;
         }
+        case RttiInfo::Kind::FixedArray:
+        {
+            if (in.getKind() != JSONValue::Kind::Array)
+            {
+                return SLANG_FAIL;
+            }
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const auto elementType = fixedArrayRttiInfo->m_elementType;
+            const Index elementCount = Index(fixedArrayRttiInfo->m_elementCount);
+            const auto elementSize = elementType->m_size;
+
+            auto srcArray = m_container->getArray(in);
+
+            if (srcArray.getCount() > elementCount)
+            {
+                m_sink->diagnose(in.loc, JSONDiagnostics::tooManyElementsForArray, srcArray.getCount(), elementCount);
+                return SLANG_FAIL;
+            }
+
+            Byte* dstEles = (Byte*)out;
+            for (Index i = 0; i < elementCount; ++i, dstEles += elementSize)
+            {
+                SLANG_RETURN_ON_FAIL(convert(srcArray[i], elementType, dstEles));
+            }
+
+            return SLANG_OK;
+        }
         case RttiInfo::Kind::Dictionary:
         {
             // We can *only* serialize this into a straight JSON object iff the key is a string-like type
@@ -339,6 +366,25 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
             }
 
             out = m_container->createArray(dstValues.getBuffer(), count);
+            return SLANG_OK;
+        }
+        case RttiInfo::Kind::FixedArray:
+        {
+            const FixedArrayRttiInfo* fixedArrayRttiInfo = static_cast<const FixedArrayRttiInfo*>(rttiInfo);
+            const auto elementType = fixedArrayRttiInfo->m_elementType;
+            const auto elementCount = Index(fixedArrayRttiInfo->m_elementCount);
+            const auto elementSize = elementType->m_size;
+
+            List<JSONValue> dstValues;
+            dstValues.setCount(elementCount);
+
+            const Byte* src = (const Byte*)in;
+            for (Index i = 0; i < elementCount; ++i, src += elementSize)
+            {
+                SLANG_RETURN_ON_FAIL(convert(elementType, src, dstValues[i]));
+            }
+
+            out = m_container->createArray(dstValues.getBuffer(), elementCount);
             return SLANG_OK;
         }
         case RttiInfo::Kind::Dictionary:

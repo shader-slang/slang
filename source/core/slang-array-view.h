@@ -120,16 +120,23 @@ namespace Slang
     };
 
     template<typename T>
-    ConstArrayView<T> makeConstArrayView(const T& obj)
+    ConstArrayView<T> makeConstArrayViewSingle(const T& obj)
     {
         return ConstArrayView<T>(&obj, 1);
-    }
+    } 
 
     template<typename T>
     ConstArrayView<T> makeConstArrayView(const T* buffer, Index count)
     {
         return ConstArrayView<T>(buffer, count);
     }
+
+    template<typename T, size_t N>
+    ConstArrayView<T> makeConstArrayView(const T (&arr)[N])
+    {
+        return ConstArrayView<T>(arr, Index(N));
+    }
+
 
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayView !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -165,16 +172,23 @@ namespace Slang
     };
 
     template<typename T>
-    ArrayView<T> makeArrayView(T& obj)
+    ArrayView<T> makeArrayViewSingle(T& obj)
     {
         return ArrayView<T>(&obj, 1);
-    }
+    } 
         
     template<typename T>
     ArrayView<T> makeArrayView(T* buffer, Index count)
     {
         return ArrayView<T>(buffer, count);
     }
+
+    template<typename T, size_t N>
+    ArrayView<T> makeArrayView(T (&arr)[N])
+    {
+        return ArrayView<T>(arr, Index(N));
+    }
+
 
 }
 

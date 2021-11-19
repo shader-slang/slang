@@ -957,8 +957,7 @@ JSONBuilder::JSONBuilder(JSONContainer* container, Flags flags):
 {
     m_state.m_kind = State::Kind::Root;
     m_state.m_startIndex = 0;
-
-    m_keyValue.reset();
+    m_state.resetKey();
 
     m_rootValue.reset();
 }
@@ -968,9 +967,9 @@ void JSONBuilder::reset()
     // Reset the state
     m_state.m_kind = State::Kind::Root;
     m_state.m_startIndex = 0;
+    m_state.resetKey();
 
     // Clear the work values
-    m_keyValue.reset();
     m_rootValue.reset();
 
     // Clear the lists
@@ -1037,17 +1036,24 @@ void JSONBuilder::_add(const JSONValue& value)
         }
         case State::Kind::Object:
         {
-            m_keyValue.value = value;
-            const Index index = _findKeyIndex(m_keyValue.key);
+            SLANG_ASSERT(m_state.hasKey());
+
+            JSONKeyValue keyValue;
+            keyValue.key = m_state.m_key;
+            keyValue.keyLoc = m_state.m_keyLoc;
+            keyValue.value = value;
+
+            const Index index = _findKeyIndex(keyValue.key);
             if (index >= 0)
             {
-                m_keyValues[index] = m_keyValue;
+                m_keyValues[index] = keyValue;
             }
             else
             {
-                m_keyValues.add(m_keyValue);
+                m_keyValues.add(keyValue);
             }
-            m_keyValue.reset();
+
+            m_state.resetKey();
             break;
         }
     }
@@ -1059,6 +1065,7 @@ void JSONBuilder::startObject(SourceLoc loc)
     m_state.m_kind = State::Kind::Object;
     m_state.m_startIndex = m_keyValues.getCount();
     m_state.m_loc = loc;
+    m_state.resetKey();
 }
 
 void JSONBuilder::endObject(SourceLoc loc)
@@ -1082,6 +1089,7 @@ void JSONBuilder::startArray(SourceLoc loc)
     m_state.m_kind = State::Kind::Array;
     m_state.m_startIndex = m_values.getCount();
     m_state.m_loc = loc;
+    m_state.resetKey();
 }
 
 void JSONBuilder::endArray(SourceLoc loc)
@@ -1110,9 +1118,8 @@ void JSONBuilder::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
 
 void JSONBuilder::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
-    SLANG_ASSERT(m_keyValue.key == JSONKey(0));
-    m_keyValue.key = m_container->getKey(key);
-    m_keyValue.keyLoc = loc;
+    SLANG_ASSERT(!m_state.hasKey());
+    m_state.setKey(m_container->getKey(key), loc);
 }
 
 void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc)
