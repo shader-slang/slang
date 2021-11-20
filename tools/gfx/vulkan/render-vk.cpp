@@ -308,8 +308,31 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
+#if SLANG_WINDOWS_FAMILY
+            VkMemoryGetWin32HandleInfoKHR info = {};
+            info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+            info.pNext = nullptr;
+            info.memory = m_imageMemory;
+            info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+            auto& api = m_device->m_api;
+            PFN_vkGetMemoryWin32HandleKHR vkCreateSharedHandle;
+            vkCreateSharedHandle = api.vkGetMemoryWin32HandleKHR;
+            if (!vkCreateSharedHandle)
+            {
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(vkCreateSharedHandle(m_device->m_device, &info, (HANDLE*)&outHandle->handleValue) != VK_SUCCESS);
+#endif
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = 0;
             return SLANG_OK;
         }
     };
@@ -5558,7 +5581,7 @@ Result VKDevice::Buffer::init(
         exportMemoryAllocateInfo.pNext =
             extMemHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
             ? &exportMemoryWin32HandleInfo
-            : NULL;
+            : nullptr;
         exportMemoryAllocateInfo.handleTypes = extMemHandleType;
         allocateInfo.pNext = &exportMemoryAllocateInfo;
     }
@@ -6767,78 +6790,99 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, this));
     texture->m_vkformat = format;
     // Create the image
+
+    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    switch (desc.type)
     {
-        VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-        switch (desc.type)
+        case IResource::Type::Texture1D:
         {
-            case IResource::Type::Texture1D:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_1D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
-                break;
-            }
-            case IResource::Type::Texture2D:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_2D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
-                break;
-            }
-            case IResource::Type::TextureCube:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_2D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
-                imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-                break;
-            }
-            case IResource::Type::Texture3D:
-            {
-                // Can't have an array and 3d texture
-                assert(desc.arraySize <= 1);
-
-                imageInfo.imageType = VK_IMAGE_TYPE_3D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
-                break;
-            }
-            default:
-            {
-                assert(!"Unhandled type");
-                return SLANG_FAIL;
-            }
+            imageInfo.imageType = VK_IMAGE_TYPE_1D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
+            break;
         }
+        case IResource::Type::Texture2D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+            break;
+        }
+        case IResource::Type::TextureCube:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+            imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+            break;
+        }
+        case IResource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
 
-        imageInfo.mipLevels = desc.numMipLevels;
-        imageInfo.arrayLayers = arraySize;
-
-        imageInfo.format = format;
-
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-
-        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
+            imageInfo.imageType = VK_IMAGE_TYPE_3D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
+            break;
+        }
+        default:
+        {
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
+        }
     }
+
+    imageInfo.mipLevels = desc.numMipLevels;
+    imageInfo.arrayLayers = arraySize;
+
+    imageInfo.format = format;
+
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO };
+#if SLANG_WINDOWS_FAMILY
+    VkExternalMemoryHandleTypeFlags extMemoryHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    if (descIn.isShared)
+    {
+        externalMemoryImageCreateInfo.pNext = nullptr;
+        externalMemoryImageCreateInfo.handleTypes = extMemoryHandleType;
+        imageInfo.pNext = &externalMemoryImageCreateInfo;
+    }
+#endif
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
 
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, texture->m_image, &memRequirements);
 
     // Allocate the memory
+    VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
+    assert(memoryTypeIndex >= 0);
+
+    VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+#if SLANG_WINDOWS_FAMILY
+    VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
+    VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
+    if (descIn.isShared)
     {
-        VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        exportMemoryWin32HandleInfo.pNext = nullptr;
+        exportMemoryWin32HandleInfo.pAttributes = nullptr;
+        exportMemoryWin32HandleInfo.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+        exportMemoryWin32HandleInfo.name = NULL;
 
-        VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-
-        int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
-        assert(memoryTypeIndex >= 0);
-
-        VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = memoryTypeIndex;
-
-        SLANG_VK_RETURN_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
+        exportMemoryAllocateInfo.pNext =
+            extMemoryHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+            ? &exportMemoryWin32HandleInfo
+            : nullptr;
+        exportMemoryAllocateInfo.handleTypes = extMemoryHandleType;
+        allocInfo.pNext = &exportMemoryAllocateInfo;
     }
+#endif
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
 
     // Bind the memory to the image
     m_api.vkBindImageMemory(m_device, texture->m_image, texture->m_imageMemory, 0);
