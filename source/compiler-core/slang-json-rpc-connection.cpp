@@ -44,7 +44,7 @@ void JSONRPCConnection::clearBuffers()
 
 bool JSONRPCConnection::isActive()
 {
-    return m_connection->isActive();
+    return m_connection->isActive() && (m_process == nullptr || !m_process->isTerminated());
 }
 
 JSONValue JSONRPCConnection::getMessageId()
@@ -175,9 +175,9 @@ SlangResult JSONRPCConnection::sendCall(const UnownedStringSlice& method, const 
     return SLANG_OK;
 }
 
-SlangResult JSONRPCConnection::waitForResult()
+SlangResult JSONRPCConnection::waitForResult(Int timeOutInMs)
 {
-    SLANG_RETURN_ON_FAIL(m_connection->waitForResult());   
+    SLANG_RETURN_ON_FAIL(m_connection->waitForResult(timeOutInMs));
     return tryReadMessage();
 }
 
@@ -226,7 +226,13 @@ SlangResult JSONRPCConnection::getMessage(const RttiInfo* rttiInfo, void* out)
 
     m_diagnosticSink.outputBuffer.Clear();
     JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
-    SLANG_RETURN_ON_FAIL(converter.convert(m_jsonRoot, rttiInfo, out));
+
+    // Get the RPC response
+    JSONResultResponse resultResponse;
+    SLANG_RETURN_ON_FAIL(converter.convert(m_jsonRoot, &resultResponse));
+
+    // Convert the result in the response
+    SLANG_RETURN_ON_FAIL(converter.convert(resultResponse.result, rttiInfo, out));
     return SLANG_OK;
 }
 
@@ -235,6 +241,35 @@ SlangResult JSONRPCConnection::getMessageOrSendError(const RttiInfo* rttiInfo, v
     if (hasMessage())
     {
         const auto res = getMessage(rttiInfo, out);
+        if (SLANG_FAILED(res))
+        {
+            return sendError(JSONRPC::ErrorCode::ParseError);
+        }
+        return res;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult JSONRPCConnection::getRPC(const RttiInfo* rttiInfo, void* out)
+{
+    if (!hasMessage())
+    {
+        return SLANG_FAIL;
+    }
+
+    m_diagnosticSink.outputBuffer.Clear();
+    JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+
+    // Convert the result in the response
+    SLANG_RETURN_ON_FAIL(converter.convert(m_jsonRoot, rttiInfo, out));
+    return SLANG_OK;
+}
+
+SlangResult JSONRPCConnection::getRPCOrSendError(const RttiInfo* rttiInfo, void* out)
+{
+    if (hasMessage())
+    {
+        const auto res = getRPC(rttiInfo, out);
         if (SLANG_FAILED(res))
         {
             return sendError(JSONRPC::ErrorCode::ParseError);

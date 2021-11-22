@@ -95,10 +95,83 @@ protected:
     Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;      ///< Maps tool names to the dll
     Dictionary<String, IUnitTestModule*> m_unitTestModules;
 
-    String m_exePath;                                               ///< Path to executable
+    String m_exePath;                                               ///< Path to executable (including exe name)
+    String m_exeDirectory;                                          ///< The directory that holds the exe
 
     RefPtr<JSONRPCConnection> m_connection;
 };
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+namespace SlangCTool {
+
+static void _diagnosticCallback(char const* message, void* userData)
+{
+    ISlangWriter* writer = (ISlangWriter*)userData;
+    writer->write(message, strlen(message));
+}
+
+SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char* const* argv)
+{
+    StdWriters::setSingleton(stdWriters);
+
+    // Assume we will used the shared session
+    ComPtr<slang::IGlobalSession> session(sharedSession);
+
+    // The sharedSession always has a pre-loaded stdlib.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+    }
+
+    ComPtr<slang::ICompileRequest> compileRequest;
+    SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
+
+    // Do any app specific configuration
+    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    {
+        compileRequest->setWriter(SlangWriterChannel(i), stdWriters->getWriter(i));
+    }
+
+    compileRequest->setDiagnosticCallback(&_diagnosticCallback, stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
+    compileRequest->setCommandLineCompilerMode();
+
+    {
+        const SlangResult res = compileRequest->processCommandLineArguments(&argv[1], argc - 1);
+        if (SLANG_FAILED(res))
+        {
+            // TODO: print usage message
+            return res;
+        }
+    }
+
+    SlangResult compileRes = SLANG_OK;
+
+#ifndef _DEBUG
+    try
+#endif
+    {
+        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        compileRes = compileRequest->compile();
+
+        // If the compilation failed, then get out of here...
+        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        compileRes = SLANG_FAILED(compileRes) ? SLANG_E_INTERNAL_FAIL : compileRes;
+    }
+#ifndef _DEBUG
+    catch (const Exception& e)
+    {
+        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
+        compileRes = SLANG_FAIL;
+    }
+#endif
+
+    return compileRes;
+}
+
+} // namespace SlangCTool
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -108,7 +181,17 @@ TestServer::TestServer()
 
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
-    m_exePath = Path::getParentDirectory(argv[0]);
+    m_exePath = argv[0];
+
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))
+    {
+        m_exeDirectory = Path::getParentDirectory(canonicalPath);
+    }
+    else
+    {
+        m_exeDirectory = Path::getParentDirectory(m_exePath);
+    }
 
     m_connection = new JSONRPCConnection;
     SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams());
@@ -148,7 +231,7 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
 
     auto loader = DefaultSharedLibraryLoader::getSingleton();
 
-    auto toolPath = Path::combine(m_exePath, name);
+    auto toolPath = Path::combine(m_exeDirectory, name);
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     if (SLANG_FAILED(loader->loadSharedLibrary(toolPath.getBuffer(), sharedLibrary.writeRef())))
@@ -208,6 +291,11 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
 
 TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, DiagnosticSink* sink)
 {
+    if (name == "slangc")
+    {
+        return &SlangCTool::innerMain;
+    }
+
     StringBuilder sharedLibToolBuilder;
     sharedLibToolBuilder.append(name);
     sharedLibToolBuilder.append("-tool");
@@ -247,20 +335,20 @@ SlangResult TestServer::_executeSingle()
         case JSONRPCMessageType::Call:
         {
             JSONRPCCall call;
-            SLANG_RETURN_ON_FAIL(m_connection->getMessageOrSendError(&call));
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
 
             // Do different things
-            if (call.method == "quit")
+            if (call.method == TestServerProtocol::QuitArgs::getMethodName())
             {
                 m_quit = true;
                 return SLANG_OK;
             }
-            else if (call.method == "unitTest")
+            else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::getMethodName())
             {
                 SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
                 return SLANG_OK;
             }
-            else if (call.method == "tool")
+            else if (call.method == TestServerProtocol::ExecuteToolTestArgs::getMethodName())
             {
                 SLANG_RETURN_ON_FAIL(_executeTool(call));
                 break;
@@ -330,7 +418,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.slangGlobalSession = session;
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
-    unitTestContext.executableDirectory = m_exePath.getBuffer();
+    unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);
@@ -386,6 +474,8 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     // Work out the args sent to the shared library
     List<const char*> toolArgs;
+
+    toolArgs.add(args.toolName.getBuffer());
     for (const auto& arg : args.args)
     {
         toolArgs.add(arg.getBuffer());

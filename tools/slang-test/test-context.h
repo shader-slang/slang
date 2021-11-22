@@ -11,6 +11,7 @@
 #include "../../source/core/slang-render-api-util.h"
 
 #include "../../source/compiler-core/slang-downstream-compiler.h"
+#include "../../source/compiler-core/slang-json-rpc-connection.h"
 
 #include "../../slang-com-ptr.h"
 
@@ -110,6 +111,9 @@ class TestContext
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
 
+    Slang::JSONRPCConnection* getOrCreateJSONRPCConnection();
+    void destroyRPCConnection();
+
         /// Ctor
     TestContext();
         /// Dtor
@@ -129,14 +133,21 @@ class TestContext
     Slang::RefPtr<Slang::DownstreamCompilerSet> compilerSet;
 
     Slang::String exeDirectoryPath;
-    
+
+    Slang::Int timeOutInMs = 100 * 1000;
+
+
 protected:
+    SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
+
     struct SharedLibraryTool
     {
         Slang::ComPtr<ISlangSharedLibrary> m_sharedLibrary;
         InnerMainFunc m_func;
     };
 
+    Slang::RefPtr<Slang::JSONRPCConnection> m_jsonRpcConnection;
+    
     SlangSession* m_session;
 
     Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;

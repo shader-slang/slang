@@ -287,14 +287,36 @@ SlangResult HTTPPacketConnection::update()
     return m_readResult;
 }
 
-SlangResult HTTPPacketConnection::waitForResult()
+SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
+    m_readResult = SLANG_OK;
+
+    int64_t startTick = 0;
+    int64_t timeOutInTicks = -1;
+
+    if (timeOutInMs >= 0)
+    {
+        timeOutInTicks = timeOutInMs * (Process::getClockFrequency() / 1000);
+        startTick = Process::getClockTick();
+    }
+
     while (m_readState == ReadState::Header ||
         m_readState == ReadState::Content)
     {
         const auto prevCount = m_readStream->getCount();
 
         SLANG_RETURN_ON_FAIL(update());
+
+        if (m_readState == ReadState::Done)
+        {
+            break;
+        }
+
+        // We timed out
+        if (timeOutInTicks >= 0 && int64_t(Process::getClockTick()) - startTick >= timeOutInTicks)
+        {
+            break;
+        }
 
         if (prevCount == m_readStream->getCount())
         {

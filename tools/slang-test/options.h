@@ -41,6 +41,7 @@ enum class SpawnType
     UseExe,
     UseSharedLibrary,
     UseProxy,
+    UseTestServer,
 };
 
 struct Options

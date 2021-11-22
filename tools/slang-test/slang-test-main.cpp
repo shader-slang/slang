@@ -655,6 +655,51 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     return res;
 }
 
+Result spawnAndWaitTestServer(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+
+    JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
+    if (!rpcConnection)
+    {
+        return SLANG_FAIL;
+    }
+
+    // This is a test tool execution
+    TestServerProtocol::ExecuteToolTestArgs args;
+
+    args.toolName = exeName;
+    args.args = inCmdLine.m_args;
+
+    // Execute
+    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(TestServerProtocol::ExecuteToolTestArgs::getMethodName(), &args));
+
+    // Wait for the result
+    rpcConnection->waitForResult(context->timeOutInMs);
+
+    if (!rpcConnection->hasMessage())
+    {
+        // We can assume somethings gone wrong. So lets kill the connection and fail.
+        context->destroyRPCConnection();
+        return SLANG_FAIL;
+    }
+
+    if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Get the result
+    TestServerProtocol::ExecutionResult exeRes;
+    SLANG_RETURN_ON_FAIL(rpcConnection->getMessage(&exeRes));
+
+    outRes.resultCode = exeRes.returnCode;
+    outRes.standardError = exeRes.stdError;
+    outRes.standardOutput = exeRes.stdOut;
+
+    return SLANG_OK;
+}
+
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
 {
     SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
@@ -1010,6 +1055,11 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         case SpawnType::UseProxy:
         {
             spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
+            break;
+        }
+        case SpawnType::UseTestServer:
+        {
+            spawnResult = spawnAndWaitTestServer(context, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -1574,7 +1624,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -1981,7 +2031,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2135,7 +2185,7 @@ static TestResult _runHLSLComparisonTest(
         if (standardOutput.getLength() != 0)	result = TestResult::Fail;
     }
     // Otherwise we compare to the expected output
-    else if (actualOutput != expectedOutput)
+    else if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2272,7 +2322,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2511,7 +2561,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
     auto actualOutput = getOutput(exeRes);
     auto expectedOutput = getExpectedOutput(outputStem);
-    if (actualOutput != expectedOutput)
+    
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2817,7 +2868,7 @@ TestResult runHLSLRenderComparisonTestImpl(
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 

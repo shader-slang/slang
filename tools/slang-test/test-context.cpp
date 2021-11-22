@@ -106,6 +106,53 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     return compilerSet;
 }
 
+SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out)
+{
+    RefPtr<Process> process;
+
+    {
+        CommandLine cmdLine;
+        cmdLine.setExecutable(exeDirectoryPath.getBuffer(), "test-server");
+        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
+    }
+
+    Stream* writeStream = process->getStream(Process::StreamType::StdIn);
+    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(process->getStream(Process::StreamType::StdOut)));
+
+    RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
+    RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
+
+    SLANG_RETURN_ON_FAIL(rpcConnection->init(connection, process));
+
+    out = rpcConnection;
+
+    return SLANG_OK;
+}
+
+
+void TestContext::destroyRPCConnection()
+{
+    if (m_jsonRpcConnection)
+    {
+        m_jsonRpcConnection->disconnect();
+        m_jsonRpcConnection.setNull();
+    }
+}
+
+Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
+{
+    if (!m_jsonRpcConnection)
+    {
+        if (SLANG_FAILED(_createJSONRPCConnection(m_jsonRpcConnection)))
+        {
+            return nullptr;
+        }
+    }
+
+    return m_jsonRpcConnection;
+}
+
+
 Slang::DownstreamCompiler* TestContext::getDefaultCompiler(SlangSourceLanguage sourceLanguage)
 {
     DownstreamCompilerSet* set = getCompilerSet();

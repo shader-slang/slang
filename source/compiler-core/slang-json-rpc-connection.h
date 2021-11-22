@@ -63,11 +63,11 @@ public:
     SlangResult sendResult(const T* result, const JSONValue& id = JSONValue()) { return sendResult(GetRttiInfo<T>::get(), (const void*)result, id); }
     SlangResult sendResult(const RttiInfo* rttiInfo, const void* result, const JSONValue& id = JSONValue());
 
-        /// Try to read a message. Will return if a message is not available.
+        /// Try to read a message. Will return if message is not available.
     SlangResult tryReadMessage();
 
-        /// Will block waiting for a message.
-    SlangResult waitForResult();
+        /// Will block for message/result up to time
+    SlangResult waitForResult(Int timeOutInMs = -1);
 
         /// If we have an JSON-RPC message m_jsonRoot the root.
     bool hasMessage() const { return m_jsonRoot.isValid(); }
@@ -77,11 +77,21 @@ public:
 
         /// Get JSON-RPC message (ie one of JSONRPC classes)
     template <typename T>
-    SlangResult getMessage(T* out) { return getMessage(GetRttiInfo<T>::get(), (void*)out); }
-    SlangResult getMessage(const RttiInfo* rttiInfo, void* out);
+    SlangResult getRPC(T* out) { return getRPC(GetRttiInfo<T>::get(), (void*)out); }
+    SlangResult getRPC(const RttiInfo* rttiInfo, void* out);
 
         /// Get JSON-RPC message (ie one of JSONRPC prefixed classes)
         /// If there is a message and there is a failure, will send an error response
+    template <typename T>
+    SlangResult getRPCOrSendError(T* out) { return getRPCOrSendError(GetRttiInfo<T>::get(), (void*)out); }
+    SlangResult getRPCOrSendError(const RttiInfo* rttiInfo, void* out);
+
+    /// Get message (has to be part of JSONRPCResultResponse)
+    template <typename T>
+    SlangResult getMessage(T* out) { return getMessage(GetRttiInfo<T>::get(), (void*)out); }
+    SlangResult getMessage(const RttiInfo* rttiInfo, void* out);
+
+    /// If there is a message and there is a failure, will send an error response
     template <typename T>
     SlangResult getMessageOrSendError(T* out) { return getMessageOrSendError(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessageOrSendError(const RttiInfo* rttiInfo, void* out);
