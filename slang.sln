@@ -17,7 +17,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-embed", "build\visual
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-generate", "build\visual-studio\slang-generate\slang-generate.vcxproj", "{66174227-8541-41FC-A6DF-4764FC66F78E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-proxy", "build\visual-studio\test-proxy\test-proxy.vcxproj", "{BE412850-4BB9-429A-877C-BFBC4B34186C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-process", "build\visual-studio\test-process\test-process.vcxproj", "{BE412850-4BB9-429A-877C-BFBC4B34186C}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-server", "build\visual-studio\test-server\test-server.vcxproj", "{23149706-C12F-4329-B6AA-8266407C32D3}"
 EndProject

@@ -39,9 +39,9 @@ protected:
 enum class SpawnType
 {
     UseExe,
-    UseSharedLibrary,
-    UseProxy,
-    UseTestServer,
+    UseSharedLibrary,                           ///< Runs testing in process (a crash tan take down the 
+    UseTestServer,                              ///< Use the test server to isolate testing
+    UseFullyIsolatedTestServer,                 ///< Uses a test server for each test (slow!)
 };
 
 struct Options

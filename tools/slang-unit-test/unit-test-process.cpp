@@ -2,6 +2,7 @@
 
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-process-util.h"
+
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-http.h"
 #include "../../source/core/slang-random-generator.h"
@@ -10,22 +11,30 @@
 
 using namespace Slang;
 
+static SlangResult _createProcess(UnitTestContext* context, const char* toolName, const List<String>* optArgs, RefPtr<Process>& outProcess)
+{
+    CommandLine cmdLine;
+    cmdLine.setExecutable(context->executableDirectory, "test-process");
+    cmdLine.addArg(toolName);
+    if (optArgs)
+    {
+        cmdLine.m_args.addRange(optArgs->getBuffer(), optArgs->getCount());
+    }
+
+    SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, outProcess));
+
+    return SLANG_OK;
+}
+
 static SlangResult _httpReflectTest(UnitTestContext* context)
 {
     SlangResult finalRes = SLANG_OK;
 
     RefPtr<Process> process;
-
-    {
-        CommandLine cmdLine;
-        cmdLine.setExecutable(context->executableDirectory, "test-proxy");
-        cmdLine.addArg("http-reflect");
-        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
-    }
+    SLANG_RETURN_ON_FAIL(_createProcess(context, "http-reflect", nullptr, process));
 
     Stream* writeStream = process->getStream(Process::StreamType::StdIn);
     RefPtr<BufferedReadStream> readStream( new BufferedReadStream(process->getStream(Process::StreamType::StdOut)));
-
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
 
     RefPtr<RandomGenerator> rand = RandomGenerator::create(10000);
@@ -81,31 +90,26 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
 
 static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
 {
-    RefPtr<Process> process;
-
     /* Here we are trying to test what happens if the server produces a large amount of data, and
     we just wait for termination. Do we receive all of the data irrespective of how much there is? */
 
+    List<String> args;
     {
-        CommandLine cmdLine;
-        
-        cmdLine.setExecutable(context->executableDirectory, "test-proxy");
-        cmdLine.addArg("count");
-        
         StringBuilder buf;
         buf << size;
 
-        cmdLine.addArg(buf);
+        args.add(buf);
 
         if (crashIndex >= 0)
         {
             buf.Clear();
             buf << crashIndex;
-            cmdLine.addArg(buf);
+            args.add(buf);
         }
-
-        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
+
+    RefPtr<Process> process;
+    SLANG_RETURN_ON_FAIL(_createProcess(context, "count", &args, process));
 
     ExecuteResult exeRes;
 
@@ -156,12 +160,7 @@ static SlangResult _countTests(UnitTestContext* context)
 static SlangResult _reflectTest(UnitTestContext* context)
 {
     RefPtr<Process> process;
-    {
-        CommandLine cmdLine;
-        cmdLine.setExecutable(context->executableDirectory, "test-proxy");
-        cmdLine.addArg("reflect");
-        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
-    }
+    SLANG_RETURN_ON_FAIL(_createProcess(context, "reflect", nullptr, process));
 
     // Write a bunch of stuff to the stream
     Stream* readStream = process->getStream(Process::StreamType::StdOut);
@@ -191,8 +190,6 @@ static SlangResult _reflectTest(UnitTestContext* context)
 SLANG_UNIT_TEST(CommandLineProcess)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
-
     SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
-
     SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
 }

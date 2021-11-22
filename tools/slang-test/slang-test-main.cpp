@@ -655,8 +655,15 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     return res;
 }
 
-static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const RttiInfo* rttiInfo, const void* args, ExecuteResult& outRes)
+static Result _executeRPC(TestContext* context, SpawnType spawnType, const UnownedStringSlice& method, const RttiInfo* rttiInfo, const void* args, ExecuteResult& outRes)
 {
+    // If we are 'fully isolated', we cannot share a test server.
+    // So tear down the RPC connection if there is one currently.
+    if (spawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        context->destroyRPCConnection();
+    }
+
     JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
     if (!rpcConnection)
     {
@@ -693,12 +700,12 @@ static Result _executeRPC(TestContext* context, const UnownedStringSlice& method
 }
 
 template <typename T>
-static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const T* msg, ExecuteResult& outRes)
+static Result _executeRPC(TestContext* context, SpawnType spawnType, const UnownedStringSlice& method, const T* msg, ExecuteResult& outRes)
 {
-    return _executeRPC(context, method, GetRttiInfo<T>::get(), (const void*)msg, outRes);
+    return _executeRPC(context, spawnType, method, GetRttiInfo<T>::get(), (const void*)msg, outRes);
 }
 
-Result spawnAndWaitTestServer(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+Result spawnAndWaitTestServer(TestContext* context, SpawnType spawnType, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
 
@@ -708,7 +715,7 @@ Result spawnAndWaitTestServer(TestContext* context, const String& testPath, cons
     args.toolName = exeName;
     args.args = inCmdLine.m_args;
 
-    return _executeRPC(context, TestServerProtocol::ExecuteToolTestArgs::g_methodName, &args, outRes);
+    return _executeRPC(context, spawnType, TestServerProtocol::ExecuteToolTestArgs::g_methodName, &args, outRes);
 }
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
@@ -1063,14 +1070,10 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
             spawnResult = spawnAndWaitSharedLibrary(context, testPath, cmdLine, outExeRes);
             break;
         }
-        case SpawnType::UseProxy:
-        {
-            spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
-            break;
-        }
+        case SpawnType::UseFullyIsolatedTestServer:
         case SpawnType::UseTestServer:
         {
-            spawnResult = spawnAndWaitTestServer(context, testPath, cmdLine, outExeRes);
+            spawnResult = spawnAndWaitTestServer(context, spawnType, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -3501,46 +3504,8 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                if (spawnType == SpawnType::UseProxy)
-                {
-                    CommandLine cmdLine;
-
-                    // The 'command' is the module 
-                    cmdLine.setExecutablePath(Path::combine(context->exeDirectoryPath, moduleName));
-
-                    // Pass the test name / index
-                    cmdLine.addArg(testName);
-
-                    {
-                        StringBuilder buf;
-                        buf << i;
-                        cmdLine.addArg(buf.ProduceString());
-                    }
-
-                    // Pass the enabled apis
-                    {
-                        StringBuilder buf;
-                        buf << context->options.enabledApis;
-                        cmdLine.addArg(buf.ProduceString());
-                    }
-
-                    {
-                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
-                        ExecuteResult exeRes;
-
-                        const auto testResult = _asTestResult(spawnAndWait(context, filePath, spawnType, cmdLine, exeRes));
-
-                        // If the test fails, output any output - which might give information about individual tests that have failed.
-                        if (testResult == TestResult::Fail)
-                        {
-                            String output = getOutput(exeRes);
-                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
-                        }
-
-                        reporter->addResult(testResult);
-                    }
-                }
-                else if (spawnType == SpawnType::UseTestServer)
+                if (spawnType == SpawnType::UseTestServer ||
+                    spawnType == SpawnType::UseFullyIsolatedTestServer)
                 {
                     TestServerProtocol::ExecuteUnitTestArgs args;
                     args.enabledApis = context->options.enabledApis;
@@ -3551,7 +3516,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
                         TestReporter::TestScope scopeTest(reporter, testOptions.command);
                         ExecuteResult exeRes;
 
-                        SlangResult rpcRes = _executeRPC(context, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
+                        SlangResult rpcRes = _executeRPC(context, spawnType, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
                         const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
 
                         // If the test fails, output any output - which might give information about individual tests that have failed.
