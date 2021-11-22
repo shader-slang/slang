@@ -114,6 +114,10 @@ SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const Uno
     errorResponse.error.code = Int(errorCode);
     errorResponse.error.message = msg;
 
+    // TODO(JS):
+    // This is only appropriate if the sendError is for the current input message.
+    // We might want to add function that the client uses, which take the id as a parameter.
+
     if (m_jsonRoot.isValid())
     {
         errorResponse.id = JSONRPCUtil::getId(&m_container, m_jsonRoot);
@@ -203,8 +207,6 @@ SlangResult JSONRPCConnection::tryReadMessage()
         m_connection->consumeContent();
         if (SLANG_FAILED(res))
         {
-            // Send with nullptr if parse error
-
             return sendError(JSONRPC::ErrorCode::ParseError);
         }
     }
@@ -238,16 +240,17 @@ SlangResult JSONRPCConnection::getMessage(const RttiInfo* rttiInfo, void* out)
 
 SlangResult JSONRPCConnection::getMessageOrSendError(const RttiInfo* rttiInfo, void* out)
 {
-    if (hasMessage())
+    if (!hasMessage())
     {
-        const auto res = getMessage(rttiInfo, out);
-        if (SLANG_FAILED(res))
-        {
-            return sendError(JSONRPC::ErrorCode::ParseError);
-        }
-        return res;
+        return SLANG_FAIL;
     }
-    return SLANG_FAIL;
+
+    const auto res = getMessage(rttiInfo, out);
+    if (SLANG_FAILED(res))
+    {
+        return sendError(JSONRPC::ErrorCode::ParseError);
+    }
+    return res;
 }
 
 SlangResult JSONRPCConnection::getRPC(const RttiInfo* rttiInfo, void* out)
@@ -267,16 +270,17 @@ SlangResult JSONRPCConnection::getRPC(const RttiInfo* rttiInfo, void* out)
 
 SlangResult JSONRPCConnection::getRPCOrSendError(const RttiInfo* rttiInfo, void* out)
 {
-    if (hasMessage())
+    if (!hasMessage())
     {
-        const auto res = getRPC(rttiInfo, out);
-        if (SLANG_FAILED(res))
-        {
-            return sendError(JSONRPC::ErrorCode::ParseError);
-        }
-        return res;
+        return SLANG_FAIL;
     }
-    return SLANG_FAIL;
+
+    const auto res = getRPC(rttiInfo, out);
+    if (SLANG_FAILED(res))
+    {
+        return sendError(JSONRPC::ErrorCode::ParseError);
+    }
+    return res;
 }
 
 } // namespcae Slang
