@@ -98,6 +98,15 @@ class D3DUtil
 
     static uint32_t getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect);
 
+    static D3D12_INPUT_CLASSIFICATION getInputSlotClass(InputSlotClass slotClass);
+
+    static D3D12_FILL_MODE getFillMode(FillMode mode);
+
+    static D3D12_CULL_MODE getCullMode(CullMode mode);
+
+    static D3D12_BLEND_OP getBlendOp(BlendOp op);
+
+    static D3D12_BLEND getBlendFactor(BlendFactor factor);
 };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT

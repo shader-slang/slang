@@ -349,12 +349,20 @@ struct FormatInfo
     uint32_t blockHeight;
 };
 
+enum class InputSlotClass
+{
+    PerVertex, PerInstance
+};
+
 struct InputElementDesc
 {
     char const* semanticName;
-    UInt        semanticIndex;
-    Format      format;
-    UInt        offset;
+    UInt semanticIndex;
+    Format format;
+    UInt offset;
+    InputSlotClass slotClass;
+    UInt bufferSlotIndex;
+    UInt instanceDataStepRate;
 };
 
 enum class PrimitiveType
@@ -1080,16 +1088,18 @@ struct DepthStencilDesc
 
 struct RasterizerDesc
 {
-    FillMode        fillMode                = FillMode::Solid;
-    CullMode        cullMode                = CullMode::Back;
-    FrontFaceMode   frontFace               = FrontFaceMode::CounterClockwise;
-    int32_t         depthBias               = 0;
-    float           depthBiasClamp          = 0.0f;
-    float           slopeScaledDepthBias    = 0.0f;
-    bool            depthClipEnable         = true;
-    bool            scissorEnable           = false;
-    bool            multisampleEnable       = false;
-    bool            antialiasedLineEnable   = false;
+    FillMode fillMode = FillMode::Solid;
+    CullMode cullMode = CullMode::None;
+    FrontFaceMode frontFace = FrontFaceMode::CounterClockwise;
+    int32_t depthBias = 0;
+    float depthBiasClamp = 0.0f;
+    float slopeScaledDepthBias = 0.0f;
+    bool depthClipEnable = true;
+    bool scissorEnable = false;
+    bool multisampleEnable = false;
+    bool antialiasedLineEnable = false;
+    bool enableConservativeRasterization = false;
+    uint32_t forcedSampleCount = 0;
 };
 
 enum class LogicOp
@@ -1153,7 +1163,7 @@ struct TargetBlendDesc
 {
     AspectBlendDesc color;
     AspectBlendDesc alpha;
-
+    bool enableBlend = false;
     LogicOp                 logicOp     = LogicOp::NoOp;
     RenderTargetWriteMaskT  writeMask   = RenderTargetWriteMask::EnableAll;
 };
@@ -1163,7 +1173,7 @@ struct BlendDesc
     TargetBlendDesc const*  targets     = nullptr;
     UInt                    targetCount = 0;
 
-    bool alphaToCoverateEnable  = false;
+    bool alphaToCoverageEnable  = false;
 };
 
 class IFramebufferLayout : public ISlangUnknown
@@ -1243,10 +1253,10 @@ class IPipelineState : public ISlangUnknown
 
 struct ScissorRect
 {
-    Int minX;
-    Int minY;
-    Int maxX;
-    Int maxY;
+    int32_t minX;
+    int32_t minY;
+    int32_t maxX;
+    int32_t maxY;
 };
 
 struct Viewport
@@ -1348,6 +1358,7 @@ enum class QueryType
     Timestamp,
     AccelerationStructureCompactedSize,
     AccelerationStructureSerializedSize,
+    AccelerationStructureCurrentSize,
 };
 
 class IQueryPool : public ISlangUnknown
@@ -1477,6 +1488,17 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
         uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+        UInt vertexCount,
+        UInt instanceCount,
+        UInt startVertex,
+        UInt startInstanceLocation) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) = 0;
 };
 
 class IComputeCommandEncoder : public ICommandEncoder

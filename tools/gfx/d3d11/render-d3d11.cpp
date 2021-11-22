@@ -3845,7 +3845,7 @@ Result D3D11Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         }
 
         dstDesc.IndependentBlendEnable = srcDesc.targetCount > 1;
-        dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverateEnable;
+        dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverageEnable;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateBlendState(
             &dstDesc,

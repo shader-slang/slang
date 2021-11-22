@@ -1149,6 +1149,26 @@ Result DebugRenderCommandEncoder::setSamplePositions(
     return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
 }
 
+void DebugRenderCommandEncoder::drawInstanced(
+    UInt vertexCount, UInt instanceCount, UInt startVertex, UInt startInstanceLocation)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->drawInstanced(
+        vertexCount, instanceCount, startVertex, startInstanceLocation);
+}
+
+void DebugRenderCommandEncoder::drawIndexedInstanced(
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startIndexLocation,
+    int32_t baseVertexLocation,
+    uint32_t startInstanceLocation)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->drawIndexedInstanced(
+        indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+}
+
 void DebugResourceCommandEncoder::endEncoding()
 {
     SLANG_GFX_API_FUNC;
