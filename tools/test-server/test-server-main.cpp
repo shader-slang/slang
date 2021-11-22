@@ -69,8 +69,6 @@ public:
         /// Execute the server
     SlangResult execute();
 
-        /// 
-    TestServer();
         /// Dtor
     ~TestServer();
 
@@ -104,8 +102,6 @@ static void _diagnosticCallback(char const* message, void* userData)
 
 SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char* const* argv)
 {
-    //StdWriters::setSingleton(stdWriters);
-
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
 
@@ -166,10 +162,6 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
 } // namespace SlangCTool
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-TestServer::TestServer()
-{
-}
 
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
@@ -254,10 +246,10 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
         return nullptr;
     }
 
-    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("slangUnitTestGetModule");
+    const char funcName[] = "slangUnitTestGetModule";
 
     // get the unit test export name
-    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName.begin());
+    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName);
     if (!getModuleFunc)
     {
         if (sink)
@@ -298,9 +290,9 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
         return nullptr;
     }
 
-    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("innerMain");
+    const char funcName[] = "innerMain";
 
-    auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName.begin());
+    auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName);
     if (!func && sink)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
@@ -467,7 +459,10 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     // Work out the args sent to the shared library
     List<const char*> toolArgs;
 
+    // Add the 'exe' name 
     toolArgs.add(args.toolName.getBuffer());
+
+    // Add the args
     for (const auto& arg : args.args)
     {
         toolArgs.add(arg.getBuffer());
@@ -503,20 +498,10 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
 SlangResult TestServer::execute()
 {
-    DiagnosticSink diagnosticSink;
-
     while (m_connection->isActive() && !m_quit)
     {
-        SlangResult res = _executeSingle();
-        if (m_quit)
-        {
-            break;
-        }
-
-        if (SLANG_FAILED(res))
-        {
-            // Return a result 
-        }
+        // Failure doesn't make the execution terminate
+        const SlangResult res = _executeSingle();
     }
 
     return SLANG_OK;
