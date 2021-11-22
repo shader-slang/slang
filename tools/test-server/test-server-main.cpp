@@ -17,16 +17,7 @@
 #include "../../source/core/slang-shared-library.h"
 
 #include "../../source/core/slang-test-tool-util.h"
-#include "../../source/core/slang-http.h"
 
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
-
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-rpc.h"
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/compiler-core/slang-json-native.h"
-#include "../../source/compiler-core/slang-json-rpc.h"
 #include "../../source/compiler-core/slang-json-rpc-connection.h"
 
 #include "../../source/compiler-core/slang-test-server-protocol.h"
@@ -64,7 +55,7 @@ public:
     SlangResult init(int argc, const char* const* argv);
 
         /// Can return nullptr if cannot create the session
-    slang::IGlobalSession* getGlobalSession();
+    slang::IGlobalSession* getOrCreateGlobalSession();
 
         /// Can return nullptr if cannot load the tool
     ISlangSharedLibrary* loadSharedLibrary(const String& name, DiagnosticSink* sink = nullptr);
@@ -90,15 +81,15 @@ protected:
 
     bool m_quit = false;
 
-    ComPtr<slang::IGlobalSession> m_session;
+    ComPtr<slang::IGlobalSession> m_session;                        /// The slang session. Is created on demand
 
-    Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;      ///< Maps tool names to the dll
-    Dictionary<String, IUnitTestModule*> m_unitTestModules;
+    Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;     ///< Maps tool names to the dll
+    Dictionary<String, IUnitTestModule*> m_unitTestModules;                 ///< All the unit test modules. 
 
     String m_exePath;                                               ///< Path to executable (including exe name)
     String m_exeDirectory;                                          ///< The directory that holds the exe
 
-    RefPtr<JSONRPCConnection> m_connection;
+    RefPtr<JSONRPCConnection> m_connection;                         ///< RPC connection, recieves calls to execute and returns results via JSON-RPC
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -113,7 +104,7 @@ static void _diagnosticCallback(char const* message, void* userData)
 
 SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char* const* argv)
 {
-    StdWriters::setSingleton(stdWriters);
+    //StdWriters::setSingleton(stdWriters);
 
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
@@ -163,7 +154,8 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
 #ifndef _DEBUG
     catch (const Exception& e)
     {
-        StdWriters::getOut().print("internal compiler error: %S\n", e.Message.toWString().begin());
+        WriterHelper writerHelper(stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+        writerHelper.print("internal compiler error: %S\n", e.Message.toWString().begin());
         compileRes = SLANG_FAIL;
     }
 #endif
@@ -206,7 +198,7 @@ TestServer::~TestServer()
     }
 }
 
-slang::IGlobalSession* TestServer::getGlobalSession()
+slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
 {
     if (!m_session)
     {
@@ -408,7 +400,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     testModule->setTestReporter(&testReporter);
     
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getGlobalSession();
+    slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
     {
         return SLANG_FAIL;
@@ -466,7 +458,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     }
 
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getGlobalSession();
+    slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
     {
         return SLANG_FAIL;
