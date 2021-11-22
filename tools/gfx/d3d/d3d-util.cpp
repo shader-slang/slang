@@ -665,6 +665,114 @@ uint32_t D3DUtil::getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect)
     }
 }
 
+D3D12_INPUT_CLASSIFICATION D3DUtil::getInputSlotClass(InputSlotClass slotClass)
+{
+    switch (slotClass)
+    {
+    case InputSlotClass::PerVertex:
+        return D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+    case InputSlotClass::PerInstance:
+        return D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown input slot class.");
+        return D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+    }
+}
+
+D3D12_FILL_MODE D3DUtil::getFillMode(FillMode mode)
+{
+    switch (mode)
+    {
+    case FillMode::Solid:
+        return D3D12_FILL_MODE_SOLID;
+    case FillMode::Wireframe:
+        return D3D12_FILL_MODE_WIREFRAME;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown fill mode.");
+        return D3D12_FILL_MODE_SOLID;
+    }
+}
+
+D3D12_CULL_MODE D3DUtil::getCullMode(CullMode mode)
+{
+    switch (mode)
+    {
+    case CullMode::None:
+        return D3D12_CULL_MODE_NONE;
+    case CullMode::Front:
+        return D3D12_CULL_MODE_FRONT;
+    case CullMode::Back:
+        return D3D12_CULL_MODE_BACK;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown cull mode.");
+        return D3D12_CULL_MODE_NONE;
+    }
+}
+
+D3D12_BLEND_OP D3DUtil::getBlendOp(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:
+        return D3D12_BLEND_OP_ADD;
+    case BlendOp::Subtract:
+        return D3D12_BLEND_OP_SUBTRACT;
+    case BlendOp::ReverseSubtract:
+        return D3D12_BLEND_OP_REV_SUBTRACT;
+    case BlendOp::Min:
+        return D3D12_BLEND_OP_MIN;
+    case BlendOp::Max:
+        return D3D12_BLEND_OP_MAX;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown blend op.");
+        return D3D12_BLEND_OP_ADD;
+    }
+}
+
+D3D12_BLEND D3DUtil::getBlendFactor(BlendFactor factor)
+{
+    switch (factor)
+    {
+    case BlendFactor::Zero:
+        return D3D12_BLEND_ZERO;
+    case BlendFactor::One:
+        return D3D12_BLEND_ONE;
+    case BlendFactor::SrcColor:
+        return D3D12_BLEND_SRC_COLOR;
+    case BlendFactor::InvSrcColor:
+        return D3D12_BLEND_INV_SRC_COLOR;
+    case BlendFactor::SrcAlpha:
+        return D3D12_BLEND_SRC_ALPHA;
+    case BlendFactor::InvSrcAlpha:
+        return D3D12_BLEND_INV_SRC_ALPHA;
+    case BlendFactor::DestAlpha:
+        return D3D12_BLEND_DEST_ALPHA;
+    case BlendFactor::InvDestAlpha:
+        return D3D12_BLEND_INV_DEST_ALPHA;
+    case BlendFactor::DestColor:
+        return D3D12_BLEND_DEST_COLOR;
+    case BlendFactor::InvDestColor:
+        return D3D12_BLEND_INV_DEST_COLOR;
+    case BlendFactor::SrcAlphaSaturate:
+        return D3D12_BLEND_SRC_ALPHA_SAT;
+    case BlendFactor::BlendColor:
+        return D3D12_BLEND_BLEND_FACTOR;
+    case BlendFactor::InvBlendColor:
+        return D3D12_BLEND_INV_BLEND_FACTOR;
+    case BlendFactor::SecondarySrcColor:
+        return D3D12_BLEND_SRC1_COLOR;
+    case BlendFactor::InvSecondarySrcColor:
+        return D3D12_BLEND_INV_SRC1_COLOR;
+    case BlendFactor::SecondarySrcAlpha:
+        return D3D12_BLEND_SRC1_ALPHA;
+    case BlendFactor::InvSecondarySrcAlpha:
+        return D3D12_BLEND_INV_SRC1_ALPHA;
+    default:
+        SLANG_ASSERT_FAILURE("Unknown blend factor.");
+        return D3D12_BLEND_ZERO;
+    }
+}
+
 /* static */SlangResult D3DUtil::findAdapters(DeviceCheckFlags flags, const UnownedStringSlice& adapterName, IDXGIFactory* dxgiFactory, List<ComPtr<IDXGIAdapter>>& outDxgiAdapters)
 {
     Slang::String lowerAdapterName = Slang::String(adapterName).toLower();
