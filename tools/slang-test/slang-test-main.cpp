@@ -655,24 +655,16 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     return res;
 }
 
-Result spawnAndWaitTestServer(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const RttiInfo* rttiInfo, const void* args, ExecuteResult& outRes)
 {
-    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
-
     JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
     if (!rpcConnection)
     {
         return SLANG_FAIL;
     }
 
-    // This is a test tool execution
-    TestServerProtocol::ExecuteToolTestArgs args;
-
-    args.toolName = exeName;
-    args.args = inCmdLine.m_args;
-
     // Execute
-    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(TestServerProtocol::ExecuteToolTestArgs::getMethodName(), &args));
+    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
 
     // Wait for the result
     rpcConnection->waitForResult(context->timeOutInMs);
@@ -698,6 +690,25 @@ Result spawnAndWaitTestServer(TestContext* context, const String& testPath, cons
     outRes.standardOutput = exeRes.stdOut;
 
     return SLANG_OK;
+}
+
+template <typename T>
+static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const T* msg, ExecuteResult& outRes)
+{
+    return _executeRPC(context, method, GetRttiInfo<T>::get(), (const void*)msg, outRes);
+}
+
+Result spawnAndWaitTestServer(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+
+    // This is a test tool execution
+    TestServerProtocol::ExecuteToolTestArgs args;
+
+    args.toolName = exeName;
+    args.args = inCmdLine.m_args;
+
+    return _executeRPC(context, TestServerProtocol::ExecuteToolTestArgs::getMethodName(), &args, outRes);
 }
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
@@ -3521,6 +3532,30 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
                         // If the test fails, output any output - which might give information about individual tests that have failed.
                         if (testResult == TestResult::Fail)
+                        {
+                            String output = getOutput(exeRes);
+                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
+                        }
+
+                        reporter->addResult(testResult);
+                    }
+                }
+                else if (spawnType == SpawnType::UseTestServer)
+                {
+                    TestServerProtocol::ExecuteUnitTestArgs args;
+                    args.enabledApis = context->options.enabledApis;
+                    args.moduleName = moduleName;
+                    args.testName = testName;
+
+                    {
+                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
+                        ExecuteResult exeRes;
+
+                        SlangResult rpcRes = _executeRPC(context, TestServerProtocol::ExecuteUnitTestArgs::getMethodName(), &args, exeRes);
+                        const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+
+                        // If the test fails, output any output - which might give information about individual tests that have failed.
+                        if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
                         {
                             String output = getOutput(exeRes);
                             reporter->message(TestMessageType::TestFailure, output.getBuffer());
