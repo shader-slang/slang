@@ -9,6 +9,8 @@
 #include "slang-json-value.h"
 #include "slang-json-rpc.h"
 
+#include "slang-json-diagnostics.h"
+
 #include "slang-test-server-protocol.h"
 
 namespace Slang {
@@ -139,17 +141,17 @@ SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, 
 {
     const RttiInfo* rttiInfo = GetRttiInfo<T>::get();
 
-    SLANG_RETURN_ON_FAIL(toNativeOrRespond(value, rttiInfo, (void*)data));
+    SLANG_RETURN_ON_FAIL(toNativeOrSendError(value, rttiInfo, (void*)data));
     if (!data->isValid())
     {
         // If it has a name add validation info
         if (rttiInfo->isNamed())
         {
             const NamedRttiInfo* namedRttiInfo = static_cast<const NamedRttiInfo*>(rttiInfo);
-            m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::argsAreInvalid, namedRttiInfo->m_name);
+            m_diagnosticSink.diagnose(SourceLoc(), JSONDiagnostics::argsAreInvalid, namedRttiInfo->m_name);
         }
 
-        return respondWithError(JSONRPC::ErrorCode::InvalidRequest);
+        return sendError(JSONRPC::ErrorCode::InvalidRequest);
     }
     return SLANG_OK;
 }

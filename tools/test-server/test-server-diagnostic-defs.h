@@ -23,6 +23,5 @@ DIAGNOSTIC(100001, Error, unableToFindFunctionInSharedLibrary, "Unable to find f
 DIAGNOSTIC(100002, Error, unableToGetUnitTestModule, "Unable to get unit test module")
 DIAGNOSTIC(100003, Error, unableToFindTest, "Unable to find test '$0'")
 DIAGNOSTIC(100004, Error, unableToFindUnitTestModule, "Unable to find unit test module '$0'")
-DIAGNOSTIC(100005, Error, argsAreInvalid, "Args for '%0' are invalid")
 
 #undef DIAGNOSTIC

@@ -708,7 +708,7 @@ Result spawnAndWaitTestServer(TestContext* context, const String& testPath, cons
     args.toolName = exeName;
     args.args = inCmdLine.m_args;
 
-    return _executeRPC(context, TestServerProtocol::ExecuteToolTestArgs::getMethodName(), &args, outRes);
+    return _executeRPC(context, TestServerProtocol::ExecuteToolTestArgs::g_methodName, &args, outRes);
 }
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
@@ -3551,7 +3551,7 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
                         TestReporter::TestScope scopeTest(reporter, testOptions.command);
                         ExecuteResult exeRes;
 
-                        SlangResult rpcRes = _executeRPC(context, TestServerProtocol::ExecuteUnitTestArgs::getMethodName(), &args, exeRes);
+                        SlangResult rpcRes = _executeRPC(context, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
                         const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
 
                         // If the test fails, output any output - which might give information about individual tests that have failed.

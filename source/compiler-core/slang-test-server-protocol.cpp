@@ -12,6 +12,7 @@ static const StructRttiInfo _makeExecuteUnitTestArgsRtti()
     builder.addField("enabledApis", &obj.enabledApis);
     return builder.make();
 }
+/* static */const UnownedStringSlice ExecuteUnitTestArgs::g_methodName = UnownedStringSlice::fromLiteral("unitTest");
 /* static */const StructRttiInfo ExecuteUnitTestArgs::g_rttiInfo = _makeExecuteUnitTestArgsRtti();
 
 static const StructRttiInfo _makeExecuteToolTestArgsRtti()
@@ -23,6 +24,8 @@ static const StructRttiInfo _makeExecuteToolTestArgsRtti()
     return builder.make();
 }
 /* static */const StructRttiInfo ExecuteToolTestArgs::g_rttiInfo = _makeExecuteToolTestArgsRtti();
+/* static */const UnownedStringSlice g_methodName = UnownedStringSlice::fromLiteral("tool");
+
 
 static const StructRttiInfo _makeExecutionResultRtti()
 {
@@ -35,5 +38,7 @@ static const StructRttiInfo _makeExecutionResultRtti()
     return builder.make();
 }
 /* static */const StructRttiInfo ExecutionResult::g_rttiInfo = _makeExecutionResultRtti();
+
+/* static */const UnownedStringSlice QuitArgs::g_methodName = UnownedStringSlice::fromLiteral("quit");
 
 } // namespace TestServerProtocol

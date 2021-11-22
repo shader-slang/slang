@@ -18,8 +18,7 @@ struct ExecuteUnitTestArgs
     String testName;
     uint32_t enabledApis;
 
-    static auto getMethodName() { return UnownedStringSlice::fromLiteral("unitTest"); }
-
+    static const UnownedStringSlice g_methodName;
     static const StructRttiInfo g_rttiInfo;
 };
 
@@ -28,14 +27,13 @@ struct ExecuteToolTestArgs
     String toolName;                ///< The name of the tool (will be a shared library typically - like render-test). Doesn't need -tool suffix.
     List<String> args;                          ///< Arguments passed to the tool during exectution
 
-    static auto getMethodName() { return UnownedStringSlice::fromLiteral("tool"); }
-
+    static const UnownedStringSlice g_methodName;
     static const StructRttiInfo g_rttiInfo;
 };
 
 struct QuitArgs
 {
-    static auto getMethodName() { return UnownedStringSlice::fromLiteral("quit"); }
+    static const UnownedStringSlice g_methodName;
 };
 
 struct ExecutionResult

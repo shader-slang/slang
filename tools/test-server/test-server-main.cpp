@@ -338,17 +338,17 @@ SlangResult TestServer::_executeSingle()
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
 
             // Do different things
-            if (call.method == TestServerProtocol::QuitArgs::getMethodName())
+            if (call.method == TestServerProtocol::QuitArgs::g_methodName)
             {
                 m_quit = true;
                 return SLANG_OK;
             }
-            else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::getMethodName())
+            else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
                 return SLANG_OK;
             }
-            else if (call.method == TestServerProtocol::ExecuteToolTestArgs::getMethodName())
+            else if (call.method == TestServerProtocol::ExecuteToolTestArgs::g_methodName)
             {
                 SLANG_RETURN_ON_FAIL(_executeTool(call));
                 break;
