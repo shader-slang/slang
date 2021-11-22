@@ -98,7 +98,6 @@ public:
     SlangResult getMessageOrSendError(T* out) { return getMessageOrSendError(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessageOrSendError(const RttiInfo* rttiInfo, void* out);
 
-
         /// Clears all the internal buffers (for JSON/Source/etc).
         /// Happens automatically on tryReadMessage/readMessage
     void clearBuffers();

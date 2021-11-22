@@ -26,7 +26,6 @@ static const StructRttiInfo _makeExecuteToolTestArgsRtti()
 /* static */const StructRttiInfo ExecuteToolTestArgs::g_rttiInfo = _makeExecuteToolTestArgsRtti();
 /* static */const UnownedStringSlice ExecuteToolTestArgs::g_methodName = UnownedStringSlice::fromLiteral("tool");
 
-
 static const StructRttiInfo _makeExecutionResultRtti()
 {
     ExecutionResult obj;
