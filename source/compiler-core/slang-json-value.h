@@ -50,6 +50,8 @@ struct JSONValue
         FloatValue,
         StringValue,
 
+        StringRepresentation,
+
         Array,
         Object,
 
@@ -105,13 +107,13 @@ struct JSONValue
 
     union 
     {
-        Index rangeIndex;           ///< Used for Array/Object
-        Index length;               ///< Length in bytes if it is a 'Lexeme'
-        double floatValue;          ///< Float value
-        int64_t intValue;           ///< Integer value
-        JSONKey stringKey;          ///< The pool key if it's a string
+        Index rangeIndex;                       ///< Used for Array/Object
+        Index length;                           ///< Length in bytes if it is a 'Lexeme'
+        double floatValue;                      ///< Float value
+        int64_t intValue;                       ///< Integer value
+        JSONKey stringKey;                      ///< The pool key if it's a string
+        StringRepresentation* stringRep;        ///< Only ever used on a 'SimpleJSONValue'
     };
-
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
 
@@ -143,6 +145,56 @@ struct JSONKeyValue
     }
 
     static JSONKeyValue g_invalid;
+};
+
+class JSONContainer;
+
+/* Is similar to JSONValue, but is designed to
+
+* Only be able to hold 'Simple' types (ie not array/object)
+* Doesn't reference/require JSONContainer.
+
+Not requiring JSONContainer means it's useful to hold state when JSONContainer goes out of scope.
+Care may need to be taken if sourceManager goes out of scope, as sourceLoc may become invalid. This
+is true of a regular JSONValue.
+
+NOTE! Because it is derived from JSONValue it can be sliced. For many operations this is useful and convenient (like comparisons).
+BUT a SimpleJSONValue should not be stored via a slice into an array/object. Doing so is undefined behavior.
+*/
+class SimpleJSONValue : public JSONValue
+{
+public:
+    typedef JSONValue Super;
+    typedef SimpleJSONValue ThisType;
+
+        /// If it's a string type this will always work
+    String getString() const;
+    UnownedStringSlice getSlice() const;
+
+        /// Set to the value
+    void set(const JSONValue& in, JSONContainer* container);
+        /// Set directly to a string
+    void set(const UnownedStringSlice& slice, SourceLoc loc);
+
+    SimpleJSONValue(const JSONValue& in, JSONContainer* container) { type = Type::Invalid; set(in, container); }
+    SimpleJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { type = Type::Invalid; set(in, container); loc = inLoc; }
+
+    SimpleJSONValue() {}
+    SimpleJSONValue(const ThisType& rhs);
+
+    void operator=(const ThisType& rhs);
+
+    ~SimpleJSONValue()
+    {
+        if (type == Type::StringRepresentation && stringRep)
+        {
+            stringRep->releaseReference();
+        }
+    }
+protected:
+        /// Assumes this has no valid data
+    void _init(const JSONValue& in, JSONContainer* container);
+    void _init(const UnownedStringSlice& slice, SourceLoc loc);
 };
 
 class JSONContainer : public RefObject
@@ -201,7 +253,7 @@ public:
         /// Get as a string. The contents will stay in scope as long as the container
     UnownedStringSlice getString(const JSONValue& in);
 
-    /// Gets the lexeme
+        /// Gets the lexeme
     UnownedStringSlice getLexeme(const JSONValue& in);
 
         /// Get a key for a name

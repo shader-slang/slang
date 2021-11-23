@@ -22,6 +22,8 @@ namespace Slang {
     JSONValue::Kind::Float,             // FloatValue,
     JSONValue::Kind::String,            // StringValue,
 
+    JSONValue::Kind::String,            // StringRepresentation
+
     JSONValue::Kind::Array,             // Array,
     JSONValue::Kind::Object,            // Object,
 };
@@ -139,6 +141,183 @@ double JSONValue::asFloat() const
     }
   
     return 0;
+}
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+                             SimpleJSONValue
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+SimpleJSONValue::SimpleJSONValue(const ThisType& rhs)
+{
+    *(JSONValue*)this = rhs;
+
+    if (type == Type::StringRepresentation && stringRep)
+    {
+        stringRep->addReference();
+    }
+}
+
+void SimpleJSONValue::operator=(const ThisType& rhs)
+{
+    if (this != &rhs)
+    {
+        if (rhs.type == Type::StringRepresentation && rhs.stringRep)
+        {
+            rhs.stringRep->addReference();
+        }
+        if (type == Type::StringRepresentation && stringRep)
+        {
+            stringRep->releaseReference();
+        }
+        *(JSONValue*)this = rhs;
+    }
+}
+
+String SimpleJSONValue::getString() const
+{
+    if (type == Type::StringRepresentation)
+    {
+        return String(stringRep);
+    }
+    SLANG_ASSERT(!"Not a string type");
+    return String();
+}
+
+UnownedStringSlice SimpleJSONValue::getSlice() const
+{
+    if (type == Type::StringRepresentation)
+    {
+        return StringRepresentation::asSlice(stringRep);
+    }
+    return UnownedStringSlice();
+}
+
+void SimpleJSONValue::set(const UnownedStringSlice& slice, SourceLoc loc)
+{
+    StringRepresentation* oldRep = (type == JSONValue::Type::StringRepresentation) ? stringRep : nullptr;
+
+    type = Type::StringRepresentation;
+
+    StringRepresentation* newRep = nullptr;
+    const auto length = slice.getLength();
+    if (length)
+    {
+        // If we have an oldRep that is unique and large enough reuse it
+        if (oldRep && oldRep->isUniquelyReferenced() && length < oldRep->capacity)
+        {
+            newRep = oldRep;
+            newRep->length = length;
+            oldRep = nullptr;
+        }
+        else
+        {
+            newRep = StringRepresentation::createWithLength(slice.getLength());
+        }
+        char* chars = newRep->getData();
+        ::memcpy(chars, slice.begin(), sizeof(char) * length);
+        chars[length] = 0;
+    }
+
+    stringRep = newRep;
+
+    if (oldRep)
+    {
+        oldRep->releaseReference();
+    }
+}
+
+void SimpleJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc)
+{
+    loc = inLoc;
+    type = Type::StringRepresentation;
+    stringRep = nullptr;
+
+    const auto length = slice.getLength();
+    if (length)
+    {   
+        StringRepresentation* newStringRep = StringRepresentation::createWithLength(slice.getLength());
+        
+        char* chars = newStringRep->getData();
+        ::memcpy(chars, slice.begin(), sizeof(char) * length);
+        chars[length] = 0;
+
+        stringRep = newStringRep;
+    }
+}
+
+void SimpleJSONValue::_init(const JSONValue& in, JSONContainer* container)
+{
+    // We are assuming this is invalid, so it can't be the same as in
+    SLANG_ASSERT(&in != this);
+
+    switch (in.type)
+    {
+        case Type::StringValue:
+        case Type::StringLexeme:
+        {
+            if (!container)
+            {
+                SLANG_ASSERT(!"Requires container");
+                return;
+            }
+            _init(container->getTransientString(in), in.loc);
+            break;
+        }
+        case Type::StringRepresentation:
+        {
+            *(JSONValue*)this = in;
+            if (stringRep)
+            {
+                stringRep->addReference();
+            }
+            break;
+        }
+        case Type::IntegerLexeme:
+        {
+            type = JSONValue::Type::IntegerValue;
+            intValue = container->asInteger(in);
+            break;
+        }
+        case Type::FloatLexeme:
+        {
+            type = JSONValue::Type::FloatValue;
+            floatValue = container->asFloat(in);
+            break;
+        }
+        case Type::Array:
+        case Type::Object:
+        {
+            SLANG_ASSERT(!"Not a simple JSON type");
+            break;
+        }
+        default:
+        {
+            *(JSONValue*)this = in;
+            break;
+        }
+    }
+}
+
+void SimpleJSONValue::set(const JSONValue& in, JSONContainer* container)
+{
+    if (&in != this)
+    {
+        if (type == Type::StringRepresentation)
+        {
+            StringRepresentation* oldStringRep = stringRep;
+            _init(in, container);
+            if (oldStringRep)
+            {
+                oldStringRep->releaseReference();
+            }
+        }
+        else
+        {
+            _init(in, container);
+        }
+    }
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -339,17 +518,25 @@ UnownedStringSlice JSONContainer::getLexeme(const JSONValue& in)
 
 UnownedStringSlice JSONContainer::getString(const JSONValue& in)
 {
-    if (in.type == JSONValue::Type::StringValue)
+    switch (in.type)
     {
-        return getStringFromKey(in.stringKey);
+        case JSONValue::Type::StringValue:
+        {
+            return getStringFromKey(in.stringKey);
+        }
+        case JSONValue::Type::StringLexeme:
+        {
+            auto slice = getTransientString(in);
+            auto handle = m_slicePool.add(slice);
+            return m_slicePool.getSlice(handle);
+        }
+        case JSONValue::Type::StringRepresentation:
+        {
+            return StringRepresentation::asSlice(in.stringRep);
+        }
+        default: break;
     }
-    else if (in.type == JSONValue::Type::StringLexeme)
-    {
-        auto slice = getTransientString(in);
-        auto handle = m_slicePool.add(slice);
-        return m_slicePool.getSlice(handle);
-    }
-
+   
     SLANG_ASSERT(!"Not a string type");
     return UnownedStringSlice();
 }
@@ -358,6 +545,10 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
 {
     switch (in.type)
     {
+        case JSONValue::Type::StringRepresentation:
+        {
+            return StringRepresentation::asSlice(in.stringRep);
+        }
         case JSONValue::Type::StringValue:
         {
             return getStringFromKey(in.stringKey);
@@ -917,7 +1108,10 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
             case JSONValue::Type::IntegerValue: return a.intValue == b.intValue;
             case JSONValue::Type::FloatValue:   return a.floatValue == b.floatValue;
             case JSONValue::Type::StringValue:  return a.stringKey == b.stringKey;
-
+            case JSONValue::Type::StringRepresentation:
+            {
+                return a.stringRep == b.stringRep || getTransientString(a) == getTransientString(b);
+            }
             case JSONValue::Type::Array:
             {
                 if (a.rangeIndex == b.rangeIndex)
@@ -981,6 +1175,10 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
         {
             const auto slice = getStringFromKey(value.stringKey);
             return listener->addStringValue(slice, value.loc);
+        }
+        case Type::StringRepresentation:
+        {
+            return listener->addStringValue(getTransientString(value), value.loc);
         }
         case Type::Array:
         {
