@@ -149,7 +149,7 @@ double JSONValue::asFloat() const
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-SimpleJSONValue::SimpleJSONValue(const ThisType& rhs)
+PersistentJSONValue::PersistentJSONValue(const ThisType& rhs)
 {
     *(JSONValue*)this = rhs;
 
@@ -159,7 +159,7 @@ SimpleJSONValue::SimpleJSONValue(const ThisType& rhs)
     }
 }
 
-void SimpleJSONValue::operator=(const ThisType& rhs)
+void PersistentJSONValue::operator=(const ThisType& rhs)
 {
     if (this != &rhs)
     {
@@ -175,7 +175,7 @@ void SimpleJSONValue::operator=(const ThisType& rhs)
     }
 }
 
-String SimpleJSONValue::getString() const
+String PersistentJSONValue::getString() const
 {
     if (type == Type::StringRepresentation)
     {
@@ -185,7 +185,7 @@ String SimpleJSONValue::getString() const
     return String();
 }
 
-UnownedStringSlice SimpleJSONValue::getSlice() const
+UnownedStringSlice PersistentJSONValue::getSlice() const
 {
     if (type == Type::StringRepresentation)
     {
@@ -194,7 +194,7 @@ UnownedStringSlice SimpleJSONValue::getSlice() const
     return UnownedStringSlice();
 }
 
-void SimpleJSONValue::set(const UnownedStringSlice& slice, SourceLoc loc)
+void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc loc)
 {
     StringRepresentation* oldRep = (type == JSONValue::Type::StringRepresentation) ? stringRep : nullptr;
 
@@ -228,7 +228,7 @@ void SimpleJSONValue::set(const UnownedStringSlice& slice, SourceLoc loc)
     }
 }
 
-void SimpleJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc)
+void PersistentJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc)
 {
     loc = inLoc;
     type = Type::StringRepresentation;
@@ -247,7 +247,49 @@ void SimpleJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc)
     }
 }
 
-void SimpleJSONValue::_init(const JSONValue& in, JSONContainer* container)
+bool PersistentJSONValue::operator==(const ThisType& rhs) const
+{
+    if (this == &rhs)
+    {
+        return true;
+    }
+
+    if (type != rhs.type ||
+        loc != rhs.loc)
+    {
+        return false;
+    }
+
+    switch (type)
+    {
+        case Type::Invalid:
+        case Type::True:
+        case Type::False:
+        case Type::Null:
+        {
+            // The type is all that needs to be checked
+            return true;
+        }
+        case Type::IntegerValue:    return intValue == rhs.intValue;
+        case Type::FloatValue:      return floatValue == rhs.floatValue;
+        case Type::StringRepresentation:
+        {
+            if (stringRep == rhs.stringRep)
+            {
+                return;
+            }
+            auto thisSlice = StringRepresentation::asSlice(stringRep);
+            auto rhsSlice = StringRepresentation::asSlice(rhs.stringRep);
+            return thisSlice == rhsSlice;
+        }
+        default: break;
+    }
+
+    SLANG_UNEXPECTED("Not a valid PersistentJSONValue type");
+    return false;
+}
+
+void PersistentJSONValue::_init(const JSONValue& in, JSONContainer* container)
 {
     // We are assuming this is invalid, so it can't be the same as in
     SLANG_ASSERT(&in != this);
@@ -300,7 +342,7 @@ void SimpleJSONValue::_init(const JSONValue& in, JSONContainer* container)
     }
 }
 
-void SimpleJSONValue::set(const JSONValue& in, JSONContainer* container)
+void PersistentJSONValue::set(const JSONValue& in, JSONContainer* container)
 {
     if (&in != this)
     {

@@ -152,20 +152,21 @@ class JSONContainer;
 /* Is similar to JSONValue, but is designed to
 
 * Only be able to hold 'Simple' types (ie not array/object)
-* Doesn't reference/require JSONContainer.
+* Does not reference/require JSONContainer.
 
 Not requiring JSONContainer means it's useful to hold state when JSONContainer goes out of scope.
-Care may need to be taken if sourceManager goes out of scope, as sourceLoc may become invalid. This
+Care may need to be taken if sourceManager goes out of scope, sourceLocs may become invalid. This
 is true of a regular JSONValue.
 
-NOTE! Because it is derived from JSONValue it can be sliced. For many operations this is useful and convenient (like comparisons).
-BUT a SimpleJSONValue should not be stored via a slice into an array/object. Doing so is undefined behavior.
+Care must also be taken because it is derived from JSONValue. It *can* be sliced and work correctly,
+but *requires* that the PersistentJSONValue with same value to stay in scope in general. In practice
+this is only an issue with StringRepresention type.
 */
-class SimpleJSONValue : public JSONValue
+class PersistentJSONValue : public JSONValue
 {
 public:
     typedef JSONValue Super;
-    typedef SimpleJSONValue ThisType;
+    typedef PersistentJSONValue ThisType;
 
         /// If it's a string type this will always work
     String getString() const;
@@ -176,15 +177,23 @@ public:
         /// Set directly to a string
     void set(const UnownedStringSlice& slice, SourceLoc loc);
 
-    SimpleJSONValue(const JSONValue& in, JSONContainer* container) { type = Type::Invalid; set(in, container); }
-    SimpleJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { type = Type::Invalid; set(in, container); loc = inLoc; }
+        /// True if identical
+    bool operator==(const ThisType& rhs) const;
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
-    SimpleJSONValue() {}
-    SimpleJSONValue(const ThisType& rhs);
-
+        /// Assignable
     void operator=(const ThisType& rhs);
 
-    ~SimpleJSONValue()
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container) { type = Type::Invalid; set(in, container); }
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { type = Type::Invalid; set(in, container); loc = inLoc; }
+
+        /// Copy Ctor
+    PersistentJSONValue(const ThisType& rhs);
+        /// Default Ctor (will be set to invalid)
+    PersistentJSONValue() {}
+
+    
+    ~PersistentJSONValue()
     {
         if (type == Type::StringRepresentation && stringRep)
         {
