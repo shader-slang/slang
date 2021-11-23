@@ -184,8 +184,8 @@ public:
         /// Assignable
     void operator=(const ThisType& rhs);
 
-    PersistentJSONValue(const JSONValue& in, JSONContainer* container) { type = Type::Invalid; set(in, container); }
-    PersistentJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { type = Type::Invalid; set(in, container); loc = inLoc; }
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container) { _init(in, container); }
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { _init(in, container); loc = inLoc; }
 
         /// Copy Ctor
     PersistentJSONValue(const ThisType& rhs);
@@ -231,7 +231,7 @@ public:
 
         /// Returns the index of key in obj, or -1 if not found
     Index findObjectIndex(const JSONValue& obj, JSONKey key) const;
-        /// Get the value in the object at key. REturns invalid if not found.
+        /// Get the value in the object at key. Returns invalid if not found.
     JSONValue findObjectValue(const JSONValue& obj, JSONKey key) const;
 
         /// Returns the index 

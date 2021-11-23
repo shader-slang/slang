@@ -194,30 +194,50 @@ UnownedStringSlice PersistentJSONValue::getSlice() const
     return UnownedStringSlice();
 }
 
-void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc loc)
+void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc inLoc)
 {
     StringRepresentation* oldRep = (type == JSONValue::Type::StringRepresentation) ? stringRep : nullptr;
 
     type = Type::StringRepresentation;
+    loc = inLoc;
 
     StringRepresentation* newRep = nullptr;
-    const auto length = slice.getLength();
-    if (length)
+    const auto sliceLength = slice.getLength();
+    if (sliceLength)
     {
         // If we have an oldRep that is unique and large enough reuse it
-        if (oldRep && oldRep->isUniquelyReferenced() && length < oldRep->capacity)
+        if (oldRep &&
+            oldRep->isUniquelyReferenced() &&
+            sliceLength <= oldRep->capacity)
         {
+            char* chars;
+            if (StringRepresentation::asSlice(oldRep).isMemoryContained(slice))
+            {
+                chars = oldRep->getData();
+                ::memmove(chars, slice.begin(), sliceLength * sizeof(char));
+            }
+            else
+            {
+                chars = newRep->getData();
+                ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
+            }
+            chars[sliceLength] = 0;
+
             newRep = oldRep;
-            newRep->length = length;
+            newRep->length = sliceLength;
             oldRep = nullptr;
         }
         else
         {
-            newRep = StringRepresentation::createWithLength(slice.getLength());
+            newRep = StringRepresentation::createWithLength(sliceLength);
+            newRep->addReference();
+
+            char* chars = newRep->getData();
+            ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
+            chars[sliceLength] = 0;
         }
-        char* chars = newRep->getData();
-        ::memcpy(chars, slice.begin(), sizeof(char) * length);
-        chars[length] = 0;
+
+        SLANG_ASSERT(newRep->debugGetReferenceCount() >= 1);
     }
 
     stringRep = newRep;
@@ -234,14 +254,15 @@ void PersistentJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc
     type = Type::StringRepresentation;
     stringRep = nullptr;
 
-    const auto length = slice.getLength();
-    if (length)
+    const auto sliceLength = slice.getLength();
+    if (sliceLength)
     {   
-        StringRepresentation* newStringRep = StringRepresentation::createWithLength(slice.getLength());
-        
+        StringRepresentation* newStringRep = StringRepresentation::createWithLength(sliceLength);
+        newStringRep->addReference();
+
         char* chars = newStringRep->getData();
-        ::memcpy(chars, slice.begin(), sizeof(char) * length);
-        chars[length] = 0;
+        ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
+        chars[sliceLength] = 0;
 
         stringRep = newStringRep;
     }
@@ -276,7 +297,7 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
         {
             if (stringRep == rhs.stringRep)
             {
-                return;
+                return true;
             }
             auto thisSlice = StringRepresentation::asSlice(stringRep);
             auto rhsSlice = StringRepresentation::asSlice(rhs.stringRep);
@@ -285,7 +306,7 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
         default: break;
     }
 
-    SLANG_UNEXPECTED("Not a valid PersistentJSONValue type");
+    SLANG_ASSERT(!"Not valid Persistent type");
     return false;
 }
 
@@ -320,12 +341,14 @@ void PersistentJSONValue::_init(const JSONValue& in, JSONContainer* container)
         {
             type = JSONValue::Type::IntegerValue;
             intValue = container->asInteger(in);
+            loc = in.loc;
             break;
         }
         case Type::FloatLexeme:
         {
             type = JSONValue::Type::FloatValue;
             floatValue = container->asFloat(in);
+            loc = in.loc;
             break;
         }
         case Type::Array:
@@ -500,8 +523,8 @@ ConstArrayView<JSONValue> JSONContainer::getArray(const JSONValue& in) const
 
 ConstArrayView<JSONKeyValue> JSONContainer::getObject(const JSONValue& in) const
 {
-    SLANG_ASSERT(in.type == JSONValue::Type::Array);
-    if (in.type != JSONValue::Type::Array || in.rangeIndex == 0)
+    SLANG_ASSERT(in.type == JSONValue::Type::Object);
+    if (in.type != JSONValue::Type::Object || in.rangeIndex == 0)
     {
         return ConstArrayView<JSONKeyValue>((const JSONKeyValue*)nullptr, 0);
     }
