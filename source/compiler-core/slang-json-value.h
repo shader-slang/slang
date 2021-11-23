@@ -100,7 +100,7 @@ struct JSONValue
         /// Given a type return the associated kind
     static Kind getKindForType(Type type) { return g_typeToKind[Index(type)]; }
 
-    Type type;                  ///< The type of value
+    Type type = Type::Invalid;  ///< The type of value
     SourceLoc loc;              ///< The (optional) location in source of this value.
 
     union 
@@ -111,6 +111,7 @@ struct JSONValue
         int64_t intValue;           ///< Integer value
         JSONKey stringKey;          ///< The pool key if it's a string
     };
+
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
 

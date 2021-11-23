@@ -164,6 +164,8 @@ void JSONContainer::reset()
     m_objectValues.clear();
 
     _addRange(Range::Type::None, 0, 0);
+
+    m_currentView = nullptr;
 }
 
 /* static */bool JSONContainer::areKeysUnique(const JSONKeyValue* keyValues, Index keyValueCount)

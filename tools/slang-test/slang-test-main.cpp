@@ -655,6 +655,62 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     return res;
 }
 
+static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const RttiInfo* rttiInfo, const void* args, ExecuteResult& outRes)
+{
+    JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
+    if (!rpcConnection)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Execute
+    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
+
+    // Wait for the result
+    rpcConnection->waitForResult(context->timeOutInMs);
+
+    if (!rpcConnection->hasMessage())
+    {
+        // We can assume somethings gone wrong. So lets kill the connection and fail.
+        context->destroyRPCConnection();
+        return SLANG_FAIL;
+    }
+
+    if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Get the result
+    TestServerProtocol::ExecutionResult exeRes;
+    SLANG_RETURN_ON_FAIL(rpcConnection->getMessage(&exeRes));
+
+    outRes.resultCode = exeRes.returnCode;
+    outRes.standardError = exeRes.stdError;
+    outRes.standardOutput = exeRes.stdOut;
+
+    return SLANG_OK;
+}
+
+template <typename T>
+static Result _executeRPC(TestContext* context, const UnownedStringSlice& method, const T* msg, ExecuteResult& outRes)
+{
+    return _executeRPC(context, method, GetRttiInfo<T>::get(), (const void*)msg, outRes);
+}
+
+Result spawnAndWaitTestServer(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+
+    // This is a test tool execution
+    TestServerProtocol::ExecuteToolTestArgs args;
+
+    args.toolName = exeName;
+    args.args = inCmdLine.m_args;
+
+    return _executeRPC(context, TestServerProtocol::ExecuteToolTestArgs::g_methodName, &args, outRes);
+}
+
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
 {
     SLANG_ASSERT(argName.getLength() > 0 && argName[0] == '-');
@@ -1010,6 +1066,11 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         case SpawnType::UseProxy:
         {
             spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
+            break;
+        }
+        case SpawnType::UseTestServer:
+        {
+            spawnResult = spawnAndWaitTestServer(context, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -1574,7 +1635,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -1981,7 +2042,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2135,7 +2196,7 @@ static TestResult _runHLSLComparisonTest(
         if (standardOutput.getLength() != 0)	result = TestResult::Fail;
     }
     // Otherwise we compare to the expected output
-    else if (actualOutput != expectedOutput)
+    else if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2272,7 +2333,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2511,7 +2572,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
     auto actualOutput = getOutput(exeRes);
     auto expectedOutput = getExpectedOutput(outputStem);
-    if (actualOutput != expectedOutput)
+    
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2817,7 +2879,7 @@ TestResult runHLSLRenderComparisonTestImpl(
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -3470,6 +3532,30 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
                         // If the test fails, output any output - which might give information about individual tests that have failed.
                         if (testResult == TestResult::Fail)
+                        {
+                            String output = getOutput(exeRes);
+                            reporter->message(TestMessageType::TestFailure, output.getBuffer());
+                        }
+
+                        reporter->addResult(testResult);
+                    }
+                }
+                else if (spawnType == SpawnType::UseTestServer)
+                {
+                    TestServerProtocol::ExecuteUnitTestArgs args;
+                    args.enabledApis = context->options.enabledApis;
+                    args.moduleName = moduleName;
+                    args.testName = testName;
+
+                    {
+                        TestReporter::TestScope scopeTest(reporter, testOptions.command);
+                        ExecuteResult exeRes;
+
+                        SlangResult rpcRes = _executeRPC(context, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
+                        const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+
+                        // If the test fails, output any output - which might give information about individual tests that have failed.
+                        if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
                         {
                             String output = getOutput(exeRes);
                             reporter->message(TestMessageType::TestFailure, output.getBuffer());

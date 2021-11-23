@@ -42,4 +42,11 @@ DIAGNOSTIC(20011, Error, fieldNotDefinedOnType, "field '$0' not defined on type 
 DIAGNOSTIC(20011, Error, fieldRequiredOnType, "field '$0' required on '$1'")
 DIAGNOSTIC(20012, Error, tooManyElementsForArray, "too many elements ($0) for array array. Max allowed is $1")
 
+//
+// 3xxxx JSON-RPC
+//
+
+DIAGNOSTIC(30000, Error, argsAreInvalid, "Args for '%0' are invalid")
+
+
 #undef DIAGNOSTIC

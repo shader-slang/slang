@@ -17,14 +17,10 @@
 #include "../../source/core/slang-shared-library.h"
 
 #include "../../source/core/slang-test-tool-util.h"
-#include "../../source/core/slang-http.h"
 
-#include "../../source/compiler-core/slang-source-loc.h"
-#include "../../source/compiler-core/slang-diagnostic-sink.h"
+#include "../../source/compiler-core/slang-json-rpc-connection.h"
 
-#include "../../source/compiler-core/slang-json-parser.h"
-#include "../../source/compiler-core/slang-json-rpc.h"
-#include "../../source/compiler-core/slang-json-value.h"
+#include "../../source/compiler-core/slang-test-server-protocol.h"
 
 #include "test-server-diagnostics.h"
 
@@ -59,7 +55,7 @@ public:
     SlangResult init(int argc, const char* const* argv);
 
         /// Can return nullptr if cannot create the session
-    slang::IGlobalSession* getGlobalSession();
+    slang::IGlobalSession* getOrCreateGlobalSession();
 
         /// Can return nullptr if cannot load the tool
     ISlangSharedLibrary* loadSharedLibrary(const String& name, DiagnosticSink* sink = nullptr);
@@ -78,43 +74,111 @@ public:
 
 protected:
     SlangResult _executeSingle();
-    SlangResult _executeUnitTest(JSONContainer* container, const JSONValue& root);
-    SlangResult _executeTool(JSONContainer* container, const JSONValue& root);
-    SlangResult _writeResponse(JSONContainer* containers, const JSONValue& root);
+    SlangResult _executeUnitTest(const JSONRPCCall& call);
+    SlangResult _executeTool(const JSONRPCCall& root);
 
     bool m_quit = false;
 
-    ComPtr<slang::IGlobalSession> m_session;
+    ComPtr<slang::IGlobalSession> m_session;                        /// The slang session. Is created on demand
 
-    Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;      ///< Maps tool names to the dll
-    Dictionary<String, IUnitTestModule*> m_unitTestModules;
+    Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;     ///< Maps tool names to the dll
+    Dictionary<String, IUnitTestModule*> m_unitTestModules;                 ///< All the unit test modules. 
 
-    String m_exePath;                                               ///< Path to executable
+    String m_exePath;                                               ///< Path to executable (including exe name)
+    String m_exeDirectory;                                          ///< The directory that holds the exe
 
-    DiagnosticSink m_diagnosticSink;
-    SourceManager m_sourceManager;
-
-    RefPtr<HTTPPacketConnection> m_connection;
+    RefPtr<JSONRPCConnection> m_connection;                         ///< RPC connection, recieves calls to execute and returns results via JSON-RPC
 };
+
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
+
+namespace SlangCTool {
+
+static void _diagnosticCallback(char const* message, void* userData)
+{
+    ISlangWriter* writer = (ISlangWriter*)userData;
+    writer->write(message, strlen(message));
+}
+
+SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char* const* argv)
+{
+    // Assume we will used the shared session
+    ComPtr<slang::IGlobalSession> session(sharedSession);
+
+    // The sharedSession always has a pre-loaded stdlib.
+    // This differed test checks if the command line has an option to setup the stdlib.
+    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
+    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    {
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+    }
+
+    ComPtr<slang::ICompileRequest> compileRequest;
+    SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
+
+    // Do any app specific configuration
+    for (int i = 0; i < SLANG_WRITER_CHANNEL_COUNT_OF; ++i)
+    {
+        compileRequest->setWriter(SlangWriterChannel(i), stdWriters->getWriter(i));
+    }
+
+    compileRequest->setDiagnosticCallback(&_diagnosticCallback, stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
+    compileRequest->setCommandLineCompilerMode();
+
+    {
+        const SlangResult res = compileRequest->processCommandLineArguments(&argv[1], argc - 1);
+        if (SLANG_FAILED(res))
+        {
+            // TODO: print usage message
+            return res;
+        }
+    }
+
+    SlangResult compileRes = SLANG_OK;
+
+#ifndef _DEBUG
+    try
+#endif
+    {
+        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        compileRes = compileRequest->compile();
+
+        // If the compilation failed, then get out of here...
+        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        compileRes = SLANG_FAILED(compileRes) ? SLANG_E_INTERNAL_FAIL : compileRes;
+    }
+#ifndef _DEBUG
+    catch (const Exception& e)
+    {
+        WriterHelper writerHelper(stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+        writerHelper.print("internal compiler error: %S\n", e.Message.toWString().begin());
+        compileRes = SLANG_FAIL;
+    }
+#endif
+
+    return compileRes;
+}
+
+} // namespace SlangCTool
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
-    m_exePath = Path::getParentDirectory(argv[0]);
+    m_exePath = argv[0];
 
-    RefPtr<Stream> stdinStream, stdoutStream;
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))
+    {
+        m_exeDirectory = Path::getParentDirectory(canonicalPath);
+    }
+    else
+    {
+        m_exeDirectory = Path::getParentDirectory(m_exePath);
+    }
 
-    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
-    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
-
-    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
-
-    m_connection = new HTTPPacketConnection(readStream, stdoutStream);
-
-    m_sourceManager.initialize(nullptr, nullptr);
-    m_diagnosticSink.init(&m_sourceManager, &JSONLexer::calcLexemeLocation);
-
+    m_connection = new JSONRPCConnection;
+    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams());
     return SLANG_OK;
 }
 
@@ -126,7 +190,7 @@ TestServer::~TestServer()
     }
 }
 
-slang::IGlobalSession* TestServer::getGlobalSession()
+slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
 {
     if (!m_session)
     {
@@ -151,7 +215,7 @@ ISlangSharedLibrary* TestServer::loadSharedLibrary(const String& name, Diagnosti
 
     auto loader = DefaultSharedLibraryLoader::getSingleton();
 
-    auto toolPath = Path::combine(m_exePath, name);
+    auto toolPath = Path::combine(m_exeDirectory, name);
 
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     if (SLANG_FAILED(loader->loadSharedLibrary(toolPath.getBuffer(), sharedLibrary.writeRef())))
@@ -182,10 +246,10 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
         return nullptr;
     }
 
-    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("slangUnitTestGetModule");
+    const char funcName[] = "slangUnitTestGetModule";
 
     // get the unit test export name
-    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName.begin());
+    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName);
     if (!getModuleFunc)
     {
         if (sink)
@@ -211,6 +275,11 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
 
 TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, DiagnosticSink* sink)
 {
+    if (name == "slangc")
+    {
+        return &SlangCTool::innerMain;
+    }
+
     StringBuilder sharedLibToolBuilder;
     sharedLibToolBuilder.append(name);
     sharedLibToolBuilder.append("-tool");
@@ -221,9 +290,9 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
         return nullptr;
     }
 
-    UnownedStringSlice funcName = UnownedStringSlice::fromLiteral("innerMain");
+    const char funcName[] = "innerMain";
 
-    auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName.begin());
+    auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName);
     if (!func && sink)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
@@ -232,79 +301,54 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     return func;
 }
 
-SlangResult TestServer::_writeResponse(JSONContainer* container, const JSONValue& root)
-{
-    // TODO(JS): We may want a non indented style, to reduce size 
-    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
-    container->traverseRecursively(root, &writer);
-    const StringBuilder& builder = writer.getBuilder();
-    return m_connection->write(builder.getBuffer(), builder.getLength());
-}
-
 SlangResult TestServer::_executeSingle()
 {
     // Block waiting for content (or error/closed)
     SLANG_RETURN_ON_FAIL(m_connection->waitForResult());
 
-    // If we don't have content, we can quit for now
-    if (!m_connection->hasContent())
+    // If we don't have a message, we can quit for now
+    if (!m_connection->hasMessage())
     {
         return SLANG_OK;
     }
 
-    auto content = m_connection->getContent();
+    const JSONRPCMessageType msgType = m_connection->getMessageType();
 
-    UnownedStringSlice slice((const char*)content.begin(), content.getCount());
-
-    // Reset for parse
-    m_sourceManager.reset();
-    m_diagnosticSink.reset();
-
-    JSONContainer container(&m_sourceManager);
-
-    // Parse as RPC JSON
-    JSONValue root;
-
+    switch (msgType)
     {
-        SlangResult res = JSONRPCUtil::parseJSON(slice, &container, &m_diagnosticSink, root);
-        // Consume that content/packet
-        m_connection->consumeContent();
-
-        if (SLANG_FAILED(res))
+        case JSONRPCMessageType::Call:
         {
-            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, JSONRPCUtil::ErrorCode::InvalidRequest, UnownedStringSlice::fromLiteral("Unable to parse JSON")));
+            JSONRPCCall call;
+            SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
+
+            // Do different things
+            if (call.method == TestServerProtocol::QuitArgs::g_methodName)
+            {
+                m_quit = true;
+                return SLANG_OK;
+            }
+            else if (call.method == TestServerProtocol::ExecuteUnitTestArgs::g_methodName)
+            {
+                SLANG_RETURN_ON_FAIL(_executeUnitTest(call));
+                return SLANG_OK;
+            }
+            else if (call.method == TestServerProtocol::ExecuteToolTestArgs::g_methodName)
+            {
+                SLANG_RETURN_ON_FAIL(_executeTool(call));
+                break;
+            }
+            else
+            {
+                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound);
+            }
+        }
+        default:
+        {
+            return m_connection->sendError(JSONRPC::ErrorCode::ParseError);
         }
     }
 
-    JSONRPCUtil::Call call;
-    {
-        SlangResult res = JSONRPCUtil::parseCall(&container, root, call);
-        if (SLANG_FAILED(res))
-        {
-            return _writeResponse(&container, JSONRPCUtil::createErrorResponse(&container, Index(JSONRPCUtil::ErrorCode::InvalidRequest), UnownedStringSlice::fromLiteral("Cannot parse call")));
-        }
-    }
-
-    const auto& method = call.method;
-
-    // Do different things
-    if (method == "quit")
-    {
-        m_quit = true;
-        return SLANG_OK;
-    }
-    else if (method == "unitTest")
-    {
-        SLANG_RETURN_ON_FAIL(_executeUnitTest(&container, root));
-        return SLANG_OK;
-    }
-    else if (method == "tool")
-    {
-        SLANG_RETURN_ON_FAIL(_executeTool(&container, root));
-        return SLANG_OK;
-    }
-
-    return SLANG_FAIL;
+    return SLANG_OK;
 }
 
 static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
@@ -322,23 +366,25 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
     return -1;
 }
 
-SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONValue& root)
+SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
-    String moduleName;
-    String testName;
-    Int enabledApis = 0;
+    TestServerProtocol::ExecuteUnitTestArgs args;
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
 
-    IUnitTestModule* testModule = getUnitTestModule(moduleName, &m_diagnosticSink);
+    auto sink = m_connection->getSink();
+
+    IUnitTestModule* testModule = getUnitTestModule(args.moduleName, m_connection->getSink());
     if (!testModule)
     {
-        return SLANG_FAIL;
+        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
-    Index testIndex = _findTestIndex(testModule, moduleName);
+    const Index testIndex = _findTestIndex(testModule, args.testName);
     if (testIndex < 0)
     {
-        m_diagnosticSink.diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, testName);
-        return SLANG_FAIL;
+        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
     TestReporter testReporter;
@@ -346,7 +392,7 @@ SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONVal
     testModule->setTestReporter(&testReporter);
     
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getGlobalSession();
+    slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
     {
         return SLANG_FAIL;
@@ -355,8 +401,8 @@ SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONVal
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = session;
     unitTestContext.workDirectory = "";
-    unitTestContext.enabledApis = RenderApiFlags(enabledApis);
-    unitTestContext.executableDirectory = m_exePath.getBuffer();
+    unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
+    unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);
@@ -372,73 +418,90 @@ SlangResult TestServer::_executeUnitTest(JSONContainer* container, const JSONVal
         testReporter.m_failCount++;
     }
 
+    TestServerProtocol::ExecutionResult result;
+    result.result = SLANG_OK;
+
     if (testReporter.m_failCount > 0)
     {
-        // Write out to stderr...
-        auto writers = StdWriters::createDefault();
-        writers->getError().put(testReporter.m_buf.getUnownedSlice());
-        return SLANG_FAIL;
+        result.result = SLANG_FAIL;
+        result.stdError = testReporter.m_buf.getUnownedSlice();
     }
-
-    if (testReporter.m_testCount == 0)
+    else if (testReporter.m_testCount == 0)
     {
-        return SLANG_E_NOT_AVAILABLE;
+        result.result = SLANG_E_NOT_AVAILABLE;
     }
 
-    return SLANG_OK;
+    result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
+    return m_connection->sendResult(&result, m_connection->getMessageId());
 }
 
-SlangResult TestServer::_executeTool(JSONContainer* container, const JSONValue& root)
+SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
-    String toolName;
+    TestServerProtocol::ExecuteToolTestArgs args;
+    
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
 
-    auto func = getToolFunction(toolName, &m_diagnosticSink);
+    auto sink = m_connection->getSink();
+
+    auto func = getToolFunction(args.toolName, sink);
     if (!func)
     {
-        // Write out to diagnostics
-        return SLANG_FAIL;
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
     }
 
     // Assume we will used the shared session
-    slang::IGlobalSession* session = getGlobalSession();
+    slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
     {
         return SLANG_FAIL;
     }
 
-    // Get the args list
-
     // Work out the args sent to the shared library
-    List<const char*> args;
+    List<const char*> toolArgs;
 
-    
-    RefPtr<StdWriters> stdWriters = StdWriters::createDefault();
+    // Add the 'exe' name 
+    toolArgs.add(args.toolName.getBuffer());
 
-    const SlangResult res = func(stdWriters, session, int(args.getCount()), args.begin());
-    if (SLANG_FAILED(res))
+    // Add the args
+    for (const auto& arg : args.args)
     {
-        return res;
+        toolArgs.add(arg.getBuffer());
     }
-    return res;
-}
 
+    StdWriters stdWriters;
+    StringBuilder stdOut;
+    StringBuilder stdError;
+
+    // Make writer/s act as if they are the console.
+    RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
+    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
+
+    stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
+    stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
+
+    // HACK, to make behavior the same as previously
+    if (args.toolName== "slangc")
+    {
+        stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
+    }
+
+    const SlangResult funcRes = func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+
+    TestServerProtocol::ExecutionResult result;
+    result.result = funcRes;
+    result.stdError = stdError;
+    result.stdOut = stdOut;
+
+    result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
+    return m_connection->sendResult(&result);
+}
 
 SlangResult TestServer::execute()
 {
-    DiagnosticSink diagnosticSink;
-
     while (m_connection->isActive() && !m_quit)
     {
-        SlangResult res = _executeSingle();
-        if (m_quit)
-        {
-            break;
-        }
-
-        if (SLANG_FAILED(res))
-        {
-            // Return a result 
-        }
+        // Failure doesn't make the execution terminate
+        const SlangResult res = _executeSingle();
     }
 
     return SLANG_OK;

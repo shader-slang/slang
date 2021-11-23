@@ -22,5 +22,6 @@ DIAGNOSTIC(100000, Error, unableToLoadSharedLibrary, "Unable to load shared libr
 DIAGNOSTIC(100001, Error, unableToFindFunctionInSharedLibrary, "Unable to find function '$0' in shared library")
 DIAGNOSTIC(100002, Error, unableToGetUnitTestModule, "Unable to get unit test module")
 DIAGNOSTIC(100003, Error, unableToFindTest, "Unable to find test '$0'")
+DIAGNOSTIC(100004, Error, unableToFindUnitTestModule, "Unable to find unit test module '$0'")
 
 #undef DIAGNOSTIC
