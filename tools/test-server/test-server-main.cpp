@@ -339,12 +339,12 @@ SlangResult TestServer::_executeSingle()
             }
             else
             {
-                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound);
+                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
             }
         }
         default:
         {
-            return m_connection->sendError(JSONRPC::ErrorCode::ParseError);
+            return m_connection->sendError(JSONRPC::ErrorCode::InvalidRequest, m_connection->getCurrentMessageId());
         }
     }
 
@@ -379,14 +379,14 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     if (!testModule)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     const Index testIndex = _findTestIndex(testModule, args.testName);
     if (testIndex < 0)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     TestReporter testReporter;
@@ -450,7 +450,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     auto func = getToolFunction(args.toolName, sink);
     if (!func)
     {
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     // Assume we will used the shared session

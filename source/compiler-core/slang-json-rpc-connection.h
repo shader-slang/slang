@@ -55,8 +55,8 @@ public:
     SlangResult sendRPC(const T* data) { return sendRPC(GetRttiInfo<T>::get(), (const void*)data);  }
 
         /// Send an error
-    SlangResult sendError(JSONRPC::ErrorCode code);
-    SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg);
+    SlangResult sendError(JSONRPC::ErrorCode code, const JSONValue& id);
+    SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg, const JSONValue& id);
 
         /// Send a call
         /// If no id is needed, id can just be invalid 
@@ -111,7 +111,7 @@ public:
     bool isActive();
 
         /// Get the id of the current message
-    JSONValue getMessageId();
+    JSONValue getCurrentMessageId();
 
         /// Get the diagnostic sink. Can queue up errors before sending an error
     DiagnosticSink* getSink() { return &m_diagnosticSink;  }
