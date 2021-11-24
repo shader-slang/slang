@@ -210,6 +210,9 @@ namespace Slang
             return (const char*)(this + 1);
         }
 
+            /// Set the contents to be the slice. Must be enough capacity to hold the slice. 
+        void setContents(const UnownedStringSlice& slice);
+
         static const char* getData(const StringRepresentation* stringRep)
         {
             return stringRep ? stringRep->getData() : "";
@@ -245,6 +248,11 @@ namespace Slang
         {
             return createWithCapacityAndLength(length, length);
         }
+
+            /// Create a representation from the slice. If slice is empty will return nullptr.
+        static StringRepresentation* create(const UnownedStringSlice& slice);
+            /// Same as create, but representation will have refcount of 1 (if not nullptr)
+        static StringRepresentation* createWithReference(const UnownedStringSlice& slice);
 
         StringRepresentation* cloneWithCapacity(Index newCapacity)
         {

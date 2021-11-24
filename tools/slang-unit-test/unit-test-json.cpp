@@ -316,5 +316,45 @@ SLANG_UNIT_TEST(json)
 
         SLANG_CHECK(container->areEqual(a, c));
     }
+
+    {
+        RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+        const char aText[] = "{ \"a\" : \"Hi!\", \"b\" : 20.0, \"c\" : \"Hello\", \"d\" : 30, \"e\": null, \"f\": true }";
+
+        JSONBuilder builder(container);
+        SLANG_CHECK(SLANG_SUCCEEDED(_parse(aText, &sink, &builder)));
+        const JSONValue rootValue = builder.getRootValue();
+
+        List<PersistentJSONValue> values;
+
+        for (char c = 'a'; c <= 'f'; c++)
+        {
+            const char name[] = { c, 0 };
+            JSONKey key = container->getKey(UnownedStringSlice(name, 1));
+            auto value = container->findObjectValue(rootValue, key);
+
+            SLANG_CHECK(value.type != JSONValue::Type::Invalid);
+
+            PersistentJSONValue persistentValue(value, container);
+            values.add(persistentValue);
+
+            PersistentJSONValue copyValue(persistentValue);
+            PersistentJSONValue assignValue;
+            assignValue = persistentValue;
+
+            SLANG_CHECK(copyValue == persistentValue);
+            SLANG_CHECK(assignValue == persistentValue);
+        }
+
+        // Destroy the container
+        container.setNull();
+
+        SLANG_CHECK(values[0].getSlice() == "Hi!");
+        SLANG_CHECK(values[1].asFloat() == 20.0f);
+        SLANG_CHECK(values[2].getSlice() == "Hello");
+        SLANG_CHECK(values[3].asInteger() == 30);
+        SLANG_CHECK(values[4].type == JSONValue::Type::Null);
+        SLANG_CHECK(values[5].asBool() == true);
+    }
 }
 
