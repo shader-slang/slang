@@ -112,7 +112,7 @@ struct JSONValue
         double floatValue;                      ///< Float value
         int64_t intValue;                       ///< Integer value
         JSONKey stringKey;                      ///< The pool key if it's a string
-        StringRepresentation* stringRep;        ///< Only ever used on a 'SimpleJSONValue'
+        StringRepresentation* stringRep;        ///< Only ever used on a 'PersistentJSONValue'
     };
 
     static const Kind g_typeToKind[Index(Type::CountOf)];

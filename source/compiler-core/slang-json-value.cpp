@@ -145,7 +145,7 @@ double JSONValue::asFloat() const
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-                             SimpleJSONValue
+                             PersistentJSONValue
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -191,6 +191,7 @@ UnownedStringSlice PersistentJSONValue::getSlice() const
     {
         return StringRepresentation::asSlice(stringRep);
     }
+    SLANG_ASSERT(!"Not a string type");
     return UnownedStringSlice();
 }
 
@@ -202,39 +203,24 @@ void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc inLoc)
     loc = inLoc;
 
     StringRepresentation* newRep = nullptr;
+
     const auto sliceLength = slice.getLength();
+    
+    // If we have an oldRep that is unique and large enough reuse it
     if (sliceLength)
     {
-        // If we have an oldRep that is unique and large enough reuse it
         if (oldRep &&
             oldRep->isUniquelyReferenced() &&
             sliceLength <= oldRep->capacity)
         {
-            char* chars;
-            if (StringRepresentation::asSlice(oldRep).isMemoryContained(slice))
-            {
-                chars = oldRep->getData();
-                ::memmove(chars, slice.begin(), sliceLength * sizeof(char));
-            }
-            else
-            {
-                chars = newRep->getData();
-                ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
-            }
-            chars[sliceLength] = 0;
-
+            oldRep->setContents(slice);
             newRep = oldRep;
-            newRep->length = sliceLength;
+            // We are reusing so make null so not freed
             oldRep = nullptr;
         }
         else
         {
-            newRep = StringRepresentation::createWithLength(sliceLength);
-            newRep->addReference();
-
-            char* chars = newRep->getData();
-            ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
-            chars[sliceLength] = 0;
+            newRep = StringRepresentation::createWithReference(slice);    
         }
 
         SLANG_ASSERT(newRep->debugGetReferenceCount() >= 1);
@@ -252,20 +238,7 @@ void PersistentJSONValue::_init(const UnownedStringSlice& slice, SourceLoc inLoc
 {
     loc = inLoc;
     type = Type::StringRepresentation;
-    stringRep = nullptr;
-
-    const auto sliceLength = slice.getLength();
-    if (sliceLength)
-    {   
-        StringRepresentation* newStringRep = StringRepresentation::createWithLength(sliceLength);
-        newStringRep->addReference();
-
-        char* chars = newStringRep->getData();
-        ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
-        chars[sliceLength] = 0;
-
-        stringRep = newStringRep;
-    }
+    stringRep = StringRepresentation::createWithReference(slice);
 }
 
 bool PersistentJSONValue::operator==(const ThisType& rhs) const
@@ -1175,7 +1148,8 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
             case JSONValue::Type::StringValue:  return a.stringKey == b.stringKey;
             case JSONValue::Type::StringRepresentation:
             {
-                return a.stringRep == b.stringRep || getTransientString(a) == getTransientString(b);
+                return a.stringRep == b.stringRep ||
+                    StringRepresentation::asSlice(a.stringRep) == StringRepresentation::asSlice(b.stringRep);
             }
             case JSONValue::Type::Array:
             {
