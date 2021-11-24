@@ -6,78 +6,12 @@
 #include "slang-ir-optix-entry-point-uniforms.h"
 
 #include "slang-ir.h"
+#include "slang-ir-entry-point-pass.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-restructure.h"
 
 namespace Slang
 {
-
-struct PerEntryPointPass
-{
-    // We'll hang on to the module we are processing,
-    // so that we can refer to it when setting up `IRBuilder`s.
-    IRModule* module;
-
-    SharedIRBuilder* m_sharedBuilder = nullptr;
-
-    // We will process a whole module by visiting all
-    // its global functions, looking for entry points.
-    void processModule()
-    {
-        SharedIRBuilder sharedBuilder(module);
-        m_sharedBuilder = &sharedBuilder;
-
-        // Note that we are only looking at true global-scope
-        // functions and not functions nested inside of
-        // IR generics. When using generic entry points, this
-        // pass should be run after the entry point(s) have
-        // been specialized to their generic type parameters.
-
-        for( auto inst : module->getGlobalInsts() )
-        {
-            // We are only interested in entry points.
-            //
-            // Every entry point must be a function.
-            //
-            auto func = as<IRFunc>(inst);
-            if( !func )
-                continue;
-
-            // Entry points will always have the `[entryPoint]`
-            // decoration to differentiate them from ordinary
-            // functions.
-            //
-            auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
-            if(!entryPointDecor)
-                continue;
-            
-            // Check the IREntryPointDecoration for raytracing entry points
-            // (as SBT records are only relevant to raytracing)
-            if (!(
-                entryPointDecor->getProfile().getStage() == Stage::RayGeneration ||
-                entryPointDecor->getProfile().getStage() == Stage::Intersection ||
-                entryPointDecor->getProfile().getStage() == Stage::AnyHit ||
-                entryPointDecor->getProfile().getStage() == Stage::ClosestHit ||
-                entryPointDecor->getProfile().getStage() == Stage::Miss ||
-                entryPointDecor->getProfile().getStage() == Stage::Callable
-            )) continue;
-            
-            // If we find a candidate entry point, then we
-            // will process it.
-            processEntryPoint(func);
-        }
-    }
-
-    void processEntryPoint(IRFunc* entryPointFunc)
-    {
-        m_entryPointFunc = entryPointFunc;
-        processEntryPointImpl(entryPointFunc);
-    }
-
-    IRFunc* m_entryPointFunc = nullptr;
-
-    virtual void processEntryPointImpl(IRFunc* entryPointFunc) = 0;
-};
 
 struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
     
@@ -91,14 +25,31 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
     IRParam* collectedParam = nullptr;
     IRVarLayout* entryPointParamsLayout = nullptr;
 
-    void processEntryPointImpl(IRFunc* entryPointFunc) SLANG_OVERRIDE
+    void processEntryPointImpl(EntryPointInfo const& info) SLANG_OVERRIDE
     {
+        auto entryPointFunc = info.func;
+        auto entryPointDecoration = info.decoration;
+
         // This pass object may be used across multiple entry points,
         // so we need to make sure to reset state that could have been
         // left over from a previous entry point.
         //
         paramStructType = nullptr;
         collectedParam = nullptr;
+
+        // We only want to process entry points that are used in OptiX/ray-tracing
+        // stages, and not ordinary compute entry points (the entry-point `uniform`
+        // parameters of an ordinary compute entry point will translate to CUDA
+        // launch parameters).
+        //
+        switch( entryPointDecoration->getProfile().getStage() )
+        {
+        default:
+            break;
+
+        case Stage::Compute:
+            return;
+        }
 
         // We expect all entry points to have explicit layout information attached.
         //
@@ -287,7 +238,7 @@ struct CollectOptixEntryPointUniformParams : PerEntryPointPass {
 
         // First we create the structure to hold the parameters.
         //
-        builder.setInsertBefore(m_entryPointFunc);
+        builder.setInsertBefore(m_entryPoint.func);
         paramStructType = builder.createStructType();
         builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("ShaderRecordParams"));
 
@@ -318,8 +269,7 @@ void collectOptiXEntryPointUniformParams(
     // Insts of the module. For any ray tracing entry points, collect all uniform parameters into one
     // common struct, and replace parameter usage with SBT record accesses.
     CollectOptixEntryPointUniformParams context;
-    context.module = module;
-    context.processModule();
+    context.processModule(module);
 }
 
 }

@@ -32,7 +32,7 @@ SlangResult JSONParser::_parseObject()
     {
         JSONToken keyToken;
         SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::StringLiteral, keyToken));
-        m_listener->addKey(m_lexer->getLexeme(keyToken), keyToken.loc);
+        m_listener->addQuotedKey(m_lexer->getLexeme(keyToken), keyToken.loc);
 
         SLANG_RETURN_ON_FAIL(m_lexer->expect(JSONTokenType::Colon));
 
@@ -308,6 +308,8 @@ void JSONWriter::endObject(SourceLoc loc)
 
     m_state = m_stack.getLast();
     m_stack.removeLast();
+
+    _postValue();
 }
 
 void JSONWriter::startArray(SourceLoc loc)
@@ -343,20 +345,43 @@ void JSONWriter::endArray(SourceLoc loc)
 
     m_state = m_stack.getLast();
     m_stack.removeLast();
+
+    _postValue();
 }
 
-void JSONWriter::addKey(const UnownedStringSlice& key, SourceLoc loc)
+void JSONWriter::addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc)
 {
     SLANG_UNUSED(loc);
     SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
 
     _maybeEmitFieldComma();
+    _maybeEmitIndent();
+
+    // Output the key quoted
+    StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+    StringEscapeUtil::appendQuoted(handler, key, m_builder);
+
+    m_builder << " : ";
+
+    m_state.m_flags |= State::Flag::HasKey;
+    // We don't want it to emit a , after the :
+    m_state.m_flags &= ~State::Flag::HasPrevious;
+}
+
+void JSONWriter::addQuotedKey(const UnownedStringSlice& key, SourceLoc loc)
+{
+    SLANG_UNUSED(loc);
+    SLANG_ASSERT(m_state.m_kind == State::Kind::Object && (m_state.m_flags & State::Flag::HasKey) == 0);
 
     // It should be quoted
     SLANG_ASSERT(key.getLength() >= 2 && key[0] == '"' && key[key.getLength() - 1] == '"');
 
+    _maybeEmitFieldComma();
     _maybeEmitIndent();
-    m_builder << key << " : ";
+
+    m_builder << key;
+
+    m_builder << " : ";
 
     m_state.m_flags |= State::Flag::HasKey;
     // We don't want it to emit a , after the :

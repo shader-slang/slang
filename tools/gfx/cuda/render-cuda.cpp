@@ -186,6 +186,7 @@ public:
 
     uint64_t getBindlessHandle() { return (uint64_t)m_cudaMemory; }
 
+    void* m_cudaExternalMemory = nullptr;
     void* m_cudaMemory = nullptr;
 
     RefPtr<CUDAContext> m_cudaContext;
@@ -195,9 +196,10 @@ public:
         return (DeviceAddress)m_cudaMemory;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        *outHandle = getBindlessHandle();
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -242,9 +244,10 @@ public:
 
     RefPtr<CUDAContext> m_cudaContext;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
     {
-        *outHandle = getBindlessHandle();
+        outHandle->handleValue = getBindlessHandle();
+        outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
 };
@@ -554,6 +557,17 @@ public:
         *outEntryPoint = nullptr;
         return SLANG_OK;
     }
+
+    virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+    {
+        return m_data.getBuffer();
+    }
+
+    virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+    {
+        return (size_t)m_data.getCount();
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         setData(ShaderOffset const& offset, void const* data, size_t size) override
     {
@@ -892,6 +906,13 @@ private:
     String m_adapterName;
 
 public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override
+    {
+        outHandles->handles[0].handleValue = (uint64_t)m_device;
+        outHandles->handles[0].api = InteropHandleAPI::CUDA;
+        return SLANG_OK;
+    }
+
     class CommandQueueImpl;
 
     class CommandBufferImpl
@@ -956,6 +977,12 @@ public:
             {
                 m_writer->writeTimestamp(pool, index);
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+            {
+                SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
+            }
         };
 
         ComputeCommandEncoderImpl m_computeCommandEncoder;
@@ -1013,6 +1040,98 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
                 m_writer->writeTimestamp(pool, index);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+                ITextureResource* dst,
+                SubresourceRange dstSubresource,
+                ITextureResource::Offset3D dstOffset,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstSubresource);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTexture");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+                ITextureResource* dst,
+                SubresourceRange subResourceRange,
+                ITextureResource::Offset3D offset,
+                ITextureResource::Offset3D extent,
+                ITextureResource::SubresourceData* subResourceData,
+                size_t subResourceDataCount) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(subResourceRange);
+                SLANG_UNUSED(offset);
+                SLANG_UNUSED(extent);
+                SLANG_UNUSED(subResourceData);
+                SLANG_UNUSED(subResourceDataCount);
+                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+                IResourceView* view,
+                ClearValue* clearValue,
+                ClearResourceViewFlags::Enum flags) override
+            {
+                SLANG_UNUSED(view);
+                SLANG_UNUSED(clearValue);
+                SLANG_UNUSED(flags);
+                SLANG_UNIMPLEMENTED_X("clearResourceView");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+                ITextureResource* source,
+                SubresourceRange sourceRange,
+                ITextureResource* dest,
+                SubresourceRange destRange) override
+            {
+                SLANG_UNUSED(source);
+                SLANG_UNUSED(sourceRange);
+                SLANG_UNUSED(dest);
+                SLANG_UNUSED(destRange);
+                SLANG_UNIMPLEMENTED_X("resolveResource");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                size_t dstSize,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(dstSize);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+                ITextureResource* texture,
+                SubresourceRange subresourceRange,
+                ResourceState src,
+                ResourceState dst) override
+            {
+                SLANG_UNUSED(texture);
+                SLANG_UNUSED(subresourceRange);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(dst);
+                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
             }
         };
 
@@ -1081,9 +1200,12 @@ public:
             return m_desc;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL
-            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+        virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
+            SLANG_UNUSED(valueToSignal);
+            // TODO: implement fence.
+            assert(fence == nullptr);
             for (uint32_t i = 0; i < count; i++)
             {
                 execute(static_cast<CommandBufferImpl*>(commandBuffers[i]));
@@ -1281,6 +1403,8 @@ public:
 
         m_context = new CUDAContext();
 
+        int count = -1;
+        cuDeviceGetCount(&count);
         SLANG_CUDA_RETURN_ON_FAIL(cuDeviceGet(&m_device, m_deviceIndex));
 
         SLANG_CUDA_RETURN_WITH_REPORT_ON_FAIL(
@@ -1759,6 +1883,68 @@ public:
         return SLANG_OK;
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromSharedHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& desc,
+        IBufferResource** outResource) override
+    {
+        if (handle.handleValue == 0)
+        {
+            *outResource = nullptr;
+            return SLANG_OK;
+        }
+
+        RefPtr<MemoryCUDAResource> resource = new MemoryCUDAResource(desc);
+        resource->m_cudaContext = m_context;
+
+        // CUDA manages sharing of buffers through the idea of an
+        // "external memory" object, which represents the relationship
+        // with another API's objects. In order to create this external
+        // memory association, we first need to fill in a descriptor struct.
+        cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+        memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+        switch (handle.api)
+        {
+        case InteropHandleAPI::D3D12:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+            break;
+        case InteropHandleAPI::Vulkan:
+            externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+            break;
+        default:
+            return SLANG_FAIL;
+        }
+        externalMemoryHandleDesc.handle.win32.handle = (void*)handle.handleValue;
+        externalMemoryHandleDesc.size = desc.sizeInBytes;
+        externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+
+        // Once we have filled in the descriptor, we can request
+        // that CUDA create the required association between the
+        // external buffer and its own memory.
+        cudaExternalMemory_t externalMemory;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaImportExternalMemory(&externalMemory, &externalMemoryHandleDesc));
+        resource->m_cudaExternalMemory = externalMemory;
+
+        // The CUDA "external memory" handle is not itself a device
+        // pointer, so we need to query for a suitable device address
+        // for the buffer with another call.
+        //
+        // Just as for the external memory, we fill in a descriptor
+        // structure (although in this case we only need to specify
+        // the size).
+        cudaExternalMemoryBufferDesc bufferDesc;
+        memset(&bufferDesc, 0, sizeof(bufferDesc));
+        bufferDesc.size = desc.sizeInBytes;
+
+        // Finally, we can "map" the buffer to get a device address.
+        void* deviceAddress;
+        SLANG_CUDA_RETURN_ON_FAIL(cudaExternalMemoryGetMappedBuffer(&deviceAddress, externalMemory, &bufferDesc));
+        resource->m_cudaMemory = deviceAddress;
+
+        returnComPtr(outResource, resource);
+        return SLANG_OK;
+    }
+
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override
     {
@@ -2106,7 +2292,7 @@ SlangResult SLANG_MCALL createCUDADevice(const IDevice::Desc* desc, IDevice** ou
 {
     SLANG_UNUSED(desc);
     *outDevice = nullptr;
-    return SLANG_OK;
+    return SLANG_FAIL;
 }
 #endif
 

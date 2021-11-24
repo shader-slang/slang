@@ -42,6 +42,9 @@
     <ClInclude Include="..\..\..\source\core\slang-com-object.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-command-line.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -72,6 +75,9 @@
     <ClInclude Include="..\..\..\source\core\slang-hex-dump-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-http.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -99,6 +105,9 @@
     <ClInclude Include="..\..\..\source\core\slang-process-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-random-generator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -109,6 +118,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-riff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-rtti-info.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\source\core\slang-rtti-util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\source\core\slang-secure-crt.h">
@@ -194,6 +209,9 @@
     <ClCompile Include="..\..\..\source\core\slang-char-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-command-line.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-deflate-compression-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -204,6 +222,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-hex-dump-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-http.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-io.cpp">
@@ -221,6 +242,9 @@
     <ClCompile Include="..\..\..\source\core\slang-platform.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-process-util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-random-generator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -231,6 +255,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-riff.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-rtti-info.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\source\core\slang-rtti-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\source\core\slang-semantic-version.cpp">
@@ -284,7 +314,7 @@
     <ClCompile Include="..\..\..\source\core\slang-zip-file-system.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\source\core\windows\slang-win-process-util.cpp">
+    <ClCompile Include="..\..\..\source\core\windows\slang-win-process.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

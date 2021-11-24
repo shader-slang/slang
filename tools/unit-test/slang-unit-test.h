@@ -37,6 +37,7 @@ struct UnitTestContext
 {
     slang::IGlobalSession* slangGlobalSession;
     const char* workDirectory;
+    const char* executableDirectory;
     Slang::RenderApiFlags enabledApis;
 };
 

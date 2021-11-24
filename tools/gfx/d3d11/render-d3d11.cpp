@@ -1240,6 +1240,16 @@ protected:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.getBuffer();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
+        }
+
         SLANG_NO_THROW Result SLANG_MCALL
             setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
         {
@@ -3835,7 +3845,7 @@ Result D3D11Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         }
 
         dstDesc.IndependentBlendEnable = srcDesc.targetCount > 1;
-        dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverateEnable;
+        dstDesc.AlphaToCoverageEnable = srcDesc.alphaToCoverageEnable;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateBlendState(
             &dstDesc,

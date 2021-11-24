@@ -1405,7 +1405,7 @@ static SlangResult _calcCommandLine(OffsetBase& base, ReproUtil::RequestState* r
     {
         CommandLine cmdLine;
         _calcCommandLine(base, requestState, cmdLine);
-        String text = ProcessUtil::getCommandLineString(cmdLine);
+        String text = cmdLine.toString();
         builder << text << "\n";
     }
         
@@ -1564,7 +1564,7 @@ static SlangResult _findFirstSourcePath(EndToEndCompileRequest* request, String&
     for (int triesCount = 0; triesCount < maxTries; ++triesCount)
     {
         // We could include the count in some way perhaps, but for now let's just go with ticks
-        auto tick = ProcessUtil::getClockTick();
+        auto tick = Process::getClockTick();
 
         StringBuilder builder;
         builder << sourceBaseName << "-" << tick << ".slang-repro";

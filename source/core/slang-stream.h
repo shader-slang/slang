@@ -43,6 +43,9 @@ public:
         /// Implies any pending data is flushed.
 	virtual void close() = 0;
 
+        /// Only applicable for write streams, flushes any buffers to underlying representation (such as pipe, or file)
+    virtual SlangResult flush() = 0;
+
         /// Helper function that will also *fail* if the specified amount of bytes aren't read.
     SlangResult readExactly(void* buffer, size_t length);
 };
@@ -76,6 +79,7 @@ public:
     virtual bool canRead() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Read)) != 0; }
     virtual bool canWrite() SLANG_OVERRIDE { return (int(m_access) & int(FileAccess::Write)) != 0; }
     virtual void close() SLANG_OVERRIDE { m_access = FileAccess::None; }
+    virtual SlangResult flush() SLANG_OVERRIDE { return canWrite() ? SLANG_OK : SLANG_E_NOT_AVAILABLE; }
 
         /// Get the contents
     ConstArrayView<uint8_t> getContents() const { return ConstArrayView<uint8_t>(m_contents, m_contentsSize); }
@@ -159,6 +163,7 @@ public:
 	virtual bool canWrite() SLANG_OVERRIDE;
 	virtual void close() SLANG_OVERRIDE;
 	virtual bool isEnd() SLANG_OVERRIDE;
+    virtual SlangResult flush() SLANG_OVERRIDE;
 
     FileStream();
     
@@ -174,6 +179,80 @@ private:
     FileAccess m_fileAccess;            
     bool m_endReached = false;
 };
+
+/* A simple BufferedReader. The valid data is between m_startIndex and getCount().
+Can be used as a buffer to build up a result from a stream in memory using 'update' to read to the appropriate buffer size. 
+*/
+class BufferedReadStream : public Stream
+{
+public:
+    typedef Stream Super;
+
+    virtual Int64 getPosition() SLANG_OVERRIDE;
+    virtual SlangResult seek(SeekOrigin origin, Int64 offset) SLANG_OVERRIDE;
+    virtual SlangResult read(void* buffer, size_t length, size_t& outReadBytes) SLANG_OVERRIDE;
+    virtual SlangResult write(const void* buffer, size_t length) SLANG_OVERRIDE;
+    virtual bool canRead() SLANG_OVERRIDE;
+    virtual bool canWrite() SLANG_OVERRIDE;
+    virtual void close() SLANG_OVERRIDE;
+    virtual bool isEnd() SLANG_OVERRIDE;
+    virtual SlangResult flush() SLANG_OVERRIDE;
+
+        /// Will read assuming backing stream is 
+    SlangResult update();
+
+        /// Consume bytes in the buffer.
+    void consume(Index byteCount);
+
+    Byte* getBuffer() { return m_buffer.getBuffer() + m_startIndex; }
+    const Byte* getBuffer() const { return m_buffer.getBuffer() + m_startIndex; }
+
+    size_t getCount() const { return m_buffer.getCount() - m_startIndex; }
+
+        /// Read until the buffer contains the specified amount of bytes
+    SlangResult readUntilContains(size_t size);
+
+    ConstArrayView<Byte> getView() const { return ConstArrayView<Byte>(getBuffer(), Index(getCount())); }
+    ArrayView<Byte> getView() { return ArrayView<Byte>(getBuffer(), Index(getCount())); }
+
+    BufferedReadStream(Stream* stream) :
+        m_stream(stream),
+        m_startIndex(0)
+    {
+
+    }
+
+protected:
+
+    void _resetBuffer()
+    {
+        m_startIndex = 0;
+        m_buffer.setCount(0);
+    }
+
+    size_t m_defaultReadSize = 1024;   ///< When initiating a read the default read size
+    List<Byte> m_buffer;        ///< Holds the characters
+    Index m_startIndex;         ///< The start index
+    RefPtr<Stream> m_stream;    ///< Stream that is being read from
+};
+
+struct StreamUtil
+{
+        /// Appends all bytes that can be read from stream into bytes
+    static SlangResult readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes);
+
+        /// Read as much as can be read until a 0 sized read, or an error and append onto ioBytes
+        /// Read size controls the size of each buffer read. Passing 0, will use the default read size.
+    static SlangResult read(Stream* stream, size_t readSize, List<Byte>& ioBytes);
+
+    static SlangResult discard(Stream* stream);
+
+    static SlangResult discardAll(Stream* stream);
+
+    static SlangResult readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes);
+    static SlangResult readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes);
+};
+
 
 } // namespace Slang
 

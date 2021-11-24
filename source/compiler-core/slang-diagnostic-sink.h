@@ -228,6 +228,10 @@ public:
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
 
+        /// Reset state.
+        /// Resets error counts. Resets the output buffer.
+    void reset();
+
         /// Initialize state. 
     void init(SourceManager* sourceManager, SourceLocationLexer sourceLocationLexer);
 

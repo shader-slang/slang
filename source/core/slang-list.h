@@ -145,6 +145,15 @@ namespace Slang
             m_capacity = 0;
             return rs;
         }
+        void attachBuffer(T* buffer, Index count, Index capacity)
+        {
+            // Can only attach a buffer if there isn't a buffer already associated
+            SLANG_ASSERT(m_buffer == nullptr);
+            SLANG_ASSERT(count <= capacity);
+            m_buffer = buffer;
+            m_count = count;
+            m_capacity = capacity;
+        }
 
         inline ArrayView<T> getArrayView() const
         {
@@ -324,7 +333,9 @@ namespace Slang
 
         void reserve(Index size)
         {
-            if(size > m_capacity)
+            // The cast for this comparison is needed, otherwise some compilers erroneously detect
+            // the possiblity of a zero sized allocation (possible if m_capacity is assumed to be negative).
+            if(UIndex(size) > UIndex(m_capacity))
             {
                 T* newBuffer = _allocate(size);
                 if (m_capacity)

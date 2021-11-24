@@ -80,14 +80,25 @@ public:
         WindowHandle window,
         ISwapchain** outSwapchain) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
+        const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureResource(
         const ITextureResource::Desc& desc,
         const ITextureResource::SubresourceData* initData,
+        ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
         IBufferResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(
+        InteropHandle handle,
+        const IBufferResource::Desc& srcDesc,
+        IBufferResource** outResource) override;
+
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
@@ -149,7 +160,7 @@ public:
         return m_info;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) override;
 
     ~D3D12Device();
 
@@ -215,6 +226,14 @@ public:
         {
         }
 
+        ~BufferResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
+        }
+
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
@@ -225,9 +244,29 @@ public:
             return (DeviceAddress)m_resource.getResource()->GetGPUVirtualAddress();
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
+        {   
+            outHandle->handleValue = (uint64_t)m_resource.getResource();
+            outHandle->api = InteropHandleAPI::D3D12;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_resource.getResource();
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
+            ComPtr<ID3D12Device> pDevice;
+            auto pResource = m_resource.getResource();
+            pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
+            SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::D3D12;
+            sharedHandle = *outHandle;
             return SLANG_OK;
         }
     };
@@ -243,12 +282,31 @@ public:
         {
         }
 
+        ~TextureResourceImpl()
+        {
+            if (sharedHandle.handleValue != 0)
+            {
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+            }
+        }
+
         D3D12Resource m_resource;
         D3D12_RESOURCE_STATES m_defaultState;
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_resource.getResource();
+            outHandle->handleValue = (uint64_t)m_resource.getResource();
+            outHandle->api = InteropHandleAPI::D3D12;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
+        {
+            ComPtr<ID3D12Device> pDevice;
+            auto pResource = m_resource.getResource();
+            pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
+            SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
+            outHandle->api = InteropHandleAPI::Win32;
             return SLANG_OK;
         }
     };
@@ -2023,6 +2081,16 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.getBuffer();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
+        }
+
         SLANG_NO_THROW Result SLANG_MCALL
             setData(ShaderOffset const& inOffset, void const* data, size_t inSize) SLANG_OVERRIDE
         {
@@ -3314,6 +3382,75 @@ public:
             {
                 m_d3dCmdList->OMSetStencilRef((UINT)referenceValue);
             }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
+                uint32_t maxDrawCount,
+                IBufferResource* argBuffer,
+                uint64_t argOffset,
+                IBufferResource* countBuffer,
+                uint64_t countOffset) override
+            {
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
+                uint32_t maxDrawCount,
+                IBufferResource* argBuffer,
+                uint64_t argOffset,
+                IBufferResource* countBuffer,
+                uint64_t countOffset) override
+            {
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
+            }
+
+            virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
+                uint32_t samplesPerPixel,
+                uint32_t pixelCount,
+                const SamplePosition* samplePositions) override
+            {
+                SLANG_UNUSED(samplesPerPixel);
+                SLANG_UNUSED(pixelCount);
+                SLANG_UNUSED(samplePositions);
+                SLANG_UNIMPLEMENTED_X("setSamplePositions");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
+                UInt vertexCount,
+                UInt instanceCount,
+                UInt startVertex,
+                UInt startInstanceLocation) override
+            {
+                SLANG_UNUSED(vertexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startVertex);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawInstanced");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
+                uint32_t indexCount,
+                uint32_t instanceCount,
+                uint32_t startIndexLocation,
+                int32_t baseVertexLocation,
+                uint32_t startInstanceLocation) override
+            {
+                SLANG_UNUSED(indexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startIndexLocation);
+                SLANG_UNUSED(baseVertexLocation);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+            }
         };
 
         RenderCommandEncoderImpl m_renderCommandEncoder;
@@ -3373,6 +3510,12 @@ public:
                     }
                 }
                 m_d3dCmdList->Dispatch(x, y, z);
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL
+                dispatchComputeIndirect(IBufferResource* argBuffer, uint64_t offset) override
+            {
+                SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
             }
         };
 
@@ -3441,6 +3584,97 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
             {
                 static_cast<QueryPoolImpl*>(pool)->writeTimestamp(m_commandBuffer->m_cmdList, index);
+            }
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
+                ITextureResource* dst,
+                SubresourceRange dstSubresource,
+                ITextureResource::Offset3D dstOffset,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstSubresource);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTexture");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
+                ITextureResource* dst,
+                SubresourceRange subResourceRange,
+                ITextureResource::Offset3D offset,
+                ITextureResource::Offset3D extent,
+                ITextureResource::SubresourceData* subResourceData,
+                size_t subResourceDataCount) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(subResourceRange);
+                SLANG_UNUSED(offset);
+                SLANG_UNUSED(extent);
+                SLANG_UNUSED(subResourceData);
+                SLANG_UNUSED(subResourceDataCount);
+                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
+                IResourceView* view,
+                ClearValue* clearValue,
+                ClearResourceViewFlags::Enum flags) override
+            {
+                SLANG_UNUSED(view);
+                SLANG_UNUSED(clearValue);
+                SLANG_UNUSED(flags);
+                SLANG_UNIMPLEMENTED_X("clearResourceView");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
+                ITextureResource* source,
+                SubresourceRange sourceRange,
+                ITextureResource* dest,
+                SubresourceRange destRange) override
+            {
+                SLANG_UNUSED(source);
+                SLANG_UNUSED(sourceRange);
+                SLANG_UNUSED(dest);
+                SLANG_UNUSED(destRange);
+                SLANG_UNIMPLEMENTED_X("resolveResource");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
+                IBufferResource* dst,
+                size_t dstOffset,
+                size_t dstSize,
+                ITextureResource* src,
+                SubresourceRange srcSubresource,
+                ITextureResource::Offset3D srcOffset,
+                ITextureResource::Size extent) override
+            {
+                SLANG_UNUSED(dst);
+                SLANG_UNUSED(dstOffset);
+                SLANG_UNUSED(dstSize);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(srcSubresource);
+                SLANG_UNUSED(srcOffset);
+                SLANG_UNUSED(extent);
+                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+            }
+
+            virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
+                ITextureResource* texture,
+                SubresourceRange subresourceRange,
+                ResourceState src,
+                ResourceState dst) override
+            {
+                SLANG_UNUSED(texture);
+                SLANG_UNUSED(subresourceRange);
+                SLANG_UNUSED(src);
+                SLANG_UNUSED(dst);
+                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
             }
         };
 
@@ -3582,8 +3816,10 @@ public:
         }
         
         virtual SLANG_NO_THROW void SLANG_MCALL
-            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers) override
+            executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
+            // TODO: implement fence signal.
+            assert(fence == nullptr);
             ShortList<ID3D12CommandList*> commandLists;
             for (uint32_t i = 0; i < count; i++)
             {
@@ -3721,7 +3957,8 @@ public:
         size_t srcDataSize,
         D3D12Resource& uploadResource,
         D3D12_RESOURCE_STATES finalState,
-        D3D12Resource& resourceOut);
+        D3D12Resource& resourceOut,
+        bool isShared = false);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
@@ -3926,7 +4163,13 @@ SlangResult SLANG_MCALL createD3D12Device(const IDevice::Desc* desc, IDevice** o
 
 D3D12Device::~D3D12Device() { m_shaderObjectLayoutCache = decltype(m_shaderObjectLayoutCache)(); }
 
-static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::Desc& textureDesc, const D3D12_RESOURCE_DESC& desc, DXGI_FORMAT pixelFormat, D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
+static void _initSrvDesc(
+    IResource::Type resourceType,
+    const ITextureResource::Desc& textureDesc,
+    const D3D12_RESOURCE_DESC& desc,
+    DXGI_FORMAT pixelFormat,
+    SubresourceRange subresourceRange,
+    D3D12_SHADER_RESOURCE_VIEW_DESC& descOut)
 {
     // create SRV
     descOut = D3D12_SHADER_RESOURCE_VIEW_DESC();
@@ -3943,9 +4186,11 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
             default: assert(!"Unknown dimension");
         }
 
-        descOut.Texture2D.MipLevels = desc.MipLevels;
-        descOut.Texture2D.MostDetailedMip = 0;
-        descOut.Texture2D.PlaneSlice = 0;
+        descOut.Texture2D.MipLevels =
+            subresourceRange.mipLevelCount == 0 ? desc.MipLevels : subresourceRange.mipLevelCount;
+        descOut.Texture2D.MostDetailedMip = subresourceRange.mipLevel;
+        descOut.Texture2D.PlaneSlice =
+            D3DUtil::getPlaneSlice(descOut.Format, subresourceRange.aspectMask);
         descOut.Texture2D.ResourceMinLODClamp = 0.0f;
     }
     else if (resourceType == IResource::Type::TextureCube)
@@ -3954,18 +4199,24 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
         {
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
 
-            descOut.TextureCubeArray.NumCubes = textureDesc.arraySize;
-            descOut.TextureCubeArray.First2DArrayFace = 0;
-            descOut.TextureCubeArray.MipLevels = desc.MipLevels;
-            descOut.TextureCubeArray.MostDetailedMip = 0;
+            descOut.TextureCubeArray.NumCubes = subresourceRange.layerCount == 0
+                                                    ? textureDesc.arraySize
+                                                    : subresourceRange.layerCount / 6;
+            descOut.TextureCubeArray.First2DArrayFace = subresourceRange.baseArrayLayer;
+            descOut.TextureCubeArray.MipLevels = subresourceRange.mipLevelCount == 0
+                                                     ? desc.MipLevels
+                                                     : subresourceRange.mipLevelCount;
+            descOut.TextureCubeArray.MostDetailedMip = subresourceRange.mipLevel;
             descOut.TextureCubeArray.ResourceMinLODClamp = 0;
         }
         else
         {
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 
-            descOut.TextureCube.MipLevels = desc.MipLevels;
-            descOut.TextureCube.MostDetailedMip = 0;
+            descOut.TextureCube.MipLevels = subresourceRange.mipLevelCount == 0
+                                                ? desc.MipLevels
+                                                : subresourceRange.mipLevelCount;
+            descOut.TextureCube.MostDetailedMip = subresourceRange.mipLevel;
             descOut.TextureCube.ResourceMinLODClamp = 0;
         }
     }
@@ -3982,16 +4233,19 @@ static void _initSrvDesc(IResource::Type resourceType, const ITextureResource::D
             default: assert(!"Unknown dimension");
         }
 
-        descOut.Texture2DArray.ArraySize = desc.DepthOrArraySize;
-        descOut.Texture2DArray.MostDetailedMip = 0;
-        descOut.Texture2DArray.MipLevels = desc.MipLevels;
-        descOut.Texture2DArray.FirstArraySlice = 0;
-        descOut.Texture2DArray.PlaneSlice = 0;
+        descOut.Texture2DArray.ArraySize =
+            subresourceRange.layerCount == 0 ? desc.DepthOrArraySize : subresourceRange.layerCount;
+        descOut.Texture2DArray.MostDetailedMip = subresourceRange.mipLevel;
+        descOut.Texture2DArray.MipLevels =
+            subresourceRange.mipLevelCount == 0 ? desc.MipLevels : subresourceRange.mipLevelCount;
+        descOut.Texture2DArray.FirstArraySlice = subresourceRange.baseArrayLayer;
+        descOut.Texture2DArray.PlaneSlice =
+            D3DUtil::getPlaneSlice(descOut.Format, subresourceRange.aspectMask);
         descOut.Texture2DArray.ResourceMinLODClamp = 0;
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
@@ -4003,9 +4257,12 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
 
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, resourceDesc, initialState, nullptr));
+        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
     }
 
     {
@@ -4139,9 +4396,10 @@ Result D3D12Device::captureTextureToSurface(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!! Renderer interface !!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Result D3D12Device::getNativeHandle(NativeHandle* outHandle)
+Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    *outHandle = NativeHandle::fromD3D12Handle(m_device);
+    outHandles->handles[0].handleValue = (uint64_t)m_device;
+    outHandles->handles[0].api = InteropHandleAPI::D3D12;
     return SLANG_OK;
 }
 
@@ -4320,7 +4578,7 @@ Result D3D12Device::initialize(const Desc& desc)
         return SLANG_FAIL;
     }
 
-    if (desc.existingDeviceHandles.getD3D12Device() == 0)
+    if (desc.existingDeviceHandles.handles[0].handleValue == 0)
     {
         FlagCombiner combiner;
         // TODO: we should probably provide a command-line option
@@ -4353,7 +4611,7 @@ Result D3D12Device::initialize(const Desc& desc)
     else
     {
         // Store the existing device handle in desc in m_deviceInfo
-        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.getD3D12Device();
+        m_deviceInfo.m_device = (ID3D12Device*)desc.existingDeviceHandles.handles[0].handleValue;
     }
 
     // Set the device
@@ -4633,13 +4891,8 @@ static D3D12_RESOURCE_DIMENSION _calcResourceDimension(IResource::Type type)
     }
 }
 
-Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+Result setupResourceDesc(D3D12_RESOURCE_DESC& resourceDesc, const ITextureResource::Desc& srcDesc)
 {
-    // Description of uploading on Dx12
-    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
-
-    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
-
     const DXGI_FORMAT pixelFormat = D3DUtil::getMapFormat(srcDesc.format);
     if (pixelFormat == DXGI_FORMAT_UNKNOWN)
     {
@@ -4655,10 +4908,6 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     }
 
     const int numMipMaps = srcDesc.numMipLevels;
-
-    // Setup desc
-    D3D12_RESOURCE_DESC resourceDesc;
-
     resourceDesc.Dimension = dimension;
     resourceDesc.Format = pixelFormat;
     resourceDesc.Width = srcDesc.size.width;
@@ -4675,6 +4924,33 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     resourceDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     resourceDesc.Alignment = 0;
+
+    return SLANG_OK;
+}
+
+Result D3D12Device::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    TextureResource::Desc srcDesc = fixupTextureDesc(desc);
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    setupResourceDesc(resourceDesc, srcDesc);
+    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    *outSize = allocInfo.SizeInBytes;
+    *outAlignment = allocInfo.Alignment;
+    return SLANG_OK;
+}
+
+Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, const ITextureResource::SubresourceData* initData, ITextureResource** outResource)
+{
+    // Description of uploading on Dx12
+    // https://msdn.microsoft.com/en-us/library/windows/desktop/dn899215%28v=vs.85%29.aspx
+
+    TextureResource::Desc srcDesc = fixupTextureDesc(descIn);
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    setupResourceDesc(resourceDesc, srcDesc);
+    const int arraySize = calcEffectiveArraySize(srcDesc);
+    const int numMipMaps = srcDesc.numMipLevels;
 
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
 
@@ -4695,7 +4971,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         {
             clearValuePtr = nullptr;
         }
-        clearValue.Format = pixelFormat;
+        clearValue.Format = resourceDesc.Format;
         memcpy(clearValue.Color, &descIn.optimalClearValue.color, sizeof(clearValue.Color));
         clearValue.DepthStencil.Depth = descIn.optimalClearValue.depthStencil.depth;
         clearValue.DepthStencil.Stencil = descIn.optimalClearValue.depthStencil.stencil;
@@ -4714,13 +4990,21 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     List<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> layouts;
     layouts.setCount(numMipMaps);
     List<UInt64> mipRowSizeInBytes;
-    mipRowSizeInBytes.setCount(numMipMaps);
+    mipRowSizeInBytes.setCount(srcDesc.numMipLevels);
     List<UInt32> mipNumRows;
     mipNumRows.setCount(numMipMaps);
 
     // NOTE! This is just the size for one array upload -> not for the whole texture
     UInt64 requiredSize = 0;
-    m_device->GetCopyableFootprints(&resourceDesc, 0, numMipMaps, 0, layouts.begin(), mipNumRows.begin(), mipRowSizeInBytes.begin(), &requiredSize);
+    m_device->GetCopyableFootprints(
+        &resourceDesc,
+        0,
+        srcDesc.numMipLevels,
+        0,
+        layouts.begin(),
+        mipNumRows.begin(),
+        mipRowSizeInBytes.begin(),
+        &requiredSize);
 
     // Sub resource indexing
     // https://msdn.microsoft.com/en-us/library/windows/desktop/dn705766(v=vs.85).aspx#subresource_indexing
@@ -4853,6 +5137,23 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
     return SLANG_OK;
 }
 
+Result D3D12Device::createTextureFromNativeHandle(InteropHandle handle, const ITextureResource::Desc& srcDesc, ITextureResource** outResource)
+{
+    RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
+
+    if (handle.api == InteropHandleAPI::D3D12)
+    {
+        texture->m_resource.setResource((ID3D12Resource*)handle.handleValue);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
+
+    returnComPtr(outResource, texture);
+    return SLANG_OK;
+}
+
 Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     BufferResource::Desc srcDesc = fixupBufferDesc(descIn);
@@ -4871,7 +5172,24 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource));
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared));
+
+    returnComPtr(outResource, buffer);
+    return SLANG_OK;
+}
+
+Result D3D12Device::createBufferFromNativeHandle(InteropHandle handle, const IBufferResource::Desc& srcDesc, IBufferResource** outResource)
+{
+    RefPtr<BufferResourceImpl> buffer(new BufferResourceImpl(srcDesc));
+
+    if (handle.api == InteropHandleAPI::D3D12)
+    {
+        buffer->m_resource.setResource((ID3D12Resource*)handle.handleValue);
+    }
+    else
+    {
+        return SLANG_FAIL;
+    }
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
@@ -5010,6 +5328,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_desc = desc;
+    bool isArray = resourceImpl->getDesc()->arraySize != 0;
     switch (desc.type)
     {
     default:
@@ -5024,13 +5343,27 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             switch (desc.renderTarget.shape)
             {
             case IResource::Type::Texture1D:
-                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE1D;
+                rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE1DARRAY
+                                                : D3D12_RTV_DIMENSION_TEXTURE1D;
                 rtvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
                 break;
             case IResource::Type::Texture2D:
-                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-                rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
-                rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                if (resourceImpl->getDesc()->sampleDesc.numSamples > 1)
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2DMS;
+                    rtvDesc.Texture2DMSArray.ArraySize = desc.renderTarget.arraySize;
+                    rtvDesc.Texture2DMSArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
+                else
+                {
+                    rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
+                                                    : D3D12_RTV_DIMENSION_TEXTURE2D;
+                    rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
+                    rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                    rtvDesc.Texture2DArray.ArraySize = desc.renderTarget.arraySize;
+                    rtvDesc.Texture2DArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
                 break;
             case IResource::Type::Texture3D:
                 rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE3D;
@@ -5077,7 +5410,49 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
 
             SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
             viewImpl->m_allocator = m_cpuViewHeap;
-            m_device->CreateUnorderedAccessView(resourceImpl->m_resource, nullptr, nullptr, viewImpl->m_descriptor.cpuHandle);
+            D3D12_UNORDERED_ACCESS_VIEW_DESC d3d12desc = {};
+            auto& resourceDesc = *resourceImpl->getDesc();
+            d3d12desc.Format = gfxIsTypelessFormat(texture->getDesc()->format)
+                                   ? D3DUtil::getMapFormat(desc.format)
+                                   : D3DUtil::getMapFormat(texture->getDesc()->format);
+            switch (resourceImpl->getDesc()->type)
+            {
+            case IResource::Type::Texture1D:
+                d3d12desc.ViewDimension = resourceDesc.arraySize == 0
+                                              ? D3D12_UAV_DIMENSION_TEXTURE1D
+                                              : D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
+                d3d12desc.Texture1D.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture1DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                                                         ? resourceDesc.arraySize
+                                                         : desc.subresourceRange.layerCount;
+                d3d12desc.Texture1DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+
+                break;
+            case IResource::Type::Texture2D:
+                d3d12desc.ViewDimension = resourceDesc.arraySize == 0
+                                              ? D3D12_UAV_DIMENSION_TEXTURE2D
+                                              : D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+                d3d12desc.Texture2D.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture2D.PlaneSlice =
+                    D3DUtil::getPlaneSlice(d3d12desc.Format, desc.subresourceRange.aspectMask);
+                d3d12desc.Texture2DArray.ArraySize = desc.subresourceRange.layerCount == 0
+                                                         ? resourceDesc.arraySize
+                                                         : desc.subresourceRange.layerCount;
+                d3d12desc.Texture2DArray.FirstArraySlice = desc.subresourceRange.baseArrayLayer;
+                break;
+            case IResource::Type::Texture3D:
+                d3d12desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+                d3d12desc.Texture3D.MipSlice = desc.subresourceRange.mipLevel;
+                d3d12desc.Texture3D.FirstWSlice = desc.subresourceRange.baseArrayLayer;
+                d3d12desc.Texture3D.WSize = desc.subresourceRange.layerCount == 0
+                                                ? resourceDesc.size.depth
+                                                : desc.subresourceRange.layerCount;
+                break;
+            default:
+                return SLANG_FAIL;
+            }
+            m_device->CreateUnorderedAccessView(
+                resourceImpl->m_resource, nullptr, &d3d12desc, viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
@@ -5093,7 +5468,13 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 gfxIsTypelessFormat(texture->getDesc()->format) ? D3DUtil::getMapFormat(desc.format) : resourceDesc.Format;
 
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-            _initSrvDesc(resourceImpl->getType(), *resourceImpl->getDesc(), resourceDesc, pixelFormat, srvDesc);
+            _initSrvDesc(
+                resourceImpl->getType(),
+                *resourceImpl->getDesc(),
+                resourceDesc,
+                pixelFormat,
+                desc.subresourceRange,
+                srvDesc);
 
             m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
         }
@@ -5123,24 +5504,33 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
-            uavDesc.Buffer.FirstElement = 0;
+            uavDesc.Buffer.FirstElement = desc.bufferRange.firstElement;
 
-            if(resourceDesc.elementSize)
+            if (resourceDesc.elementSize)
             {
                 uavDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
-                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
+                uavDesc.Buffer.NumElements =
+                    desc.bufferRange.elementCount == 0
+                        ? UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize)
+                        : desc.bufferRange.elementCount;
             }
             else if(desc.format == Format::Unknown)
             {
                 uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
                 uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+                uavDesc.Buffer.NumElements = desc.bufferRange.elementCount == 0
+                                                 ? UINT(resourceDesc.sizeInBytes / 4)
+                                                 : desc.bufferRange.elementCount / 4;
             }
             else
             {
                 FormatInfo sizeInfo;
                 gfxGetFormatInfo(desc.format, &sizeInfo);
-                uavDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
+                assert(sizeInfo.pixelsPerBlock == 1);
+                uavDesc.Buffer.NumElements =
+                    desc.bufferRange.elementCount == 0
+                        ? UINT(resourceDesc.sizeInBytes / sizeInfo.blockSizeInBytes)
+                        : desc.bufferRange.elementCount;
             }
 
 
@@ -5159,24 +5549,34 @@ Result D3D12Device::createBufferView(IBufferResource* buffer, IResourceView::Des
             srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
             srvDesc.Format = D3DUtil::getMapFormat(desc.format);
             srvDesc.Buffer.StructureByteStride = 0;
-            srvDesc.Buffer.FirstElement = 0;
+            srvDesc.Buffer.FirstElement = desc.bufferRange.firstElement;
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
             if(resourceDesc.elementSize)
             {
                 srvDesc.Buffer.StructureByteStride = resourceDesc.elementSize;
-                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize);
+                srvDesc.Buffer.NumElements =
+                    desc.bufferRange.elementCount == 0
+                        ? UINT(resourceDesc.sizeInBytes / resourceDesc.elementSize)
+                        : desc.bufferRange.elementCount;
             }
             else if(desc.format == Format::Unknown)
             {
                 srvDesc.Buffer.Flags |= D3D12_BUFFER_SRV_FLAG_RAW;
                 srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / 4);
+                srvDesc.Buffer.NumElements = desc.bufferRange.elementCount == 0
+                                                 ? UINT(resourceDesc.sizeInBytes / 4)
+                                                 : desc.bufferRange.elementCount / 4;
+                
             }
             else
             {
                 FormatInfo sizeInfo;
                 gfxGetFormatInfo(desc.format, &sizeInfo);
-                srvDesc.Buffer.NumElements = UINT(resourceDesc.sizeInBytes / (sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock));
+                assert(sizeInfo.pixelsPerBlock == 1);
+                srvDesc.Buffer.NumElements =
+                    desc.bufferRange.elementCount == 0
+                        ? UINT(resourceDesc.sizeInBytes / sizeInfo.blockSizeInBytes)
+                        : desc.bufferRange.elementCount;
             }
 
             SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
@@ -5297,10 +5697,10 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
         dstEle.SemanticName = semanticName;
         dstEle.SemanticIndex = (UINT)srcEle.semanticIndex;
         dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
-        dstEle.InputSlot = 0;
+        dstEle.InputSlot = (UINT)srcEle.bufferSlotIndex;
         dstEle.AlignedByteOffset = (UINT)srcEle.offset;
-        dstEle.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
-        dstEle.InstanceDataStepRate = 0;
+        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcEle.slotClass);
+        dstEle.InstanceDataStepRate = (UINT)srcEle.instanceDataStepRate;
     }
 
     returnComPtr(outLayout, layout);
@@ -5499,10 +5899,15 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         if (framebufferLayout->m_hasDepthStencil)
         {
             psoDesc.DSVFormat = D3DUtil::getMapFormat(framebufferLayout->m_depthStencil.format);
+            psoDesc.SampleDesc.Count = framebufferLayout->m_depthStencil.sampleCount;
         }
         else
         {
             psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+            if (framebufferLayout->m_renderTargets.getCount())
+            {
+                psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
+            }
         }
         psoDesc.NumRenderTargets = numRenderTargets;
         for (Int i = 0; i < numRenderTargets; i++)
@@ -5511,43 +5916,57 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
                 D3DUtil::getMapFormat(framebufferLayout->m_renderTargets[i].format);
         }
 
-        psoDesc.SampleDesc.Count = 1;
         psoDesc.SampleDesc.Quality = 0;
-
         psoDesc.SampleMask = UINT_MAX;
     }
 
     {
         auto& rs = psoDesc.RasterizerState;
-        rs.FillMode = D3D12_FILL_MODE_SOLID;
-        rs.CullMode = D3D12_CULL_MODE_NONE;
-        rs.FrontCounterClockwise = FALSE;
-        rs.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
-        rs.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
-        rs.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-        rs.DepthClipEnable = TRUE;
-        rs.MultisampleEnable = FALSE;
-        rs.AntialiasedLineEnable = FALSE;
-        rs.ForcedSampleCount = 0;
-        rs.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+        rs.FillMode = D3DUtil::getFillMode(desc.rasterizer.fillMode);
+        rs.CullMode = D3DUtil::getCullMode(desc.rasterizer.cullMode);
+        rs.FrontCounterClockwise =
+            desc.rasterizer.frontFace == gfx::FrontFaceMode::CounterClockwise ? TRUE : FALSE;
+        rs.DepthBias = desc.rasterizer.depthBias;
+        rs.DepthBiasClamp = desc.rasterizer.depthBiasClamp;
+        rs.SlopeScaledDepthBias = desc.rasterizer.slopeScaledDepthBias;
+        rs.DepthClipEnable = desc.rasterizer.depthClipEnable ? TRUE : FALSE;
+        rs.MultisampleEnable = desc.rasterizer.multisampleEnable ? TRUE : FALSE;
+        rs.AntialiasedLineEnable = desc.rasterizer.antialiasedLineEnable ? TRUE : FALSE;
+        rs.ForcedSampleCount = desc.rasterizer.forcedSampleCount;
+        rs.ConservativeRaster = desc.rasterizer.enableConservativeRasterization
+                                    ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+                                    : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
     }
 
     {
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
-
-        blend.AlphaToCoverageEnable = FALSE;
         blend.IndependentBlendEnable = FALSE;
-        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
+        blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
-            FALSE,FALSE,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-            D3D12_LOGIC_OP_NOOP,
-            D3D12_COLOR_WRITE_ENABLE_ALL,
-        };
-        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+            auto& d3dDesc = blend.RenderTarget[i];
+            d3dDesc.BlendEnable = desc.blend.targets[i].enableBlend ? TRUE : FALSE;
+            d3dDesc.BlendOp = D3DUtil::getBlendOp(desc.blend.targets[i].color.op);
+            d3dDesc.BlendOpAlpha = D3DUtil::getBlendOp(desc.blend.targets[i].alpha.op);
+            d3dDesc.DestBlend = D3DUtil::getBlendFactor(desc.blend.targets[i].color.dstFactor);
+            d3dDesc.DestBlendAlpha = D3DUtil::getBlendFactor(desc.blend.targets[i].alpha.dstFactor);
+            d3dDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+            d3dDesc.LogicOpEnable = FALSE;
+            d3dDesc.RenderTargetWriteMask = desc.blend.targets[i].writeMask;
+            d3dDesc.SrcBlend = D3DUtil::getBlendFactor(desc.blend.targets[i].color.srcFactor);
+            d3dDesc.SrcBlendAlpha = D3DUtil::getBlendFactor(desc.blend.targets[i].alpha.srcFactor);
+        }
+        for (uint32_t i = 1; i < desc.blend.targetCount; i++)
         {
-            blend.RenderTarget[i] = defaultRenderTargetBlendDesc;
+            if (memcmp(&desc.blend.targets[i], &desc.blend.targets[0], sizeof(desc.blend.targets[0])) != 0)
+            {
+                blend.IndependentBlendEnable = TRUE;
+                break;
+            }
+        }
+        for (uint32_t i = (uint32_t)desc.blend.targetCount; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        {
+            blend.RenderTarget[i] = blend.RenderTarget[0];
         }
     }
 

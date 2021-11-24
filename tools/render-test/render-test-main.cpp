@@ -63,7 +63,7 @@ using namespace Slang;
 static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
 {
     WriterHelper out = StdWriters::getOut();
-    double time = double(endTicks - startTicks) / ProcessUtil::getClockFrequency();
+    double time = double(endTicks - startTicks) / Process::getClockFrequency();
     out.print("profile-time=%g\n", time);
 }
 
@@ -202,7 +202,7 @@ struct AssignValsFromLayoutContext
         ComPtr<IBufferResource> bufferResource;
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBufferResource(srcBuffer, /*entry.isOutput,*/ bufferSize, bufferData.getBuffer(), device, bufferResource));
 
-        IResourceView::Desc viewDesc;
+        IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = srcBuffer.format;
         auto bufferView = device->createBufferView(
@@ -225,7 +225,7 @@ struct AssignValsFromLayoutContext
 
         auto sampler = _createSamplerState(device, samplerEntry->samplerDesc);
 
-        IResourceView::Desc viewDesc;
+        IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::ShaderResource;
         auto textureView = device->createTextureView(
             texture,
@@ -252,7 +252,7 @@ struct AssignValsFromLayoutContext
         SLANG_RETURN_ON_FAIL(ShaderRendererUtil::generateTextureResource(
             srcVal->textureDesc, defaultState, device, texture));
 
-        IResourceView::Desc viewDesc;
+        IResourceView::Desc viewDesc = {};
         viewDesc.type = viewType;
         viewDesc.format = texture->getDesc()->format;
         auto textureView = device->createTextureView(
@@ -618,7 +618,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.allowedStates = ResourceState::RenderTarget;
     m_colorBuffer = m_device->createTextureResource(colorBufferDesc, nullptr);
 
-    gfx::IResourceView::Desc colorBufferViewDesc;
+    gfx::IResourceView::Desc colorBufferViewDesc = {};
     memset(&colorBufferViewDesc, 0, sizeof(colorBufferViewDesc));
     colorBufferViewDesc.format = gfx::Format::R8G8B8A8_UNORM;
     colorBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
@@ -626,7 +626,7 @@ void RenderTestApp::_initializeRenderPass()
     ComPtr<gfx::IResourceView> rtv =
         m_device->createTextureView(m_colorBuffer.get(), colorBufferViewDesc);
 
-    gfx::IResourceView::Desc depthBufferViewDesc;
+    gfx::IResourceView::Desc depthBufferViewDesc = {};
     memset(&depthBufferViewDesc, 0, sizeof(depthBufferViewDesc));
     depthBufferViewDesc.format = gfx::Format::D32_FLOAT;
     depthBufferViewDesc.renderTarget.shape = gfx::IResource::Type::Texture2D;
@@ -991,7 +991,7 @@ Result RenderTestApp::update()
     }
     commandBuffer->close();
 
-    m_startTicks = ProcessUtil::getClockTick();
+    m_startTicks = Process::getClockTick();
     m_queue->executeCommandBuffer(commandBuffer);
     m_queue->wait();
 
@@ -1030,7 +1030,7 @@ Result RenderTestApp::update()
             // Note we don't do the same with screen rendering -> as that will do a lot of work, which may swamp any computation
             // so can only really profile compute shaders at the moment
 
-            const uint64_t endTicks = ProcessUtil::getClockTick();
+            const uint64_t endTicks = Process::getClockTick();
 
             _outputProfileTime(m_startTicks, endTicks);
         }

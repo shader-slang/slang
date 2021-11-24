@@ -60,3 +60,4 @@ prelude/*.h.cpp
 /source/slang/slang-stdlib-generated.h
 
 /examples/heterogeneous-hello-world/shader.cpp
+/multiple-definitions.hlsl

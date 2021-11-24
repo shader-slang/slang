@@ -139,6 +139,7 @@ SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Swapchain)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(TransientResourceHeap)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(QueryPool)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(AccelerationStructure, ResourceView)
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Fence)
 
 
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL
@@ -177,6 +178,7 @@ SLANG_GFX_DEBUG_GET_OBJ_IMPL(Swapchain)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(TransientResourceHeap)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(QueryPool)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(AccelerationStructure)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(Fence)
 
 #undef SLANG_GFX_DEBUG_GET_OBJ_IMPL
 
@@ -285,9 +287,9 @@ void validateAccelerationStructureBuildInputs(
     }
 }
 
-Result DebugDevice::getNativeHandle(NativeHandle* outHandle)
+Result DebugDevice::getNativeDeviceHandles(InteropHandles* outHandles)
 {
-    return baseObject->getNativeHandle(outHandle);
+    return baseObject->getNativeDeviceHandles(outHandles);
 }
 
 Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt* outFeatureCount)
@@ -295,6 +297,12 @@ Result DebugDevice::getFeatures(const char** outFeatures, UInt bufferSize, UInt*
     SLANG_GFX_API_FUNC;
 
     return baseObject->getFeatures(outFeatures, bufferSize, outFeatureCount);
+}
+
+Result DebugDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getFormatSupportedResourceStates(format, outStates);
 }
 
 DebugDevice::DebugDevice()
@@ -347,6 +355,21 @@ Result DebugDevice::createTextureResource(
     return result;
 }
 
+Result DebugDevice::createTextureFromNativeHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    ITextureResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
+    auto result = baseObject->createTextureFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,
@@ -355,8 +378,37 @@ Result DebugDevice::createBufferResource(
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
-    auto result =
-        baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
+    auto result = baseObject->createBufferResource(desc, initData, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
+Result DebugDevice::createBufferFromNativeHandle(
+    InteropHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
+    auto result = baseObject->createBufferFromNativeHandle(handle, srcDesc, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
+Result DebugDevice::createBufferFromSharedHandle(
+    InteropHandle handle,
+    const IBufferResource::Desc& srcDesc,
+    IBufferResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugBufferResource> outObject = new DebugBufferResource();
+    auto result = baseObject->createBufferFromSharedHandle(handle, srcDesc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outResource, outObject);
@@ -583,6 +635,13 @@ Result DebugDevice::createMutableShaderObject(
     return result;
 }
 
+Result DebugDevice::createMutableRootShaderObject(
+    IShaderProgram* program, IShaderObject** outObject)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->createMutableRootShaderObject(program, outObject);
+}
+
 Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     SLANG_GFX_API_FUNC;
@@ -695,6 +754,29 @@ Result DebugDevice::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** o
     return SLANG_OK;
 }
 
+Result DebugDevice::createFence(const IFence::Desc& desc, IFence** outFence)
+{
+    SLANG_GFX_API_FUNC;
+    RefPtr<DebugFence> result = new DebugFence();
+    SLANG_RETURN_ON_FAIL(baseObject->createFence(desc, result->baseObject.writeRef()));
+    returnComPtr(outFence, result);
+    return SLANG_OK;
+}
+
+Result DebugDevice::waitForFences(
+    uint32_t fenceCount, IFence** fences, uint64_t* values , bool waitForAll, uint64_t timeout)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->waitForFences(fenceCount, fences, values, waitForAll, timeout);
+}
+
+Result DebugDevice::getTextureAllocationInfo(
+    const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);
+}
+
 IResource::Type DebugBufferResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -709,12 +791,32 @@ IBufferResource::Desc* DebugBufferResource::getDesc()
 
 DeviceAddress DebugBufferResource::getDeviceAddress()
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getDeviceAddress();
 }
 
-Result DebugBufferResource::getNativeHandle(NativeHandle* outHandle)
+Result DebugBufferResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
-    return baseObject->getNativeHandle(outHandle);
+    SLANG_GFX_API_FUNC;
+    return baseObject->getNativeResourceHandle(outHandle);
+}
+
+Result DebugBufferResource::getSharedHandle(InteropHandle* outHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSharedHandle(outHandle);
+}
+
+Result DebugBufferResource::setDebugName(const char* name)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setDebugName(name);
+}
+
+const char* DebugBufferResource::getDebugName()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getDebugName();
 }
 
 IResource::Type DebugTextureResource::getType()
@@ -729,10 +831,25 @@ ITextureResource::Desc* DebugTextureResource::getDesc()
     return baseObject->getDesc();
 }
 
-Result DebugTextureResource::getNativeHandle(NativeHandle* outHandle)
+Result DebugTextureResource::getNativeResourceHandle(InteropHandle* outHandle)
 {
-    return baseObject->getNativeHandle(outHandle);
+    SLANG_GFX_API_FUNC;
+    return baseObject->getNativeResourceHandle(outHandle);
 }
+
+Result DebugTextureResource::getSharedHandle(InteropHandle* outHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSharedHandle(outHandle);
+}
+
+Result DebugTextureResource::setDebugName(const char* name)
+{
+    return baseObject->setDebugName(name);
+}
+
+const char* DebugTextureResource::getDebugName() { return baseObject->getDebugName(); }
+
 
 DebugCommandBuffer::DebugCommandBuffer()
 {
@@ -897,6 +1014,13 @@ void DebugComputeCommandEncoder::dispatchCompute(int x, int y, int z)
     baseObject->dispatchCompute(x, y, z);
 }
 
+void DebugComputeCommandEncoder::dispatchComputeIndirect(
+    IBufferResource* cmdBuffer, uint64_t offset)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->dispatchComputeIndirect(getInnerObj(cmdBuffer), offset);
+}
+
 void DebugComputeCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
 {
     SLANG_GFX_API_FUNC;
@@ -982,6 +1106,30 @@ void DebugRenderCommandEncoder::drawIndexed(UInt indexCount, UInt startIndex, UI
     baseObject->drawIndexed(indexCount, startIndex, baseVertex);
 }
 
+void DebugRenderCommandEncoder::drawIndirect(
+    uint32_t maxDrawCount,
+    IBufferResource* argBuffer,
+    uint64_t argOffset,
+    IBufferResource* countBuffer,
+    uint64_t countOffset)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->drawIndirect(
+        maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
+}
+
+void DebugRenderCommandEncoder::drawIndexedIndirect(
+    uint32_t maxDrawCount,
+    IBufferResource* argBuffer,
+    uint64_t argOffset,
+    IBufferResource* countBuffer,
+    uint64_t countOffset)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->drawIndexedIndirect(
+        maxDrawCount, getInnerObj(argBuffer), argOffset, getInnerObj(countBuffer), countOffset);
+}
+
 void DebugRenderCommandEncoder::setStencilReference(uint32_t referenceValue)
 {
     SLANG_GFX_API_FUNC;
@@ -992,6 +1140,33 @@ void DebugRenderCommandEncoder::writeTimestamp(IQueryPool* pool, SlangInt index)
 {
     SLANG_GFX_API_FUNC;
     baseObject->writeTimestamp(static_cast<DebugQueryPool*>(pool)->baseObject, index);
+}
+
+Result DebugRenderCommandEncoder::setSamplePositions(
+    uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setSamplePositions(samplesPerPixel, pixelCount, samplePositions);
+}
+
+void DebugRenderCommandEncoder::drawInstanced(
+    UInt vertexCount, UInt instanceCount, UInt startVertex, UInt startInstanceLocation)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->drawInstanced(
+        vertexCount, instanceCount, startVertex, startInstanceLocation);
+}
+
+void DebugRenderCommandEncoder::drawIndexedInstanced(
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startIndexLocation,
+    int32_t baseVertexLocation,
+    uint32_t startInstanceLocation)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->drawIndexedInstanced(
+        indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
 }
 
 void DebugResourceCommandEncoder::endEncoding()
@@ -1061,6 +1236,80 @@ void DebugResourceCommandEncoder::bufferBarrier(
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
     baseObject->bufferBarrier(count, innerBuffers.getBuffer(), src, dst);
+}
+
+void DebugResourceCommandEncoder::copyTexture(
+    ITextureResource* dst,
+    SubresourceRange dstSubresource,
+    ITextureResource::Offset3D dstOffset,
+    ITextureResource* src,
+    SubresourceRange srcSubresource,
+    ITextureResource::Offset3D srcOffset,
+    ITextureResource::Size extent)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->copyTexture(
+        getInnerObj(dst),
+        dstSubresource,
+        dstOffset,
+        getInnerObj(src),
+        srcSubresource,
+        srcOffset,
+        extent);
+}
+
+void DebugResourceCommandEncoder::uploadTextureData(
+    ITextureResource* dst,
+    SubresourceRange subResourceRange,
+    ITextureResource::Offset3D offset,
+    ITextureResource::Offset3D extent,
+    ITextureResource::SubresourceData* subResourceData,
+    size_t subResourceDataCount)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->uploadTextureData(
+        getInnerObj(dst), subResourceRange, offset, extent, subResourceData, subResourceDataCount);
+}
+
+void DebugResourceCommandEncoder::clearResourceView(
+    IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
+}
+
+void DebugResourceCommandEncoder::resolveResource(
+    ITextureResource* source,
+    SubresourceRange sourceRange,
+    ITextureResource* dest,
+    SubresourceRange destRange)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->resolveResource(getInnerObj(source), sourceRange, getInnerObj(dest), destRange);
+}
+
+void DebugResourceCommandEncoder::copyTextureToBuffer(
+    IBufferResource* dst,
+    size_t dstOffset,
+    size_t dstSize,
+    ITextureResource* src,
+    SubresourceRange srcSubresource,
+    ITextureResource::Offset3D srcOffset,
+    ITextureResource::Size extent)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->copyTextureToBuffer(
+        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcSubresource, srcOffset, extent);
+}
+
+void DebugResourceCommandEncoder::textureSubresourceBarrier(
+    ITextureResource* texture,
+    SubresourceRange subresourceRange,
+    ResourceState src,
+    ResourceState dst)
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->textureSubresourceBarrier(getInnerObj(texture), subresourceRange, src, dst);
 }
 
 void DebugRayTracingCommandEncoder::endEncoding()
@@ -1189,7 +1438,7 @@ const ICommandQueue::Desc& DebugCommandQueue::getDesc()
     return baseObject->getDesc();
 }
 
-void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers)
+void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal)
 {
     SLANG_GFX_API_FUNC;
     List<ICommandBuffer*> innerCommandBuffers;
@@ -1215,7 +1464,7 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
             }
         }
     }
-    baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer());
+    baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
 }
 
 void DebugCommandQueue::wait() { baseObject->wait(); }
@@ -1420,12 +1669,14 @@ Result DebugShaderObject::setSpecializationArgs(
     const slang::SpecializationArg* args,
     uint32_t count)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->setSpecializationArgs(offset, args, count);
 }
 
 Result DebugShaderObject::getCurrentVersion(
     ITransientResourceHeap* transientHeap, IShaderObject** outObject)
 {
+    SLANG_GFX_API_FUNC;
     ComPtr<IShaderObject> innerObject;
     SLANG_RETURN_ON_FAIL(baseObject->getCurrentVersion(getInnerObj(transientHeap), innerObject.writeRef()));
     RefPtr<DebugShaderObject> debugShaderObject = new DebugShaderObject();
@@ -1433,6 +1684,30 @@ Result DebugShaderObject::getCurrentVersion(
     debugShaderObject->m_typeName = innerObject->getElementTypeLayout()->getName();
     returnComPtr(outObject, debugShaderObject);
     return SLANG_OK;
+}
+
+Result DebugShaderObject::copyFrom(IShaderObject* other)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->copyFrom(getInnerObj(other));
+}
+
+const void* DebugShaderObject::getRawData()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getRawData();
+}
+
+size_t DebugShaderObject::getSize()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSize();
+}
+
+Result DebugShaderObject::setConstantBufferOverride(IBufferResource* constantBuffer)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setConstantBufferOverride(getInnerObj(constantBuffer));
 }
 
 DebugObjectBase::DebugObjectBase()
@@ -1488,6 +1763,30 @@ IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
     SLANG_GFX_API_FUNC;
 
     return baseObject->getViewDesc();
+}
+
+Result DebugFence::getSharedHandle(InteropHandle* outHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getSharedHandle(outHandle);
+}
+
+Result DebugFence::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getNativeHandle(outNativeHandle);
+}
+
+Result DebugFence::getCurrentValue(uint64_t* outValue)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getCurrentValue(outValue);
+}
+
+Result DebugFence::setCurrentValue(uint64_t value)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->setCurrentValue(value);
 }
 
 } // namespace gfx

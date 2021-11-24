@@ -6,7 +6,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\tools\test-proxy\test-proxy-main.cpp">
+    <ClCompile Include="..\..\..\tools\test-process\test-process-main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

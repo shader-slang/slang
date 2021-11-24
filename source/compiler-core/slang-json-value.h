@@ -9,6 +9,8 @@
 
 #include "slang-json-parser.h"
 
+#include "../core/slang-rtti-info.h"
+
 namespace Slang {
 
 typedef uint32_t JSONKey;
@@ -48,6 +50,8 @@ struct JSONValue
         FloatValue,
         StringValue,
 
+        StringRepresentation,
+
         Array,
         Object,
 
@@ -66,6 +70,7 @@ struct JSONValue
     static JSONValue makeEmptyArray(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Array; value.loc = loc; value.rangeIndex = 0; return value; }
     static JSONValue makeEmptyObject(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Object; value.loc = loc; value.rangeIndex = 0; return value; }
 
+    static JSONValue makeInvalid(SourceLoc loc = SourceLoc()) { JSONValue value; value.type = Type::Invalid; value.loc = loc; return value; }
     // The following functions only work if the value is stored directly NOT as a lexeme. Use the methods on the container
     // to access values if it is potentially stored as a lexeme
 
@@ -97,20 +102,26 @@ struct JSONValue
         /// Given a type return the associated kind
     static Kind getKindForType(Type type) { return g_typeToKind[Index(type)]; }
 
-    Type type;                  ///< The type of value
+    Type type = Type::Invalid;  ///< The type of value
     SourceLoc loc;              ///< The (optional) location in source of this value.
 
     union 
     {
-        Index rangeIndex;           ///< Used for Array/Object
-        Index length;               ///< Length in bytes if it is a 'Lexeme'
-        double floatValue;          ///< Float value
-        int64_t intValue;           ///< Integer value
-        JSONKey stringKey;          ///< The pool key if it's a string
+        Index rangeIndex;                       ///< Used for Array/Object
+        Index length;                           ///< Length in bytes if it is a 'Lexeme'
+        double floatValue;                      ///< Float value
+        int64_t intValue;                       ///< Integer value
+        JSONKey stringKey;                      ///< The pool key if it's a string
+        StringRepresentation* stringRep;        ///< Only ever used on a 'PersistentJSONValue'
     };
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
+
+    static const OtherRttiInfo g_rttiInfo;
 };
+
+template <>
+struct GetRttiInfo<JSONValue> { static const RttiInfo* get() { return &JSONValue::g_rttiInfo; } };
 
 struct JSONKeyValue
 {
@@ -128,7 +139,71 @@ struct JSONKeyValue
     SourceLoc keyLoc;
     JSONValue value;
 
+    static JSONKeyValue make(JSONKey inKey, JSONValue inValue, SourceLoc inKeyLoc = SourceLoc())
+    {
+        return JSONKeyValue{ inKey, inKeyLoc, inValue };
+    }
+
     static JSONKeyValue g_invalid;
+};
+
+class JSONContainer;
+
+/* Is similar to JSONValue, but is designed to
+
+* Only be able to hold 'Simple' types (ie not array/object)
+* Does not reference/require JSONContainer.
+
+Not requiring JSONContainer means it's useful to hold state when JSONContainer goes out of scope.
+Care may need to be taken if sourceManager goes out of scope, sourceLocs may become invalid. This
+is true of a regular JSONValue.
+
+Care must also be taken because it is derived from JSONValue. It *can* be sliced and work correctly,
+but *requires* that the PersistentJSONValue with same value to stay in scope in general. In practice
+this is only an issue with StringRepresention type.
+*/
+class PersistentJSONValue : public JSONValue
+{
+public:
+    typedef JSONValue Super;
+    typedef PersistentJSONValue ThisType;
+
+        /// If it's a string type this will always work
+    String getString() const;
+    UnownedStringSlice getSlice() const;
+
+        /// Set to the value
+    void set(const JSONValue& in, JSONContainer* container);
+        /// Set directly to a string
+    void set(const UnownedStringSlice& slice, SourceLoc loc);
+
+        /// True if identical
+    bool operator==(const ThisType& rhs) const;
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        /// Assignable
+    void operator=(const ThisType& rhs);
+
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container) { _init(in, container); }
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { _init(in, container); loc = inLoc; }
+
+        /// Copy Ctor
+    PersistentJSONValue(const ThisType& rhs);
+        /// Default Ctor (will be set to invalid)
+    PersistentJSONValue() {}
+
+    
+    ~PersistentJSONValue()
+    {
+        if (type == Type::StringRepresentation && stringRep)
+        {
+            stringRep->releaseReference();
+        }
+    }
+protected:
+        /// Assumes this has no valid data
+    void _init(const JSONValue& in, JSONContainer* container);
+    void _init(const UnownedStringSlice& slice, SourceLoc loc);
 };
 
 class JSONContainer : public RefObject
@@ -154,6 +229,11 @@ public:
         /// Get the value at the index in the array
     JSONValue& getAt(const JSONValue& array, Index index);
 
+        /// Returns the index of key in obj, or -1 if not found
+    Index findObjectIndex(const JSONValue& obj, JSONKey key) const;
+        /// Get the value in the object at key. Returns invalid if not found.
+    JSONValue findObjectValue(const JSONValue& obj, JSONKey key) const;
+
         /// Returns the index 
     Index findKeyGlobalIndex(const JSONValue& obj, JSONKey key);
     Index findKeyGlobalIndex(const JSONValue& obj, const UnownedStringSlice& slice);
@@ -175,7 +255,11 @@ public:
         /// Returns string as a key
     JSONKey getStringKey(const JSONValue& in);
 
-        /// Get as a string. 
+        /// Get as a string. The slice may used backing lexeme (ie will only last
+        /// as long as the backing JSON text, or be decoded and be transitory).
+    UnownedStringSlice getTransientString(const JSONValue& in);
+
+        /// Get as a string. The contents will stay in scope as long as the container
     UnownedStringSlice getString(const JSONValue& in);
 
         /// Gets the lexeme
@@ -183,6 +267,8 @@ public:
 
         /// Get a key for a name
     JSONKey getKey(const UnownedStringSlice& slice);
+        /// Returns JSONKey(0) if not found
+    JSONKey findKey(const UnownedStringSlice& slice) const;
         /// Get the string from the key
     UnownedStringSlice getStringFromKey(JSONKey key) const { return m_slicePool.getSlice(StringSlicePool::Handle(key)); }
 
@@ -192,6 +278,8 @@ public:
     bool areEqual(const JSONValue& a, const JSONValue& b);
     bool areEqual(const JSONValue* a, const JSONValue* b, Index count);
     bool areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+
+    bool areEqual(const JSONValue& a, const UnownedStringSlice& slice);
 
         /// Destroy value
     void destroy(JSONValue& value);
@@ -203,6 +291,19 @@ public:
 
         /// Returns the source manager used. 
     SourceManager* getSourceManager() const { return m_sourceManager; } 
+        /// Set the source manager
+    void setSourceManager(SourceManager* sourceManger) { m_sourceManager = sourceManger;  }
+
+        /// Clears all the source locs. Useful if the sourceManager is no longer available, or has itself been reset.
+        /// All JSONValues which were Lexeme based will become held in the container
+        /// The source manager will set to nullptr
+    void clearSourceManagerDependency(JSONValue* ioValues, Index count);
+
+        /// Reset the state
+    void reset();
+
+        /// Return inValue as a regular value (ie not held as a lexeme)
+    JSONValue asValue(const JSONValue& inValue);
 
         // Ctor
     JSONContainer(SourceManager* sourceManger);
@@ -246,6 +347,9 @@ protected:
         /// True if the key and value are equal
     bool _areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
 
+    void _clearSourceManagerDependency(JSONValue* ioValues, Index count);
+    JSONValue _removeManagerDependency(const JSONValue& inValue);
+
     StringBuilder m_buf;                        ///< A temporary buffer used to hold unescaped strings
 
     SourceView* m_currentView = nullptr;
@@ -276,7 +380,8 @@ public:
     virtual void endObject(SourceLoc loc) SLANG_OVERRIDE;
     virtual void startArray(SourceLoc loc) SLANG_OVERRIDE;
     virtual void endArray(SourceLoc loc) SLANG_OVERRIDE;
-    virtual void addKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addQuotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
+    virtual void addUnquotedKey(const UnownedStringSlice& key, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addLexemeValue(JSONTokenType type, const UnownedStringSlice& value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addIntegerValue(int64_t value, SourceLoc loc) SLANG_OVERRIDE;
     virtual void addFloatValue(double value, SourceLoc loc) SLANG_OVERRIDE;
@@ -302,9 +407,15 @@ protected:
             Object,
             Array,
         };
+        void setKey(JSONKey key, SourceLoc loc) { m_key = key; m_keyLoc = loc; }
+        void resetKey() { m_key = JSONKey(0); m_keyLoc = SourceLoc(); }
+        bool hasKey() const { return m_key != JSONKey(0); }
+
         Kind m_kind;
         Index m_startIndex;
         SourceLoc m_loc;
+        JSONKey m_key;
+        SourceLoc m_keyLoc;
     };
 
     void _popState();
@@ -321,9 +432,9 @@ protected:
     State m_state;
 
     JSONContainer* m_container;
-
-    JSONKeyValue m_keyValue;
     JSONValue m_rootValue;
+
+    StringBuilder m_work;
 };
 
 } // namespace Slang

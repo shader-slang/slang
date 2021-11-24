@@ -425,14 +425,24 @@ void SourceManager::initialize(
 
     m_parent = p;
 
-    if( p )
+    _resetLoc();
+}
+
+SourceManager::~SourceManager()
+{
+    _resetSource();
+}
+
+void SourceManager::_resetLoc()
+{
+    if (m_parent)
     {
         // If we have a parent source manager, then we assume that all code at that level
         // has already been loaded, and it is safe to start our own source locations
         // right after those from the parent.
         //
         // TODO: more clever allocation in cases where that might not be reasonable
-        m_startLoc = p->m_nextLoc;
+        m_startLoc = m_parent->m_nextLoc;
     }
     else
     {
@@ -444,7 +454,7 @@ void SourceManager::initialize(
     m_nextLoc = m_startLoc;
 }
 
-SourceManager::~SourceManager()
+void SourceManager::_resetSource()
 {
     for (auto item : m_sourceViews)
     {
@@ -455,6 +465,18 @@ SourceManager::~SourceManager()
     {
         delete item;
     }
+
+    m_sourceViews.clear();
+    m_sourceFiles.clear();
+
+    m_sourceFileMap.Clear();
+}
+
+
+void SourceManager::reset()
+{
+    _resetSource();
+    _resetLoc();
 }
 
 UnownedStringSlice SourceManager::allocateStringSlice(const UnownedStringSlice& slice)
