@@ -119,12 +119,12 @@ SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const Uno
     return sendRPC(&errorResponse);
 }
 
-SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst)
+SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id)
 {
     m_diagnosticSink.outputBuffer.Clear();
     if (SLANG_FAILED(JSONRPCUtil::convertToNative(&m_container, value, &m_diagnosticSink, info, dst)))
     {
-        return sendError(JSONRPC::ErrorCode::InvalidRequest, getCurrentMessageId());
+        return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
     }
     return SLANG_OK;
 }

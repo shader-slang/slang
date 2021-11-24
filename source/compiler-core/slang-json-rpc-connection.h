@@ -42,12 +42,12 @@ public:
     void disconnect();
 
         /// Convert value to dst. Will write response on fails
-    SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst);
+    SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id);
     template <typename T>
-    SlangResult toNativeOrSendError(const JSONValue& value, T* data) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data); }
+    SlangResult toNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data, id); }
 
     template <typename T>
-    SlangResult toValidNativeOrSendError(const JSONValue& value, T* data);
+    SlangResult toValidNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id);
 
         /// Send a RPC response (ie should only be one of the JSONRPC classes)
     SlangResult sendRPC(const RttiInfo* info, const void* data);
@@ -144,7 +144,7 @@ protected:
 
 // ---------------------------------------------------------------------------
 template <typename T>
-SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, T* data)
+SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id)
 {
     const RttiInfo* rttiInfo = GetRttiInfo<T>::get();
 
@@ -158,7 +158,7 @@ SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, 
             m_diagnosticSink.diagnose(SourceLoc(), JSONDiagnostics::argsAreInvalid, namedRttiInfo->m_name);
         }
 
-        return sendError(JSONRPC::ErrorCode::InvalidRequest);
+        return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
     }
     return SLANG_OK;
 }
