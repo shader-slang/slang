@@ -368,6 +368,8 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
 
 SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
+    PersistentJSONValue id(call.id, m_connection->getContainer(), SourceLoc());
+
     TestServerProtocol::ExecuteUnitTestArgs args;
     SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
 
@@ -432,11 +434,13 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, m_connection->getMessageId());
+    return m_connection->sendResult(&result, id);
 }
 
 SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
+    PersistentJSONValue id(call.id, m_connection->getContainer(), SourceLoc());
+
     TestServerProtocol::ExecuteToolTestArgs args;
     
     SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
@@ -493,7 +497,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.stdOut = stdOut;
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result);
+    return m_connection->sendResult(&result, id);
 }
 
 SlangResult TestServer::execute()
