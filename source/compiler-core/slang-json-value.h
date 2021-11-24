@@ -233,8 +233,16 @@ public:
         /// Set the source manager
     void setSourceManager(SourceManager* sourceManger) { m_sourceManager = sourceManger;  }
 
+        /// Clears all the source locs. Useful if the sourceManager is no longer available, or has itself been reset.
+        /// All JSONValues which were Lexeme based will become held in the container
+        /// The source manager will set to nullptr
+    void clearSourceManagerDependency(JSONValue* ioValues, Index count);
+
         /// Reset the state
     void reset();
+
+        /// Return inValue as a regular value (ie not held as a lexeme)
+    JSONValue asValue(const JSONValue& inValue);
 
         // Ctor
     JSONContainer(SourceManager* sourceManger);
@@ -277,6 +285,9 @@ protected:
     bool _areEqualValues(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
         /// True if the key and value are equal
     bool _areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+
+    void _clearSourceManagerDependency(JSONValue* ioValues, Index count);
+    JSONValue _removeManagerDependency(const JSONValue& inValue);
 
     StringBuilder m_buf;                        ///< A temporary buffer used to hold unescaped strings
 

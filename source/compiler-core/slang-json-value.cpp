@@ -401,6 +401,82 @@ bool JSONContainer::asBool(const JSONValue& value)
     }
 }
 
+JSONValue JSONContainer::asValue(const JSONValue& inValue)
+{
+    JSONValue value = inValue;
+    switch (value.type)
+    {
+        case JSONValue::Type::StringLexeme:
+        {
+            const UnownedStringSlice slice = getTransientString(inValue);
+            value.stringKey = getKey(slice);
+            value.type = JSONValue::Type::StringValue;
+            break;
+        }
+        case JSONValue::Type::IntegerLexeme:
+        {
+            value.floatValue = value.asFloat();
+            value.type = JSONValue::Type::IntegerValue;
+            break;
+        }
+        case JSONValue::Type::FloatLexeme:
+        {
+            value.floatValue = value.asFloat();
+            value.type = JSONValue::Type::FloatValue;
+            break;
+        }
+        default: break;
+    }
+
+    return value;
+}
+
+void JSONContainer::_clearSourceManagerDependency(JSONValue* ioValues, Index count)
+{
+    for (Index i = 0; i < count; ++i)
+    {
+        auto& value = ioValues[i];
+        value = asValue(value);
+        value.loc = SourceLoc();
+    }
+}
+
+void JSONContainer::clearSourceManagerDependency(JSONValue* ioValues, Index valuesCount)
+{
+    _clearSourceManagerDependency(ioValues, valuesCount);
+
+    // We need to find ranges that are available
+    for (auto& range : m_ranges)
+    {
+        switch (range.type)
+        {
+            case Range::Type::Array:
+            {
+                _clearSourceManagerDependency(m_arrayValues.getBuffer() + range.startIndex, range.count);
+                break;
+            }
+            case Range::Type::Object:
+            {
+                const Index count = range.count;
+                auto pairs = m_objectValues.getBuffer() + range.startIndex;
+
+                for (Index i = 0; i < count; ++i)
+                {
+                    auto& pair = pairs[i];
+                    pair.keyLoc = SourceLoc();
+                    pair.value = asValue(pair.value);
+                    pair.value.loc = SourceLoc();
+                }
+                break;
+            }
+            default: break;
+        }
+    }
+
+    // Remove the source manager
+    m_sourceManager = nullptr;
+}
+
 int64_t JSONContainer::asInteger(const JSONValue& value)
 {
     switch (value.type)
