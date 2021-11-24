@@ -119,6 +119,10 @@ public:
         /// Get the container
     JSONContainer* getContainer() { return &m_container;  }
 
+        /// Turn a value into a persistant value. This will also remove any sourceLoc under the assumption that it's highly likely
+        /// it will become invalid in most usage scenarios. 
+    PersistentJSONValue getPersistentValue(const JSONValue& value) { return PersistentJSONValue(value, &m_container, SourceLoc()); }
+
         /// Dtor
     ~JSONRPCConnection() { disconnect(); }
 
