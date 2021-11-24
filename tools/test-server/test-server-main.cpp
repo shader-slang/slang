@@ -371,7 +371,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     PersistentJSONValue id(call.id, m_connection->getContainer(), SourceLoc());
 
     TestServerProtocol::ExecuteUnitTestArgs args;
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, call.id));
 
     auto sink = m_connection->getSink();
 
@@ -443,7 +443,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     TestServerProtocol::ExecuteToolTestArgs args;
     
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, id));
 
     auto sink = m_connection->getSink();
 
