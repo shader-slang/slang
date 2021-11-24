@@ -148,7 +148,7 @@ SlangResult JSONRPCConnection::toValidNativeOrSendError(const JSONValue& value, 
 {
     const RttiInfo* rttiInfo = GetRttiInfo<T>::get();
 
-    SLANG_RETURN_ON_FAIL(toNativeOrSendError(value, rttiInfo, (void*)data));
+    SLANG_RETURN_ON_FAIL(toNativeOrSendError(value, rttiInfo, (void*)data, id));
     if (!data->isValid())
     {
         // If it has a name add validation info
