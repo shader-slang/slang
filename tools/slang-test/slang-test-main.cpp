@@ -3752,6 +3752,9 @@ SlangResult innerMain(int argc, char** argv)
 int main(int argc, char** argv)
 {
     const SlangResult res = innerMain(argc, argv);
+
+    Slang::RttiInfo::deallocateAll();
+
 #ifdef _MSC_VER
     _CrtDumpMemoryLeaks();
 #endif
