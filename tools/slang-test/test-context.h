@@ -107,6 +107,12 @@ class TestContext
         /// True if can run unit tests
     bool canRunUnitTests() const { return options.apiOnly == false; }
 
+        /// Given a spawn type, return the final spawn type.
+        /// In particular we want 'Default' spawn type to vary by the environment (for example running on test server on CI)
+    SpawnType getFinalSpawnType(SpawnType spawnType);
+
+    SpawnType getFinalSpawnType();
+
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);

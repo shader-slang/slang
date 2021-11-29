@@ -170,4 +170,25 @@ bool TestContext::canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFla
     return (requiredFlags & options.enabledApis) == requiredFlags;
 }
 
+SpawnType TestContext::getFinalSpawnType(SpawnType spawnType)
+{
+    if (spawnType == SpawnType::Default)
+    {
+        if (options.outputMode == TestOutputMode::Default)
+        {
+            return SpawnType::UseSharedLibrary;
+        }
+        else
+        {
+            return SpawnType::UseTestServer;
+        }
+    }
 
+    // Just return whatever spawnType was passed in
+    return spawnType;
+}
+
+SpawnType TestContext::getFinalSpawnType()
+{
+    return getFinalSpawnType(options.defaultSpawnType);
+}

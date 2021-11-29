@@ -134,10 +134,6 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->defaultSpawnType = SpawnType::UseFullyIsolatedTestServer;
         }
-        else if (strcmp(arg, "-use-test-server") == 0)
-        {
-            optionsOut->defaultSpawnType = SpawnType::UseTestServer;
-        }
         else if (strcmp(arg, "-v") == 0)
         {
             optionsOut->shouldBeVerbose = true;
