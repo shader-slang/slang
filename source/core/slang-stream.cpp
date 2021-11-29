@@ -696,8 +696,9 @@ static int _getBufferOptions(StreamBufferStyle style)
         // https://www.cplusplus.com/reference/cstdio/setvbuf/
 
         // NOTE! We don't set a buffer here (we pass in nullptr).
-        // Passing is fine for 'no buffering'. It's not clear if it sets default for
-        // other options, but seems likely because it's documented as a suggestion.
+        // Passing nullptr is fine for 'no buffering' and sets a 'dynamic buffer' for others.
+        // But it's not clear the behavior is around the buffer size. It seems the size is a
+        // 'suggestion' so it will set the default but the documentation is unclear.
         if (setvbuf(file, nullptr, options, 0) == 0)
         {
             return SLANG_OK;
