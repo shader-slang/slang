@@ -109,6 +109,11 @@ struct RttiInfo
         /// Is thread safe, and doesn't require the memory to be freed explicitly
         /// Will be freed at shutdown (via global dtor)
     static void* allocate(size_t size);
+        /// Will free up any allocations. Can only be called at shutdown, and there are guarenteed no uses of
+        /// RttiInfo - otherwise contents may be undefined.
+        /// NOTE! Memory *will* be freed with final dtors, but if memory check functions are used they can report
+        /// this memory.
+    static void deallocateAll();
 
     static bool isIntegral(RttiInfo::Kind kind) { return Index(kind) >= Index(RttiInfo::Kind::I32) && Index(kind) <= Index(RttiInfo::Kind::U64); }
     static bool isFloat(RttiInfo::Kind kind) { return kind == RttiInfo::Kind::F32 || kind == RttiInfo::Kind::F64; }
