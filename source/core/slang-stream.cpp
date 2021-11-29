@@ -663,4 +663,49 @@ SlangResult BufferedReadStream::readUntilContains(size_t size)
     }
 }
 
+static FILE* _getFileFromStdStreamType(StdStreamType stdStream)
+{
+    switch (stdStream)
+    {
+        case StdStreamType::ErrorOut: return stderr;
+        case StdStreamType::Out:   return stdout;
+        case StdStreamType::In:    return stdin;
+        default: return nullptr;
+    }
+}
+
+static int _getBufferOptions(StreamBufferStyle style)
+{
+    switch (style)
+    {
+        case StreamBufferStyle::None:       return _IONBF;
+        case StreamBufferStyle::Line:       return _IOLBF;
+        default:
+        case StreamBufferStyle::Full:       return _IOFBF;
+    }
+}
+
+/* static */SlangResult StreamUtil::setStreamBufferStyle(StdStreamType stdStream, StreamBufferStyle style)
+{
+    FILE* file = _getFileFromStdStreamType(stdStream);
+
+    if (file)
+    {
+        auto options = _getBufferOptions(style);
+
+        // https://www.cplusplus.com/reference/cstdio/setvbuf/
+
+        // NOTE! We don't set a buffer here (we pass in nullptr).
+        // Passing is fine for 'no buffering'. It's not clear if it sets default for
+        // other options, but seems likely because it's documented as a suggestion.
+        if (setvbuf(file, nullptr, options, 0) == 0)
+        {
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+    }
+
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 } // namespace Slang

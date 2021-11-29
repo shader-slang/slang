@@ -120,7 +120,7 @@ public:
     WinProcess(HANDLE handle, Stream* const* streams) :
         m_processHandle(handle)
     {
-        for (Index i = 0; i < Index(Process::StreamType::CountOf); ++i)
+        for (Index i = 0; i < Index(StdStreamType::CountOf); ++i)
         {
             m_streams[i] = streams[i];
         }
@@ -373,21 +373,21 @@ void WinProcess::kill(int32_t returnCode)
     return UnownedStringSlice::fromLiteral(".exe");
 }
 
-/* static */SlangResult Process::getStdStream(StreamType type, RefPtr<Stream>& out)
+/* static */SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
 {
     switch (type)
     {
-        case StreamType::StdIn:
+        case StdStreamType::In:
         {
             out = new WinPipeStream(GetStdHandle(STD_INPUT_HANDLE), FileAccess::Read, false);
             return SLANG_OK;
         }
-        case StreamType::StdOut:
+        case StdStreamType::Out:
         {
             out = new WinPipeStream(GetStdHandle(STD_OUTPUT_HANDLE), FileAccess::Write, false);
             return SLANG_OK;
         }
-        case StreamType::ErrorOut:
+        case StdStreamType::ErrorOut:
         {
             out = new WinPipeStream(GetStdHandle(STD_ERROR_HANDLE), FileAccess::Write, false);
             return SLANG_OK;
@@ -518,10 +518,10 @@ void WinProcess::kill(int32_t returnCode)
         processHandle = processInfo.hProcess;
     }
 
-    RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
-    streams[Index(Process::StreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
-    streams[Index(Process::StreamType::StdOut)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
-    streams[Index(Process::StreamType::StdIn)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
+    RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
+    streams[Index(StdStreamType::ErrorOut)] = new WinPipeStream(childStdErrRead.detach(), FileAccess::Read);
+    streams[Index(StdStreamType::Out)] = new WinPipeStream(childStdOutRead.detach(), FileAccess::Read);
+    streams[Index(StdStreamType::In)] = new WinPipeStream(childStdInWrite.detach(), FileAccess::Write);
 
     outProcess = new WinProcess(processHandle.detach(), streams[0].readRef());
     return SLANG_OK;

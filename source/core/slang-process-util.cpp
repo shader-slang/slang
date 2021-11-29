@@ -49,8 +49,8 @@ static String _getText(const ConstArrayView<Byte>& bytes)
 
 /* static */SlangResult ProcessUtil::readUntilTermination(Process* process, List<Byte>* outStdOut, List<Byte>* outStdError)
 {
-    Stream* stdOutStream = process->getStream(Process::StreamType::StdOut);
-    Stream* stdErrorStream = process->getStream(Process::StreamType::ErrorOut);
+    Stream* stdOutStream = process->getStream(StdStreamType::Out);
+    Stream* stdErrorStream = process->getStream(StdStreamType::ErrorOut);
 
     while (!process->isTerminated())
     {

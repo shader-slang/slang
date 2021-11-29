@@ -16,14 +16,6 @@ namespace Slang {
 class Process : public RefObject
 {
 public:
-    enum class StreamType
-    {
-        ErrorOut,
-        StdOut,
-        StdIn,
-        CountOf,
-    };
-
     typedef uint32_t Flags;
     struct Flag
     {
@@ -34,7 +26,7 @@ public:
     };
 
         /// Get the stream for the type
-    Stream* getStream(StreamType type) const { return m_streams[Index(type)]; }
+    Stream* getStream(StdStreamType type) const { return m_streams[Index(type)]; }
 
         /// Get the value returned from the process when it exited/returned. 
     int32_t getReturnValue() const { return m_returnValue;  }
@@ -71,7 +63,7 @@ public:
     static void sleepCurrentThread(Int timeInMs);
 
         /// Get a standard stream 
-    static SlangResult getStdStream(StreamType type, RefPtr<Stream>& out);
+    static SlangResult getStdStream(StdStreamType type, RefPtr<Stream>& out);
 
         /// Get the clock frequency
     static uint64_t getClockFrequency();
@@ -81,7 +73,7 @@ public:
 
 protected:
     int32_t m_returnValue = 0;                              ///< Value returned if process terminated
-    RefPtr<Stream> m_streams[Index(StreamType::CountOf)];   ///< Streams to communicate with the process
+    RefPtr<Stream> m_streams[Index(StdStreamType::CountOf)];   ///< Streams to communicate with the process
 };
 
 }
