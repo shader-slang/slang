@@ -339,12 +339,12 @@ SlangResult TestServer::_executeSingle()
             }
             else
             {
-                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound);
+                return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
             }
         }
         default:
         {
-            return m_connection->sendError(JSONRPC::ErrorCode::ParseError);
+            return m_connection->sendError(JSONRPC::ErrorCode::InvalidRequest, m_connection->getCurrentMessageId());
         }
     }
 
@@ -368,8 +368,10 @@ static Index _findTestIndex(IUnitTestModule* testModule, const String& name)
 
 SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 {
+    auto id = m_connection->getPersistentValue(call.id);
+
     TestServerProtocol::ExecuteUnitTestArgs args;
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, call.id));
 
     auto sink = m_connection->getSink();
 
@@ -377,14 +379,14 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     if (!testModule)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindUnitTestModule, args.moduleName);
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     const Index testIndex = _findTestIndex(testModule, args.testName);
     if (testIndex < 0)
     {
         sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindTest, args.testName);
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     TestReporter testReporter;
@@ -432,21 +434,23 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     }
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result, m_connection->getMessageId());
+    return m_connection->sendResult(&result, id);
 }
 
 SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 {
+    auto id = m_connection->getPersistentValue(call.id);
+
     TestServerProtocol::ExecuteToolTestArgs args;
     
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, id));
 
     auto sink = m_connection->getSink();
 
     auto func = getToolFunction(args.toolName, sink);
     if (!func)
     {
-        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams);
+        return m_connection->sendError(JSONRPC::ErrorCode::InvalidParams, id);
     }
 
     // Assume we will used the shared session
@@ -493,7 +497,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     result.stdOut = stdOut;
 
     result.returnCode = int32_t(TestToolUtil::getReturnCode(result.result));
-    return m_connection->sendResult(&result);
+    return m_connection->sendResult(&result, id);
 }
 
 SlangResult TestServer::execute()

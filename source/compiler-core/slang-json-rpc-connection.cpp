@@ -47,7 +47,7 @@ bool JSONRPCConnection::isActive()
     return m_connection->isActive() && (m_process == nullptr || !m_process->isTerminated());
 }
 
-JSONValue JSONRPCConnection::getMessageId()
+JSONValue JSONRPCConnection::getCurrentMessageId()
 {
     SLANG_ASSERT(hasMessage());
     return JSONRPCUtil::getId(&m_container, m_jsonRoot);
@@ -103,40 +103,28 @@ SlangResult JSONRPCConnection::sendRPC(const RttiInfo* rttiInfo, const void* dat
     return m_connection->write(builder.getBuffer(), builder.getLength());
 }
 
-SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode code)
+SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode code, const JSONValue& id)
 {
-    return sendError(code, m_diagnosticSink.outputBuffer.getUnownedSlice());
+    return sendError(code, m_diagnosticSink.outputBuffer.getUnownedSlice(), id);
 }
 
-SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg)
+SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg, const JSONValue& id)
 {
     JSONRPCErrorResponse errorResponse;
     errorResponse.error.code = Int(errorCode);
     errorResponse.error.message = msg;
+    errorResponse.id = id;
 
-    // TODO(JS):
-    // This is only appropriate if the sendError is for the current input message.
-    // We might want to add function that the client uses, which take the id as a parameter.
-
-    if (m_jsonRoot.isValid())
-    {
-        errorResponse.id = JSONRPCUtil::getId(&m_container, m_jsonRoot);
-    }
-    else
-    {
-        // If we don't have valid json, we set the id to be null per the spec
-        errorResponse.id = JSONValue::makeNull();
-    }
-
+    
     return sendRPC(&errorResponse);
 }
 
-SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst)
+SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id)
 {
     m_diagnosticSink.outputBuffer.Clear();
     if (SLANG_FAILED(JSONRPCUtil::convertToNative(&m_container, value, &m_diagnosticSink, info, dst)))
     {
-        return sendError(JSONRPC::ErrorCode::InvalidRequest);
+        return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
     }
     return SLANG_OK;
 }
@@ -207,7 +195,8 @@ SlangResult JSONRPCConnection::tryReadMessage()
         m_connection->consumeContent();
         if (SLANG_FAILED(res))
         {
-            return sendError(JSONRPC::ErrorCode::ParseError);
+            // if we can't parse JSON, we return with id of 'null' as per the standard
+            return sendError(JSONRPC::ErrorCode::ParseError, JSONValue::makeNull());
         }
     }
 
@@ -248,7 +237,7 @@ SlangResult JSONRPCConnection::getMessageOrSendError(const RttiInfo* rttiInfo, v
     const auto res = getMessage(rttiInfo, out);
     if (SLANG_FAILED(res))
     {
-        return sendError(JSONRPC::ErrorCode::ParseError);
+        return sendError(JSONRPC::ErrorCode::ParseError, getCurrentMessageId());
     }
     return res;
 }
@@ -278,7 +267,7 @@ SlangResult JSONRPCConnection::getRPCOrSendError(const RttiInfo* rttiInfo, void*
     const auto res = getRPC(rttiInfo, out);
     if (SLANG_FAILED(res))
     {
-        return sendError(JSONRPC::ErrorCode::ParseError);
+        return sendError(JSONRPC::ErrorCode::ParseError, getCurrentMessageId());
     }
     return res;
 }
