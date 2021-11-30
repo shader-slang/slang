@@ -15,6 +15,12 @@ using namespace Slang;
 TestContext::TestContext() 
 {
     m_session = nullptr;
+
+    /// if we are testing on arm, debug, we may want to increase the connection timeout
+#if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
+    // 5 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on debug
+    connectionTimeOutInMs = 1000 * 60 * 5;
+#endif
 }
 
 Result TestContext::init(const char* exePath)
@@ -116,8 +122,8 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
 
-    Stream* writeStream = process->getStream(Process::StreamType::StdIn);
-    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(process->getStream(Process::StreamType::StdOut)));
+    Stream* writeStream = process->getStream(StdStreamType::In);
+    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(process->getStream(StdStreamType::Out)));
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
@@ -170,4 +176,25 @@ bool TestContext::canRunTestWithRenderApiFlags(Slang::RenderApiFlags requiredFla
     return (requiredFlags & options.enabledApis) == requiredFlags;
 }
 
+SpawnType TestContext::getFinalSpawnType(SpawnType spawnType)
+{
+    if (spawnType == SpawnType::Default)
+    {
+        if (options.outputMode == TestOutputMode::Default)
+        {
+            return SpawnType::UseSharedLibrary;
+        }
+        else
+        {
+            return SpawnType::UseTestServer;
+        }
+    }
 
+    // Just return whatever spawnType was passed in
+    return spawnType;
+}
+
+SpawnType TestContext::getFinalSpawnType()
+{
+    return getFinalSpawnType(options.defaultSpawnType);
+}

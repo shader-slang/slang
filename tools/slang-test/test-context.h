@@ -107,6 +107,12 @@ class TestContext
         /// True if can run unit tests
     bool canRunUnitTests() const { return options.apiOnly == false; }
 
+        /// Given a spawn type, return the final spawn type.
+        /// In particular we want 'Default' spawn type to vary by the environment (for example running on test server on CI)
+    SpawnType getFinalSpawnType(SpawnType spawnType);
+
+    SpawnType getFinalSpawnType();
+
         /// Get compiler set
     Slang::DownstreamCompilerSet* getCompilerSet();
     Slang::DownstreamCompiler* getDefaultCompiler(SlangSourceLanguage sourceLanguage);
@@ -134,8 +140,18 @@ class TestContext
 
     Slang::String exeDirectoryPath;
 
-    Slang::Int timeOutInMs = 100 * 1000;
-
+        /// Timeout time for communication over connection.
+        /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
+        /// For tests that compile the stdlib, if that takes this time, the stdlib will be
+        /// repeatedly compiled and each time fail.
+        /// NOTE! This timeout may be altered in the ctor for a specific target, the initializatoin
+        /// value is just the default.
+        ///
+        /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
+        /// that. To do this we could have a 'compileStdLib' RPC method.
+        ///
+        /// Current default is 2 mins.
+    Slang::Int connectionTimeOutInMs = 2 * 60 * 1000;
 
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
