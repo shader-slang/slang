@@ -435,12 +435,12 @@ static const int kCannotExecute = 126;
         ::close(stderrPipe[1]);
         ::close(stdinPipe[0]);
 
-        RefPtr<Stream> streams[Index(Process::StreamType::CountOf)];
+        RefPtr<Stream> streams[Index(StdStreamType::CountOf)];
 
         // Previously code didn't need to close, so we'll make stream not own the handles
-        streams[Index(Process::StreamType::StdOut)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
-        streams[Index(Process::StreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
-        streams[Index(Process::StreamType::StdIn)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+        streams[Index(StdStreamType::Out)] = new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
+        streams[Index(StdStreamType::ErrorOut)] = new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
+        streams[Index(StdStreamType::In)] = new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
 
         outProcess = new UnixProcess(childPid, streams[0].readRef());
         return SLANG_OK;
@@ -481,21 +481,21 @@ static const int kCannotExecute = 126;
     nanosleep(&timeSpec, nullptr);
 }
 
-/* static */SlangResult Process::getStdStream(StreamType type, RefPtr<Stream>& out)
+/* static */SlangResult Process::getStdStream(StdStreamType type, RefPtr<Stream>& out)
 {
     switch (type)
     {
-        case StreamType::StdIn:
+        case StdStreamType::In:
         {
             out = new UnixPipeStream(STDIN_FILENO, FileAccess::Read, false);
             break;
         }
-        case StreamType::StdOut:
+        case StdStreamType::Out:
         {
             out = new UnixPipeStream(STDOUT_FILENO, FileAccess::Write, false);
             break; 
         }
-        case StreamType::ErrorOut:
+        case StdStreamType::ErrorOut:
         {
             out = new UnixPipeStream(STDERR_FILENO, FileAccess::Write, false);
             break;

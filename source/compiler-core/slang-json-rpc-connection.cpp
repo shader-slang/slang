@@ -25,8 +25,8 @@ SlangResult JSONRPCConnection::initWithStdStreams(Process* process)
 {
     RefPtr<Stream> stdinStream, stdoutStream;
 
-    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
-    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
+    Process::getStdStream(StdStreamType::In, stdinStream);
+    Process::getStdStream(StdStreamType::Out, stdoutStream);
 
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
