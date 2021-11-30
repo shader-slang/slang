@@ -140,8 +140,8 @@ class TestContext
 
     Slang::String exeDirectoryPath;
 
+        /// Timeout time for communication over pipe
     Slang::Int timeOutInMs = 100 * 1000;
-
 
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);

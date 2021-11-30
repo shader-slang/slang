@@ -140,10 +140,7 @@ protected:
 
     JSONValue m_jsonRoot;                                   ///< The root JSON value for the currently read message. 
 
-        /// Default timeout is 10 seconds
-    Int m_timeOutInMs = 10 * 1000;
-        /// Termination timeout
-    Int m_terminationTimeOutInMs = 1 * 1000;
+    Int m_terminationTimeOutInMs = 1 * 1000;                ///< Time to wait for termination response. Default is 1 second
 };
 
 // ---------------------------------------------------------------------------
