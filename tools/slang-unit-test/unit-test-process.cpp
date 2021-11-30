@@ -33,8 +33,8 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
     RefPtr<Process> process;
     SLANG_RETURN_ON_FAIL(_createProcess(context, "http-reflect", nullptr, process));
 
-    Stream* writeStream = process->getStream(Process::StreamType::StdIn);
-    RefPtr<BufferedReadStream> readStream( new BufferedReadStream(process->getStream(Process::StreamType::StdOut)));
+    Stream* writeStream = process->getStream(StdStreamType::In);
+    RefPtr<BufferedReadStream> readStream( new BufferedReadStream(process->getStream(StdStreamType::Out)));
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
 
     RefPtr<RandomGenerator> rand = RandomGenerator::create(10000);
@@ -163,8 +163,8 @@ static SlangResult _reflectTest(UnitTestContext* context)
     SLANG_RETURN_ON_FAIL(_createProcess(context, "reflect", nullptr, process));
 
     // Write a bunch of stuff to the stream
-    Stream* readStream = process->getStream(Process::StreamType::StdOut);
-    Stream* writeStream = process->getStream(Process::StreamType::StdIn);
+    Stream* readStream = process->getStream(StdStreamType::Out);
+    Stream* writeStream = process->getStream(StdStreamType::In);
 
     List<Byte> readBuffer;
 

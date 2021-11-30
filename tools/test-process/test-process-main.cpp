@@ -74,7 +74,7 @@ static SlangResult _outputReflect()
     // Get in as Stream
 
     RefPtr<Stream> stdinStream;
-    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
+    Process::getStdStream(StdStreamType::In, stdinStream);
 
     FILE* fileOut = stdout;
 
@@ -124,8 +124,8 @@ static SlangResult _httpReflect(int argc, const char* const* argv)
 
     RefPtr<Stream> stdinStream, stdoutStream;
 
-    Process::getStdStream(Process::StreamType::StdIn, stdinStream);
-    Process::getStdStream(Process::StreamType::StdOut, stdoutStream);
+    Process::getStdStream(StdStreamType::In, stdinStream);
+    Process::getStdStream(StdStreamType::Out, stdoutStream);
 
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
