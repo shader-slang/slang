@@ -871,6 +871,13 @@ namespace Slang
             return getIntVal(intLitExpr);
         }
 
+        if (auto boolLitExpr = expr.as<BoolLiteralExpr>())
+        {
+            // If it's a boolean, we allow promotion to int.
+            const IntegerLiteralValue value = IntegerLiteralValue(boolLitExpr.getExpr()->value);
+            return m_astBuilder->create<ConstantIntVal>(value);
+        }
+
         // it is possible that we are referring to a generic value param
         if (auto declRefExpr = expr.as<DeclRefExpr>())
         {
