@@ -349,6 +349,8 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     return StringEscapeUtil::getHandler(StringEscapeUtil::Style::Space);
 }
 
+static const int kCannotExecute = 126;
+
 /* static */SlangResult Process::create(const CommandLine& commandLine, Process::Flags flags, RefPtr<Process>& outProcess)
 {
     List<char const*> argPtrs;
@@ -376,6 +378,12 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         return SLANG_FAIL;
     }
 
+    // TODO(JS): 
+    // Ideally we'd have a mechanism to test if execvp can be successfully executed (at least in principal) before
+    // doing fork. Once we have forked we then have the problem of communicating to the parent process somehow.
+    //
+    // We could do a search down PATH and test files etc, but this seems to repeat a lot of the functionality of exec.
+    //    
     pid_t childPid = fork();
     if (childPid == -1)
     {
@@ -402,6 +410,11 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         ::close(stdinPipe[0]);
         ::close(stdinPipe[1]);
 
+        // TODO(JS): Strictly speaking if m_executableType is 'Path' then we shouldn't be searching. Ie which
+        // exec we use here should be dependent on the executable type.
+
+        // Path = execvp
+        // Filename = execv
         ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
 
         // If we get here, then `exec` failed
@@ -409,6 +422,9 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         // NOTE! Because we have dup2 into STDERR_FILENO, this error will *not* generally appear on
         // the terminal but in the stderrPipe. 
         fprintf(stderr, "error: `exec` failed\n");
+
+        // Terminate with failure. 
+        exit(kCannotExecute);
 
         return SLANG_FAIL;
     }

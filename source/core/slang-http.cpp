@@ -287,6 +287,46 @@ SlangResult HTTPPacketConnection::update()
     return m_readResult;
 }
 
+
+namespace { // anonymous
+
+// Handles binary backoff like sleeping mechanism.
+struct SleepState
+{
+    void sleep()
+    {
+        Process::sleepCurrentThread(m_intervalInMs);
+        _update();
+    }
+    void reset()
+    {
+        m_intervalInMs = 0;
+        m_count = 0;
+    }
+    void _update()
+    {
+        const Int maxIntervalInMs = 32;
+        const Int initialCountThreshold = 4;
+
+        ++m_count;
+
+        const Int countThreshold = (m_intervalInMs == 0) ? initialCountThreshold : 1;
+
+        // If we hit the count change the interval
+        if (m_count >= countThreshold)
+        {
+            m_intervalInMs = (m_intervalInMs == 0) ? 1 : Math::Min(m_intervalInMs * 2, maxIntervalInMs);
+            // Reset the count
+            m_count = 0;
+        }
+    }
+
+    Int m_intervalInMs = 0;
+    Int m_count = 0;
+};
+
+} // anonymous
+
 SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 {
     m_readResult = SLANG_OK;
@@ -299,6 +339,8 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         timeOutInTicks = timeOutInMs * (Process::getClockFrequency() / 1000);
         startTick = Process::getClockTick();
     }
+
+    SleepState sleepState;
 
     while (m_readState == ReadState::Header ||
         m_readState == ReadState::Content)
@@ -320,8 +362,11 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
 
         if (prevCount == m_readStream->getCount())
         {
-            // Yield if it appears nothing was read.
-            Process::sleepCurrentThread(0);
+            sleepState.sleep();
+        }
+        else
+        {
+            sleepState.reset();
         }
     }
 

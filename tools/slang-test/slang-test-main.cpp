@@ -674,7 +674,7 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
     SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
 
     // Wait for the result
-    rpcConnection->waitForResult(context->timeOutInMs);
+    rpcConnection->waitForResult(context->connectionTimeOutInMs);
 
     if (!rpcConnection->hasMessage())
     {
@@ -1057,14 +1057,17 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
 
     const auto& options = context->options;
 
+    const auto finalSpawnType = context->getFinalSpawnType(spawnType);
+
     SlangResult spawnResult = SLANG_FAIL;
-    switch (spawnType)
+    switch (finalSpawnType)
     {
         case SpawnType::UseExe:
         {
             spawnResult = spawnAndWaitExe(context, testPath, cmdLine, outExeRes);
             break;
         }
+        case SpawnType::Default:
         case SpawnType::UseSharedLibrary:
         {
             spawnResult = spawnAndWaitSharedLibrary(context, testPath, cmdLine, outExeRes);
@@ -1073,7 +1076,7 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
         case SpawnType::UseFullyIsolatedTestServer:
         case SpawnType::UseTestServer:
         {
-            spawnResult = spawnAndWaitTestServer(context, spawnType, testPath, cmdLine, outExeRes);
+            spawnResult = spawnAndWaitTestServer(context, finalSpawnType, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -3601,7 +3604,8 @@ SlangResult innerMain(int argc, char** argv)
     {
         SlangSession* session = context.getSession();
 
-        StdWriters::getOut().print("Supported backends:");
+        auto out = StdWriters::getOut();
+        out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
@@ -3624,11 +3628,11 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
-                StdWriters::getOut().write(buf.getBuffer(), buf.getLength());
+                out.write(buf.getBuffer(), buf.getLength());
             }
         }
 
-        StdWriters::getOut().print("\n");
+        out.print("\n");
     }
 
     // Working out what renderApis is worked on on demand through
@@ -3727,18 +3731,20 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
+            const auto spawnType = context.getFinalSpawnType();
+
             // Run the unit tests
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "slang-unit-test-tool");
+                runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
             }
 
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "gfx-unit-test-tool");
+                runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
             }
              
             TestReporter::set(nullptr);
