@@ -305,15 +305,15 @@ struct SleepState
     }
     void _update()
     {
-        const Int maxIntervalInMs = 16;
-        const Int initialCount = 4;
+        const Int maxIntervalInMs = 32;
+        const Int initialCountThreshold = 4;
 
         ++m_count;
 
-        const Int maxCount = (m_intervalInMs == 0) ? initialCount : 1;
+        const Int countThreshold = (m_intervalInMs == 0) ? initialCountThreshold : 1;
 
         // If we hit the count change the interval
-        if (m_count >= maxCount)
+        if (m_count >= countThreshold)
         {
             m_intervalInMs = (m_intervalInMs == 0) ? 1 : Math::Min(m_intervalInMs * 2, maxIntervalInMs);
             // Reset the count

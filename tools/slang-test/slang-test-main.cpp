@@ -674,7 +674,7 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
     SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
 
     // Wait for the result
-    rpcConnection->waitForResult(context->timeOutInMs);
+    rpcConnection->waitForResult(context->connectionTimeOutInMs);
 
     if (!rpcConnection->hasMessage())
     {
@@ -3604,7 +3604,8 @@ SlangResult innerMain(int argc, char** argv)
     {
         SlangSession* session = context.getSession();
 
-        StdWriters::getOut().print("Supported backends:");
+        auto out = StdWriters::getOut();
+        out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
@@ -3627,11 +3628,11 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
-                StdWriters::getOut().write(buf.getBuffer(), buf.getLength());
+                out.write(buf.getBuffer(), buf.getLength());
             }
         }
 
-        StdWriters::getOut().print("\n");
+        out.print("\n");
     }
 
     // Working out what renderApis is worked on on demand through

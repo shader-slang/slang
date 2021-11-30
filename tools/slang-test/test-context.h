@@ -140,8 +140,18 @@ class TestContext
 
     Slang::String exeDirectoryPath;
 
-        /// Timeout time for communication over pipe
-    Slang::Int timeOutInMs = 100 * 1000;
+        /// Timeout time for communication over connection.
+        /// NOTE! If the timeout is hit, the connection will be destroyed, and then recreated.
+        /// For tests that compile the stdlib, if that takes this time, the stdlib will be
+        /// repeatedly compiled and each time fail.
+        /// NOTE! This timeout may be altered in the ctor for a specific target, the initializatoin
+        /// value is just the default.
+        ///
+        /// TODO(JS): We could split the stdlib compilation from other actions, and have timeout specific for
+        /// that. To do this we could have a 'compileStdLib' RPC method.
+        ///
+        /// Current default is 2 mins.
+    Slang::Int connectionTimeOutInMs = 2 * 60 * 1000;
 
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
