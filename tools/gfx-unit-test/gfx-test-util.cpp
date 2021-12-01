@@ -66,7 +66,7 @@ namespace gfx_test
         return SLANG_OK;
     }
 
-    void compareComputeResult(gfx::IDevice* device, gfx::ITextureResource* texture, gfx::ResourceState state, uint8_t* expectedResult, size_t expectedBufferSize)
+    void compareComputeResult(gfx::IDevice* device, gfx::ITextureResource* texture, gfx::ResourceState state, float* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
@@ -75,6 +75,7 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(device->readTextureResource(
             texture, state, resultBlob.writeRef(), &rowPitch, &pixelSize));
         SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
+        auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
         SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
     }

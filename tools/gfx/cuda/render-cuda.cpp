@@ -1452,8 +1452,38 @@ public:
         case Format::R16_FLOAT:
             *outFormat = CU_AD_FORMAT_HALF;
             return SLANG_OK;
+        case Format::R32G32B32A32_UINT:
+        case Format::R32G32B32_UINT:
+        case Format::R32G32_UINT:
+        case Format::R32_UINT:
+            *outFormat = CU_AD_FORMAT_UNSIGNED_INT32;
+            return SLANG_OK;
+        case Format::R16G16B16A16_UINT:
+        case Format::R16G16_UINT:
+        case Format::R16_UINT:
+            *outFormat = CU_AD_FORMAT_UNSIGNED_INT16;
+            return SLANG_OK;
+        case Format::R8G8B8A8_UINT:
+        case Format::R8G8_UINT:
+        case Format::R8_UINT:
         case Format::R8G8B8A8_UNORM:
             *outFormat = CU_AD_FORMAT_UNSIGNED_INT8;
+            return SLANG_OK;
+        case Format::R32G32B32A32_SINT:
+        case Format::R32G32B32_SINT:
+        case Format::R32G32_SINT:
+        case Format::R32_SINT:
+            *outFormat = CU_AD_FORMAT_SIGNED_INT32;
+            return SLANG_OK;
+        case Format::R16G16B16A16_SINT:
+        case Format::R16G16_SINT:
+        case Format::R16_SINT:
+            *outFormat = CU_AD_FORMAT_SIGNED_INT16;
+            return SLANG_OK;
+        case Format::R8G8B8A8_SINT:
+        case Format::R8G8_SINT:
+        case Format::R8_SINT:
+            *outFormat = CU_AD_FORMAT_SIGNED_INT8;
             return SLANG_OK;
         default:
             SLANG_ASSERT(!"Only support R32_FLOAT/R8G8B8A8_UNORM formats for now");

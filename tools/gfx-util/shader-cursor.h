@@ -87,6 +87,12 @@ struct ShaderCursor
         return m_baseObject->setData(m_offset, data, size);
     }
 
+    template <typename T>
+    SlangResult setData(T const& data) const
+    {
+        return setData(&data, sizeof(data));
+    }
+
     SlangResult setObject(IShaderObject* object) const
     {
         return m_baseObject->setObject(m_offset, object);

@@ -30,7 +30,7 @@ namespace gfx_test
         gfx::IDevice* device,
         gfx::ITextureResource* texture,
         gfx::ResourceState state,
-        uint8_t* expectedResult,
+        float* expectedResult,
         size_t expectedBufferSize);
 
         /// Reads back the content of `buffer` and compares it against `expectedResult` with a set tolerance.
