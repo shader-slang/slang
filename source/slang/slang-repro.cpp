@@ -1087,40 +1087,54 @@ struct LoadContext
     return saveState(request, stream);
 }
 
-/* static */ SlangResult ReproUtil::loadState(const String& filename, List<uint8_t>& outBuffer)
+/* static */ SlangResult ReproUtil::loadState(const String& filename, DiagnosticSink* sink, List<uint8_t>& outBuffer)
 {
     RefPtr<FileStream> stream = new FileStream;
     SLANG_RETURN_ON_FAIL(stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-    return loadState(stream, outBuffer);
+    return loadState(stream, sink, outBuffer);
 }
 
-/* static */ SlangResult ReproUtil::loadState(Stream* stream, List<uint8_t>& buffer)
+/* static */ SlangResult ReproUtil::loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& buffer)
 {
     Header header;
 
-    SLANG_RETURN_ON_FAIL(RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer));
+    {
+        Result res = RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer);
+        if (SLANG_FAILED(res))
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+            return res;
+        }
+    }
     if (header.m_chunk.type != kSlangStateFourCC)
     {
+        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
         return SLANG_FAIL;
     }
 
     if (!RiffSemanticVersion::areCompatible(g_semanticVersion, header.m_semanticVersion))
     {
+        StringBuilder headerBuf, currentBuf;
+        header.m_semanticVersion.asSemanticVersion().append(headerBuf);
+        g_semanticVersion.asSemanticVersion().append(currentBuf);
+
+        sink->diagnose(SourceLoc(), Diagnostics::incompatibleRiffSemanticVersion, headerBuf, currentBuf);
         return SLANG_FAIL;
     }
 
     if (header.m_typeHash != uint32_t(_getTypeHash()))
     {
+        sink->diagnose(SourceLoc(), Diagnostics::riffHashMismatch);
         return SLANG_FAIL;
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer)
+/* static */SlangResult ReproUtil::loadState(const uint8_t* data, size_t size, DiagnosticSink* sink, List<uint8_t>& outBuffer)
 {
     MemoryStreamBase stream(FileAccess::Read, data, size);
-    return loadState(&stream, outBuffer);
+    return loadState(&stream, sink, outBuffer);
 }
 
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
@@ -1149,10 +1163,10 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */SlangResult ReproUtil::extractFilesToDirectory(const String& filename)
+/* static */SlangResult ReproUtil::extractFilesToDirectory(const String& filename, DiagnosticSink* sink)
 {
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(filename, buffer));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(filename, sink, buffer));
 
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
@@ -1162,7 +1176,12 @@ struct LoadContext
     String dirPath;
     SLANG_RETURN_ON_FAIL(ReproUtil::calcDirectoryPathFromFilename(filename, dirPath));
 
-    Path::createDirectory(dirPath);
+    if (Path::createDirectory(dirPath))
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::unableToCreateDirectory, dirPath);
+        return SLANG_FAIL;
+    }
+
     // Set up a file system to write into this directory
     RelativeFileSystem relFileSystem(OSFileSystem::getMutableSingleton(), dirPath);
 

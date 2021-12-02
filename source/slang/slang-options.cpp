@@ -413,7 +413,7 @@ struct OptionsParser
         Slang::List<String> m_filenames;
     };
 
-    static SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir)
+    static SlangResult _compileReproDirectory(SlangSession* session, EndToEndCompileRequest* originalRequest, const String& dir, DiagnosticSink* sink)
     {
         auto stdOut = originalRequest->getWriter(WriterChannel::StdOutput);
 
@@ -430,7 +430,7 @@ struct OptionsParser
             auto requestImpl = asInternal(request);
 
             List<uint8_t> buffer;
-            SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, buffer));
+            SLANG_RETURN_ON_FAIL(ReproUtil::loadState(path, sink, buffer));
 
             auto requestState = ReproUtil::getRequest(buffer);
             MemoryOffsetBase base;
@@ -671,7 +671,14 @@ struct OptionsParser
                     CommandLineArg reproName;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
-                    SLANG_RETURN_ON_FAIL(ReproUtil::extractFilesToDirectory(reproName.value));
+                    {
+                        const Result res = ReproUtil::extractFilesToDirectory(reproName.value, sink);
+                        if (SLANG_FAILED(res))
+                        {
+                            sink->diagnose(reproName.loc, Diagnostics::unableExtractReproToDirectory, reproName.value);
+                            return res;
+                        }
+                    }
                 }
                 else if (argValue == "-module-name")
                 {
@@ -686,7 +693,14 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName.value, buffer));
+                    {
+                        const Result res = ReproUtil::loadState(reproName.value, sink, buffer);
+                        if (SLANG_FAILED(res))
+                        {
+                            sink->diagnose(reproName.loc, Diagnostics::unableToReadFile, reproName.value);
+                            return res;
+                        }
+                    }
 
                     auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
@@ -713,7 +727,7 @@ struct OptionsParser
                     CommandLineArg reproDirectory;
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproDirectory));
 
-                    SLANG_RETURN_ON_FAIL(_compileReproDirectory(session, requestImpl, reproDirectory.value));
+                    SLANG_RETURN_ON_FAIL(_compileReproDirectory(session, requestImpl, reproDirectory.value, sink));
                 }
                 else if (argValue == "-repro-file-system")
                 {
@@ -721,7 +735,14 @@ struct OptionsParser
                     SLANG_RETURN_ON_FAIL(reader.expectArg(reproName));
 
                     List<uint8_t> buffer;
-                    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(reproName.value, buffer));
+                    {
+                        const Result res = ReproUtil::loadState(reproName.value, sink, buffer);
+                        if (SLANG_FAILED(res))
+                        {
+                            sink->diagnose(reproName.loc, Diagnostics::unableToReadFile, reproName.value);
+                            return res;
+                        }
+                    }
 
                     auto requestState = ReproUtil::getRequest(buffer);
                     MemoryOffsetBase base;
