@@ -106,7 +106,8 @@ public:
         override;
     virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
-    virtual Result createMutableRootShaderObject(
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(
         IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -3451,8 +3452,8 @@ public:
             return SLANG_OK;
         }
 
-        virtual Result copyFrom(
-            IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
         {
             SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
             if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
@@ -6761,8 +6762,8 @@ Result VKDevice::getTextureAllocationInfo(
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
 
-    *outSize = memRequirements.size;
-    *outAlignment = memRequirements.alignment;
+    *outSize = (size_t)memRequirements.size;
+    *outAlignment = (size_t)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
     return SLANG_OK;

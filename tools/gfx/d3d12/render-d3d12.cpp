@@ -131,8 +131,8 @@ public:
         override;
     virtual Result createMutableShaderObject(
         ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
-    virtual Result createMutableRootShaderObject(
-        IShaderProgram* program, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -2821,8 +2821,8 @@ public:
             return SLANG_OK;
         }
 
-        virtual Result copyFrom(
-            IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
         {
             SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
             if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
@@ -4952,8 +4952,8 @@ Result D3D12Device::getTextureAllocationInfo(
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
     auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
-    *outSize = allocInfo.SizeInBytes;
-    *outAlignment = allocInfo.Alignment;
+    *outSize = (size_t)allocInfo.SizeInBytes;
+    *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
 }
 
