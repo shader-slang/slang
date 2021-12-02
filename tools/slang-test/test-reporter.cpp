@@ -439,7 +439,7 @@ void TestReporter::_addResult(const TestInfo& info)
             // https://www.appveyor.com/docs/build-worker-api/#add-tests
 
             CommandLine cmdLine;
-            cmdLine.setExecutableName("appveyor");
+            cmdLine.setExecutableLocation(ExecutableLocation("appveyor"));
             cmdLine.addArg("AddTest");
             cmdLine.addArg(info.name);
             cmdLine.addArg("-FileName");

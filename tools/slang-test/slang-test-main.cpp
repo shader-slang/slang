@@ -707,7 +707,7 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
 
 Result spawnAndWaitTestServer(TestContext* context, SpawnType spawnType, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
-    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     // This is a test tool execution
     TestServerProtocol::ExecuteToolTestArgs args;
@@ -945,7 +945,7 @@ static SlangResult _extractReflectionTestRequirements(const CommandLine& cmdLine
 
 static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequirements* ioInfo)
 {
-    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
     if (exeName == "render-test")
     {
@@ -1150,7 +1150,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
-    ioCmdLine.setExecutable(context->options.binDir, "slangc");
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
 
     if (context->options.verbosePaths)
     {
@@ -2652,7 +2652,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
     _addRenderTestOptions(context->options, cmdLine);
