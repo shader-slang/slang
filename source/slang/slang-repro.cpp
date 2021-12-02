@@ -1176,7 +1176,7 @@ struct LoadContext
     String dirPath;
     SLANG_RETURN_ON_FAIL(ReproUtil::calcDirectoryPathFromFilename(filename, dirPath));
 
-    if (Path::createDirectory(dirPath))
+    if (!Path::createDirectory(dirPath))
     {
         sink->diagnose(SourceLoc(), Diagnostics::unableToCreateDirectory, dirPath);
         return SLANG_FAIL;
