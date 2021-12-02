@@ -54,21 +54,21 @@ namespace gfx_test
         return compareComputeResult(device, buffer, expectedBuffer.getBuffer(), bufferSize);
     }
 
-    template<typename T, Slang::Index count>
-    void compareComputeResult(
-        gfx::IDevice* device,
-        gfx::ITextureResource* texture,
-        gfx::ResourceState state,
-        Slang::Array<T, count> expectedResult)
-    {
-        Slang::List<uint8_t> expectedBuffer;
-        size_t bufferSize = sizeof(T) * count;
-        expectedBuffer.setCount(bufferSize);
-        memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
-        // TODO: compareComputeResultFuzzy not currently implemented for textures
-        //if (std::is_same<T, float>::value) return compareComputeResultFuzzy(device, buffer, (float*)expectedBuffer.getBuffer(), bufferSize);
-        return compareComputeResult(device, texture, state, expectedBuffer.getBuffer(), bufferSize);
-    }
+//     TODO: Implement compareComputeResultFuzzy() and keep or just directly use compareComputeResult() above and add a second overload for uint/int? 
+//     template<typename T, Slang::Index count>
+//     void compareComputeResult(
+//         gfx::IDevice* device,
+//         gfx::ITextureResource* texture,
+//         gfx::ResourceState state,
+//         Slang::Array<T, count> expectedResult)
+//     {
+//         Slang::List<uint8_t> expectedBuffer;
+//         size_t bufferSize = sizeof(T) * count;
+//         expectedBuffer.setCount(bufferSize);
+//         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
+//         if (std::is_same<T, float>::value) return compareComputeResultFuzzy(device, buffer, (float*)expectedBuffer.getBuffer(), bufferSize);
+//         return compareComputeResult(device, texture, state, expectedBuffer.getBuffer(), bufferSize);
+//     }
     
     Slang::ComPtr<gfx::IDevice> createTestingDevice(UnitTestContext* context, Slang::RenderApiFlag::Enum api);
 
