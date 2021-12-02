@@ -200,7 +200,7 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
         String vswherePath = programFilesPath;
         vswherePath.append("\\Microsoft Visual Studio\\Installer\\vswhere");
 
-        cmd.setExecutableFilename(vswherePath);
+        cmd.setExecutableLocation(ExecutableLocation(vswherePath));
 
         StringBuilder versionName;
         WinVisualStudioUtil::append(version, versionName);
@@ -306,8 +306,8 @@ static SlangResult _find(int versionIndex, WinVisualStudioUtil::VersionPath& out
     // So here we build up a cl command line that is run by first running vcvars, and then executing cl with the parameters as passed to commandLine
 
     CommandLine cmdLine;
-
-    cmdLine.setExecutableFilename("cmd.exe");
+    cmdLine.setExecutableLocation(ExecutableLocation("cmd"));
+    
     {
         String options[] = { "/q", "/c", "@prompt", "$" };
         cmdLine.addArgs(options, SLANG_COUNT_OF(options));

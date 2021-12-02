@@ -13,7 +13,7 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
     static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompiler::Desc& outDesc);
 
         /// Runs the exeName, and extracts the version info into outDesc
-    static SlangResult calcVersion(const String& exeName, DownstreamCompiler::Desc& outDesc);
+    static SlangResult calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc);
 
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
@@ -28,7 +28,7 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
     static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
 
         /// Given a path and an exe name, detects if compiler is present, and if so adds to compiler set.
-    static SlangResult createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler);
+    static SlangResult createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler);
 
     static SlangResult locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 

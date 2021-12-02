@@ -453,10 +453,11 @@ void WinProcess::kill(int32_t returnCode)
         OSString pathBuffer;
         LPCWSTR path = nullptr;
 
-        if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
+        const auto& exe = commandLine.m_executableLocation;
+        if (exe.m_type == ExecutableLocation::Type::Path)
         {
             StringBuilder cmd;
-            StringEscapeUtil::appendMaybeQuoted(getEscapeHandler(), commandLine.m_executable.getUnownedSlice(), cmd);
+            StringEscapeUtil::appendMaybeQuoted(getEscapeHandler(), exe.m_pathOrName.getUnownedSlice(), cmd);
 
             pathBuffer = cmd.toWString();
             path = pathBuffer.begin();

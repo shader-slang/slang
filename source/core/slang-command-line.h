@@ -7,14 +7,54 @@
 
 namespace Slang {
 
+struct ExecutableLocation
+{
+    typedef ExecutableLocation ThisType;
+
+    enum Type
+    {
+        Unknown,                    ///< Not specified 
+        Path,                       ///< The executable is set as a path (ie won't be searched for)
+        Name,                       ///< The executable is passed as a name which will be searched for
+    };
+
+        /// Set the executable path.
+        /// NOTE! On some targets the executable path *must* include an extension to be able to start as a process
+    void setPath(const String& path) { m_type = Type::Path; m_pathOrName = path; }
+
+        /// Set a filename (such that the path will be looked up)
+    void setName(const String& filename) { m_type = Type::Name; m_pathOrName = filename; }
+
+    void set(Type type, const String& pathOrName) { m_type = type; m_pathOrName = pathOrName; }
+
+        /// Set the executable path from a base directory and an executable name (no suffix such as '.exe' needed)
+    void set(const String& dir, const String& name);
+
+        /// Determines if it's a name or a path when it sets
+    void set(const String& nameOrPath);
+
+        /// Append as text to out. 
+    void append(StringBuilder& out) const;
+
+        /// Reset state to be same as ctor
+    void reset() { m_type = Type::Unknown; m_pathOrName = String(); }
+
+        /// Equality means exactly the same definition.
+        /// *NOT* that exactly the same executable is specified
+    bool operator==(const ThisType& rhs) const { return m_type == rhs.m_type && m_pathOrName == rhs.m_pathOrName;  }
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+    ExecutableLocation() {}
+    ExecutableLocation(const String& dir, const String& name) { set(dir, name);  }
+    explicit ExecutableLocation(const String& nameOrPath) { set(nameOrPath); }
+
+    Type m_type = Type::Unknown;
+    String m_pathOrName;
+};
+
 struct CommandLine
 {
-    enum class ExecutableType
-    {
-        Unknown,                    ///< The executable is not specified 
-        Path,                       ///< The executable is set as a path (ie won't be searched for)
-        Filename,                   ///< The executable is set as a filename
-    };
+    typedef CommandLine ThisType;
 
         /// Add args - assumed unescaped
     void addArg(const String& in) { m_args.add(in); }
@@ -22,16 +62,6 @@ struct CommandLine
 
         /// Find the index of an arg which is exact match for slice
     SLANG_INLINE Index findArgIndex(const UnownedStringSlice& slice) const { return m_args.indexOf(slice); }
-
-        /// Set the executable path.
-        /// NOTE! On some targets the executable path *must* include an extension to be able to start as a process
-    void setExecutablePath(const String& path) { m_executableType = ExecutableType::Path; m_executable = path; }
-
-        /// Set the executable path from a base directory and an executable name (no suffix such as '.exe' needed)
-    void setExecutable(const String& dir, const String& name);
-
-        /// Set a filename (such that the path will be looked up
-    void setExecutableFilename(const String& filename) { m_executableType = ExecutableType::Filename; m_executable = filename; }
 
         /// For handling args where the switch is placed directly in front of the path 
     void addPrefixPathArg(const char* prefix, const String& path, const char* pathPostfix = nullptr);
@@ -47,12 +77,11 @@ struct CommandLine
         /// convert into a string
     String toString() const;
 
-        /// Ctor
-    CommandLine():m_executableType(ExecutableType::Unknown) {}
+        /// Set an executable location
+    void setExecutableLocation(const ExecutableLocation& loc) { m_executableLocation = loc; }
 
-    ExecutableType m_executableType;    ///< How the executable is specified
-    String m_executable;                ///< Executable to run. Note that the executable is never escaped.
-    List<String> m_args;                ///< The arguments (Stored *unescaped*)
+    ExecutableLocation m_executableLocation;        ///< The executable location
+    List<String> m_args;                            ///< The arguments (Stored *unescaped*)
 };
 
 }

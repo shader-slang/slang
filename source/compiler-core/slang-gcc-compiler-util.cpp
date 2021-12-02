@@ -86,10 +86,10 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
     return SLANG_FAIL;
 }
 
-SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, DownstreamCompiler::Desc& outDesc)
+SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc)
 {
     CommandLine cmdLine;
-    cmdLine.setExecutableFilename(exeName);
+    cmdLine.setExecutableLocation(exe);
     cmdLine.addArg("-v");
 
     ExecuteResult exeRes;
@@ -635,19 +635,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler)
+/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler)
 {
-    String exeName(inExeName);
-    if (path.getLength() > 0)
-    {
-        exeName = Path::combine(path, inExeName);
-    }
-
     DownstreamCompiler::Desc desc;
-    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exeName, desc));
+    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exe, desc));
 
     RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
-    compiler->m_cmdLine.setExecutableFilename(exeName);
+    compiler->m_cmdLine.setExecutableLocation(exe);
 
     outCompiler = compiler;
     return SLANG_OK;
@@ -656,8 +650,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 /* static */SlangResult GCCDownstreamCompilerUtil::locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(loader);
+
     RefPtr<DownstreamCompiler> compiler;
-    if (SLANG_SUCCEEDED(createCompiler(path, "g++", compiler)))
+    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
         set->addCompiler(compiler);
     }
@@ -669,7 +664,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     SLANG_UNUSED(loader);
 
     RefPtr<DownstreamCompiler> compiler;
-    if (SLANG_SUCCEEDED(createCompiler(path, "clang", compiler)))
+    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "clang"), compiler)))
     {
         set->addCompiler(compiler);
     }
