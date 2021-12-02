@@ -291,6 +291,12 @@ public:
                 vkAPI.vkFreeMemory(vkAPI.m_device, m_imageMemory, nullptr);
                 vkAPI.vkDestroyImage(vkAPI.m_device, m_image, nullptr);
             }
+            if (sharedHandle.handleValue != 0)
+            {
+#if SLANG_WINDOWS_FAMILY
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+#endif
+            }
         }
 
         VkImage m_image = VK_NULL_HANDLE;

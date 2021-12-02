@@ -65,6 +65,7 @@ namespace gfx_test
         size_t bufferSize = sizeof(T) * count;
         expectedBuffer.setCount(bufferSize);
         memcpy(expectedBuffer.getBuffer(), expectedResult.begin(), bufferSize);
+        // TODO: compareComputeResultFuzzy not currently implemented for textures
         //if (std::is_same<T, float>::value) return compareComputeResultFuzzy(device, buffer, (float*)expectedBuffer.getBuffer(), bufferSize);
         return compareComputeResult(device, texture, state, expectedBuffer.getBuffer(), bufferSize);
     }
