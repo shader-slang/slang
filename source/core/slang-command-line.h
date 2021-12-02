@@ -46,8 +46,10 @@ struct ExecutableLocation
 
     ExecutableLocation() {}
     ExecutableLocation(const String& dir, const String& name) { set(dir, name);  }
-    explicit ExecutableLocation(const String& nameOrPath) { set(nameOrPath); }
+    ExecutableLocation(Type type, const String& pathOrName) : m_type(type), m_pathOrName(pathOrName) {}
 
+    explicit ExecutableLocation(const String& nameOrPath) { set(nameOrPath); }
+    
     Type m_type = Type::Unknown;
     String m_pathOrName;
 };
@@ -72,10 +74,16 @@ struct CommandLine
         /// Reset to the initial state
     void reset() { *this = CommandLine();  }
 
+        /// Append the args
+    void appendArgs(StringBuilder& out) const;
+
         /// Append the command line to out
     void append(StringBuilder& out) const;
         /// convert into a string
     String toString() const;
+
+        /// Convert just the args to string
+    String toStringArgs() const;
 
         /// Set an executable location
     void setExecutableLocation(const ExecutableLocation& loc) { m_executableLocation = loc; }

@@ -84,11 +84,25 @@ void CommandLine::append(StringBuilder& out) const
 {
     m_executableLocation.append(out);
 
-    for (const auto& arg : m_args)
+    if (m_args.getCount())
     {
-        auto escapeHandler = Process::getEscapeHandler();
-
         out << " ";
+        appendArgs(out);
+    }
+}
+
+void CommandLine::appendArgs(StringBuilder& out) const
+{
+    auto escapeHandler = Process::getEscapeHandler();
+
+    const Int argCount = m_args.getCount();
+    for (Index i = 0; i < argCount; ++i)
+    {
+        const auto& arg = m_args[i];
+        if (i > 0)
+        {
+            out << " ";
+        }
         StringEscapeUtil::appendMaybeQuoted(escapeHandler, arg.getUnownedSlice(), out);
     }
 }
@@ -97,6 +111,13 @@ String CommandLine::toString() const
 {
     StringBuilder buf;
     append(buf);
+    return buf.ProduceString();
+}
+
+String CommandLine::toStringArgs() const
+{
+    StringBuilder buf;
+    appendArgs(buf);
     return buf.ProduceString();
 }
 

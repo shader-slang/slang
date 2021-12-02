@@ -1884,12 +1884,16 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     String modulePath = _calcModulePath(input);
     
     // Remove the binary..
+    String moduleExePath;
     {
-        StringBuilder moduleExePath;
-        moduleExePath << modulePath;
-        moduleExePath << Process::getExecutableSuffix();
-        File::remove(moduleExePath);
+        StringBuilder buf;
+        buf << modulePath;
+        buf << Process::getExecutableSuffix();
+        moduleExePath = buf;
     }
+
+    // Remove the exe if it exists
+    File::remove(moduleExePath);
 
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
@@ -1920,11 +1924,8 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
        // Execute the binary and see what we get
         CommandLine cmdLine;
 
-        StringBuilder exePath;
-        exePath << modulePath << Process::getExecutableSuffix();
-
         ExecutableLocation exe;
-        exe.setPath(exePath);
+        exe.setPath(moduleExePath);
 
         cmdLine.setExecutableLocation(exe);
 
