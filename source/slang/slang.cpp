@@ -2398,13 +2398,6 @@ SlangResult EndToEndCompileRequest::executeActions()
     return res;
 }
 
-IRDumpOptions FrontEndCompileRequest::getIRDumpOptions()
-{
-    IRDumpOptions options = m_defaultIrDumpOptions;
-    options.sourceManager = getSourceManager();
-    return options;
-}
-
 int FrontEndCompileRequest::addTranslationUnit(SourceLanguage language, Name* moduleName)
 {
     if (!moduleName)

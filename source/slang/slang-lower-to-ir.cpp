@@ -8147,9 +8147,7 @@ IRModule* generateIRForTranslationUnit(
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
 
-        IRDumpOptions options = compileRequest->getIRDumpOptions();
-
-        dumpIR(module, options, "LOWER-TO-IR", &writer);
+        dumpIR(module, compileRequest->m_irDumpOptions, "LOWER-TO-IR", compileRequest->getSourceManager(), &writer);
     }
 
     return module;

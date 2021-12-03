@@ -626,8 +626,8 @@ struct OptionsParser
                 }
                 else if (argValue == "-dump-ir-ids")
                 {
-                    requestImpl->getFrontEndReq()->m_defaultIrDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
-                    requestImpl->getBackEndReq()->m_defaultIrDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
+                    requestImpl->getFrontEndReq()->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
+                    requestImpl->getBackEndReq()->m_irDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
                 }
                 else if (argValue == "-dump-intermediate-prefix")
                 {

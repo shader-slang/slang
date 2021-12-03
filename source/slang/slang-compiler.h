@@ -1855,8 +1855,8 @@ namespace Slang
 
         Name* m_defaultModuleName = nullptr;
 
-            /// The default irDumpOptions
-        IRDumpOptions m_defaultIrDumpOptions;
+            /// The irDumpOptions
+        IRDumpOptions m_irDumpOptions;
 
             /// An "extra" entry point that was added via a library reference
         struct ExtraEntryPointInfo
@@ -1868,9 +1868,6 @@ namespace Slang
 
             /// A list of "extra" entry points added via a library reference
         List<ExtraEntryPointInfo> m_extraEntryPoints;
-
-            /// Get the IRDumpOptions
-        IRDumpOptions getIRDumpOptions();
 
     private:
             /// A component type that includes only the global scopes of the translation unit(s) that were compiled.
@@ -2031,8 +2028,6 @@ namespace Slang
             DiagnosticSink* sink,
             ComponentType*  program = nullptr);
 
-        inline IRDumpOptions getIRDumpOptions();
-
         // Should we dump intermediate results along the way, for debugging?
         bool shouldDumpIntermediates = false;
 
@@ -2052,20 +2047,13 @@ namespace Slang
         bool disableDynamicDispatch = false;
 
         // The default IR dumping options
-        IRDumpOptions m_defaultIrDumpOptions;
+        IRDumpOptions m_irDumpOptions;
 
         String m_dumpIntermediatePrefix;
 
     private:
         RefPtr<ComponentType> m_program;
     };
-
-    IRDumpOptions BackEndCompileRequest::getIRDumpOptions()
-    {
-        IRDumpOptions options = m_defaultIrDumpOptions;
-        options.sourceManager = getSourceManager();
-        return options;
-    }
 
         /// A compile request that spans the front and back ends of the compiler
         ///
