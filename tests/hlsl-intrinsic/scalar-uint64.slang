@@ -19,12 +19,23 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint64_t ti = 0;
    
     ti += max(2, idx);
-    ti += min(idx, 1ull);
-    ti += (idx * 3) % 5;
-    
+    ti += min(idx, 1ull); 
     ti += clamp(idx * 10, 11, 23);
     
     ti += countbits(idx * 13);
+   
+    // Math
+    ti = ti - idx;
+    ti = ti + (ti % (idx + 5));
+    ti = ti + (ti / (idx + 20));
+
+    // Logical ops
+    ti = ti | idx;
+    ti = ti ^ (idx & (idx + 1));
+    
+    // Shift
+    ti = ti + (idx >> 1);
+    ti = ti + (idx << 2);
    
     uint64_t v = uint64_t(ti) * 0x8000100354354354ull; 
     // Let's check all the bits make it

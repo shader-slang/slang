@@ -74,6 +74,11 @@ namespace Slang
         static Index findExtIndex(String const& path) { return findExtIndex(path.getUnownedSlice()); }
         static Index findExtIndex(UnownedStringSlice const& path);
 
+            /// True if isn't just a name (ie has any path separator)
+            /// Note this is no the same as having a 'parent' as '/thing' 'has a path', but it doesn't have a parent.
+        static bool hasPath(const UnownedStringSlice& path) { return findLastSeparatorIndex(path) >= 0; }
+        static bool hasPath(const String& path) { return findLastSeparatorIndex(path) >= 0; }
+
         static String replaceExt(const String& path, const char* newExt);
         static String getFileName(const String& path);
         static String getPathWithoutExt(const String& path);
