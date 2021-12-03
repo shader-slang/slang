@@ -18,8 +18,8 @@ TestContext::TestContext()
 
     /// if we are testing on arm, debug, we may want to increase the connection timeout
 #if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
-    // 5 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on debug
-    connectionTimeOutInMs = 1000 * 60 * 5;
+    // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on debug
+    connectionTimeOutInMs = 1000 * 60 * 10;
 #endif
 }
 
