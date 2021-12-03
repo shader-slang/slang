@@ -5,6 +5,7 @@
 #include "slang-stream.h"
 #include "slang-memory-arena.h"
 #include "slang-writer.h"
+#include "slang-semantic-version.h"
 
 namespace Slang
 {
@@ -88,6 +89,11 @@ struct RiffSemanticVersion
         /// A major change is binary incompatible by default
     int getMajor() const { return (m_raw >> 16); }
 
+    SemanticVersion asSemanticVersion() const
+    {
+        return SemanticVersion(getMajor(), getMinor(), getPatch());
+    }
+
     static RawType makeRaw(int major, int minor, int patch)
     {
         SLANG_ASSERT((major | minor | patch) >= 0);
@@ -103,6 +109,7 @@ struct RiffSemanticVersion
     }
 
     static RiffSemanticVersion make(int major, int minor, int patch) { return makeFromRaw(makeRaw(major, minor, patch)); }
+    static RiffSemanticVersion make(const SemanticVersion& in) { return makeFromRaw(makeRaw(in.m_major, in.m_minor, in.m_patch)); }
 
         /// True if the read version is compatible with the current version, based on semantic rules.
     static bool areCompatible(const ThisType& currentVersion, const ThisType& readVersion)

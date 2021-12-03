@@ -777,10 +777,13 @@ SLANG_API SlangResult spExtractRepro(SlangSession* session, const void* reproDat
     using namespace Slang;
     SLANG_UNUSED(session);
 
+    DiagnosticSink sink;
+    sink.init(nullptr, nullptr);
+
     List<uint8_t> buffer;
     {
         MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, buffer));
+        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, &sink, buffer));
     }
 
     MemoryOffsetBase base;
@@ -801,10 +804,13 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
 
     SLANG_UNUSED(session);
 
+    DiagnosticSink sink;
+    sink.init(nullptr, nullptr);
+
     MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
 
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, buffer));
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, &sink, buffer));
 
     auto requestState = ReproUtil::getRequest(buffer);
     MemoryOffsetBase base;
