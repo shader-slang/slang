@@ -225,6 +225,13 @@ public:
         Buffer m_buffer;
         Buffer m_uploadBuffer;
 
+        const Buffer& uploadBuffer() {
+            if (m_desc.hasCpuAccessFlag(AccessFlag::Write) || m_desc.hasCpuAccessFlag(AccessFlag::Read)) {
+                return m_buffer;
+            }
+            return m_uploadBuffer;
+        }
+
         virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
         {
             if (!m_buffer.m_api->vkGetBufferDeviceAddress)
@@ -2241,13 +2248,19 @@ public:
         {
             auto& api = buffer->m_renderer->m_api;
 
-            assert(buffer->m_uploadBuffer.isInitialized());
+            const Buffer& uploadBuffer = buffer->uploadBuffer();
+
+            assert(uploadBuffer.isInitialized());
 
             void* mappedData = nullptr;
             SLANG_VK_CHECK(api.vkMapMemory(
-                api.m_device, buffer->m_uploadBuffer.m_memory, offset, size, 0, &mappedData));
+                api.m_device, uploadBuffer.m_memory, offset, size, 0, &mappedData));
             memcpy(mappedData, data, size);
-            api.vkUnmapMemory(api.m_device, buffer->m_uploadBuffer.m_memory);
+            api.vkUnmapMemory(api.m_device, uploadBuffer.m_memory);
+
+            if (uploadBuffer.m_buffer == buffer->m_buffer.m_buffer) {
+                return;
+            }
 
             // Copy from staging buffer to real buffer
             VkBufferCopy copyInfo = {};
@@ -6744,8 +6757,8 @@ Result VKDevice::getTextureAllocationInfo(
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
 
-    *outSize = memRequirements.size;
-    *outAlignment = memRequirements.alignment;
+    *outSize = (size_t)memRequirements.size;
+    *outAlignment = (size_t)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
     return SLANG_OK;
@@ -6996,6 +7009,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
 Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     BufferResource::Desc desc = fixupBufferDesc(descIn);
+    bool cpuVisible = (descIn.hasCpuAccessFlag(AccessFlag::Write) || descIn.hasCpuAccessFlag(AccessFlag::Read));
 
     const size_t bufferSize = desc.sizeInBytes;
 
@@ -7011,7 +7025,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     {
         usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
-    if (initData)
+    if (initData && !cpuVisible)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
@@ -7031,29 +7045,31 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
+    if (((reqMemoryProperties & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) == 0) && initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
 
     if (initData)
     {
-        // TODO: only create staging buffer if the memory type
-        // used for the buffer doesn't let us fill things in
-        // directly.
+        Buffer& copyBuffer = cpuVisible ? buffer->m_buffer : buffer->m_uploadBuffer;
+
         // Copy into staging buffer
         void* mappedData = nullptr;
-        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+
+        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, copyBuffer.m_memory, 0, bufferSize, 0, &mappedData));
         ::memcpy(mappedData, initData, bufferSize);
-        m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
+        m_api.vkUnmapMemory(m_device, copyBuffer.m_memory);
 
-        // Copy from staging buffer to real buffer
-        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+        if (!cpuVisible) {
+            // Copy from staging buffer to real buffer (if they are different).
+            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
-        VkBufferCopy copyInfo = {};
-        copyInfo.size = bufferSize;
-        m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
-        m_deviceQueue.flush();
+            VkBufferCopy copyInfo = {};
+            copyInfo.size = bufferSize;
+            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+            m_deviceQueue.flush();
+        }
     }
 
     returnComPtr(outResource, buffer);

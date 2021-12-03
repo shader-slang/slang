@@ -237,6 +237,13 @@ public:
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
         D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
 
+        const D3D12Resource& uploadResource() {
+            if (m_desc.hasCpuAccessFlag(AccessFlag::Read) || m_desc.hasCpuAccessFlag(AccessFlag::Write)) {
+                return m_resource;
+            }
+            return m_uploadResource;
+        }
+
         D3D12_RESOURCE_STATES m_defaultState;
 
         virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
@@ -615,10 +622,16 @@ public:
         readRange.End = offset + size;
 
         void* uploadData;
-        SLANG_RETURN_ON_FAIL(buffer->m_uploadResource.getResource()->Map(
+        const D3D12Resource& uploadResource = buffer->uploadResource();
+        SLANG_RETURN_ON_FAIL(uploadResource.getResource()->Map(
             0, &readRange, reinterpret_cast<void**>(&uploadData)));
         memcpy((uint8_t*)uploadData + offset, data, size);
-        buffer->m_uploadResource.getResource()->Unmap(0, &readRange);
+        uploadResource.getResource()->Unmap(0, &readRange);
+
+        if (uploadResource == buffer->m_resource) {
+            return SLANG_OK;
+        }
+
         {
             D3D12BarrierSubmitter submitter(cmdList);
             submitter.transition(
@@ -627,7 +640,7 @@ public:
         cmdList->CopyBufferRegion(
             buffer->m_resource.getResource(),
             offset,
-            buffer->m_uploadResource.getResource(),
+           uploadResource.getResource(),
             offset,
             size);
         {
@@ -3958,7 +3971,8 @@ public:
         D3D12Resource& uploadResource,
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
-        bool isShared = false);
+        bool isShared,
+        bool cpuVisible = false);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
@@ -4245,11 +4259,29 @@ static void _initSrvDesc(
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, bool cpuVisible)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
-    {
+   D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
+
+   // Always create the upload resource
+   {
+       D3D12_HEAP_PROPERTIES heapProps;
+       heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+       heapProps.CreationNodeMask = 1;
+       heapProps.VisibleNodeMask = 1;
+
+       D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
+       uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+       SLANG_RETURN_ON_FAIL(upload.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+   }
+
+   // If not CPU visible, create the dedicated GPU resource as well.
+    if (!cpuVisible) {
         D3D12_HEAP_PROPERTIES heapProps;
         heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
         heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -4265,19 +4297,7 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
         SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
     }
 
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
 
-        D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
-        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-
-        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
-    }
 
     if (srcData)
     {
@@ -4286,15 +4306,17 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
         UINT8* dstData;
         D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
 
-        ID3D12Resource* dxUploadResource = uploadResource.getResource();
+        ID3D12Resource* dxUploadResource = upload.getResource();
 
         SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
         ::memcpy(dstData, srcData, srcDataSize);
         dxUploadResource->Unmap(0, nullptr);
 
-        auto encodeInfo = encodeResourceCommands();
-        encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
-        submitResourceCommandsAndWait(encodeInfo);
+        if (!cpuVisible) {
+            auto encodeInfo = encodeResourceCommands();
+            encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
+            submitResourceCommandsAndWait(encodeInfo);
+        }
     }
 
     return SLANG_OK;
@@ -5172,7 +5194,8 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared));
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared,
+        descIn.hasCpuAccessFlag(AccessFlag::Read) || descIn.hasCpuAccessFlag(AccessFlag::Write)));
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
