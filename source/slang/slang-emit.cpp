@@ -144,8 +144,7 @@ static void dumpIRIfEnabled(
         //FILE* f = nullptr;
         //fopen_s(&f, (String("dump-") + label + ".txt").getBuffer(), "wt");
         //FileWriter writer(f, 0);
-        IRDumpOptions options;
-        options.sourceManager = compileRequest->getSourceManager();
+        const IRDumpOptions options = compileRequest->getIRDumpOptions();
 
         dumpIR(irModule, options, label, &writer);
         //fclose(f);

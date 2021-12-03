@@ -1500,7 +1500,8 @@ struct IRDumpOptions
     {
         enum Enum : Flags
         {
-            SourceLocations = 0x1,          ///< If set will output source locations 
+            SourceLocations = 0x1,          ///< If set will output source locations
+            DumpDebugIds    = 0x2,          ///< If set *and* debug build will write ids
         };
     };
 

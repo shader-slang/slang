@@ -4555,9 +4555,12 @@ namespace Slang
     static void dumpDebugID(IRDumpContext* context, IRInst* inst)
     {
 #if SLANG_ENABLE_IR_BREAK_ALLOC
-        dump(context, "[#");
-        dump(context, String(inst->_debugUID));
-        dump(context, "]");
+        if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
+        {
+            dump(context, "[#");
+            dump(context, String(inst->_debugUID));
+            dump(context, "]");
+        }
 #else
         SLANG_UNUSED(context);
         SLANG_UNUSED(inst);

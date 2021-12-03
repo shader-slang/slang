@@ -624,6 +624,11 @@ struct OptionsParser
                 {
                     compileRequest->setDumpIntermediates(true);
                 }
+                else if (argValue == "-dump-ir-ids")
+                {
+                    requestImpl->getFrontEndReq()->m_defaultIrDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
+                    requestImpl->getBackEndReq()->m_defaultIrDumpOptions.flags |= IRDumpOptions::Flag::DumpDebugIds;
+                }
                 else if (argValue == "-dump-intermediate-prefix")
                 {
                     CommandLineArg prefix;
