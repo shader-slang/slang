@@ -654,6 +654,22 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     RefPtr<DownstreamCompiler> compiler;
     if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
+        // A downstream compiler for Slang must currently support C++14 - such that
+        // the prelude and generated code works.
+        // 
+        // The first version of gcc that supports -std=c++14 is 5.0
+        // https://gcc.gnu.org/projects/cxx-status.html
+        //
+        // If could be argued to allow C/C++ compilations via older versions through an older version
+        // but that requires some more complex behavior, so we don't allow for now.
+        
+        auto desc = compiler->getDesc();
+        if (desc.majorVersion < 5)
+        {
+            // If the version isn't 5 or higher, we don't add this version of the compiler.
+            return SLANG_OK;
+        }
+
         set->addCompiler(compiler);
     }
     return SLANG_OK;
