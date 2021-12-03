@@ -39,6 +39,11 @@ struct RttiInfoManager
         std::lock_guard<std::recursive_mutex> guard(m_mutex);
         return m_arena.allocate(size);
     }
+    void deallocateAll()
+    {
+        std::lock_guard<std::recursive_mutex> guard(m_mutex);
+        m_arena.reset();
+    }
 
     static RttiInfoManager& getSingleton()
     {
@@ -59,6 +64,11 @@ protected:
 /* static */void* RttiInfo::allocate(size_t size)
 {
     return RttiInfoManager::getSingleton().allocate(size);
+}
+
+/* static */void RttiInfo::deallocateAll()
+{
+    return RttiInfoManager::getSingleton().deallocateAll();
 }
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! StructRttiBuilder !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */

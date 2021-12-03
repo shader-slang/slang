@@ -757,11 +757,11 @@ end
      links { "compiler-core", "core" }
  
  
- tool "test-proxy"
+ tool "test-process"
      uuid "BE412850-4BB9-429A-877C-BFBC4B34186C"
      includedirs { "." }
  
-     links { "compiler-core", "core", "slang" }
+     links { "compiler-core", "core" }
  
  tool "test-server"
      uuid "23149706-C12F-4329-B6AA-8266407C32D3"

@@ -38,9 +38,11 @@ protected:
 
 enum class SpawnType
 {
-    UseExe,
-    UseSharedLibrary,
-    UseProxy,
+    Default,                                    ///< Default - typically uses shared library, on CI may use TestServer    
+    UseExe,                                     ///< Tests using executable (for example slangc)
+    UseSharedLibrary,                           ///< Runs testing in process (a crash tan take down the 
+    UseTestServer,                              ///< Use the test server to isolate testing
+    UseFullyIsolatedTestServer,                 ///< Uses a test server for each test (slow!)
 };
 
 struct Options
@@ -77,11 +79,9 @@ struct Options
     bool dumpOutputOnFailure = false;
 
     // Set the default spawn type to use
-    // Set to SpawnType::UseProxy, if isolation of test execution is desired.
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
     // desirable default usually.
-    SpawnType defaultSpawnType = SpawnType::UseSharedLibrary;
-    //SpawnType defaultSpawnType = SpawnType::UseProxy;
+    SpawnType defaultSpawnType = SpawnType::Default;
     
     // kind of output to generate
     TestOutputMode outputMode = TestOutputMode::Default;

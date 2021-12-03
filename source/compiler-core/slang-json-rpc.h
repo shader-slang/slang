@@ -12,49 +12,9 @@
 
 namespace Slang {
 
-struct JSONRPCErrorResponse
+/// Struct to hold values associated with JSON-RPC
+struct JSONRPC
 {
-    struct Error
-    {
-        Index code = 0;                     ///< Value from ErrorCode
-        UnownedStringSlice message;         ///< Error message
-
-        static const StructRttiInfo g_rttiInfo;
-    };
-
-    Error error;
-    JSONValue data;                 
-    Int id = -1;                        ///< Id of initiating method or -1 if not set
-
-    static const StructRttiInfo g_rttiInfo;
-};
-
-struct JSONRPCCall
-{
-    UnownedStringSlice method;          ///< The name of the method
-    JSONValue params;                   ///< Can be invalid/array/object
-    Int id = -1;                        ///< Id associated with this request, or -1 if not set
-
-    static const StructRttiInfo g_rttiInfo;
-};
-
-struct JSONResultResponse
-{
-    JSONValue result;                   ///< The result value
-    Int id = -1;                        ///< Id of initiating method or -1 if not set
-
-    static const StructRttiInfo g_rttiInfo;
-};
-
-/// Send and receive messages as JSON
-///
-/// Strictly speaking should support ids, as strings or ids. Currently just supports with integer ids.
-/// One way of dealing with this would be to just use JSONValue for ids, would allow invalid/string/integer and
-/// a mechanism to compare/display etc.
-class JSONRPCUtil
-{
-public:
-
     enum class ErrorCode
     {
         ParseError = -32700,        ///< Invalid JSON was received by the server.
@@ -67,60 +27,109 @@ public:
         ServerImplEnd = -32099,
     };
 
-    enum class ResponseType
+    static bool isIdOk(const JSONValue& value)
     {
-        Invalid,
-        Error,
-        Result
-    };
+        auto kind = value.getKind();
+        switch (kind)
+        {
+            case JSONValue::Kind::Integer:
+            case JSONValue::Kind::Invalid:
+            case JSONValue::Kind::String:
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
-    struct ErrorResponse
+    static const UnownedStringSlice jsonRpc;
+    static const UnownedStringSlice jsonRpcVersion;
+    static const UnownedStringSlice id;
+};
+
+struct JSONRPCErrorResponse
+{
+    struct Error
     {
-        Index code = 0;                     ///< Value from ErrorCode
+        bool isValid() const { return code != 0; }
+
+        Int code = 0;                     ///< Value from ErrorCode
         UnownedStringSlice message;         ///< Error message
-        JSONValue data;
-        Int id = -1;                        ///< Id of initiating method or -1 if not set
+    
+        static const StructRttiInfo g_rttiInfo;
     };
 
-    struct ResultResponse
-    {
-        JSONValue result;                   ///< The result value
-        Int id = -1;                        ///< Id of initiating method or -1 if not set
-    };
+    bool isValid() const { return jsonrpc == JSONRPC::jsonRpcVersion && error.isValid() && JSONRPC::isIdOk(id);  }
 
-    struct Call
-    {
-        UnownedStringSlice method;          ///< The name of the method
-        JSONValue params;                   ///< Can be invalid/array/object
-        Int id = -1;                        ///< Id associated with this request, or -1 if not set
-    };
+    UnownedStringSlice jsonrpc = JSONRPC::jsonRpcVersion;
+    Error error;
+    JSONValue data;                      ///< Optional data describing the errro
+    JSONValue id;                        ///< Id associated with this request
 
-        /// Parameters can be either named or via index.
-    static JSONValue createCall(JSONContainer* container, const UnownedStringSlice& method, JSONValue params, Int id = -1);
-        /// Parameters can be either named or via index.
-    static JSONValue createCall(JSONContainer* container, const UnownedStringSlice& method, Int id = -1);
+    static const StructRttiInfo g_rttiInfo;
+};
 
-        /// Create an error response
-        /// Code should typically be something in the ErrorCode range
-    static JSONValue createErrorResponse(JSONContainer* container, Index code, const UnownedStringSlice& message, const JSONValue& data = JSONValue(), Int id = -1);
-    static JSONValue createErrorResponse(JSONContainer* container, ErrorCode code, const UnownedStringSlice& message, const JSONValue& data = JSONValue(), Int id = -1);
-        /// Create a result response
-    static JSONValue createResultResponse(JSONContainer* container, const JSONValue& resultValue, Int id = -1);
+struct JSONRPCCall
+{
+    bool isValid() const { return method.getLength() > 0 && jsonrpc == JSONRPC::jsonRpcVersion && JSONRPC::isIdOk(id);  }
+
+    UnownedStringSlice jsonrpc = JSONRPC::jsonRpcVersion;
+    UnownedStringSlice method;          ///< The name of the method
+    JSONValue params;                   ///< Can be invalid/array/object
+    JSONValue id;                       ///< Id associated with this request
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+struct JSONResultResponse
+{
+    bool isValid() const { return jsonrpc == JSONRPC::jsonRpcVersion && JSONRPC::isIdOk(id); }
+
+    UnownedStringSlice jsonrpc = JSONRPC::jsonRpcVersion;
+    JSONValue result;                           ///< The result value
+    JSONValue id;                               ///< Id associated with this request 
+
+    static const StructRttiInfo g_rttiInfo;
+};
+
+enum class JSONRPCMessageType
+{
+    Invalid,
+    Result,
+    Call,
+    Error,
+    CountOf,
+};
+
+/// Send and receive messages as JSON
+class JSONRPCUtil
+{
+public:
 
         /// Determine the response type
-    static ResponseType getResponseType(JSONContainer* container, const JSONValue& response);
-
-    static SlangResult parseError(JSONContainer* container, const JSONValue& response, ErrorResponse& out);
-
-    static SlangResult parseResult(JSONContainer* container, const JSONValue& response, ResultResponse& out);
-
-    static SlangResult parseCall(JSONContainer* container, const JSONValue& value, Call& out);
+    static JSONRPCMessageType getMessageType(JSONContainer* container, const JSONValue& value);
 
         /// Parse slice into JSONContainer. outValue is the root of the hierarchy.
+        /// NOTE! Uses and *assumes* there is a source manager on the sink. outValue is likely only usable whilst the sourceManger is in scope
+        /// The sourceLoc can only be interpretted with the sourceLoc anyway
     static SlangResult parseJSON(const UnownedStringSlice& slice, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
 
-        /// Parse content from stream, and consume the packet
-    static SlangResult parseJSONAndConsume(HTTPPacketConnection* connection, JSONContainer* container, DiagnosticSink* sink, JSONValue& outValue);
+        /// Convert value into out
+    static SlangResult convertToNative(JSONContainer* container, const JSONValue& value, DiagnosticSink* sink, const RttiInfo* rttiInfo, void* out);
+    template <typename T>
+    static SlangResult convertToNative(JSONContainer* container, const JSONValue& value, DiagnosticSink* sink, T& out) { return convertToNative(container, value, sink, GetRttiInfo<T>::get(), (void*)&out); }
+
+        /// Convert to JSON
+    static SlangResult convertToJSON(const RttiInfo* rttiInfo, const void* in, DiagnosticSink* sink, StringBuilder& out);
+
+    template <typename T>
+    static SlangResult convertToJSON(const T* in, DiagnosticSink* sink, StringBuilder& out)
+    {
+        return convertToJSON(GetRttiInfo<T>::get(), (const void*)in, sink, out);
+    }
+
+        /// Get an id directly from root (assumed id: is in root object definition).
+    static JSONValue getId(JSONContainer* container, const JSONValue& root);
 };
 
 } // namespace Slang

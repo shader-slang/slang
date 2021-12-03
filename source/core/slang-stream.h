@@ -6,6 +6,14 @@
 namespace Slang
 {
 
+enum class StdStreamType
+{
+    ErrorOut,
+    Out,
+    In,
+    CountOf,
+};
+
 enum class SeekOrigin
 {
 	Start,      ///< Seek from the start of the stream
@@ -236,6 +244,13 @@ protected:
     RefPtr<Stream> m_stream;    ///< Stream that is being read from
 };
 
+enum class StreamBufferStyle
+{
+    None,
+    Line,
+    Full,
+};
+
 struct StreamUtil
 {
         /// Appends all bytes that can be read from stream into bytes
@@ -251,6 +266,8 @@ struct StreamUtil
 
     static SlangResult readOrDiscard(Stream* stream, size_t readSize, List<Byte>* ioBytes);
     static SlangResult readOrDiscardAll(Stream* stream, size_t readSize, List<Byte>* ioBytes);
+
+    static SlangResult setStreamBufferStyle(StdStreamType stdStream, StreamBufferStyle style);
 };
 
 

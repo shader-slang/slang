@@ -123,8 +123,9 @@ public:
         /// Write. Will potentially block if write stream is blocking.
     SlangResult write(const void* content, size_t sizeInBytes);
 
-        /// Blocks until some result - a packet, closure, or some kind of error
-    SlangResult waitForResult();
+        /// Blocks until some result - a packet, closure, or some kind of error or timeout.
+        /// TimeOut of -1 means no timeout.
+    SlangResult waitForResult(Int timeOutInMs = -1);
         /// Consume the content - so can read next content
     void consumeContent();
 

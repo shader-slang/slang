@@ -81,6 +81,7 @@ static bool _isSubCommand(const char* arg)
     while (argCursor != argEnd)
     {
         char const* arg = *argCursor++;
+
         if (arg[0] != '-')
         {
             // We need to determine if this is a command, the confusion is that
@@ -125,9 +126,13 @@ static bool _isSubCommand(const char* arg)
             }
             optionsOut->binDir = *argCursor++;
         }
-        else if (strcmp(arg, "-use-test-proxy") == 0)
+        else if (strcmp(arg, "-use-test-server") == 0)
         {
-            optionsOut->defaultSpawnType = SpawnType::UseProxy;
+            optionsOut->defaultSpawnType = SpawnType::UseTestServer;
+        }
+        else if (strcmp(arg, "-use-fully-isolated-test-server") == 0)
+        {
+            optionsOut->defaultSpawnType = SpawnType::UseFullyIsolatedTestServer;
         }
         else if (strcmp(arg, "-v") == 0)
         {

@@ -288,6 +288,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-lexer.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-native.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-parser.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-json-rpc-connection.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-rpc.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-json-value.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-lexer-diagnostic-defs.h" />
@@ -298,6 +299,7 @@
     <ClInclude Include="..\..\..\source\compiler-core\slang-name.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-source-loc.h" />
+    <ClInclude Include="..\..\..\source\compiler-core\slang-test-server-protocol.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token-defs.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-token.h" />
     <ClInclude Include="..\..\..\source\compiler-core\slang-visual-studio-compiler-util.h" />
@@ -317,6 +319,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-lexer.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-native.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-parser.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-json-rpc-connection.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-rpc.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-json-value.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-lexer.cpp" />
@@ -325,6 +328,7 @@
     <ClCompile Include="..\..\..\source\compiler-core\slang-name.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-nvrtc-compiler.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-source-loc.cpp" />
+    <ClCompile Include="..\..\..\source\compiler-core\slang-test-server-protocol.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-token.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\slang-visual-studio-compiler-util.cpp" />
     <ClCompile Include="..\..\..\source\compiler-core\windows\slang-win-visual-studio-util.cpp" />

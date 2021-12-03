@@ -50,6 +50,8 @@ struct JSONValue
         FloatValue,
         StringValue,
 
+        StringRepresentation,
+
         Array,
         Object,
 
@@ -100,16 +102,17 @@ struct JSONValue
         /// Given a type return the associated kind
     static Kind getKindForType(Type type) { return g_typeToKind[Index(type)]; }
 
-    Type type;                  ///< The type of value
+    Type type = Type::Invalid;  ///< The type of value
     SourceLoc loc;              ///< The (optional) location in source of this value.
 
     union 
     {
-        Index rangeIndex;           ///< Used for Array/Object
-        Index length;               ///< Length in bytes if it is a 'Lexeme'
-        double floatValue;          ///< Float value
-        int64_t intValue;           ///< Integer value
-        JSONKey stringKey;          ///< The pool key if it's a string
+        Index rangeIndex;                       ///< Used for Array/Object
+        Index length;                           ///< Length in bytes if it is a 'Lexeme'
+        double floatValue;                      ///< Float value
+        int64_t intValue;                       ///< Integer value
+        JSONKey stringKey;                      ///< The pool key if it's a string
+        StringRepresentation* stringRep;        ///< Only ever used on a 'PersistentJSONValue'
     };
 
     static const Kind g_typeToKind[Index(Type::CountOf)];
@@ -144,6 +147,65 @@ struct JSONKeyValue
     static JSONKeyValue g_invalid;
 };
 
+class JSONContainer;
+
+/* Is similar to JSONValue, but is designed to
+
+* Only be able to hold 'Simple' types (ie not array/object)
+* Does not reference/require JSONContainer.
+
+Not requiring JSONContainer means it's useful to hold state when JSONContainer goes out of scope.
+Care may need to be taken if sourceManager goes out of scope, sourceLocs may become invalid. This
+is true of a regular JSONValue.
+
+Care must also be taken because it is derived from JSONValue. It *can* be sliced and work correctly,
+but *requires* that the PersistentJSONValue with same value to stay in scope in general. In practice
+this is only an issue with StringRepresention type.
+*/
+class PersistentJSONValue : public JSONValue
+{
+public:
+    typedef JSONValue Super;
+    typedef PersistentJSONValue ThisType;
+
+        /// If it's a string type this will always work
+    String getString() const;
+    UnownedStringSlice getSlice() const;
+
+        /// Set to the value
+    void set(const JSONValue& in, JSONContainer* container);
+        /// Set directly to a string
+    void set(const UnownedStringSlice& slice, SourceLoc loc);
+
+        /// True if identical
+    bool operator==(const ThisType& rhs) const;
+    bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
+
+        /// Assignable
+    void operator=(const ThisType& rhs);
+
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container) { _init(in, container); }
+    PersistentJSONValue(const JSONValue& in, JSONContainer* container, SourceLoc inLoc) { _init(in, container); loc = inLoc; }
+
+        /// Copy Ctor
+    PersistentJSONValue(const ThisType& rhs);
+        /// Default Ctor (will be set to invalid)
+    PersistentJSONValue() {}
+
+    
+    ~PersistentJSONValue()
+    {
+        if (type == Type::StringRepresentation && stringRep)
+        {
+            stringRep->releaseReference();
+        }
+    }
+protected:
+        /// Assumes this has no valid data
+    void _init(const JSONValue& in, JSONContainer* container);
+    void _init(const UnownedStringSlice& slice, SourceLoc loc);
+};
+
 class JSONContainer : public RefObject
 {
 public:
@@ -169,7 +231,7 @@ public:
 
         /// Returns the index of key in obj, or -1 if not found
     Index findObjectIndex(const JSONValue& obj, JSONKey key) const;
-        /// Get the value in the object at key. REturns invalid if not found.
+        /// Get the value in the object at key. Returns invalid if not found.
     JSONValue findObjectValue(const JSONValue& obj, JSONKey key) const;
 
         /// Returns the index 
@@ -200,7 +262,7 @@ public:
         /// Get as a string. The contents will stay in scope as long as the container
     UnownedStringSlice getString(const JSONValue& in);
 
-    /// Gets the lexeme
+        /// Gets the lexeme
     UnownedStringSlice getLexeme(const JSONValue& in);
 
         /// Get a key for a name
@@ -232,8 +294,16 @@ public:
         /// Set the source manager
     void setSourceManager(SourceManager* sourceManger) { m_sourceManager = sourceManger;  }
 
+        /// Clears all the source locs. Useful if the sourceManager is no longer available, or has itself been reset.
+        /// All JSONValues which were Lexeme based will become held in the container
+        /// The source manager will set to nullptr
+    void clearSourceManagerDependency(JSONValue* ioValues, Index count);
+
         /// Reset the state
     void reset();
+
+        /// Return inValue as a regular value (ie not held as a lexeme)
+    JSONValue asValue(const JSONValue& inValue);
 
         // Ctor
     JSONContainer(SourceManager* sourceManger);
@@ -276,6 +346,9 @@ protected:
     bool _areEqualValues(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
         /// True if the key and value are equal
     bool _areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyValue* b, Index count);
+
+    void _clearSourceManagerDependency(JSONValue* ioValues, Index count);
+    JSONValue _removeManagerDependency(const JSONValue& inValue);
 
     StringBuilder m_buf;                        ///< A temporary buffer used to hold unescaped strings
 

@@ -118,6 +118,12 @@ DIAGNOSTIC(    86, Error, unableToCreateModuleContainer, "unable to create modul
 DIAGNOSTIC(    87, Error, unableToSetDefaultDownstreamCompiler, "unable to set default downstream compiler for source language '%0' to '%1'")
 
 DIAGNOSTIC(    88, Error, unknownArchiveType, "archive type '%0' is unknown")
+DIAGNOSTIC(    89, Error, expectingSlangRiffContainer, "expecting a slang riff container")
+DIAGNOSTIC(    90, Error, incompatibleRiffSemanticVersion, "incompatible riff semantic version %0 expecting %1")
+DIAGNOSTIC(    91, Error, riffHashMismatch, "riff hash mismatch - incompatible riff")
+DIAGNOSTIC(    92, Error, unableToCreateDirectory, "unable to create directory '$0'")
+DIAGNOSTIC(    93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
+DIAGNOSTIC(    94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
 
 //
 // 001xx - Downstream Compilers

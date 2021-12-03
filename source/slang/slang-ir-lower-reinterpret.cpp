@@ -17,12 +17,6 @@ struct ReinterpretLoweringContext
 
     void addToWorkList(IRInst* inst)
     {
-        for (auto ii = inst->getParent(); ii; ii = ii->getParent())
-        {
-            if (as<IRGeneric>(ii))
-                return;
-        }
-
         if (workList.Contains(inst))
             return;
 

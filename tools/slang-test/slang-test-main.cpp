@@ -553,13 +553,13 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
-    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
     if (options.shouldBeVerbose)
     {
         CommandLine testCmdLine;
 
-        testCmdLine.setExecutableFilename("slang-test");
+        testCmdLine.setExecutableLocation(ExecutableLocation("slang-test"));
 
         if (options.binDir.getLength())
         {
@@ -622,7 +622,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 Result spawnAndWaitProxy(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
     // Get the name of the thing to execute
-    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     if (exeName == "slangc")
     {
@@ -635,7 +635,7 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
 
     // Make the first arg the name of the tool to invoke
     cmdLine.m_args.insert(0, exeName);
-    cmdLine.setExecutable(context->exeDirectoryPath, "test-proxy");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->exeDirectoryPath, "test-proxy"));
 
     const auto& options = context->options;
     if (options.shouldBeVerbose)
@@ -653,6 +653,69 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     }
 
     return res;
+}
+
+static Result _executeRPC(TestContext* context, SpawnType spawnType, const UnownedStringSlice& method, const RttiInfo* rttiInfo, const void* args, ExecuteResult& outRes)
+{
+    // If we are 'fully isolated', we cannot share a test server.
+    // So tear down the RPC connection if there is one currently.
+    if (spawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        context->destroyRPCConnection();
+    }
+
+    JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
+    if (!rpcConnection)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Execute
+    SLANG_RETURN_ON_FAIL(rpcConnection->sendCall(method, rttiInfo, args));
+
+    // Wait for the result
+    rpcConnection->waitForResult(context->connectionTimeOutInMs);
+
+    if (!rpcConnection->hasMessage())
+    {
+        // We can assume somethings gone wrong. So lets kill the connection and fail.
+        context->destroyRPCConnection();
+        return SLANG_FAIL;
+    }
+
+    if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
+    {
+        return SLANG_FAIL;
+    }
+
+    // Get the result
+    TestServerProtocol::ExecutionResult exeRes;
+    SLANG_RETURN_ON_FAIL(rpcConnection->getMessage(&exeRes));
+
+    outRes.resultCode = exeRes.returnCode;
+    outRes.standardError = exeRes.stdError;
+    outRes.standardOutput = exeRes.stdOut;
+
+    return SLANG_OK;
+}
+
+template <typename T>
+static Result _executeRPC(TestContext* context, SpawnType spawnType, const UnownedStringSlice& method, const T* msg, ExecuteResult& outRes)
+{
+    return _executeRPC(context, spawnType, method, GetRttiInfo<T>::get(), (const void*)msg, outRes);
+}
+
+Result spawnAndWaitTestServer(TestContext* context, SpawnType spawnType, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
+{
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
+
+    // This is a test tool execution
+    TestServerProtocol::ExecuteToolTestArgs args;
+
+    args.toolName = exeName;
+    args.args = inCmdLine.m_args;
+
+    return _executeRPC(context, spawnType, TestServerProtocol::ExecuteToolTestArgs::g_methodName, &args, outRes);
 }
 
 static SlangResult _extractArg(const CommandLine& cmdLine, const String& argName, String& outValue)
@@ -882,7 +945,7 @@ static SlangResult _extractReflectionTestRequirements(const CommandLine& cmdLine
 
 static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequirements* ioInfo)
 {
-    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
     if (exeName == "render-test")
     {
@@ -939,7 +1002,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 }
                 // Try starting up the device
                 CommandLine cmdLine;
-                cmdLine.setExecutable(context->options.binDir, "render-test");
+                cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
                 _addRenderTestOptions(context->options, cmdLine);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
@@ -994,22 +1057,26 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
 
     const auto& options = context->options;
 
+    const auto finalSpawnType = context->getFinalSpawnType(spawnType);
+
     SlangResult spawnResult = SLANG_FAIL;
-    switch (spawnType)
+    switch (finalSpawnType)
     {
         case SpawnType::UseExe:
         {
             spawnResult = spawnAndWaitExe(context, testPath, cmdLine, outExeRes);
             break;
         }
+        case SpawnType::Default:
         case SpawnType::UseSharedLibrary:
         {
             spawnResult = spawnAndWaitSharedLibrary(context, testPath, cmdLine, outExeRes);
             break;
         }
-        case SpawnType::UseProxy:
+        case SpawnType::UseFullyIsolatedTestServer:
+        case SpawnType::UseTestServer:
         {
-            spawnResult = spawnAndWaitProxy(context, testPath, cmdLine, outExeRes);
+            spawnResult = spawnAndWaitTestServer(context, finalSpawnType, testPath, cmdLine, outExeRes);
             break;
         }
         default: break;
@@ -1083,7 +1150,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
-    ioCmdLine.setExecutable(context->options.binDir, "slangc");
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
 
     if (context->options.verbosePaths)
     {
@@ -1136,9 +1203,12 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
 
     // Execute it
+    ExecutableLocation exe;
+    exe.setPath(fileName);
+
     CommandLine cmdLine;
-    cmdLine.m_executable = fileName;
-    cmdLine.m_executableType = CommandLine::ExecutableType::Path;
+    cmdLine.setExecutableLocation(exe);
+
     return ProcessUtil::execute(cmdLine, outExeRes);
 }
 
@@ -1532,7 +1602,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
     
-    cmdLine.setExecutable(options.binDir, "slang-reflection-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(options.binDir, "slang-reflection-test"));
     cmdLine.addArg(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -1574,7 +1644,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -1814,12 +1884,16 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     String modulePath = _calcModulePath(input);
     
     // Remove the binary..
+    String moduleExePath;
     {
-        StringBuilder moduleExePath;
-        moduleExePath << modulePath;
-        moduleExePath << Process::getExecutableSuffix();
-        File::remove(moduleExePath);
+        StringBuilder buf;
+        buf << modulePath;
+        buf << Process::getExecutableSuffix();
+        moduleExePath = buf;
     }
+
+    // Remove the exe if it exists
+    File::remove(moduleExePath);
 
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
@@ -1848,13 +1922,12 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     else
     {
        // Execute the binary and see what we get
-
         CommandLine cmdLine;
 
-        StringBuilder exePath;
-        exePath << modulePath << Process::getExecutableSuffix();
+        ExecutableLocation exe;
+        exe.setPath(moduleExePath);
 
-        cmdLine.setExecutablePath(exePath);
+        cmdLine.setExecutableLocation(exe);
 
         ExecuteResult exeRes;
         if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
@@ -1981,7 +2054,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
     TestResult result = TestResult::Pass;
 
     // Otherwise we compare to the expected output
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2135,7 +2208,7 @@ static TestResult _runHLSLComparisonTest(
         if (standardOutput.getLength() != 0)	result = TestResult::Fail;
     }
     // Otherwise we compare to the expected output
-    else if (actualOutput != expectedOutput)
+    else if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         result = TestResult::Fail;
     }
@@ -2272,7 +2345,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2318,7 +2391,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
@@ -2471,7 +2544,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
     _addRenderTestOptions(context->options, cmdLine);
@@ -2511,7 +2584,8 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
     auto actualOutput = getOutput(exeRes);
     auto expectedOutput = getExpectedOutput(outputStem);
-    if (actualOutput != expectedOutput)
+    
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -2579,7 +2653,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
     _addRenderTestOptions(context->options, cmdLine);
@@ -2817,7 +2891,7 @@ TestResult runHLSLRenderComparisonTestImpl(
     if( hlslResult  == TestResult::Fail )   return TestResult::Fail;
     if( slangResult == TestResult::Fail )   return TestResult::Fail;
 
-    if (actualOutput != expectedOutput)
+    if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
         context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
 
@@ -3439,37 +3513,23 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
         {
             if (testPassesCategoryMask(context, testOptions))
             {
-                if (spawnType == SpawnType::UseProxy)
+                if (spawnType == SpawnType::UseTestServer ||
+                    spawnType == SpawnType::UseFullyIsolatedTestServer)
                 {
-                    CommandLine cmdLine;
-
-                    // The 'command' is the module 
-                    cmdLine.setExecutablePath(Path::combine(context->exeDirectoryPath, moduleName));
-
-                    // Pass the test name / index
-                    cmdLine.addArg(testName);
-
-                    {
-                        StringBuilder buf;
-                        buf << i;
-                        cmdLine.addArg(buf.ProduceString());
-                    }
-
-                    // Pass the enabled apis
-                    {
-                        StringBuilder buf;
-                        buf << context->options.enabledApis;
-                        cmdLine.addArg(buf.ProduceString());
-                    }
+                    TestServerProtocol::ExecuteUnitTestArgs args;
+                    args.enabledApis = context->options.enabledApis;
+                    args.moduleName = moduleName;
+                    args.testName = testName;
 
                     {
                         TestReporter::TestScope scopeTest(reporter, testOptions.command);
                         ExecuteResult exeRes;
 
-                        const auto testResult = _asTestResult(spawnAndWait(context, filePath, spawnType, cmdLine, exeRes));
+                        SlangResult rpcRes = _executeRPC(context, spawnType, TestServerProtocol::ExecuteUnitTestArgs::g_methodName, &args, exeRes);
+                        const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
 
                         // If the test fails, output any output - which might give information about individual tests that have failed.
-                        if (testResult == TestResult::Fail)
+                        if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
                         {
                             String output = getOutput(exeRes);
                             reporter->message(TestMessageType::TestFailure, output.getBuffer());
@@ -3505,6 +3565,10 @@ static SlangResult runUnitTestModule(TestContext* context, TestOptions& testOpti
 
 SlangResult innerMain(int argc, char** argv)
 {
+    // Disable buffering for out and std out
+    StreamUtil::setStreamBufferStyle(StdStreamType::Out, StreamBufferStyle::None);
+    StreamUtil::setStreamBufferStyle(StdStreamType::ErrorOut, StreamBufferStyle::None);
+
     auto stdWriters = StdWriters::initDefaultSingleton();
 
     // The context holds useful things used during testing
@@ -3550,7 +3614,8 @@ SlangResult innerMain(int argc, char** argv)
     {
         SlangSession* session = context.getSession();
 
-        StdWriters::getOut().print("Supported backends:");
+        auto out = StdWriters::getOut();
+        out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
@@ -3573,11 +3638,11 @@ SlangResult innerMain(int argc, char** argv)
                 SLANG_ASSERT(passThroughCategories[i] == nullptr);
                 passThroughCategories[i] = categorySet.add(buf.getBuffer() + 1, fullTestCategory);
 
-                StdWriters::getOut().write(buf.getBuffer(), buf.getLength());
+                out.write(buf.getBuffer(), buf.getLength());
             }
         }
 
-        StdWriters::getOut().print("\n");
+        out.print("\n");
     }
 
     // Working out what renderApis is worked on on demand through
@@ -3676,18 +3741,20 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
+            const auto spawnType = context.getFinalSpawnType();
+
             // Run the unit tests
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "slang-unit-test-tool");
+                runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
             }
 
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, context.options.defaultSpawnType, "gfx-unit-test-tool");
+                runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
             }
              
             TestReporter::set(nullptr);
@@ -3701,6 +3768,9 @@ SlangResult innerMain(int argc, char** argv)
 int main(int argc, char** argv)
 {
     const SlangResult res = innerMain(argc, argv);
+
+    Slang::RttiInfo::deallocateAll();
+
 #ifdef _MSC_VER
     _CrtDumpMemoryLeaks();
 #endif

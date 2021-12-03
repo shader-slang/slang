@@ -11,6 +11,66 @@ namespace Slang
     // for anything that uses core
     static const auto s_charUtilLink = CharUtil::_ensureLink();
 
+
+    // StringRepresentation
+
+    void StringRepresentation::setContents(const UnownedStringSlice& slice)
+    {
+        const auto sliceLength = slice.getLength();
+        SLANG_ASSERT(sliceLength <= capacity);
+
+        char* chars = getData();
+
+        // Use move (rather than memcpy), because the slice *could* be contained in the StringRepresentation
+        ::memmove(chars, slice.begin(), sliceLength * sizeof(char));
+        // Zero terminate. 
+        chars[sliceLength] = 0;
+        // Set the length
+        length = sliceLength;
+    }
+
+
+    /* static */StringRepresentation* StringRepresentation::create(const UnownedStringSlice& slice)
+    {
+        const auto sliceLength = slice.getLength();
+
+        if (sliceLength)
+        {
+            StringRepresentation* rep = StringRepresentation::createWithLength(sliceLength);
+         
+            char* chars = rep->getData();
+            ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
+            chars[sliceLength] = 0;
+
+            return rep;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    /* static */StringRepresentation* StringRepresentation::createWithReference(const UnownedStringSlice& slice)
+    {
+        const auto sliceLength = slice.getLength();
+
+        if (sliceLength)
+        {
+            StringRepresentation* rep = StringRepresentation::createWithLength(sliceLength);
+            rep->addReference();
+
+            char* chars = rep->getData();
+            ::memcpy(chars, slice.begin(), sizeof(char) * sliceLength);
+            chars[sliceLength] = 0;
+
+            return rep;
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
     // OSString
 
     OSString::OSString()

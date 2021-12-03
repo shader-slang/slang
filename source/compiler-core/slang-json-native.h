@@ -12,6 +12,8 @@ namespace Slang {
 struct JSONToNativeConverter
 {
     SlangResult convert(const JSONValue& value, const RttiInfo* rttiInfo, void* out);
+    template <typename T>
+    SlangResult convert(const JSONValue& value, T* in) { return convert(value, GetRttiInfo<T>::get(), (void*)in); }
 
     JSONToNativeConverter(JSONContainer* container, DiagnosticSink* sink):
         m_container(container),
@@ -31,6 +33,9 @@ protected:
 struct NativeToJSONConverter
 {
     SlangResult convert(const RttiInfo* rttiInfo, const void* in, JSONValue& out);
+
+    template <typename T>
+    SlangResult convert(T* in, JSONValue& out) { return convert(GetRttiInfo<T>::get(), (const void*)in, out); }
 
     NativeToJSONConverter(JSONContainer* container, DiagnosticSink* sink) :
         m_container(container),
