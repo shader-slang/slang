@@ -355,8 +355,10 @@ static const int kCannotExecute = 126;
 {
     List<char const*> argPtrs;
 
+    const auto& exe = commandLine.m_executableLocation;
+
     // Add the command
-    argPtrs.add(commandLine.m_executable.getBuffer());
+    argPtrs.add(exe.m_pathOrName.getBuffer());
 
     // Add all the args - they don't need any explicit escaping 
     for (auto arg : commandLine.m_args)
@@ -413,9 +415,16 @@ static const int kCannotExecute = 126;
         // TODO(JS): Strictly speaking if m_executableType is 'Path' then we shouldn't be searching. Ie which
         // exec we use here should be dependent on the executable type.
 
-        // Path = execvp
-        // Filename = execv
-        ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
+        if (exe.m_type == ExecutableLocation::Type::Path)
+        {
+            // Use the specified path (ie don't search)
+            ::execv(argPtrs[0], (char* const*)&argPtrs[0]);
+        }
+        else
+        {
+            // Search for the executable
+            ::execvp(argPtrs[0], (char* const*)&argPtrs[0]);
+        }
 
         // If we get here, then `exec` failed
 

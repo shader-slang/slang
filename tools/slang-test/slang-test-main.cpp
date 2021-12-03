@@ -553,13 +553,13 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
     const auto& options = context->options;
-    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
     if (options.shouldBeVerbose)
     {
         CommandLine testCmdLine;
 
-        testCmdLine.setExecutableFilename("slang-test");
+        testCmdLine.setExecutableLocation(ExecutableLocation("slang-test"));
 
         if (options.binDir.getLength())
         {
@@ -622,7 +622,7 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 Result spawnAndWaitProxy(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
     // Get the name of the thing to execute
-    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     if (exeName == "slangc")
     {
@@ -635,7 +635,7 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
 
     // Make the first arg the name of the tool to invoke
     cmdLine.m_args.insert(0, exeName);
-    cmdLine.setExecutable(context->exeDirectoryPath, "test-proxy");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->exeDirectoryPath, "test-proxy"));
 
     const auto& options = context->options;
     if (options.shouldBeVerbose)
@@ -707,7 +707,7 @@ static Result _executeRPC(TestContext* context, SpawnType spawnType, const Unown
 
 Result spawnAndWaitTestServer(TestContext* context, SpawnType spawnType, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
-    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
     // This is a test tool execution
     TestServerProtocol::ExecuteToolTestArgs args;
@@ -945,7 +945,7 @@ static SlangResult _extractReflectionTestRequirements(const CommandLine& cmdLine
 
 static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequirements* ioInfo)
 {
-    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executable);
+    String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
     if (exeName == "render-test")
     {
@@ -1002,7 +1002,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 }
                 // Try starting up the device
                 CommandLine cmdLine;
-                cmdLine.setExecutable(context->options.binDir, "render-test");
+                cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
                 _addRenderTestOptions(context->options, cmdLine);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
@@ -1150,7 +1150,7 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 
 static void _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
-    ioCmdLine.setExecutable(context->options.binDir, "slangc");
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
 
     if (context->options.verbosePaths)
     {
@@ -1203,9 +1203,12 @@ static SlangResult _executeBinary(const UnownedStringSlice& hexDump, ExecuteResu
     SLANG_RETURN_ON_FAIL(File::makeExecutable(fileName));
 
     // Execute it
+    ExecutableLocation exe;
+    exe.setPath(fileName);
+
     CommandLine cmdLine;
-    cmdLine.m_executable = fileName;
-    cmdLine.m_executableType = CommandLine::ExecutableType::Path;
+    cmdLine.setExecutableLocation(exe);
+
     return ProcessUtil::execute(cmdLine, outExeRes);
 }
 
@@ -1599,7 +1602,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
     
-    cmdLine.setExecutable(options.binDir, "slang-reflection-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(options.binDir, "slang-reflection-test"));
     cmdLine.addArg(filePath);
 
     for( auto arg : input.testOptions->args )
@@ -1881,12 +1884,16 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     String modulePath = _calcModulePath(input);
     
     // Remove the binary..
+    String moduleExePath;
     {
-        StringBuilder moduleExePath;
-        moduleExePath << modulePath;
-        moduleExePath << Process::getExecutableSuffix();
-        File::remove(moduleExePath);
+        StringBuilder buf;
+        buf << modulePath;
+        buf << Process::getExecutableSuffix();
+        moduleExePath = buf;
     }
+
+    // Remove the exe if it exists
+    File::remove(moduleExePath);
 
     // Set up the compilation options
     DownstreamCompiler::CompileOptions options;
@@ -1915,13 +1922,12 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     else
     {
        // Execute the binary and see what we get
-
         CommandLine cmdLine;
 
-        StringBuilder exePath;
-        exePath << modulePath << Process::getExecutableSuffix();
+        ExecutableLocation exe;
+        exe.setPath(moduleExePath);
 
-        cmdLine.setExecutablePath(exePath);
+        cmdLine.setExecutableLocation(exe);
 
         ExecuteResult exeRes;
         if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
@@ -2385,7 +2391,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
@@ -2538,7 +2544,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
 	CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
     _addRenderTestOptions(context->options, cmdLine);
@@ -2647,7 +2653,7 @@ TestResult doRenderComparisonTestRun(TestContext* context, TestInput& input, cha
 
     CommandLine cmdLine;
 
-    cmdLine.setExecutable(context->options.binDir, "render-test");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
     _addRenderTestOptions(context->options, cmdLine);
