@@ -14,7 +14,7 @@ using namespace Slang;
 static SlangResult _createProcess(UnitTestContext* context, const char* toolName, const List<String>* optArgs, RefPtr<Process>& outProcess)
 {
     CommandLine cmdLine;
-    cmdLine.setExecutable(context->executableDirectory, "test-process");
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "test-process"));
     cmdLine.addArg(toolName);
     if (optArgs)
     {

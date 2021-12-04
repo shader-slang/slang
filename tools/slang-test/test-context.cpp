@@ -118,7 +118,7 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
 
     {
         CommandLine cmdLine;
-        cmdLine.setExecutable(exeDirectoryPath.getBuffer(), "test-server");
+        cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
         SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger, process));
     }
 

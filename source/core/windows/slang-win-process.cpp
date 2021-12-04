@@ -453,12 +453,12 @@ void WinProcess::kill(int32_t returnCode)
         OSString pathBuffer;
         LPCWSTR path = nullptr;
 
-        if (commandLine.m_executableType == CommandLine::ExecutableType::Path)
+        const auto& exe = commandLine.m_executableLocation;
+        if (exe.m_type == ExecutableLocation::Type::Path)
         {
-            StringBuilder cmd;
-            StringEscapeUtil::appendMaybeQuoted(getEscapeHandler(), commandLine.m_executable.getUnownedSlice(), cmd);
-
-            pathBuffer = cmd.toWString();
+            // If it 'Path' specified we pass in as the lpApplicationName to limit
+            // searching.
+            pathBuffer = exe.m_pathOrName.toWString();
             path = pathBuffer.begin();
         }
 
@@ -478,6 +478,14 @@ void WinProcess::kill(int32_t returnCode)
         {
             createFlags |= CREATE_SUSPENDED;
         }
+
+        // From docs:
+        // If both lpApplicationName and lpCommandLine are non-NULL, the null-terminated string pointed to by lpApplicationName
+        // specifies the module to execute, and the null-terminated string pointed to by lpCommandLine specifies the command line.
+
+        // JS:
+        // Somewhat confusingly this means that even if lpApplicationName is specified, it muse *ALSO* be included as the first
+        // whitespace delimited arg must *also* be the (possibly) quoted executable
 
         // https://docs.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessa
         // `CreateProcess` requires write access to this, for some reason...

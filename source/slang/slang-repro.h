@@ -177,13 +177,13 @@ struct ReproUtil
         /// it will attempt to load from fileSystem the *uniqueName*
     static SlangResult load(OffsetBase& base, RequestState* requestState, ISlangFileSystem* fileSystem, EndToEndCompileRequest* request);
 
-    static SlangResult loadState(const String& filename, List<uint8_t>& outBuffer);
-    static SlangResult loadState(Stream* stream, List<uint8_t>& outBuffer);
-    static SlangResult loadState(const uint8_t* data, size_t size, List<uint8_t>& outBuffer);
+    static SlangResult loadState(const String& filename, DiagnosticSink* sink, List<uint8_t>& outBuffer);
+    static SlangResult loadState(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);
+    static SlangResult loadState(const uint8_t* data, size_t size, DiagnosticSink* sink, List<uint8_t>& outBuffer);
 
     static RequestState* getRequest(const List<uint8_t>& inBuffer);
 
-    static SlangResult extractFilesToDirectory(const String& file);
+    static SlangResult extractFilesToDirectory(const String& file, DiagnosticSink* sink);
 
     static SlangResult extractFiles(OffsetBase& base, RequestState* requestState, ISlangMutableFileSystem* fileSystem);
 
