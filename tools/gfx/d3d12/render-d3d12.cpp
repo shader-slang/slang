@@ -4957,8 +4957,8 @@ Result D3D12Device::getTextureAllocationInfo(
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
     auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
-    *outSize = allocInfo.SizeInBytes;
-    *outAlignment = allocInfo.Alignment;
+    *outSize = (size_t)allocInfo.SizeInBytes;
+    *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
 }
 

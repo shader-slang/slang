@@ -470,7 +470,7 @@ public:
         /// Base class for Descs
     struct DescBase
     {
-        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
+        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) const { return (cpuAccessFlags & accessFlag) != 0; }
 
         Type type = Type::Unknown;
         ResourceState defaultState = ResourceState::Undefined;
