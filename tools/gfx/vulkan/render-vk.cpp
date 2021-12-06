@@ -106,6 +106,9 @@ public:
         override;
     virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(
+        IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -3460,6 +3463,21 @@ public:
         {
             returnComPtr(outEntryPoint, m_entryPoints[index]);
             return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        {
+            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
+            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            {
+                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
+                {
+                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
+                }
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
         }
 
             /// Bind this object as a root shader object
@@ -7568,6 +7586,15 @@ Result VKDevice::createMutableShaderObject(
     SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
     returnComPtr(outObject, result);
 
+    return SLANG_OK;
+}
+
+Result VKDevice::createMutableRootShaderObject(
+    IShaderProgram* program, IShaderObject** outObject)
+{
+    RefPtr<MutableRootShaderObject> result =
+        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    returnComPtr(outObject, result);
     return SLANG_OK;
 }
 

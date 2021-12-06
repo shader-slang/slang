@@ -131,6 +131,8 @@ public:
         override;
     virtual Result createMutableShaderObject(
         ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -2830,6 +2832,21 @@ public:
                 SLANG_RETURN_ON_FAIL(entryPoint->collectSpecializationArgs(args));
             }
             return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        {
+            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
+            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            {
+                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
+                {
+                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
+                }
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
         }
 
     public:
@@ -5863,6 +5880,14 @@ Result D3D12Device::createMutableShaderObject(
     SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
     returnComPtr(outObject, result);
 
+    return SLANG_OK;
+}
+
+Result D3D12Device::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+{
+    RefPtr<MutableRootShaderObject> result =
+        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    returnComPtr(outObject, result);
     return SLANG_OK;
 }
 
