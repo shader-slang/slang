@@ -178,7 +178,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
     }
 
     m_connection = new JSONRPCConnection;
-    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams());
+    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams(JSONRPCConnection::Flag::UseArrayForArgs));
     return SLANG_OK;
 }
 
@@ -371,7 +371,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     auto id = m_connection->getPersistentValue(call.id);
 
     TestServerProtocol::ExecuteUnitTestArgs args;
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, call.id));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, call.id));
 
     auto sink = m_connection->getSink();
 
@@ -443,7 +443,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     TestServerProtocol::ExecuteToolTestArgs args;
     
-    SLANG_RETURN_ON_FAIL(m_connection->toNativeOrSendError(call.params, &args, id));
+    SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
 
     auto sink = m_connection->getSink();
 
