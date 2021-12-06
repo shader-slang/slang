@@ -53,10 +53,14 @@ public:
     template <typename T>
     SlangResult toNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data, id); }
 
-        /// Convert value to dst. Will write response on fails
-    SlangResult toNativeArgsOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id);
+        /// Convert value to dst.
+        /// The 'Args' aspect here is to handle Args/Params in JSON-RPC which can be specified as an array or object style.
+        /// This call will automatically handle either case.
+        /// toNativeOrSendError does not assume the thing being converted is args, and so doesn't allow such a transformation.
+        /// Will write error response on failure.
+    SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id);
     template <typename T>
-    SlangResult toNativeArgsOrSendError(const JSONValue& value, T* data, const JSONValue& id) { return toNativeArgsOrSendError(value, GetRttiInfo<T>::get(), data, id); }
+    SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, T* dstArgs, const JSONValue& id) { return toNativeArgsOrSendError(srcArgs, GetRttiInfo<T>::get(), dstArgs, id); }
 
     template <typename T>
     SlangResult toValidNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id);
@@ -70,13 +74,14 @@ public:
     SlangResult sendError(JSONRPC::ErrorCode code, const JSONValue& id);
     SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg, const JSONValue& id);
 
-        /// Send - uses the mechanism defined in the flags
+        /// Send a 'call'
+        /// Uses the default CallStyle as set when init
     SlangResult sendCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
     template <typename T>
     SlangResult sendCall(const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(method, GetRttiInfo<T>::get(), (const void*)args, id); }
 
-
-        /// Send - uses the mechanism defined in the flags
+        /// Send a 'call'
+        /// Uses the call mechanism specified in callStyle. It is valid to pass as Default. 
     SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
     template <typename T>
     SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(callStyle, method, GetRttiInfo<T>::get(), (const void*)args, id); }

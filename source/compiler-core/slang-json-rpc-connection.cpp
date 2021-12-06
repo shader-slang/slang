@@ -127,13 +127,13 @@ SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const Uno
     return sendRPC(&errorResponse);
 }
 
-SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& value, const RttiInfo* inInfo, void* dst, const JSONValue& id)
+SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id)
 {
-    if (inInfo->m_kind == RttiInfo::Kind::Struct &&
-        value.getKind() == JSONValue::Kind::Array)
+    if (dstArgsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        srcArgs.getKind() == JSONValue::Kind::Array)
     {
         JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
-        if (SLANG_FAILED(converter.convertArrayToStruct(value, inInfo, dst)))
+        if (SLANG_FAILED(converter.convertArrayToStruct(srcArgs, dstArgsRttiInfo, dstArgs)))
         {
             return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
         }
@@ -141,7 +141,7 @@ SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& value, c
     }
     else
     {
-        return toNativeOrSendError(value, inInfo, dst, id);
+        return toNativeOrSendError(srcArgs, dstArgsRttiInfo, dstArgs, id);
     }
 }
 
@@ -150,12 +150,12 @@ SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const
     m_diagnosticSink.outputBuffer.Clear();
 
     JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
-    Result res = converter.convert(value, info, dst);
-
-    if (SLANG_FAILED(res))
+    
+    if (SLANG_FAILED(converter.convert(value, info, dst)))
     {
         return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
     }
+
     return SLANG_OK;
 } 
 
