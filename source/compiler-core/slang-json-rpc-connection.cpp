@@ -125,42 +125,11 @@ SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& value, c
     if (inInfo->m_kind == RttiInfo::Kind::Struct &&
         value.getKind() == JSONValue::Kind::Array)
     {
-        // If its args we can convert an array into args structure
-
-        Index totalFieldCount = 0;
-
-        ShortList<const StructRttiInfo*, 8> infos;
-        for (const StructRttiInfo* cur = static_cast<const StructRttiInfo*>(inInfo); cur; cur = cur->m_super)
-        {
-            totalFieldCount += cur->m_fieldCount;
-            infos.add(cur);
-        }
-
-        // Must have the same amount of fields
-        auto array = m_container.getArray(value);
-        if (array.getCount() != totalFieldCount)
+        JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+        if (SLANG_FAILED(converter.convertArrayToStruct(value, inInfo, dst)))
         {
             return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
         }
-
-        JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
-        
-        Byte* dstBase = (Byte*)dst;
-
-        Index argIndex = 0;
-        for (Index i = infos.getCount() - 1; i >= 0; --i)
-        {
-            auto info = infos[i];
-
-            const Index fieldCount = info->m_fieldCount;
-            for (Index j = 0; j < fieldCount; ++j)
-            {
-                const auto& field = info->m_fields[j];
-
-                SLANG_RETURN_ON_FAIL(converter.convert(array[argIndex++], field.m_type, dstBase + field.m_offset));
-            }
-        }
-
         return SLANG_OK;
     }
     else
@@ -235,52 +204,18 @@ SlangResult JSONRPCConnection::sendObjectCall(const UnownedStringSlice& method, 
 
 SlangResult JSONRPCConnection::sendArrayCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
 {
-    JSONRPCCall call;
-    call.id = id;
-    call.method = method;
-
     // We only flatten structs to arrays
     if (argsRttiInfo->m_kind != RttiInfo::Kind::Struct)
     {
         return sendObjectCall(method, argsRttiInfo, args, id);
     }
 
-    Index totalFieldsCount = 0;
-    ShortList<const StructRttiInfo*, 8> infos;
-    for (const StructRttiInfo* cur = static_cast<const StructRttiInfo*>(argsRttiInfo); cur; cur = cur->m_super)
-    {
-        totalFieldsCount += Index(cur->m_fieldCount);
-        infos.add(cur);
-    }
-    
-    // Convert the args/params
-    
+    JSONRPCCall call;
+    call.id = id;
+    call.method = method;
+
     NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
-
-    List<JSONValue> argsArray;
-    argsArray.setCount(totalFieldsCount);
-
-    // NOTE! We do no special handling here around optional parameters.
-    // All fields of the input args are output
-    {
-        Index argsArrayIndex = 0;
-        const Byte* argsBase = (const Byte*)args;
-        for (Index i = infos.getCount() - 1; i >= 0; --i)
-        {
-            auto structRttiInfo = infos[i];
-            const Index fieldCount = Index(structRttiInfo->m_fieldCount);
-
-            for (Index j = 0; j < fieldCount; ++j)
-            {
-                const auto& field = structRttiInfo->m_fields[j];
-                // Convert the field
-                SLANG_RETURN_ON_FAIL(converter.convert(field.m_type, argsBase + field.m_offset, argsArray[argsArrayIndex++]));
-            }
-        }
-    }
-
-    // Okay now we convert the List to the output, which will just be an array.
-    SLANG_RETURN_ON_FAIL(converter.convert(&argsArray, call.params));
+    SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
 
     // Send the RPC
     SLANG_RETURN_ON_FAIL(sendRPC(&call));
