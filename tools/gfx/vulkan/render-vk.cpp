@@ -106,6 +106,9 @@ public:
         override;
     virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(
+        IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -3449,6 +3452,21 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        {
+            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
+            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            {
+                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
+                {
+                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
+                }
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
+        }
+
             /// Bind this object as a root shader object
         Result bindAsRoot(
             PipelineCommandEncoder*     encoder,
@@ -6744,8 +6762,8 @@ Result VKDevice::getTextureAllocationInfo(
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, image, &memRequirements);
 
-    *outSize = memRequirements.size;
-    *outAlignment = memRequirements.alignment;
+    *outSize = (size_t)memRequirements.size;
+    *outAlignment = (size_t)memRequirements.alignment;
 
     m_api.vkDestroyImage(m_device, image, nullptr);
     return SLANG_OK;
@@ -7552,6 +7570,15 @@ Result VKDevice::createMutableShaderObject(
     SLANG_RETURN_ON_FAIL(result->init(this, layoutImpl));
     returnComPtr(outObject, result);
 
+    return SLANG_OK;
+}
+
+Result VKDevice::createMutableRootShaderObject(
+    IShaderProgram* program, IShaderObject** outObject)
+{
+    RefPtr<MutableRootShaderObject> result =
+        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    returnComPtr(outObject, result);
     return SLANG_OK;
 }
 
