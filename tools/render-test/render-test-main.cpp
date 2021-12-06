@@ -751,7 +751,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
@@ -774,7 +774,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
     }
 
     // Build top level acceleration structure.
@@ -840,7 +840,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
     }
 }
 
@@ -883,7 +883,7 @@ void RenderTestApp::finalize()
 Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
-    m_queue->wait();
+    m_queue->waitOnHost();
 
     FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
@@ -993,7 +993,7 @@ Result RenderTestApp::update()
 
     m_startTicks = Process::getClockTick();
     m_queue->executeCommandBuffer(commandBuffer);
-    m_queue->wait();
+    m_queue->waitOnHost();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
     if (m_options.outputPath.getLength() || m_options.performanceProfile)

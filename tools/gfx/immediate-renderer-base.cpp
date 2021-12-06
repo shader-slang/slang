@@ -593,7 +593,13 @@ public:
         static_cast<ImmediateRendererBase*>(m_renderer.get())->endCommandBuffer(info);
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }
+    virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override { getRenderer()->waitForGpu(); }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+    {
+        return SLANG_FAIL;
+    }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getNativeHandle(NativeHandle* outHandle) override

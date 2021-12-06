@@ -397,7 +397,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
@@ -419,7 +419,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     // Build top level acceleration structure.
@@ -483,7 +483,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     IBufferResource::Desc fullScreenVertexBufferDesc;
