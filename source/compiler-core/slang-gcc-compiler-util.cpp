@@ -661,7 +661,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         // A downstream compiler for Slang must currently support C++14 - such that
         // the prelude and generated code works.
         // 
-        // The first version of gcc that supports -std=c++14 is 5.0
+        // The first version of gcc that supports `-std=c++14` is 5.0
         // https://gcc.gnu.org/projects/cxx-status.html
         //
         // If could be argued to allow C/C++ compilations via older versions through an older version
