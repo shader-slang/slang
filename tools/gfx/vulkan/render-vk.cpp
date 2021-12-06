@@ -2741,7 +2741,8 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto resourceView = static_cast<TexelBufferResourceViewImpl*>(resourceViews[i].Ptr());
-
+                if (!resourceView)
+                    continue;
                 VkBufferView bufferView = resourceView->m_view;
 
                 VkWriteDescriptorSet write = {};
@@ -2770,7 +2771,8 @@ public:
             {
                 auto texture = slots[i].textureView;
                 auto sampler = slots[i].sampler;
-
+                if (!texture)
+                    continue;
                 VkDescriptorImageInfo imageInfo = {};
                 imageInfo.imageView = texture->m_view;
                 imageInfo.imageLayout = texture->m_layout;
@@ -2802,7 +2804,8 @@ public:
             {
                 auto accelerationStructure =
                     static_cast<AccelerationStructureImpl*>(resourceViews[i].Ptr());
-                
+                if (!accelerationStructure)
+                    continue;
                 VkWriteDescriptorSetAccelerationStructureKHR writeAS = {};
                 writeAS.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
                 writeAS.accelerationStructureCount = 1;
@@ -2831,7 +2834,8 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto texture = static_cast<TextureResourceViewImpl*>(resourceViews[i].Ptr());
-
+                if (!texture)
+                    continue;
                 VkDescriptorImageInfo imageInfo = {};
                 imageInfo.imageView = texture->m_view;
                 imageInfo.imageLayout = texture->m_layout;
@@ -2862,7 +2866,8 @@ public:
             for(Index i = 0; i < count; ++i)
             {
                 auto sampler = samplers[i];
-
+                if (!sampler)
+                    continue;
                 VkDescriptorImageInfo imageInfo = {};
                 imageInfo.imageView = 0;
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;

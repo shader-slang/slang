@@ -5967,6 +5967,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
         blend.IndependentBlendEnable = FALSE;
         blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
         for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
             auto& d3dDesc = blend.RenderTarget[i];
