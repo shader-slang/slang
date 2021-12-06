@@ -205,7 +205,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         #include "../slang.h"
         ^~~~~~~~~~~~
         compilation terminated.*/
-    
+
+    /* g++: error: unrecognized command line option ‘-std=c++14’ */
+
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
     List<UnownedStringSlice> split;
@@ -257,7 +259,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
         // Check for special handling for clang (Can be Clang or clang apparently)
         if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")) ||
-            split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) )
+            split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) ||
+            split0 == UnownedStringSlice::fromLiteral("g++") ||
+            split0 == UnownedStringSlice::fromLiteral("gcc"))
         {
             // Extract the type
             SLANG_RETURN_ON_FAIL(_parseSeverity(split[1].trim(), outDiagnostic.severity));
