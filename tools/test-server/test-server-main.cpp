@@ -178,7 +178,7 @@ SlangResult TestServer::init(int argc, const char* const* argv)
     }
 
     m_connection = new JSONRPCConnection;
-    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams(JSONRPCConnection::Flag::UseArrayForArgs));
+    SLANG_RETURN_ON_FAIL(m_connection->initWithStdStreams());
     return SLANG_OK;
 }
 

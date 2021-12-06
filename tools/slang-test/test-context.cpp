@@ -128,7 +128,7 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
 
-    SLANG_RETURN_ON_FAIL(rpcConnection->init(connection, JSONRPCConnection::Flag::UseArrayForArgs, process));
+    SLANG_RETURN_ON_FAIL(rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
 
     out = rpcConnection;
 

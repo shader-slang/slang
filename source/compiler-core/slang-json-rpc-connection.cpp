@@ -10,12 +10,19 @@
 
 namespace Slang {
 
-SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, Flags flags, Process* process)
+SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, CallStyle defaultCallStyle, Process* process)
 {
     m_connection = connection;
     m_process = process;
-    m_flags = flags;
 
+    {
+        // If a call style isn't set, use the prefered style
+        const CallStyle preferedCallStyle = CallStyle::Array;
+        defaultCallStyle = (defaultCallStyle == CallStyle::Default) ? preferedCallStyle : defaultCallStyle;
+        m_defaultCallStyle = defaultCallStyle;
+    }
+        
+    
     m_sourceManager.initialize(nullptr, nullptr);
     m_diagnosticSink.init(&m_sourceManager, &JSONLexer::calcLexemeLocation);
     m_container.setSourceManager(&m_sourceManager);
@@ -23,7 +30,7 @@ SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, Flags flag
     return SLANG_OK;
 }
 
-SlangResult JSONRPCConnection::initWithStdStreams(Flags flags, Process* process)
+SlangResult JSONRPCConnection::initWithStdStreams(CallStyle defaultCallStyle, Process* process)
 {
     RefPtr<Stream> stdinStream, stdoutStream;
 
@@ -33,7 +40,7 @@ SlangResult JSONRPCConnection::initWithStdStreams(Flags flags, Process* process)
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, stdoutStream);
-    return init(connection, flags, process);
+    return init(connection, defaultCallStyle, process);
 }
 
 void JSONRPCConnection::clearBuffers()
@@ -177,17 +184,10 @@ SlangResult JSONRPCConnection::sendResult(const RttiInfo* rttiInfo, const void* 
 
 SlangResult JSONRPCConnection::sendCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
 {
-    if (m_flags & Flag::UseArrayForArgs)
-    {
-        return sendArrayCall(method, argsRttiInfo, args, id);
-    }
-    else
-    {
-        return sendObjectCall(method, argsRttiInfo, args, id);
-    }
+    return sendCall(m_defaultCallStyle, method, argsRttiInfo, args, id);
 }
 
-SlangResult JSONRPCConnection::sendObjectCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
+SlangResult JSONRPCConnection::sendCall(CallStyle callStyle, const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
 {
     JSONRPCCall call;
     call.id = id;
@@ -197,25 +197,24 @@ SlangResult JSONRPCConnection::sendObjectCall(const UnownedStringSlice& method, 
     NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
     SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
 
-    // Send the RPC
-    SLANG_RETURN_ON_FAIL(sendRPC(&call));
-    return SLANG_OK;
-}
-
-SlangResult JSONRPCConnection::sendArrayCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
-{
-    // We only flatten structs to arrays
-    if (argsRttiInfo->m_kind != RttiInfo::Kind::Struct)
+    if (argsRttiInfo->m_kind == RttiInfo::Kind::Struct)
     {
-        return sendObjectCall(method, argsRttiInfo, args, id);
+        if (_getCallStyle(callStyle) == CallStyle::Array)
+        {
+            // Convert the args/params in the 'array' style
+            SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
+        }
+        else
+        {
+            // Convert the args/params in the 'object' sytle
+            SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
+        }
     }
-
-    JSONRPCCall call;
-    call.id = id;
-    call.method = method;
-
-    NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
-    SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
+    else
+    {
+        // Just go with what we have
+        SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
+    }
 
     // Send the RPC
     SLANG_RETURN_ON_FAIL(sendRPC(&call));

@@ -31,21 +31,19 @@ class JSONRPCConnection : public RefObject
 {
 public:
 
-    typedef uint32_t Flags;
-    struct Flag
+    enum class CallStyle
     {
-        enum Enum : Flags
-        {
-            UseArrayForArgs = 0x1,  ///< If used, by default, args will be converted into an array (as opposed to an object)
-        };
+        Default,        ///< The default
+        Object,         ///< Params are passed as an object
+        Array,          ///< Params are passed as an array
     };
 
         /// An init function must be called before use
         /// If a process is implementing the server it should be passed in if the process needs to shut down if the connection does
-    SlangResult init(HTTPPacketConnection* connection, Flags flags, Process* process = nullptr);
+    SlangResult init(HTTPPacketConnection* connection, CallStyle callStyle = CallStyle::Default, Process* process = nullptr);
 
         /// Initialize using stdin/out streams for input/output. 
-    SlangResult initWithStdStreams(Flags flags, Process* process = nullptr);
+    SlangResult initWithStdStreams(CallStyle callStyle = CallStyle::Default, Process* process = nullptr);
 
         /// Disconnect. May block while server shuts down
     void disconnect();
@@ -72,20 +70,16 @@ public:
     SlangResult sendError(JSONRPC::ErrorCode code, const JSONValue& id);
     SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg, const JSONValue& id);
 
-        /// Send a call where args are in 'object' format
-    SlangResult sendObjectCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
-    template <typename T>
-    SlangResult sendObjectCall(const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendObjectCall(method, GetRttiInfo<T>::get(), (const void*)args, id); }
-
-        /// Send a call where args are turned into an 'array'. (Makes for smaller messages, but less obvious and more fragile to change)
-    SlangResult sendArrayCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
-    template <typename T>
-    SlangResult sendArrayCall(const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendArrayCall(method, GetRttiInfo<T>::get(), (const void*)args, id); }
-
         /// Send - uses the mechanism defined in the flags
     SlangResult sendCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
     template <typename T>
     SlangResult sendCall(const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(method, GetRttiInfo<T>::get(), (const void*)args, id); }
+
+
+        /// Send - uses the mechanism defined in the flags
+    SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
+    template <typename T>
+    SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(callStyle, method, GetRttiInfo<T>::get(), (const void*)args, id); }
 
         /// Send a call, wheret there are no arguments
     SlangResult sendCall(const UnownedStringSlice& method, const JSONValue& id = JSONValue());
@@ -154,6 +148,8 @@ public:
     JSONRPCConnection():m_container(nullptr) {}
 
 protected:
+    CallStyle _getCallStyle(CallStyle callStyle) const { return (callStyle == CallStyle::Default) ? m_defaultCallStyle : callStyle; }
+
     RefPtr<Process> m_process;                       ///< Backing process (optional)
     RefPtr<HTTPPacketConnection> m_connection;       ///< The underlying 'transport' connection, whilst HTTP currently doesn't have to be 
 
@@ -164,8 +160,8 @@ protected:
 
     JSONValue m_jsonRoot;                           ///< The root JSON value for the currently read message. 
 
-    Flags m_flags;                                  ///< Flags to control behavior
-
+    CallStyle m_defaultCallStyle = CallStyle::Array;    ///< The default calling style
+    
     Int m_terminationTimeOutInMs = 1 * 1000;        ///< Time to wait for termination response. Default is 1 second
 };
 
