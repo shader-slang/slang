@@ -193,29 +193,22 @@ SlangResult JSONRPCConnection::sendCall(CallStyle callStyle, const UnownedString
     call.id = id;
     call.method = method;
 
-    // Convert the args/params
+    // Set up the converter to now convert the args.
     NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
-    SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
-
-    if (argsRttiInfo->m_kind == RttiInfo::Kind::Struct)
+    
+    // If we have a struct *and* call style is 'array', do special handling
+    if (argsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        _getCallStyle(callStyle) == CallStyle::Array)
     {
-        if (_getCallStyle(callStyle) == CallStyle::Array)
-        {
-            // Convert the args/params in the 'array' style
-            SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
-        }
-        else
-        {
-            // Convert the args/params in the 'object' sytle
-            SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
-        }
+        // Convert the args/params in the 'array' style
+        SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
     }
     else
     {
-        // Just go with what we have
+        // Convert the args/params in the 'object' sytle
         SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
     }
-
+    
     // Send the RPC
     SLANG_RETURN_ON_FAIL(sendRPC(&call));
     return SLANG_OK;
