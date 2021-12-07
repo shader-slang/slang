@@ -18,6 +18,14 @@ namespace gfx_test
         const char* entryPointName,
         slang::ProgramLayout*& slangReflection);
 
+    Slang::Result loadGraphicsProgram(
+        gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* vertexEntryPointName,
+        const char* fragmentEntryPointName,
+        slang::ProgramLayout*& slangReflection);
+
         /// Reads back the content of `buffer` and compares it against `expectedResult`.
     void compareComputeResult(
         gfx::IDevice* device,

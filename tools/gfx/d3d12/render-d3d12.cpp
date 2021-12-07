@@ -3435,19 +3435,19 @@ public:
                 desc.NumArgumentDescs = 1;
                 desc.pArgumentDescs = args;
 
-                ID3D12CommandSignature* cmdSignature = nullptr;
-                m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&cmdSignature)); // Problem when wrapped in SLANG_RETURN_ON_FAIL?
-
-                if (cmdSignature)
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
                 {
-                    m_d3dCmdList->ExecuteIndirect(
-                        cmdSignature,
-                        maxDrawCount,
-                        (ID3D12Resource*)argBuffer,
-                        argOffset,
-                        (ID3D12Resource*)countBuffer,
-                        countOffset);
+                    return;
                 }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -3467,19 +3467,19 @@ public:
                 desc.NumArgumentDescs = 1;
                 desc.pArgumentDescs = args;
 
-                ID3D12CommandSignature* cmdSignature = nullptr;
-                m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(&cmdSignature)); // Problem when wrapped in SLANG_RETURN_ON_FAIL?
-
-                if (cmdSignature)
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
                 {
-                    m_d3dCmdList->ExecuteIndirect(
-                        cmdSignature,
-                        maxDrawCount,
-                        (ID3D12Resource*)argBuffer,
-                        argOffset,
-                        (ID3D12Resource*)countBuffer,
-                        countOffset);
+                    return;
                 }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(

@@ -1190,8 +1190,8 @@ public:
     struct Desc
     {
         uint32_t renderTargetCount;
-        AttachmentLayout* renderTargets;
-        AttachmentLayout* depthStencil;
+        AttachmentLayout* renderTargets = nullptr;
+        AttachmentLayout* depthStencil = nullptr;
     };
 };
 #define SLANG_UUID_IFramebufferLayout                                                \

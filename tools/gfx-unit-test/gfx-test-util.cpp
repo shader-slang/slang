@@ -66,6 +66,55 @@ namespace gfx_test
         return SLANG_OK;
     }
 
+    Slang::Result loadGraphicsProgram(
+        gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* vertexEntryPointName,
+        const char* fragmentEntryPointName,
+        slang::ProgramLayout*& slangReflection)
+    {
+        Slang::ComPtr<slang::ISession> slangSession;
+        SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        if (!module)
+            return SLANG_FAIL;
+
+        ComPtr<slang::IEntryPoint> vertexEntryPoint;
+        SLANG_RETURN_ON_FAIL(
+            module->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
+
+        ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+        SLANG_RETURN_ON_FAIL(
+            module->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
+
+        Slang::List<slang::IComponentType*> componentTypes;
+        componentTypes.add(module);
+        componentTypes.add(vertexEntryPoint);
+        componentTypes.add(fragmentEntryPoint);
+
+        Slang::ComPtr<slang::IComponentType> composedProgram;
+        SlangResult result = slangSession->createCompositeComponentType(
+            componentTypes.getBuffer(),
+            componentTypes.getCount(),
+            composedProgram.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+        slangReflection = composedProgram->getLayout();
+
+        gfx::IShaderProgram::Desc programDesc = {};
+        programDesc.pipelineType = gfx::PipelineType::Graphics;
+        programDesc.slangProgram = composedProgram.get();
+
+        auto shaderProgram = device->createProgram(programDesc);
+
+        outShaderProgram = shaderProgram;
+        return SLANG_OK;
+    }
+
     void compareComputeResult(gfx::IDevice* device, gfx::ITextureResource* texture, gfx::ResourceState state, float* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.

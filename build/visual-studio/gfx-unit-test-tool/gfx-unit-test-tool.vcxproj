@@ -275,6 +275,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\draw-instanced-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-unit-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
@@ -293,6 +294,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
