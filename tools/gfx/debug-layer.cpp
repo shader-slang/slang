@@ -1686,10 +1686,10 @@ Result DebugShaderObject::getCurrentVersion(
     return SLANG_OK;
 }
 
-Result DebugShaderObject::copyFrom(IShaderObject* other)
+Result DebugShaderObject::copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->copyFrom(getInnerObj(other));
+    return baseObject->copyFrom(getInnerObj(other), getInnerObj(transientHeap));
 }
 
 const void* DebugShaderObject::getRawData()

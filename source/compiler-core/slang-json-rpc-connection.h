@@ -31,12 +31,19 @@ class JSONRPCConnection : public RefObject
 {
 public:
 
+    enum class CallStyle
+    {
+        Default,        ///< The default
+        Object,         ///< Params are passed as an object
+        Array,          ///< Params are passed as an array
+    };
+
         /// An init function must be called before use
         /// If a process is implementing the server it should be passed in if the process needs to shut down if the connection does
-    SlangResult init(HTTPPacketConnection* connection, Process* process = nullptr);
+    SlangResult init(HTTPPacketConnection* connection, CallStyle callStyle = CallStyle::Default, Process* process = nullptr);
 
         /// Initialize using stdin/out streams for input/output. 
-    SlangResult initWithStdStreams(Process* process = nullptr);
+    SlangResult initWithStdStreams(CallStyle callStyle = CallStyle::Default, Process* process = nullptr);
 
         /// Disconnect. May block while server shuts down
     void disconnect();
@@ -45,6 +52,15 @@ public:
     SlangResult toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id);
     template <typename T>
     SlangResult toNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id) { return toNativeOrSendError(value, GetRttiInfo<T>::get(), data, id); }
+
+        /// Convert value to dst.
+        /// The 'Args' aspect here is to handle Args/Params in JSON-RPC which can be specified as an array or object style.
+        /// This call will automatically handle either case.
+        /// toNativeOrSendError does not assume the thing being converted is args, and so doesn't allow such a transformation.
+        /// Will write error response on failure.
+    SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id);
+    template <typename T>
+    SlangResult toNativeArgsOrSendError(const JSONValue& srcArgs, T* dstArgs, const JSONValue& id) { return toNativeArgsOrSendError(srcArgs, GetRttiInfo<T>::get(), dstArgs, id); }
 
     template <typename T>
     SlangResult toValidNativeOrSendError(const JSONValue& value, T* data, const JSONValue& id);
@@ -58,12 +74,19 @@ public:
     SlangResult sendError(JSONRPC::ErrorCode code, const JSONValue& id);
     SlangResult sendError(JSONRPC::ErrorCode errorCode, const UnownedStringSlice& msg, const JSONValue& id);
 
-        /// Send a call
-        /// If no id is needed, id can just be invalid 
+        /// Send a 'call'
+        /// Uses the default CallStyle as set when init
     SlangResult sendCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
     template <typename T>
     SlangResult sendCall(const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(method, GetRttiInfo<T>::get(), (const void*)args, id); }
-        ///
+
+        /// Send a 'call'
+        /// Uses the call mechanism specified in callStyle. It is valid to pass as Default. 
+    SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id = JSONValue());
+    template <typename T>
+    SlangResult sendCall(CallStyle callStyle, const UnownedStringSlice& method, const T* args, const JSONValue& id = JSONValue()) { return sendCall(callStyle, method, GetRttiInfo<T>::get(), (const void*)args, id); }
+
+        /// Send a call, wheret there are no arguments
     SlangResult sendCall(const UnownedStringSlice& method, const JSONValue& id = JSONValue());
 
     template <typename T>
@@ -93,12 +116,12 @@ public:
     SlangResult getRPCOrSendError(T* out) { return getRPCOrSendError(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getRPCOrSendError(const RttiInfo* rttiInfo, void* out);
 
-    /// Get message (has to be part of JSONRPCResultResponse)
+        /// Get message (has to be part of JSONRPCResultResponse)
     template <typename T>
     SlangResult getMessage(T* out) { return getMessage(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessage(const RttiInfo* rttiInfo, void* out);
 
-    /// If there is a message and there is a failure, will send an error response
+        /// If there is a message and there is a failure, will send an error response
     template <typename T>
     SlangResult getMessageOrSendError(T* out) { return getMessageOrSendError(GetRttiInfo<T>::get(), (void*)out); }
     SlangResult getMessageOrSendError(const RttiInfo* rttiInfo, void* out);
@@ -130,17 +153,21 @@ public:
     JSONRPCConnection():m_container(nullptr) {}
 
 protected:
+    CallStyle _getCallStyle(CallStyle callStyle) const { return (callStyle == CallStyle::Default) ? m_defaultCallStyle : callStyle; }
+
     RefPtr<Process> m_process;                       ///< Backing process (optional)
     RefPtr<HTTPPacketConnection> m_connection;       ///< The underlying 'transport' connection, whilst HTTP currently doesn't have to be 
 
-    DiagnosticSink m_diagnosticSink;                        ///< Holds any diagnostics typically generated by parsing JSON, producing JSON from native types
+    DiagnosticSink m_diagnosticSink;                ///< Holds any diagnostics typically generated by parsing JSON, producing JSON from native types
 
-    SourceManager m_sourceManager;                          ///< Holds the JSON text for current message/output. Is cleared regularly.
-    JSONContainer m_container;                              ///< Holds the backing memory for jsonMemory, and used when converting input into output JSON
+    SourceManager m_sourceManager;                  ///< Holds the JSON text for current message/output. Is cleared regularly.
+    JSONContainer m_container;                      ///< Holds the backing memory for jsonMemory, and used when converting input into output JSON
 
-    JSONValue m_jsonRoot;                                   ///< The root JSON value for the currently read message. 
+    JSONValue m_jsonRoot;                           ///< The root JSON value for the currently read message. 
 
-    Int m_terminationTimeOutInMs = 1 * 1000;                ///< Time to wait for termination response. Default is 1 second
+    CallStyle m_defaultCallStyle = CallStyle::Array;    ///< The default calling style
+    
+    Int m_terminationTimeOutInMs = 1 * 1000;        ///< Time to wait for termination response. Default is 1 second
 };
 
 // ---------------------------------------------------------------------------

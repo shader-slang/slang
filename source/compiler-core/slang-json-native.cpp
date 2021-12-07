@@ -252,6 +252,52 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
     return SLANG_FAIL;
 }
 
+SlangResult JSONToNativeConverter::convertArrayToStruct(const JSONValue& value, const RttiInfo* rttiInfo, void* out)
+{
+    // Check converting JSON array into a struct, as that's what this method supports
+    if (!(rttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        value.getKind() == JSONValue::Kind::Array))
+    {
+        // If they are the wrong types then just fail
+        return SLANG_FAIL;
+    }
+
+    // Find the total amount of fields, and all the classes involved
+    Index totalFieldCount = 0;
+
+    ShortList<const StructRttiInfo*, 8> infos;
+    for (const StructRttiInfo* cur = static_cast<const StructRttiInfo*>(rttiInfo); cur; cur = cur->m_super)
+    {
+        totalFieldCount += cur->m_fieldCount;
+        infos.add(cur);
+    }
+
+    // Must have the same amount of fields
+    auto array = m_container->getArray(value);
+    if (array.getCount() != totalFieldCount)
+    {
+        return SLANG_FAIL;
+    }
+
+    Byte* dstBase = (Byte*)out;
+
+    // We work in the order from the base class to the final type
+    Index argIndex = 0;
+    for (Index i = infos.getCount() - 1; i >= 0; --i)
+    {
+        auto info = infos[i];
+
+        const Index fieldCount = info->m_fieldCount;
+        for (Index j = 0; j < fieldCount; ++j)
+        {
+            // Convert the field
+            const auto& field = info->m_fields[j];
+            SLANG_RETURN_ON_FAIL(convert(array[argIndex++], field.m_type, dstBase + field.m_offset));
+        }
+    }
+
+    return SLANG_OK;
+}
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! NativeToJSONConverter !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -418,6 +464,54 @@ SlangResult NativeToJSONConverter::convert(const RttiInfo* rttiInfo, const void*
     }
 
     return SLANG_E_NOT_IMPLEMENTED;
+}
+
+SlangResult NativeToJSONConverter::convertStructToArray(const RttiInfo* rttiInfo, const void* in, JSONValue& out)
+{
+    if (rttiInfo->m_kind != RttiInfo::Kind::Struct)
+    {
+        // Must be a struct
+        return SLANG_FAIL;
+    }
+
+    // Work out the total amount of fields, and all invloved struct types
+    Index totalFieldsCount = 0;
+    ShortList<const StructRttiInfo*, 8> infos;
+    for (const StructRttiInfo* cur = static_cast<const StructRttiInfo*>(rttiInfo); cur; cur = cur->m_super)
+    {
+        totalFieldsCount += Index(cur->m_fieldCount);
+        infos.add(cur);
+    }
+
+    // Convert the args/params
+    List<JSONValue> argsArray;
+    argsArray.setCount(totalFieldsCount);
+
+    // NOTE! We do no special handling here around optional parameters.
+    // All fields of the input args are output
+    {
+        Index argsArrayIndex = 0;
+        const Byte* argsBase = (const Byte*)in;
+
+        // Work in the order from the base class to the actual type
+        for (Index i = infos.getCount() - 1; i >= 0; --i)
+        {
+            auto structRttiInfo = infos[i];
+            const Index fieldCount = Index(structRttiInfo->m_fieldCount);
+
+            for (Index j = 0; j < fieldCount; ++j)
+            {
+                const auto& field = structRttiInfo->m_fields[j];
+                // Convert the field
+                SLANG_RETURN_ON_FAIL(convert(field.m_type, argsBase + field.m_offset, argsArray[argsArrayIndex++]));
+            }
+        }
+    }
+
+    // Okay now we convert the List to the output, which will just be a JSON array.
+    SLANG_RETURN_ON_FAIL(convert(&argsArray, out));
+
+    return SLANG_OK;
 }
 
 } // namespace Slang
