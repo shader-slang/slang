@@ -1073,7 +1073,7 @@ struct DepthStencilOpDesc
 
 struct DepthStencilDesc
 {
-    bool            depthTestEnable     = true;
+    bool            depthTestEnable     = false;
     bool            depthWriteEnable    = true;
     ComparisonFunc  depthFunc           = ComparisonFunc::Less;
 

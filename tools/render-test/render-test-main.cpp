@@ -813,13 +813,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         m_tlasBuffer = m_device->createBufferResource(asBufferDesc);
 
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = m_device->createBufferResource(scratchBufferDesc);
 
         IAccelerationStructure::CreateDesc createDesc;

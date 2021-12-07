@@ -1855,6 +1855,9 @@ namespace Slang
 
         Name* m_defaultModuleName = nullptr;
 
+            /// The irDumpOptions
+        IRDumpOptions m_irDumpOptions;
+
             /// An "extra" entry point that was added via a library reference
         struct ExtraEntryPointInfo
         {
@@ -2042,6 +2045,9 @@ namespace Slang
 
         // If true will disable generating dynamic dispatch code.
         bool disableDynamicDispatch = false;
+
+        // The default IR dumping options
+        IRDumpOptions m_irDumpOptions;
 
         String m_dumpIntermediatePrefix;
 
