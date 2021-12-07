@@ -1,9 +1,14 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
+VisualStudioVersion = 16.0.31205.134
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{FD47AE19-69FD-260F-F2F1-20E65EA61D13}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "slang-test", "build\visual-studio\slang-test\slang-test.vcxproj", "{0C768A18-1D25-4000-9F37-DA5FE99E3B64}"
+	ProjectSection(ProjectDependencies) = postProject
+		{222F7498-B40C-4F3F-A704-DDEB91A4484A} = {222F7498-B40C-4F3F-A704-DDEB91A4484A}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gfx", "build\visual-studio\gfx\gfx.vcxproj", "{222F7498-B40C-4F3F-A704-DDEB91A4484A}"
 EndProject
@@ -51,8 +56,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "generator", "generator", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "run-generators", "build\visual-studio\run-generators\run-generators.vcxproj", "{E145B2B8-CD13-A6BE-B6A7-16E5A2148223}"
 	ProjectSection(ProjectDependencies) = postProject
-		{CA8A30D1-8FA9-4330-B7F7-84709246D8DC} = {CA8A30D1-8FA9-4330-B7F7-84709246D8DC}
 		{66174227-8541-41FC-A6DF-4764FC66F78E} = {66174227-8541-41FC-A6DF-4764FC66F78E}
+		{CA8A30D1-8FA9-4330-B7F7-84709246D8DC} = {CA8A30D1-8FA9-4330-B7F7-84709246D8DC}
 		{7F773DD9-EB8F-2403-B43C-B49C2014B99C} = {7F773DD9-EB8F-2403-B43C-B49C2014B99C}
 	EndProjectSection
 EndProject
@@ -476,5 +481,8 @@ Global
 		{61F7EB00-7281-4BF3-9470-7C2EA92620C3} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{C5ACCA6E-C04D-4B36-8516-3752B3C13C2F} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
 		{0162864E-7651-4B5E-9105-C571105276EA} = {57B5AA5E-C340-1823-CC51-9B17385C7423}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EE59E10B-0E66-49E1-BDF0-A559B1F207CB}
 	EndGlobalSection
 EndGlobal

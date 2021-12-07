@@ -3989,7 +3989,7 @@ public:
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
         bool isShared,
-        bool cpuVisible = false);
+        AccessFlag::Enum access = AccessFlag::Enum::None);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
@@ -4276,14 +4276,55 @@ static void _initSrvDesc(
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, bool cpuVisible)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, AccessFlag::Enum access)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
+
+   bool cpuVisible = (access != AccessFlag::None);
+
+   // If access is *only* read...
+   if (access == AccessFlag::Read) {
+       D3D12_HEAP_PROPERTIES heapProps;
+       heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+       heapProps.CreationNodeMask = 1;
+       heapProps.VisibleNodeMask = 1;
+
+       D3D12_RESOURCE_DESC downloadResourceDesc(resourceDesc);
+       downloadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+       if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
+       D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COPY_DEST | finalState;
+
+       SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, downloadResourceDesc, state, nullptr));
+   }
+   else {
+       // If not CPU visible, create the dedicated GPU resource as well.
+       if (!cpuVisible) {
+           D3D12_HEAP_PROPERTIES heapProps;
+           heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+           heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+           heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+           heapProps.CreationNodeMask = 1;
+           heapProps.VisibleNodeMask = 1;
+
+           D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+           if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
+           const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
+
+           SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
+       }
+
+   }
 
    D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
 
    // Always create the upload resource
-   {
+   if (access != AccessFlag::Read || srcData) {
        D3D12_HEAP_PROPERTIES heapProps;
        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -4294,30 +4335,30 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-       SLANG_RETURN_ON_FAIL(upload.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+       if (cpuVisible && isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
+       D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_GENERIC_READ;
+       if (cpuVisible) state |= finalState; // Up to programmer to know if this is compatible. Should we check?
+
+       SLANG_RETURN_ON_FAIL(upload.initCommitted(m_device, heapProps, flags, uploadResourceDesc, state, nullptr));
    }
 
-   // If not CPU visible, create the dedicated GPU resource as well.
-    if (!cpuVisible) {
-        D3D12_HEAP_PROPERTIES heapProps;
-        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
-
-        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-        if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
-
-        const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
-
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
-    }
-
-
+   // 1. Check for write flag. If write, create on upload heap.
+   // 2. Check for read flag. If read and not write, create on readback heap.
+   // 3. If not CPU visible flag, create on default heap.
+   // 4. It is reponsibility of the programmer to ensure that the state flags are
+   //    correct for their intended use case. We will add only the flags necessary
+   //    for the allocation (GENERIC_READ for upload, COPY_DEST for download).
+   // 5. If you did not create with CPU access flags, you cannot access this buffer from CPU.
+   // 6. If you created with write and want to read (or vice versa), you can but it will not
+   //    be as performant.
 
     if (srcData)
     {
+
+        D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
+
         // Copy data to the intermediate upload heap and then schedule a copy
         // from the upload heap to the vertex buffer.
         UINT8* dstData;
@@ -5212,7 +5253,7 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
     SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared,
-        descIn.hasCpuAccessFlag(AccessFlag::Read) || descIn.hasCpuAccessFlag(AccessFlag::Write)));
+        (AccessFlag::Enum)descIn.cpuAccessFlags));
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
