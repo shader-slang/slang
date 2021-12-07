@@ -1,0 +1,15 @@
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define SLANG_NO_THROW __declspec(nothrow)
+#define SLANG_NO_THROW
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define SLANG_NO_THROW __declspec(nothrow)
+#define SLANG_NO_THROW
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define SLANG_NO_THROW __declspec(nothrow)
+#define SLANG_NO_THROW
