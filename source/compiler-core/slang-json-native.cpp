@@ -254,15 +254,15 @@ SlangResult JSONToNativeConverter::convert(const JSONValue& in, const RttiInfo* 
 
 SlangResult JSONToNativeConverter::convertArrayToStruct(const JSONValue& value, const RttiInfo* rttiInfo, void* out)
 {
+    // Check converting JSON array into a struct, as that's what this method supports
     if (!(rttiInfo->m_kind == RttiInfo::Kind::Struct &&
         value.getKind() == JSONValue::Kind::Array))
     {
-        // Converts JSON array into a struct
+        // If they are the wrong types then just fail
         return SLANG_FAIL;
     }
 
-    // If its args we can convert an array into args structure
-
+    // Find the total amount of fields, and all the classes involved
     Index totalFieldCount = 0;
 
     ShortList<const StructRttiInfo*, 8> infos;
@@ -281,6 +281,7 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(const JSONValue& value, 
 
     Byte* dstBase = (Byte*)out;
 
+    // We work in the order from the base class to the final type
     Index argIndex = 0;
     for (Index i = infos.getCount() - 1; i >= 0; --i)
     {
@@ -289,8 +290,8 @@ SlangResult JSONToNativeConverter::convertArrayToStruct(const JSONValue& value, 
         const Index fieldCount = info->m_fieldCount;
         for (Index j = 0; j < fieldCount; ++j)
         {
+            // Convert the field
             const auto& field = info->m_fields[j];
-
             SLANG_RETURN_ON_FAIL(convert(array[argIndex++], field.m_type, dstBase + field.m_offset));
         }
     }
@@ -473,6 +474,7 @@ SlangResult NativeToJSONConverter::convertStructToArray(const RttiInfo* rttiInfo
         return SLANG_FAIL;
     }
 
+    // Work out the total amount of fields, and all invloved struct types
     Index totalFieldsCount = 0;
     ShortList<const StructRttiInfo*, 8> infos;
     for (const StructRttiInfo* cur = static_cast<const StructRttiInfo*>(rttiInfo); cur; cur = cur->m_super)
@@ -490,6 +492,8 @@ SlangResult NativeToJSONConverter::convertStructToArray(const RttiInfo* rttiInfo
     {
         Index argsArrayIndex = 0;
         const Byte* argsBase = (const Byte*)in;
+
+        // Work in the order from the base class to the actual type
         for (Index i = infos.getCount() - 1; i >= 0; --i)
         {
             auto structRttiInfo = infos[i];
@@ -504,7 +508,7 @@ SlangResult NativeToJSONConverter::convertStructToArray(const RttiInfo* rttiInfo
         }
     }
 
-    // Okay now we convert the List to the output, which will just be an array.
+    // Okay now we convert the List to the output, which will just be a JSON array.
     SLANG_RETURN_ON_FAIL(convert(&argsArray, out));
 
     return SLANG_OK;
