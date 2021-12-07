@@ -109,17 +109,17 @@ namespace gfx_test
 
         sharedBufferTestImpl(srcDevice, dstDevice, context);
     }
-#if SLANG_WIN64
+#if SLANG_WINDOWS_FAMILY
     SLANG_UNIT_TEST(sharedBufferD3D12ToCUDA)
     {
         sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
     }
+#endif
 
-#if SLANG_WINDOWS_FAMILY // TODO: Remove when Linux support is added
+#if SLANG_WIN64 // TODO: Remove when Linux support is added
     SLANG_UNIT_TEST(sharedBufferVulkanToCUDA)
     {
         sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
     }
-#endif
 #endif
 }
