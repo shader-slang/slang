@@ -207,14 +207,14 @@ namespace gfx_test
 
         sharedTextureTestImpl(srcDevice, dstDevice, context);
     }
-#if SLANG_WIN64
+#if SLANG_WINDOWS_FAMILY
     SLANG_UNIT_TEST(sharedTextureD3D12ToCUDA)
     {
         sharedTextureTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
     }
 #endif
 
-#if SLANG_WINDOWS_FAMILY // TODO: Remove when Linux support is added
+#if SLANG_WIN64 // TODO: Remove when Linux support is added
     SLANG_UNIT_TEST(sharedTextureVulkanToCUDA)
     {
         sharedTextureTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
