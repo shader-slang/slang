@@ -4284,6 +4284,9 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 
    // If access is *only* read...
    if (access == AccessFlag::Read) {
+
+       assert(!srcData, "Initialized a read-only buffer with source data.");
+
        D3D12_HEAP_PROPERTIES heapProps;
        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
@@ -4300,31 +4303,30 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COPY_DEST | finalState;
 
        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, downloadResourceDesc, state, nullptr));
+       return SLANG_OK;
    }
-   else {
-       // If not CPU visible, create the dedicated GPU resource as well.
-       if (!cpuVisible) {
-           D3D12_HEAP_PROPERTIES heapProps;
-           heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-           heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-           heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-           heapProps.CreationNodeMask = 1;
-           heapProps.VisibleNodeMask = 1;
 
-           D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-           if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+   // If not CPU visible, create the dedicated GPU resource as well.
+   if (!cpuVisible) {
+       D3D12_HEAP_PROPERTIES heapProps;
+       heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+       heapProps.CreationNodeMask = 1;
+       heapProps.VisibleNodeMask = 1;
 
-           const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
+       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+       if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
 
-           SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
-       }
+       const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
 
+       SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
    }
+
 
    D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
 
-   // Always create the upload resource
-   if (access != AccessFlag::Read || srcData) {
+   {
        D3D12_HEAP_PROPERTIES heapProps;
        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
