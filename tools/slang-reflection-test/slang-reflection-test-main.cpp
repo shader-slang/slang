@@ -1285,6 +1285,15 @@ static SlangResult maybeDumpDiagnostic(SlangResult res, SlangCompileRequest* req
 
 SlangResult performCompilationAndReflection(SlangCompileRequest* request, int argc, const char*const* argv)
 {
+    // We don't actually need codegen to get reflection.
+    // 
+    // Ideally perhaps this would use a call to
+    // request->setCompileFlags(flags);
+    // But that relies on knowing what flags are set, and there isn't a way to get that, so do it arg way
+
+    const char* noCodeGenArgs[] = { "-no-codegen" };
+    SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, noCodeGenArgs, SLANG_COUNT_OF(noCodeGenArgs)), request));
+
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spProcessCommandLineArguments(request, &argv[1], argc - 1), request));
     SLANG_RETURN_ON_FAIL(maybeDumpDiagnostic(spCompile(request), request));
 
