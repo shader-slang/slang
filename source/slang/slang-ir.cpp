@@ -4360,6 +4360,7 @@ namespace Slang
         int             indent  = 0;
 
         IRDumpOptions   options;
+        SourceManager*  sourceManager;
         PathInfo        lastPathInfo = PathInfo::makeUnknown();
         
         Dictionary<IRInst*, String> mapValueToName;
@@ -4555,9 +4556,12 @@ namespace Slang
     static void dumpDebugID(IRDumpContext* context, IRInst* inst)
     {
 #if SLANG_ENABLE_IR_BREAK_ALLOC
-        dump(context, "[#");
-        dump(context, String(inst->_debugUID));
-        dump(context, "]");
+        if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
+        {
+            dump(context, "[#");
+            dump(context, String(inst->_debugUID));
+            dump(context, "]");
+        }
 #else
         SLANG_UNUSED(context);
         SLANG_UNUSED(inst);
@@ -5115,7 +5119,7 @@ namespace Slang
 
         // Output the originating source location
         {
-            SourceManager* sourceManager = context->options.sourceManager;
+            SourceManager* sourceManager = context->sourceManager;
             if (sourceManager && context->options.flags & IRDumpOptions::Flag::SourceLocations)
             {
                 StringBuilder buf;
@@ -5168,17 +5172,18 @@ namespace Slang
         }
     }
 
-    void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options)
+    void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager)
     {
         IRDumpContext context;
         context.builder = &builder;
         context.indent = 0;
         context.options = options;
+        context.sourceManager = sourceManager;
         
         dumpIRModule(&context, module);
     }
 
-    void dumpIR(IRInst* globalVal, const IRDumpOptions& options, ISlangWriter* writer)
+    void dumpIR(IRInst* globalVal, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer)
     {
         StringBuilder sb;
 
@@ -5186,6 +5191,7 @@ namespace Slang
         context.builder = &sb;
         context.indent = 0;
         context.options = options;
+        context.sourceManager = sourceManager;
 
         dumpInst(&context, globalVal);
 
@@ -5193,7 +5199,7 @@ namespace Slang
         writer->flush();
     }
 
-    void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, ISlangWriter* inWriter)
+    void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, SourceManager* sourceManager, ISlangWriter* inWriter)
     {
         WriterHelper writer(inWriter);
 
@@ -5204,7 +5210,7 @@ namespace Slang
             writer.put(":\n");
         }
 
-        dumpIR(module, options, inWriter);
+        dumpIR(module, options, sourceManager, inWriter);
 
         if (label)
         {
@@ -5212,16 +5218,16 @@ namespace Slang
         }
     }
 
-    String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options)
+    String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager)
     {
         StringBuilder sb;
-        printSlangIRAssembly(sb, module, options);
+        printSlangIRAssembly(sb, module, options, sourceManager);
         return sb;
     }
 
-    void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* writer)
+    void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer)
     {
-        String ir = getSlangIRAssembly(module, options);
+        String ir = getSlangIRAssembly(module, options, sourceManager);
         writer->write(ir.getBuffer(), ir.getLength());
         writer->flush();
     }

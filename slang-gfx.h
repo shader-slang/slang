@@ -914,6 +914,7 @@ public:
     struct Desc
     {
         uint64_t initialValue = 0;
+        bool isShared = false;
     };
 
     /// Returns the currently signaled value on the device.
@@ -1074,7 +1075,7 @@ struct DepthStencilOpDesc
 
 struct DepthStencilDesc
 {
-    bool            depthTestEnable     = true;
+    bool            depthTestEnable     = false;
     bool            depthWriteEnable    = true;
     ComparisonFunc  depthFunc           = ComparisonFunc::Less;
 
@@ -1728,9 +1729,12 @@ public:
         executeCommandBuffers(1, &commandBuffer, fenceToSignal, newFenceValue);
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL wait() = 0;
-
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+
+    virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
+
+    /// Queue a device side wait for the given fences.
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \

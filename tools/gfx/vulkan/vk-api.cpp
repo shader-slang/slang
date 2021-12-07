@@ -91,7 +91,10 @@ Slang::Result VulkanApi::initDeviceProcs(VkDevice device)
         vkGetBufferDeviceAddressKHR = vkGetBufferDeviceAddressEXT;
     if (!vkGetBufferDeviceAddress && vkGetBufferDeviceAddressKHR)
         vkGetBufferDeviceAddress = vkGetBufferDeviceAddressKHR;
-
+    if (!vkGetSemaphoreCounterValue && vkGetSemaphoreCounterValueKHR)
+        vkGetSemaphoreCounterValue = vkGetSemaphoreCounterValueKHR;
+    if (!vkSignalSemaphore && vkSignalSemaphoreKHR)
+        vkSignalSemaphore = vkSignalSemaphoreKHR;
     m_device = device;
     return SLANG_OK;
 }

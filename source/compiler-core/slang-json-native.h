@@ -15,6 +15,10 @@ struct JSONToNativeConverter
     template <typename T>
     SlangResult convert(const JSONValue& value, T* in) { return convert(value, GetRttiInfo<T>::get(), (void*)in); }
 
+    template <typename T>
+    SlangResult convertArrayToStruct(const JSONValue& value, T* in) { return convertArrayToStruct(value, GetRttiInfo<T>::get(), (void*)in); }
+    SlangResult convertArrayToStruct(const JSONValue& value, const RttiInfo* rttiInfo, void* out);
+
     JSONToNativeConverter(JSONContainer* container, DiagnosticSink* sink):
         m_container(container),
         m_sink(sink)
@@ -36,6 +40,11 @@ struct NativeToJSONConverter
 
     template <typename T>
     SlangResult convert(T* in, JSONValue& out) { return convert(GetRttiInfo<T>::get(), (const void*)in, out); }
+
+    SlangResult convertStructToArray(const RttiInfo* rttiInfo, const void* in, JSONValue& out);
+    template <typename T>
+    SlangResult convertStructToArray(T* in, JSONValue& out) { return convertStructToArray(GetRttiInfo<T>::get(), (const void*)in, out); }
+
 
     NativeToJSONConverter(JSONContainer* container, DiagnosticSink* sink) :
         m_container(container),

@@ -1914,7 +1914,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
 
     const auto& diagnostics = compileResult->getDiagnostics();
 
-    // If the actual compilation failed, then the output will be
+    // If the actual compilation failed, then the output will be the summary
     if (SLANG_FAILED(diagnostics.result))
     {
         actualOutput = _calcSummary(diagnostics);

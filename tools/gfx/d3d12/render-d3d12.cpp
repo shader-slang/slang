@@ -144,6 +144,16 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc, IQueryPool** outState) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFence(const IFence::Desc& desc, IFence** outFence) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
+        uint32_t fenceCount,
+        IFence** fences,
+        uint64_t* fenceValues,
+        bool waitForAll,
+        uint64_t timeout) override;
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* resource,
         ResourceState state,
@@ -3793,6 +3803,65 @@ public:
         }
     };
 
+    class FenceImpl : public FenceBase
+    {
+    public:
+        ComPtr<ID3D12Fence> m_fence;
+        HANDLE m_waitEvent = 0;
+
+        ~FenceImpl()
+        {
+            if (m_waitEvent)
+                CloseHandle(m_waitEvent);
+        }
+
+        HANDLE getWaitEvent()
+        {
+            if (m_waitEvent)
+                return m_waitEvent;
+            m_waitEvent = CreateEventEx(
+                nullptr,
+                nullptr,
+                0,
+                EVENT_ALL_ACCESS);
+            return m_waitEvent;
+        }
+
+        Result init(D3D12Device* device, const IFence::Desc& desc)
+        {
+            SLANG_RETURN_ON_FAIL(device->m_device->CreateFence(
+                desc.initialValue,
+                desc.isShared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
+                IID_PPV_ARGS(m_fence.writeRef())));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentValue(uint64_t* outValue) override
+        {
+            *outValue = m_fence->GetCompletedValue();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override
+        {
+            SLANG_RETURN_ON_FAIL(m_fence->Signal(value));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
+        {
+            outHandle->handleValue = 0;
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(InteropHandle* outNativeHandle) override
+        {
+            outNativeHandle->handleValue = 0;
+            return SLANG_FAIL;
+        }
+    };
+
     class CommandQueueImpl
         : public ICommandQueue
         , public ComObject
@@ -3836,7 +3905,7 @@ public:
         }
         ~CommandQueueImpl()
         {
-            wait();
+            waitOnHost();
             CloseHandle(globalWaitHandle);
             m_renderer->m_queueIndexAllocator.free((int)m_queueIndex, 1);
         }
@@ -3874,13 +3943,24 @@ public:
             ResetEvent(globalWaitHandle);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override
         {
             m_fenceValue++;
             m_d3dQueue->Signal(m_fence, m_fenceValue);
             ResetEvent(globalWaitHandle);
             m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
             WaitForSingleObject(globalWaitHandle, INFINITE);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        {
+            for (uint32_t i = 0; i < fenceCount; ++i)
+            {
+                auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
+                m_d3dQueue->Wait(fenceImpl->m_fence.get(), waitValues[i]);
+            }
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -6033,6 +6113,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
         blend.IndependentBlendEnable = FALSE;
         blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
         for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
             auto& d3dDesc = blend.RenderTarget[i];
@@ -6268,6 +6349,30 @@ Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** o
             return SLANG_OK;
         }
     }   
+}
+
+Result D3D12Device::createFence(const IFence::Desc& desc, IFence** outFence)
+{
+    RefPtr<FenceImpl> fence = new FenceImpl();
+    SLANG_RETURN_ON_FAIL(fence->init(this, desc));
+    returnComPtr(outFence, fence);
+    return SLANG_OK;
+}
+
+Result D3D12Device::waitForFences(
+    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+{
+    List<HANDLE> waitHandles;
+    for (uint32_t i = 0; i < fenceCount; ++i)
+    {
+        auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
+        waitHandles.add(fenceImpl->getWaitEvent());
+        SLANG_RETURN_ON_FAIL(fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
+    }
+    auto result = WaitForMultipleObjects(fenceCount, waitHandles.getBuffer(), waitForAll ? TRUE : FALSE, (DWORD)timeout);
+    if (result == WAIT_TIMEOUT)
+        return SLANG_E_TIME_OUT;
+    return result == WAIT_FAILED ? SLANG_FAIL : SLANG_OK;
 }
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
