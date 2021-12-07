@@ -419,10 +419,10 @@ public:
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) = 0;
     virtual SlangResult parseOutput(const ExecuteResult& exeResult, DownstreamDiagnostics& output) = 0;
 
-    CommandLineDownstreamCompiler(const Desc& desc, const String& exeName) :
+    CommandLineDownstreamCompiler(const Desc& desc, const ExecutableLocation& exe) :
         Super(desc)
     {
-        m_cmdLine.setExecutableFilename(exeName);
+        m_cmdLine.setExecutableLocation(exe);
     }
 
     CommandLineDownstreamCompiler(const Desc& desc, const CommandLine& cmdLine) :

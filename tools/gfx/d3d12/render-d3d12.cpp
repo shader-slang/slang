@@ -131,6 +131,8 @@ public:
         override;
     virtual Result createMutableShaderObject(
         ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -2827,6 +2829,21 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        {
+            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
+            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            {
+                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
+                {
+                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
+                }
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
+        }
+
     public:
         Result bindAsRoot(
             BindingContext*             context,
@@ -4939,13 +4956,12 @@ Result setupResourceDesc(D3D12_RESOURCE_DESC& resourceDesc, const ITextureResour
 Result D3D12Device::getTextureAllocationInfo(
     const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment)
 {
-    auto count = m_device->GetNodeCount();
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
-    auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
-    *outSize = allocInfo.SizeInBytes;
-    *outAlignment = allocInfo.Alignment;
+    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    *outSize = (size_t)allocInfo.SizeInBytes;
+    *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
 }
 
@@ -5855,6 +5871,14 @@ Result D3D12Device::createMutableShaderObject(
     return SLANG_OK;
 }
 
+Result D3D12Device::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+{
+    RefPtr<MutableRootShaderObject> result =
+        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    returnComPtr(outObject, result);
+    return SLANG_OK;
+}
+
 Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
@@ -5954,6 +5978,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
         blend.IndependentBlendEnable = FALSE;
         blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
         for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
             auto& d3dDesc = blend.RenderTarget[i];

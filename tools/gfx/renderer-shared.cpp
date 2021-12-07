@@ -813,4 +813,32 @@ IDebugCallback* _getNullDebugCallback()
     return &result;
 }
 
+Result ShaderObjectBase::copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap)
+{
+    if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+    {
+        setData(gfx::ShaderOffset(), srcObj->m_data.begin(), (size_t)srcObj->m_data.getCount());
+        for (auto& kv : srcObj->m_objects)
+        {
+            ComPtr<IShaderObject> subObject;
+            SLANG_RETURN_ON_FAIL(kv.Value->getCurrentVersion(transientHeap, subObject.writeRef()));
+            setObject(kv.Key, subObject);
+        }
+        for (auto& kv : srcObj->m_resources)
+        {
+            setResource(kv.Key, kv.Value.Ptr());
+        }
+        for (auto& kv : srcObj->m_samplers)
+        {
+            setSampler(kv.Key, kv.Value.Ptr());
+        }
+        for (auto& kv : srcObj->m_specializationArgs)
+        {
+            setSpecializationArgs(kv.Key, kv.Value.begin(), (uint32_t)kv.Value.getCount());
+        }
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
 } // namespace gfx

@@ -86,10 +86,10 @@ static Index _findVersionEnd(const UnownedStringSlice& in)
     return SLANG_FAIL;
 }
 
-SlangResult GCCDownstreamCompilerUtil::calcVersion(const String& exeName, DownstreamCompiler::Desc& outDesc)
+SlangResult GCCDownstreamCompilerUtil::calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc)
 {
     CommandLine cmdLine;
-    cmdLine.setExecutableFilename(exeName);
+    cmdLine.setExecutableLocation(exe);
     cmdLine.addArg("-v");
 
     ExecuteResult exeRes;
@@ -205,7 +205,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
         #include "../slang.h"
         ^~~~~~~~~~~~
         compilation terminated.*/
-    
+
+    /* g++: error: unrecognized command line option ‘-std=c++14’ */
+
     outDiagnostic.stage = Diagnostic::Stage::Compile;
 
     List<UnownedStringSlice> split;
@@ -257,7 +259,9 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 
         // Check for special handling for clang (Can be Clang or clang apparently)
         if (split0.startsWith(UnownedStringSlice::fromLiteral("clang")) ||
-            split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) )
+            split0.startsWith(UnownedStringSlice::fromLiteral("Clang")) ||
+            split0 == UnownedStringSlice::fromLiteral("g++") ||
+            split0 == UnownedStringSlice::fromLiteral("gcc"))
         {
             // Extract the type
             SLANG_RETURN_ON_FAIL(_parseSeverity(split[1].trim(), outDiagnostic.severity));
@@ -635,19 +639,13 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     return SLANG_OK;
 }
 
-/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler)
+/* static */SlangResult GCCDownstreamCompilerUtil::createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler)
 {
-    String exeName(inExeName);
-    if (path.getLength() > 0)
-    {
-        exeName = Path::combine(path, inExeName);
-    }
-
     DownstreamCompiler::Desc desc;
-    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exeName, desc));
+    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exe, desc));
 
     RefPtr<CommandLineDownstreamCompiler> compiler(new GCCDownstreamCompiler(desc));
-    compiler->m_cmdLine.setExecutableFilename(exeName);
+    compiler->m_cmdLine.setExecutableLocation(exe);
 
     outCompiler = compiler;
     return SLANG_OK;
@@ -656,9 +654,26 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
 /* static */SlangResult GCCDownstreamCompilerUtil::locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set)
 {
     SLANG_UNUSED(loader);
+
     RefPtr<DownstreamCompiler> compiler;
-    if (SLANG_SUCCEEDED(createCompiler(path, "g++", compiler)))
+    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "g++"), compiler)))
     {
+        // A downstream compiler for Slang must currently support C++14 - such that
+        // the prelude and generated code works.
+        // 
+        // The first version of gcc that supports `-std=c++14` is 5.0
+        // https://gcc.gnu.org/projects/cxx-status.html
+        //
+        // If could be argued to allow C/C++ compilations via older versions through an older version
+        // but that requires some more complex behavior, so we don't allow for now.
+        
+        auto desc = compiler->getDesc();
+        if (desc.majorVersion < 5)
+        {
+            // If the version isn't 5 or higher, we don't add this version of the compiler.
+            return SLANG_OK;
+        }
+
         set->addCompiler(compiler);
     }
     return SLANG_OK;
@@ -669,7 +684,7 @@ static SlangResult _parseGCCFamilyLine(const UnownedStringSlice& line, LineParse
     SLANG_UNUSED(loader);
 
     RefPtr<DownstreamCompiler> compiler;
-    if (SLANG_SUCCEEDED(createCompiler(path, "clang", compiler)))
+    if (SLANG_SUCCEEDED(createCompiler(ExecutableLocation(path, "clang"), compiler)))
     {
         set->addCompiler(compiler);
     }

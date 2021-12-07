@@ -533,15 +533,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override
     {
-        SLANG_UNUSED(outObject);
-        return SLANG_E_NOT_AVAILABLE;
+        returnComPtr(outObject, this);
+        return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override
-    {
-        SLANG_UNUSED(other);
-        return SLANG_E_NOT_AVAILABLE;
-    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
     {

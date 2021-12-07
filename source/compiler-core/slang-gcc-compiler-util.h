@@ -12,28 +12,30 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerBaseUtil
         /// Extracts version number into desc from text (assumes gcc/clang -v layout with a line with version)
     static SlangResult parseVersion(const UnownedStringSlice& text, const UnownedStringSlice& prefix, DownstreamCompiler::Desc& outDesc);
 
-        /// Runs the exeName, and extracts the version info into outDesc
-    static SlangResult calcVersion(const String& exeName, DownstreamCompiler::Desc& outDesc);
+        /// Runs the exe, and extracts the version info into outDesc
+    static SlangResult calcVersion(const ExecutableLocation& exe, DownstreamCompiler::Desc& outDesc);
 
         /// Calculate gcc family compilers (including clang) cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
 
-        /// Parse ExecuteResult into Output
-    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& outOutput);
+        /// Parse ExecuteResult into diagnostics 
+    static SlangResult parseOutput(const ExecuteResult& exeRes, DownstreamDiagnostics& out);
 
         /// Calculate the output module filename 
     static SlangResult calcModuleFilePath(const CompileOptions& options, StringBuilder& outPath);
 
-        /// Given options, calculate paths to products produced for a compilation
+        /// Given options, calculate paths to products/files produced for a compilation
     static SlangResult calcCompileProducts(const CompileOptions& options, ProductFlags flags, List<String>& outPaths);
 
-        /// Given a path and an exe name, detects if compiler is present, and if so adds to compiler set.
-    static SlangResult createCompiler(const String& path, const String& inExeName, RefPtr<DownstreamCompiler>& outCompiler);
+        /// Given the exe location, creates a DownstreamCompiler.
+        /// Note! Invoke/s the compiler  to determine the compiler version number. 
+    static SlangResult createCompiler(const ExecutableLocation& exe, RefPtr<DownstreamCompiler>& outCompiler);
 
+        /// Finds GCC compiler/s and adds them to the set
     static SlangResult locateGCCCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
 
+        /// Finds clang compiler/s and adds them to the set
     static SlangResult locateClangCompilers(const String& path, ISlangSharedLibraryLoader* loader, DownstreamCompilerSet* set);
-
 };
 
 class GCCDownstreamCompiler : public CommandLineDownstreamCompiler

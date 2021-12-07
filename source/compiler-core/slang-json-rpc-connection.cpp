@@ -3,17 +3,26 @@
 
 #include "../core/slang-string-util.h"
 #include "../core/slang-process-util.h"
+#include "../core/slang-short-list.h"
 
 #include "slang-json-rpc.h"
 #include "slang-json-native.h"
 
 namespace Slang {
 
-SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, Process* process)
+SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, CallStyle defaultCallStyle, Process* process)
 {
     m_connection = connection;
     m_process = process;
 
+    {
+        // If a call style isn't set, use the prefered style
+        const CallStyle preferedCallStyle = CallStyle::Array;
+        defaultCallStyle = (defaultCallStyle == CallStyle::Default) ? preferedCallStyle : defaultCallStyle;
+        m_defaultCallStyle = defaultCallStyle;
+    }
+        
+    
     m_sourceManager.initialize(nullptr, nullptr);
     m_diagnosticSink.init(&m_sourceManager, &JSONLexer::calcLexemeLocation);
     m_container.setSourceManager(&m_sourceManager);
@@ -21,7 +30,7 @@ SlangResult JSONRPCConnection::init(HTTPPacketConnection* connection, Process* p
     return SLANG_OK;
 }
 
-SlangResult JSONRPCConnection::initWithStdStreams(Process* process)
+SlangResult JSONRPCConnection::initWithStdStreams(CallStyle defaultCallStyle, Process* process)
 {
     RefPtr<Stream> stdinStream, stdoutStream;
 
@@ -31,7 +40,7 @@ SlangResult JSONRPCConnection::initWithStdStreams(Process* process)
     RefPtr<BufferedReadStream> readStream(new BufferedReadStream(stdinStream));
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, stdoutStream);
-    return init(connection, process);
+    return init(connection, defaultCallStyle, process);
 }
 
 void JSONRPCConnection::clearBuffers()
@@ -115,19 +124,40 @@ SlangResult JSONRPCConnection::sendError(JSONRPC::ErrorCode errorCode, const Uno
     errorResponse.error.message = msg;
     errorResponse.id = id;
 
-    
     return sendRPC(&errorResponse);
+}
+
+SlangResult JSONRPCConnection::toNativeArgsOrSendError(const JSONValue& srcArgs, const RttiInfo* dstArgsRttiInfo, void* dstArgs, const JSONValue& id)
+{
+    if (dstArgsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        srcArgs.getKind() == JSONValue::Kind::Array)
+    {
+        JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+        if (SLANG_FAILED(converter.convertArrayToStruct(srcArgs, dstArgsRttiInfo, dstArgs)))
+        {
+            return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
+        }
+        return SLANG_OK;
+    }
+    else
+    {
+        return toNativeOrSendError(srcArgs, dstArgsRttiInfo, dstArgs, id);
+    }
 }
 
 SlangResult JSONRPCConnection::toNativeOrSendError(const JSONValue& value, const RttiInfo* info, void* dst, const JSONValue& id)
 {
     m_diagnosticSink.outputBuffer.Clear();
-    if (SLANG_FAILED(JSONRPCUtil::convertToNative(&m_container, value, &m_diagnosticSink, info, dst)))
+
+    JSONToNativeConverter converter(&m_container, &m_diagnosticSink);
+    
+    if (SLANG_FAILED(converter.convert(value, info, dst)))
     {
         return sendError(JSONRPC::ErrorCode::InvalidRequest, id);
     }
+
     return SLANG_OK;
-}
+} 
 
 SlangResult JSONRPCConnection::sendCall(const UnownedStringSlice& method, const JSONValue& id)
 {
@@ -154,14 +184,31 @@ SlangResult JSONRPCConnection::sendResult(const RttiInfo* rttiInfo, const void* 
 
 SlangResult JSONRPCConnection::sendCall(const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
 {
+    return sendCall(m_defaultCallStyle, method, argsRttiInfo, args, id);
+}
+
+SlangResult JSONRPCConnection::sendCall(CallStyle callStyle, const UnownedStringSlice& method, const RttiInfo* argsRttiInfo, const void* args, const JSONValue& id)
+{
     JSONRPCCall call;
     call.id = id;
     call.method = method;
 
-    // Convert the args/params
+    // Set up the converter to now convert the args.
     NativeToJSONConverter converter(&m_container, &m_diagnosticSink);
-    SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
-
+    
+    // If we have a struct *and* call style is 'array', do special handling
+    if (argsRttiInfo->m_kind == RttiInfo::Kind::Struct &&
+        _getCallStyle(callStyle) == CallStyle::Array)
+    {
+        // Convert the args/params in the 'array' style
+        SLANG_RETURN_ON_FAIL(converter.convertStructToArray(argsRttiInfo, args, call.params));
+    }
+    else
+    {
+        // Convert the args/params in the 'object' sytle
+        SLANG_RETURN_ON_FAIL(converter.convert(argsRttiInfo, args, call.params));
+    }
+    
     // Send the RPC
     SLANG_RETURN_ON_FAIL(sendRPC(&call));
     return SLANG_OK;

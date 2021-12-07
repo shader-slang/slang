@@ -139,6 +139,17 @@ static void _cloneInstDecorationsAndChildren(
     builder->sharedBuilder = sharedBuilder;
     builder->setInsertInto(newInst);
 
+    // If `newInst` already has non-decoration children, we want to
+    // insert the new children between the existing decoration and non-decoration children
+    // so that we maintain the invariant that all decorations are defined before non-decorations.
+    if (auto lastDecor = newInst->getLastDecoration())
+    {
+        if (auto nextInstBeforeLastDecor = lastDecor->getNextInst())
+        {
+            builder->setInsertBefore(nextInstBeforeLastDecor);
+        }
+    }
+
     // When applying the first phase of cloning to
     // children, we will keep track of those that
     // require the second phase.

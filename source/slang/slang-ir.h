@@ -1500,7 +1500,8 @@ struct IRDumpOptions
     {
         enum Enum : Flags
         {
-            SourceLocations = 0x1,          ///< If set will output source locations 
+            SourceLocations = 0x1,          ///< If set will output source locations
+            DumpDebugIds    = 0x2,          ///< If set *and* debug build will write ids
         };
     };
 
@@ -1532,18 +1533,15 @@ struct IRDumpOptions
     Mode mode = Mode::Simplified;
         /// Flags to control output
         /// Add Flag::SourceLocations to output source locations set on IR
-    Flags flags = 0;
-    
-        /// Must be set if source location output is desired
-    SourceManager* sourceManager = nullptr;         
+    Flags flags = 0;    
 };
 
-void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options);
-String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options);
+void printSlangIRAssembly(StringBuilder& builder, IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager);
+String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager);
 
-void dumpIR(IRModule* module, const IRDumpOptions& options, ISlangWriter* writer);
-void dumpIR(IRInst* globalVal, const IRDumpOptions& options, ISlangWriter* writer);
-void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, ISlangWriter* writer);
+void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
+void dumpIR(IRInst* globalVal, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
+void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, SourceManager* sourceManager, ISlangWriter* writer);
 
 IRInst* createEmptyInst(
     IRModule*   module,
