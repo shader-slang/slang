@@ -367,12 +367,12 @@ Slang::Result initialize()
         IBufferResource::Desc asDraftBufferDesc;
         asDraftBufferDesc.type = IResource::Type::Buffer;
         asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asDraftBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asDraftBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         ComPtr<IBufferResource> draftBuffer = gDevice->createBufferResource(asDraftBufferDesc);
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = gDevice->createBufferResource(scratchBufferDesc);
 
         // Build acceleration structure.
@@ -412,13 +412,13 @@ Slang::Result initialize()
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = compactedSize;
+        asBufferDesc.sizeInBytes = (size_t)compactedSize;
         gBLASBuffer = gDevice->createBufferResource(asBufferDesc);
         IAccelerationStructure::CreateDesc createDesc;
         createDesc.buffer = gBLASBuffer;
         createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
         createDesc.offset = 0;
-        createDesc.size = compactedSize;
+        createDesc.size = (size_t)compactedSize;
         gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
 
         commandBuffer = gTransientHeaps[0]->createCommandBuffer();
@@ -465,20 +465,20 @@ Slang::Result initialize()
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         gTLASBuffer = gDevice->createBufferResource(asBufferDesc);
 
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = gDevice->createBufferResource(scratchBufferDesc);
 
         IAccelerationStructure::CreateDesc createDesc;
         createDesc.buffer = gTLASBuffer;
         createDesc.kind = IAccelerationStructure::Kind::TopLevel;
         createDesc.offset = 0;
-        createDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        createDesc.size = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         SLANG_RETURN_ON_FAIL(gDevice->createAccelerationStructure(createDesc, gTLAS.writeRef()));
 
         auto commandBuffer = gTransientHeaps[0]->createCommandBuffer();
