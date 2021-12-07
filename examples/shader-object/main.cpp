@@ -235,7 +235,7 @@ int main()
         encoder->endEncoding();
         commandBuffer->close();
         queue->executeCommandBuffer(commandBuffer);
-        queue->wait();
+        queue->waitOnHost();
     }
     // Read back the results.
     ComPtr<ISlangBlob> resultBlob;

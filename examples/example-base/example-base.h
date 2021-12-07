@@ -40,7 +40,7 @@ protected:
     virtual void renderFrame(int framebufferIndex) = 0;
 public:
     platform::Window* getWindow() { return gWindow.Ptr(); }
-    virtual void finalize() { gQueue->wait(); }
+    virtual void finalize() { gQueue->waitOnHost(); }
 };
 
 int64_t getCurrentTime();

@@ -155,7 +155,7 @@ void WindowedAppBase::createSwapchainFramebuffers()
 void WindowedAppBase::windowSizeChanged()
 {
     // Wait for the GPU to finish.
-    gQueue->wait();
+    gQueue->waitOnHost();
 
     auto clientRect = gWindow->getClientRect();
     if (clientRect.width > 0 && clientRect.height > 0)
