@@ -3947,13 +3947,15 @@ public:
             WaitForSingleObject(globalWaitHandle, INFINITE);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
         {
             for (uint32_t i = 0; i < fenceCount; ++i)
             {
                 auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
-                m_d3dQueue->Wait(fenceImpl->m_fence.get(), waitValues[i]);
+                m_d3dQueue->Wait(
+                    fenceImpl->m_fence.get(),
+                    waitValues[i]);
             }
             return SLANG_OK;
         }
@@ -6307,14 +6309,18 @@ Result D3D12Device::createFence(const IFence::Desc& desc, IFence** outFence)
 Result D3D12Device::waitForFences(
     uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
-    List<HANDLE> waitHandles;
+    ShortList<HANDLE> waitHandles;
     for (uint32_t i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         waitHandles.add(fenceImpl->getWaitEvent());
         SLANG_RETURN_ON_FAIL(fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
     }
-    auto result = WaitForMultipleObjects(fenceCount, waitHandles.getBuffer(), waitForAll ? TRUE : FALSE, (DWORD)timeout);
+    auto result = WaitForMultipleObjects(
+        fenceCount,
+        waitHandles.getArrayView().getBuffer(),
+        waitForAll ? TRUE : FALSE,
+        timeout == kTimeoutInfinite ? INFINITE : (DWORD)(timeout / 1000000));
     if (result == WAIT_TIMEOUT)
         return SLANG_E_TIME_OUT;
     return result == WAIT_FAILED ? SLANG_FAIL : SLANG_OK;

@@ -42,6 +42,8 @@ typedef SlangInt Int;
 typedef SlangUInt UInt;
 typedef uint64_t DeviceAddress;
 
+const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
+
 // Declare opaque type
 class IInputLayout: public ISlangUnknown
 {
@@ -1732,8 +1734,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
 
-    /// Queue a device side wait for the given fences.
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
+    /// Queues a device side wait for the given fences.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFenceValuesOnDevice(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -2158,6 +2161,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFence(const IFence::Desc& desc, IFence** outFence) = 0;
 
+    /// Wait on the host for the fences to signals.
+    /// `timeout` is in nanoseconds, can be set to `kTimeoutInfinite`.
     virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
         uint32_t fenceCount,
         IFence** fences,
