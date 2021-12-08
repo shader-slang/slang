@@ -9,7 +9,7 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    void sharedHandleTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContext* context)
+    void sharedBufferTestImpl(IDevice* srcDevice, IDevice* dstDevice, UnitTestContext* context)
     {
         // Create a shareable buffer using srcDevice, get its handle, then create a buffer using the handle using
         // dstDevice. Read back the buffer and check that its contents are correct.
@@ -98,7 +98,7 @@ namespace gfx_test
             Slang::makeArray<float>(1.0f, 2.0f, 3.0f, 4.0f));
     }
 
-    void sharedHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum srcApi, Slang::RenderApiFlag::Enum dstApi)
+    void sharedBufferTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum srcApi, Slang::RenderApiFlag::Enum dstApi)
     {
         auto srcDevice = createTestingDevice(context, srcApi);
         auto dstDevice = createTestingDevice(context, dstApi);
@@ -107,19 +107,17 @@ namespace gfx_test
             SLANG_IGNORE_TEST;
         }
 
-        sharedHandleTestImpl(srcDevice, dstDevice, context);
+        sharedBufferTestImpl(srcDevice, dstDevice, context);
     }
 #if SLANG_WIN64
-    SLANG_UNIT_TEST(sharedHandleD3D12ToCUDA)
+    SLANG_UNIT_TEST(sharedBufferD3D12ToCUDA)
     {
-        sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
+        sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::D3D12, Slang::RenderApiFlag::CUDA);
     }
 
-#if SLANG_WINDOWS_FAMILY // TODO: Remove when Linux support is added
-    SLANG_UNIT_TEST(sharedHandleVulkanToCUDA)
+    SLANG_UNIT_TEST(sharedBufferVulkanToCUDA)
     {
-        sharedHandleTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
+        sharedBufferTestAPI(unitTestContext, Slang::RenderApiFlag::Vulkan, Slang::RenderApiFlag::CUDA);
     }
-#endif
 #endif
 }

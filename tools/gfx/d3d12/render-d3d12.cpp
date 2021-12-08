@@ -314,11 +314,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
             ComPtr<ID3D12Device> pDevice;
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
-            outHandle->api = InteropHandleAPI::Win32;
+            outHandle->api = InteropHandleAPI::D3D12;
             return SLANG_OK;
         }
     };
@@ -5033,7 +5041,7 @@ Result D3D12Device::getTextureAllocationInfo(
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
-    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
     *outSize = (size_t)allocInfo.SizeInBytes;
     *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
@@ -5063,6 +5071,9 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (descIn.isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         D3D12_CLEAR_VALUE clearValue;
         D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
@@ -5077,7 +5088,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
-            D3D12_HEAP_FLAG_NONE,
+            flags,
             resourceDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             clearValuePtr));
