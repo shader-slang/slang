@@ -1291,6 +1291,18 @@ void DebugResourceCommandEncoder::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
     SLANG_GFX_API_FUNC;
+    switch (view->getViewDesc()->type)
+    {
+    case IResourceView::Type::DepthStencil:
+    case IResourceView::Type::RenderTarget:
+    case IResourceView::Type::UnorderedAccess:
+        break;
+    default:
+        GFX_DIAGNOSE_ERROR_FORMAT(
+            "Resource view %lld cannot be cleared. Only DepthStencil, "
+            "RenderTarget or UnorderedAccess views can be cleared.",
+            getDebugObj(view)->uid);
+    }
     baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
