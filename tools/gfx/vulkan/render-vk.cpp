@@ -146,6 +146,16 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFence(const IFence::Desc& desc, IFence** outFence) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
+        uint32_t fenceCount,
+        IFence** fences,
+        uint64_t* fenceValues,
+        bool waitForAll,
+        uint64_t timeout) override;
+
     void waitForGpu();
 
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
@@ -270,10 +280,87 @@ public:
             {
                 return SLANG_FAIL;
             }
-            SLANG_RETURN_ON_FAIL(vkCreateSharedHandle(api->m_device, &info, (HANDLE*)&outHandle->handleValue) != VK_SUCCESS);
+            SLANG_VK_RETURN_ON_FAIL(
+                vkCreateSharedHandle(api->m_device, &info, (HANDLE*)&outHandle->handleValue));
 #endif
             outHandle->api = InteropHandleAPI::Vulkan;
             return SLANG_OK;
+        }
+    };
+
+    class FenceImpl : public FenceBase
+    {
+    public:
+        VkSemaphore m_semaphore = VK_NULL_HANDLE;
+        RefPtr<VKDevice> m_device;
+
+        FenceImpl(VKDevice* device)
+            : m_device(device)
+        {
+            
+        }
+
+        ~FenceImpl()
+        {
+            if (m_semaphore)
+            {
+                m_device->m_api.vkDestroySemaphore(m_device->m_api.m_device, m_semaphore, nullptr);
+            }
+        }
+
+        Result init(const IFence::Desc& desc)
+        {
+            if (!m_device->m_api.m_extendedFeatures.timelineFeatures.timelineSemaphore)
+                return SLANG_E_NOT_AVAILABLE;
+
+            VkSemaphoreTypeCreateInfo timelineCreateInfo;
+            timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+            timelineCreateInfo.pNext = nullptr;
+            timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+            timelineCreateInfo.initialValue = desc.initialValue;
+
+            VkSemaphoreCreateInfo createInfo;
+            createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            createInfo.pNext = &timelineCreateInfo;
+            createInfo.flags = 0;
+
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkCreateSemaphore(
+                m_device->m_api.m_device, &createInfo, nullptr, &m_semaphore));
+
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentValue(uint64_t* outValue) override
+        {
+            SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetSemaphoreCounterValue(
+                m_device->m_api.m_device, m_semaphore, outValue));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override
+        {
+            VkSemaphoreSignalInfo signalInfo;
+            signalInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+            signalInfo.pNext = NULL;
+            signalInfo.semaphore = m_semaphore;
+            signalInfo.value = 2;
+
+            SLANG_VK_RETURN_ON_FAIL(
+                m_device->m_api.vkSignalSemaphore(m_device->m_api.m_device, &signalInfo));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
+        {
+            outHandle->handleValue = 0;
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(InteropHandle* outNativeHandle) override
+        {
+            outNativeHandle->handleValue = 0;
+            return SLANG_FAIL;
         }
     };
 
@@ -4846,40 +4933,37 @@ public:
         RefPtr<VKDevice> m_renderer;
         VkQueue m_queue;
         uint32_t m_queueFamilyIndex;
+        struct FenceWaitInfo
+        {
+            RefPtr<FenceImpl> fence;
+            uint64_t waitValue;
+        };
+        List<FenceWaitInfo> m_pendingWaitFences;
         VkSemaphore m_pendingWaitSemaphores[2] = {VK_NULL_HANDLE, VK_NULL_HANDLE};
         List<VkCommandBuffer> m_submitCommandBuffers;
-        static const int kSemaphoreCount = 32;
-        uint32_t m_currentSemaphoreIndex;
-        VkSemaphore m_semaphores[kSemaphoreCount];
+        VkSemaphore m_semaphore;
         ~CommandQueueImpl()
         {
             m_renderer->m_api.vkQueueWaitIdle(m_queue);
 
             m_renderer->m_queueAllocCount--;
-            for (int i = 0; i < kSemaphoreCount; i++)
-            {
-                m_renderer->m_api.vkDestroySemaphore(
-                    m_renderer->m_api.m_device, m_semaphores[i], nullptr);
-            }
+            m_renderer->m_api.vkDestroySemaphore(
+                m_renderer->m_api.m_device, m_semaphore, nullptr);
         }
 
         void init(VKDevice* renderer, VkQueue queue, uint32_t queueFamilyIndex)
         {
             m_renderer = renderer;
-            m_currentSemaphoreIndex = 0;
             m_queue = queue;
             m_queueFamilyIndex = queueFamilyIndex;
-            for (int i = 0; i < kSemaphoreCount; i++)
-            {
-                VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-                semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-                semaphoreCreateInfo.flags = 0;
-                m_renderer->m_api.vkCreateSemaphore(
-                    m_renderer->m_api.m_device, &semaphoreCreateInfo, nullptr, &m_semaphores[i]);
-            }
+            VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+            semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            semaphoreCreateInfo.flags = 0;
+            m_renderer->m_api.vkCreateSemaphore(
+                m_renderer->m_api.m_device, &semaphoreCreateInfo, nullptr, &m_semaphore);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override
         {
             auto& vkAPI = m_renderer->m_api;
             vkAPI.vkQueueWaitIdle(m_queue);
@@ -4897,15 +4981,25 @@ public:
             return m_desc;
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
-            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
         {
-            // TODO: implement fence signaling.
-            assert(fence == nullptr);
+            for (uint32_t i = 0; i < fenceCount; ++i)
+            {
+                FenceWaitInfo waitInfo;
+                waitInfo.fence = static_cast<FenceImpl*>(fences[i]);
+                waitInfo.waitValue = waitValues[i];
+                m_pendingWaitFences.add(waitInfo);
+            }
+            return SLANG_OK;
+        }
 
-            if (count == 0)
-                return;
-
+        void queueSubmitImpl(
+            uint32_t count,
+            ICommandBuffer* const* commandBuffers,
+            IFence* fence,
+            uint64_t valueToSignal)
+        {
             auto& vkAPI = m_renderer->m_api;
             m_submitCommandBuffers.clear();
             for (uint32_t i = 0; i < count; i++)
@@ -4916,7 +5010,11 @@ public:
                 auto vkCmdBuf = cmdBufImpl->m_commandBuffer;
                 m_submitCommandBuffers.add(vkCmdBuf);
             }
-            VkSemaphore signalSemaphore = m_semaphores[m_currentSemaphoreIndex];
+            Array<VkSemaphore, 2> signalSemaphores;
+            Array<uint64_t, 2> signalValues;
+            signalSemaphores.add(m_semaphore);
+            signalValues.add(0);
+
             VkSubmitInfo submitInfo = {};
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             VkPipelineStageFlags stageFlag[] = {
@@ -4924,32 +5022,58 @@ public:
             submitInfo.pWaitDstStageMask = stageFlag;
             submitInfo.commandBufferCount = (uint32_t)m_submitCommandBuffers.getCount();
             submitInfo.pCommandBuffers = m_submitCommandBuffers.getBuffer();
-            Array<VkSemaphore, 2> waitSemaphores;
+            Array<VkSemaphore, 3> waitSemaphores;
+            Array<uint64_t, 3> waitValues;
             for (auto s : m_pendingWaitSemaphores)
             {
                 if (s != VK_NULL_HANDLE)
                 {
                     waitSemaphores.add(s);
+                    waitValues.add(0);
                 }
+            }
+            for (auto& fenceWait : m_pendingWaitFences)
+            {
+                waitSemaphores.add(fenceWait.fence->m_semaphore);
+                waitValues.add(fenceWait.waitValue);
+            }
+            m_pendingWaitFences.clear();
+            VkTimelineSemaphoreSubmitInfo timelineSubmitInfo = {
+                VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+            if (fence)
+            {
+                auto fenceImpl = static_cast<FenceImpl*>(fence);
+                signalSemaphores.add(fenceImpl->m_semaphore);
+                signalValues.add(valueToSignal);
+                submitInfo.pNext = &timelineSubmitInfo;
+                timelineSubmitInfo.signalSemaphoreValueCount = (uint32_t)signalValues.getCount();
+                timelineSubmitInfo.pSignalSemaphoreValues = signalValues.getBuffer();
+                timelineSubmitInfo.waitSemaphoreValueCount = (uint32_t)waitValues.getCount();
+                timelineSubmitInfo.pWaitSemaphoreValues = waitValues.getBuffer();
             }
             submitInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.getCount();
             if (submitInfo.waitSemaphoreCount)
             {
                 submitInfo.pWaitSemaphores = waitSemaphores.getBuffer();
             }
-            submitInfo.signalSemaphoreCount = 1;
-            submitInfo.pSignalSemaphores = &signalSemaphore;
+            submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.getCount();
+            submitInfo.pSignalSemaphores = signalSemaphores.getBuffer();
 
             auto commandBufferImpl = static_cast<CommandBufferImpl*>(commandBuffers[0]);
             auto vkFence = commandBufferImpl->m_transientHeap->getCurrentFence();
             vkAPI.vkResetFences(vkAPI.m_device, 1, &vkFence);
             vkAPI.vkQueueSubmit(m_queue, 1, &submitInfo, vkFence);
-            m_pendingWaitSemaphores[0] = signalSemaphore;
+            m_pendingWaitSemaphores[0] = m_semaphore;
             m_pendingWaitSemaphores[1] = VK_NULL_HANDLE;
             commandBufferImpl->m_transientHeap->advanceFence();
+        }
 
-            m_currentSemaphoreIndex++;
-            m_currentSemaphoreIndex = m_currentSemaphoreIndex % kSemaphoreCount;
+        virtual SLANG_NO_THROW void SLANG_MCALL executeCommandBuffers(
+            uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
+        {
+            if (count == 0 && fence == nullptr)
+                return;
+            queueSubmitImpl(count, commandBuffers, fence, valueToSignal);
         }
     };
 
@@ -5377,6 +5501,13 @@ public:
         }
         virtual SLANG_NO_THROW Result SLANG_MCALL present() override
         {
+            // If there are pending fence wait operations, flush them as an
+            // empty vkQueueSubmit.
+            if (m_queue->m_pendingWaitFences.getCount() != 0)
+            {
+                m_queue->queueSubmitImpl(0, nullptr, nullptr, 0);
+            }
+
             uint32_t swapChainIndices[] = {uint32_t(m_currentImageIndex)};
 
             VkPresentInfoKHR presentInfo = {};
@@ -7850,6 +7981,36 @@ Result VKDevice::createQueryPool(
     SLANG_RETURN_ON_FAIL(result->init(desc, this));
     returnComPtr(outPool, result);
     return SLANG_OK;
+}
+
+Result VKDevice::createFence(const IFence::Desc& desc, IFence** outFence)
+{
+    RefPtr<FenceImpl> fence = new FenceImpl(this);
+    SLANG_RETURN_ON_FAIL(fence->init(desc));
+    returnComPtr(outFence, fence);
+    return SLANG_OK;
+}
+
+Result VKDevice::waitForFences(
+    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+{
+    ShortList<VkSemaphore> semaphores;
+    for (uint32_t i = 0; i < fenceCount; ++i)
+    {
+        auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
+        semaphores.add(fenceImpl->m_semaphore);
+    }
+    VkSemaphoreWaitInfo waitInfo;
+    waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    waitInfo.pNext = NULL;
+    waitInfo.flags = 0;
+    waitInfo.semaphoreCount = 1;
+    waitInfo.pSemaphores = semaphores.getArrayView().getBuffer();
+    waitInfo.pValues = fenceValues;
+    auto result = m_api.vkWaitSemaphores(m_api.m_device, &waitInfo, timeout);
+    if (result == VK_TIMEOUT)
+        return SLANG_E_TIME_OUT;
+    return result == VK_SUCCESS ? SLANG_OK : SLANG_FAIL;
 }
 
 } //  renderer_test

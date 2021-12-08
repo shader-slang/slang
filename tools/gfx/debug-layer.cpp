@@ -1483,10 +1483,26 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
     baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
 }
 
-void DebugCommandQueue::wait() { baseObject->wait(); }
+void DebugCommandQueue::waitOnHost()
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->waitOnHost();
+}
+
+Result DebugCommandQueue::waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+{
+    SLANG_GFX_API_FUNC;
+    List<IFence*> innerFences;
+    for (uint32_t i = 0; i < fenceCount; ++i)
+    {
+        innerFences.add(getInnerObj(fences[i]));
+    }
+    return baseObject->waitForFences(fenceCount, innerFences.getBuffer(), waitValues);
+}
 
 Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
 }
 

@@ -91,7 +91,7 @@ namespace gfx_test
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
-            queue->wait();
+            queue->waitOnHost();
         }
     }
 

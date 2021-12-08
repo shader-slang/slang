@@ -65,6 +65,13 @@ return gfx::StageType::TO
     }
 }
 
+IFence* FenceBase::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFence)
+        return static_cast<IFence*>(this);
+    return nullptr;
+}
+
 IResource* BufferResource::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResource ||

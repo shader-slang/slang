@@ -99,7 +99,7 @@ namespace gfx_test
 
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
-            queue->wait();
+            queue->waitOnHost();
         }
 
         compareComputeResult(

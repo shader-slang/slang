@@ -179,6 +179,12 @@ namespace gfx {
     x(vkCreateAccelerationStructureKHR) \
     x(vkDestroyAccelerationStructureKHR) \
     x(vkGetAccelerationStructureBuildSizesKHR) \
+    x(vkGetSemaphoreCounterValue) \
+    x(vkGetSemaphoreCounterValueKHR) \
+    x(vkSignalSemaphore) \
+    x(vkSignalSemaphoreKHR) \
+    x(vkWaitSemaphores) \
+    x(vkWaitSemaphoresKHR) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

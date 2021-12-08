@@ -1214,11 +1214,17 @@ public:
             }
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override
         {
             auto resultCode = cuStreamSynchronize(stream);
             if (resultCode != cudaSuccess)
                 SLANG_CUDA_HANDLE_ERROR(resultCode);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        {
+            return SLANG_FAIL;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
