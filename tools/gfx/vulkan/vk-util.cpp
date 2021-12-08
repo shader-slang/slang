@@ -148,21 +148,6 @@ VkShaderStageFlags VulkanUtil::getShaderStage(SlangStage stage)
     }
 }
 
-VkPipelineBindPoint VulkanUtil::getPipelineBindPoint(PipelineType pipelineType)
-{
-    switch (pipelineType)
-    {
-    case gfx::PipelineType::Graphics:
-        return VK_PIPELINE_BIND_POINT_GRAPHICS;
-    case gfx::PipelineType::Compute:
-        return VK_PIPELINE_BIND_POINT_COMPUTE;
-    case gfx::PipelineType::RayTracing:
-        return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
-    default:
-        return VkPipelineBindPoint(-1);
-    }
-}
-
 VkImageLayout VulkanUtil::getImageLayoutFromState(ResourceState state)
 {
     switch (state)

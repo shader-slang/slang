@@ -1008,6 +1008,15 @@ public:
     IQueryPool* getInterface(const Slang::Guid& guid);
 };
 
+enum class PipelineType
+{
+    Unknown,
+    Graphics,
+    Compute,
+    RayTracing,
+    CountOf,
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject

@@ -2061,7 +2061,6 @@ public:
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        PipelineType m_pipelineType;
         List<ShaderBinary> m_shaders;
         RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     };
@@ -5872,7 +5871,6 @@ Result D3D12Device::readBufferResource(
 Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
-    shaderProgram->m_pipelineType = desc.pipelineType;
     shaderProgram->slangProgram = desc.slangProgram;
     RootShaderObjectLayoutImpl::create(
         this,
