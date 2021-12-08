@@ -595,8 +595,8 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override { getRenderer()->waitForGpu(); }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+        uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
     {
         return SLANG_FAIL;
     }

@@ -1473,7 +1473,8 @@ void DebugCommandQueue::waitOnHost()
     baseObject->waitOnHost();
 }
 
-Result DebugCommandQueue::waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+Result DebugCommandQueue::waitForFenceValuesOnDevice(
+    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
 {
     SLANG_GFX_API_FUNC;
     List<IFence*> innerFences;
@@ -1481,7 +1482,7 @@ Result DebugCommandQueue::waitForFences(uint32_t fenceCount, IFence** fences, ui
     {
         innerFences.add(getInnerObj(fences[i]));
     }
-    return baseObject->waitForFences(fenceCount, innerFences.getBuffer(), waitValues);
+    return baseObject->waitForFenceValuesOnDevice(fenceCount, innerFences.getBuffer(), waitValues);
 }
 
 Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)

@@ -4952,8 +4952,8 @@ public:
             return m_desc;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
         {
             for (uint32_t i = 0; i < fenceCount; ++i)
             {

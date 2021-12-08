@@ -1734,8 +1734,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
 
-    /// Queue a device side wait for the given fences.
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
+    /// Queues a device side wait for the given fences.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFenceValuesOnDevice(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
