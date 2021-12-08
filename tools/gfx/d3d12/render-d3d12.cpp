@@ -4380,7 +4380,7 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
        if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
 
-       D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COPY_DEST | finalState;
+       D3D12_RESOURCE_STATES state = finalState;
 
        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, downloadResourceDesc, state, nullptr));
        return SLANG_OK;
@@ -5899,6 +5899,19 @@ Result D3D12Device::readBufferResource(
 
     D3D12Resource stageBuf;
     SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+
+    //D3D12_RESOURCE_TRANSITION_BARRIER transitionBarrier;
+    //transitionBarrier.pResource = resource;
+    //transitionBarrier.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+    //transitionBarrier.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE | D3D12_RESOURCE_STATE_RESOLVE_DEST;
+    //transitionBarrier.Subresource = 0;
+
+    //D3D12_RESOURCE_BARRIER barrier;
+    //barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    //barrier.Transition = transitionBarrier;
+    //barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    //encodeInfo.d3dCommandList->ResourceBarrier(1, &barrier);
 
     // Do the copy
     encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
