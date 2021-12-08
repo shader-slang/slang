@@ -60,6 +60,11 @@ public:
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
