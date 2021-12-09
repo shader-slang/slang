@@ -263,7 +263,6 @@ Result loadShaderProgram(gfx::IDevice* device, ComPtr<gfx::IShaderProgram>& outS
     SLANG_RETURN_ON_FAIL(result);
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.slangProgram = linkedProgram.get();
     auto shaderProgram = device->createProgram(programDesc);
     outShaderProgram = shaderProgram;

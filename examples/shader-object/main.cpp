@@ -120,7 +120,6 @@ Result loadShaderProgram(
     // We can create a `gfx::IShaderProgram` object from `composedProgram`
     // so it may be used by the graphics layer.
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.slangProgram = composedProgram.get();
 
     auto shaderProgram = device->createProgram(programDesc);
