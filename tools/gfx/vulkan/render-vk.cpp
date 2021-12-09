@@ -4093,12 +4093,19 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+                auto& api = *m_api;
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndirectCommand));
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -4108,12 +4115,24 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+                auto& api = *m_api;
+                api.vkCmdBindIndexBuffer(
+                    m_vkCommandBuffer,
+                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
+                    m_boundIndexBuffer.m_offset,
+                    m_boundIndexFormat);
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -4133,11 +4152,20 @@ public:
                 UInt startVertex,
                 UInt startInstanceLocation) override
             {
-                SLANG_UNUSED(vertexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startVertex);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawInstanced");
+                prepareDraw();
+                auto& api = *m_api;
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(vertexCount), static_cast<uint32_t>(instanceCount),
+                    static_cast<uint32_t>(startVertex), static_cast<uint32_t>(startInstanceLocation));
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -4147,12 +4175,25 @@ public:
                 int32_t baseVertexLocation,
                 uint32_t startInstanceLocation) override
             {
-                SLANG_UNUSED(indexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startIndexLocation);
-                SLANG_UNUSED(baseVertexLocation);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+                prepareDraw();
+                auto& api = *m_api;
+                api.vkCmdBindIndexBuffer(
+                    m_vkCommandBuffer,
+                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
+                    m_boundIndexBuffer.m_offset,
+                    m_boundIndexFormat);
+                // Bind the vertex buffer
+                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                {
+                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+
+                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+
+                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                }
+                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(indexCount), static_cast<uint32_t>(instanceCount),
+                    static_cast<uint32_t>(baseVertexLocation), static_cast<uint32_t>(startInstanceLocation));
             }
         };
 
