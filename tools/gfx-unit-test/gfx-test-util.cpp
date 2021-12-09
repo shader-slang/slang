@@ -105,7 +105,6 @@ namespace gfx_test
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
-        programDesc.pipelineType = gfx::PipelineType::Graphics;
         programDesc.slangProgram = composedProgram.get();
 
         auto shaderProgram = device->createProgram(programDesc);
