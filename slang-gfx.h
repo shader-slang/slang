@@ -53,15 +53,6 @@ class IInputLayout: public ISlangUnknown
         0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
     }
 
-enum class PipelineType
-{
-    Unknown,
-    Graphics,
-    Compute,
-    RayTracing,
-    CountOf,
-};
-
 enum class StageType
 {
     Unknown,
@@ -123,7 +114,6 @@ class IShaderProgram: public ISlangUnknown
 public:
     struct Desc
     {
-        PipelineType        pipelineType;
         slang::IComponentType*  slangProgram;
     };
 };

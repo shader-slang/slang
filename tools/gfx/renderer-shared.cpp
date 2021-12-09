@@ -752,7 +752,6 @@ Result RendererBase::maybeSpecializePipeline(
             ComPtr<IShaderProgram> specializedProgram;
             IShaderProgram::Desc specializedProgramDesc = {};
             specializedProgramDesc.slangProgram = specializedComponentType;
-            specializedProgramDesc.pipelineType = pipelineType;
             SLANG_RETURN_ON_FAIL(createProgram(specializedProgramDesc, specializedProgram.writeRef()));
 
             // Create specialized pipeline state.

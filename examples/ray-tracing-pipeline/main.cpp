@@ -155,9 +155,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 
 // Load and compile shader code from souce.
 gfx::Result loadShaderProgram(
-    gfx::IDevice*         device,
-    gfx::PipelineType pipelineType,
-    gfx::IShaderProgram**   outProgram)
+    gfx::IDevice* device, bool isRayTracingPipeline, gfx::IShaderProgram** outProgram)
 {
     ComPtr<slang::ISession> slangSession;
     slangSession = device->getSlangSession();
@@ -170,7 +168,7 @@ gfx::Result loadShaderProgram(
 
     Slang::List<slang::IComponentType*> componentTypes;
     componentTypes.add(module);
-    if (pipelineType == PipelineType::RayTracing)
+    if (isRayTracingPipeline)
     {
         ComPtr<slang::IEntryPoint> entryPoint;
         SLANG_RETURN_ON_FAIL(module->findEntryPointByName("rayGenShader", entryPoint.writeRef()));
@@ -203,7 +201,6 @@ gfx::Result loadShaderProgram(
     SLANG_RETURN_ON_FAIL(result);
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = pipelineType;
     programDesc.slangProgram = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
@@ -512,7 +509,7 @@ Slang::Result initialize()
         return SLANG_FAIL;
 
     ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, PipelineType::Graphics, shaderProgram.writeRef()));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, false, shaderProgram.writeRef()));
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
@@ -523,7 +520,7 @@ Slang::Result initialize()
 
     ComPtr<IShaderProgram> rayTracingProgram;
     SLANG_RETURN_ON_FAIL(
-        loadShaderProgram(gDevice, PipelineType::RayTracing, rayTracingProgram.writeRef()));
+        loadShaderProgram(gDevice, true, rayTracingProgram.writeRef()));
     RayTracingPipelineStateDesc rtpDesc = {};
     rtpDesc.program = rayTracingProgram;
     rtpDesc.hitGroupCount = 2;

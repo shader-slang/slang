@@ -181,7 +181,6 @@ gfx::Result loadShaderProgram(
     // program representation.
     //
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Graphics;
     programDesc.slangProgram = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 

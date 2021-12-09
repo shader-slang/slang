@@ -80,6 +80,13 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
+enum class PipelineType
+{
+    Graphics,
+    Compute,
+    RayTracing,
+};
+
 class RenderTestApp
 {
 public:
@@ -1227,25 +1234,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
         default:
             break;
-    }
-
-    switch( options.shaderType )
-    {
-    case Options::ShaderProgramType::Graphics:
-    case Options::ShaderProgramType::GraphicsCompute:
-        input.pipelineType = PipelineType::Graphics;
-        break;
-
-    case Options::ShaderProgramType::Compute:
-        input.pipelineType = PipelineType::Compute;
-        break;
-
-    case Options::ShaderProgramType::RayTracing:
-        input.pipelineType = PipelineType::RayTracing;
-        break;
-
-    default:
-        break;
     }
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)

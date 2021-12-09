@@ -2279,9 +2279,8 @@ public:
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        ShaderProgramImpl(VKDevice* device, PipelineType pipelineType)
+        ShaderProgramImpl(VKDevice* device)
             : m_device(device)
-            , m_pipelineType(pipelineType)
         {
             for (auto& shaderModule : m_modules)
                 shaderModule = VK_NULL_HANDLE;
@@ -2305,8 +2304,6 @@ public:
         }
 
         BreakableReference<VKDevice> m_device;
-
-        PipelineType m_pipelineType;
 
         Array<VkPipelineShaderStageCreateInfo, 8> m_stageCreateInfos;
         Array<ComPtr<ISlangBlob>, 8> m_codeBlobs; //< To keep storage of code in scope
@@ -4033,8 +4030,7 @@ public:
             void prepareDraw()
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-                if (!pipeline || static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())
-                                         ->m_pipelineType != PipelineType::Graphics)
+                if (!pipeline)
                 {
                     assert(!"Invalid render pipeline");
                     return;
@@ -4195,9 +4191,7 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-                if (!pipeline ||
-                    static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())->m_pipelineType !=
-                        PipelineType::Compute)
+                if (!pipeline)
                 {
                     assert(!"Invalid compute pipeline");
                     return;
@@ -7893,8 +7887,7 @@ static VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITe
 
 Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
-    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this, desc.pipelineType);
-    shaderProgram->m_pipelineType = desc.pipelineType;
+    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->slangProgram = desc.slangProgram;
     m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
 
