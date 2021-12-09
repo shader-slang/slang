@@ -1345,10 +1345,10 @@ public:
     };
     struct Desc
     {
-        IFramebufferLayout* framebufferLayout;
+        IFramebufferLayout* framebufferLayout = nullptr;
         uint32_t renderTargetCount;
-        AttachmentAccessDesc* renderTargetAccess;
-        AttachmentAccessDesc* depthStencilAccess;
+        AttachmentAccessDesc* renderTargetAccess = nullptr;
+        AttachmentAccessDesc* depthStencilAccess = nullptr;
     };
 };
 #define SLANG_UUID_IRenderPassLayout                                                   \
