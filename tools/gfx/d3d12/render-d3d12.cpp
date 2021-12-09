@@ -246,15 +246,8 @@ public:
             }
         }
 
+        int m_flag = -1;
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
-        D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
-
-        const D3D12Resource& uploadResource() {
-            if (m_desc.hasCpuAccessFlag(AccessFlag::Read) || m_desc.hasCpuAccessFlag(AccessFlag::Write)) {
-                return m_resource;
-            }
-            return m_uploadResource;
-        }
 
         D3D12_RESOURCE_STATES m_defaultState;
 
@@ -623,6 +616,7 @@ public:
     }
 
     static Result _uploadBufferData(
+        ID3D12Device* device,
         ID3D12GraphicsCommandList* cmdList,
         BufferResourceImpl* buffer,
         size_t offset,
@@ -634,13 +628,34 @@ public:
         readRange.End = offset + size;
 
         void* uploadData;
-        const D3D12Resource& uploadResource = buffer->uploadResource();
-        SLANG_RETURN_ON_FAIL(uploadResource.getResource()->Map(
+
+        D3D12Resource uploadResource;
+        if (!buffer->getDesc()->hasCpuAccessFlag(AccessFlag::Write)) {
+            D3D12_HEAP_PROPERTIES heapProps;
+            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+            heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+            heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+            heapProps.CreationNodeMask = 1;
+            heapProps.VisibleNodeMask = 1;
+
+            D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+
+            D3D12_RESOURCE_DESC desc;
+            _initBufferResourceDesc(size, desc);
+            desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+            SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(device, heapProps, flags, desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+        }
+
+        D3D12Resource& uploadResourceRef = (buffer->getDesc()->hasCpuAccessFlag(AccessFlag::Write)) ? buffer->m_resource : uploadResource;
+
+        SLANG_RETURN_ON_FAIL(uploadResourceRef.getResource()->Map(
             0, &readRange, reinterpret_cast<void**>(&uploadData)));
         memcpy((uint8_t*)uploadData + offset, data, size);
-        uploadResource.getResource()->Unmap(0, &readRange);
+        uploadResourceRef.getResource()->Unmap(0, &readRange);
 
-        if (uploadResource == buffer->m_resource) {
+        if (buffer->getDesc()->hasCpuAccessFlag(AccessFlag::Write)) {
+            // No need for the copy
             return SLANG_OK;
         }
 
@@ -2314,7 +2329,7 @@ public:
 
             SLANG_ASSERT(srcSize <= destSize);
 
-            _uploadBufferData(encoder->m_d3dCmdList, buffer, offset, srcSize, src);
+            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, buffer, offset, srcSize, src);
 
             // In the case where this object has any sub-objects of
             // existential/interface type, we need to recurse on those objects
@@ -3599,6 +3614,7 @@ public:
                 void* data) override
             {
                 _uploadBufferData(
+                    m_commandBuffer->m_renderer->m_device,
                     m_commandBuffer->m_cmdList,
                     static_cast<BufferResourceImpl*>(dst),
                     offset,
@@ -4065,11 +4081,10 @@ public:
         const D3D12_RESOURCE_DESC& resourceDesc,
         const void* srcData,
         size_t srcDataSize,
-        D3D12Resource& uploadResource,
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
         bool isShared,
-        AccessFlag::Enum access = AccessFlag::Enum::None);
+        AccessFlag::Enum access = AccessFlag::None);
 
     Result captureTextureToSurface(
         D3D12Resource& resource,
@@ -4356,108 +4371,83 @@ static void _initSrvDesc(
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, AccessFlag::Enum access)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, AccessFlag::Enum access)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
-   bool cpuVisible = (access != AccessFlag::None);
+   D3D12_HEAP_PROPERTIES heapProps;
+   heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+   heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+   heapProps.CreationNodeMask = 1;
+   heapProps.VisibleNodeMask = 1;
 
-   // If access is *only* read...
-   if (access == AccessFlag::Read) {
+   D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+   if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
 
-       assert(!srcData, "Initialized a read-only buffer with source data.");
+   D3D12_RESOURCE_DESC desc = resourceDesc;
 
-       D3D12_HEAP_PROPERTIES heapProps;
+   D3D12_RESOURCE_STATES initialState = finalState;
+
+   switch (access) {
+   case AccessFlag::Read:
+       assert(!srcData);
+
        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-       heapProps.CreationNodeMask = 1;
-       heapProps.VisibleNodeMask = 1;
+       desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       initialState |= D3D12_RESOURCE_STATE_COPY_DEST;
 
-       D3D12_RESOURCE_DESC downloadResourceDesc(resourceDesc);
-       downloadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       break;
+   case AccessFlag::Write:
 
-       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-       if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
-
-       D3D12_RESOURCE_STATES state = finalState;
-
-       SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, downloadResourceDesc, state, nullptr));
-       return SLANG_OK;
-   }
-
-   // If not CPU visible, create the dedicated GPU resource as well.
-   if (!cpuVisible) {
-       D3D12_HEAP_PROPERTIES heapProps;
-       heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-       heapProps.CreationNodeMask = 1;
-       heapProps.VisibleNodeMask = 1;
-
-       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-       if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
-
-       const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
-
-       SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
-   }
-
-
-   D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
-
-   {
-       D3D12_HEAP_PROPERTIES heapProps;
        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-       heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-       heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-       heapProps.CreationNodeMask = 1;
-       heapProps.VisibleNodeMask = 1;
+       desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       initialState |= D3D12_RESOURCE_STATE_GENERIC_READ;
 
-       D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
-       uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       break;
+   case AccessFlag::None:
+   default:
 
-       D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-       if (cpuVisible && isShared) flags |= D3D12_HEAP_FLAG_SHARED;
-
-       D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_GENERIC_READ;
-       if (cpuVisible) state |= finalState; // Up to programmer to know if this is compatible. Should we check?
-
-       SLANG_RETURN_ON_FAIL(upload.initCommitted(m_device, heapProps, flags, uploadResourceDesc, state, nullptr));
+       heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+       initialState = (srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState);
    }
 
-   // 1. Check for write flag. If write, create on upload heap.
-   // 2. Check for read flag. If read and not write, create on readback heap.
-   // 3. If not CPU visible flag, create on default heap.
-   // 4. It is reponsibility of the programmer to ensure that the state flags are
-   //    correct for their intended use case. We will add only the flags necessary
-   //    for the allocation (GENERIC_READ for upload, COPY_DEST for download).
-   // 5. If you did not create with CPU access flags, you cannot access this buffer from CPU.
-   // 6. If you created with write and want to read (or vice versa), you can but it will not
-   //    be as performant.
+   // Create the resource.
+   SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, desc, initialState, nullptr));
 
-    if (srcData)
-    {
+   if (srcData)
+   {
+       D3D12Resource uploadResource;
 
-        D3D12Resource& upload = cpuVisible ? resourceOut : uploadResource;
+       if (access == AccessFlag::None) {
+           // If the buffer is on the default heap, create upload buffer.
+           D3D12_RESOURCE_DESC uploadDesc;
+           _initBufferResourceDesc(bufferSize, uploadDesc);
 
-        // Copy data to the intermediate upload heap and then schedule a copy
-        // from the upload heap to the vertex buffer.
-        UINT8* dstData;
-        D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
+           heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
-        ID3D12Resource* dxUploadResource = upload.getResource();
+           SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+       }
 
-        SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
-        ::memcpy(dstData, srcData, srcDataSize);
-        dxUploadResource->Unmap(0, nullptr);
+       // Be careful not to actually copy a resource here.
+       D3D12Resource& uploadResourceRef = (access == AccessFlag::None) ? uploadResource : resourceOut;
 
-        if (!cpuVisible) {
-            auto encodeInfo = encodeResourceCommands();
-            encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
-            submitResourceCommandsAndWait(encodeInfo);
-        }
-    }
+       // Copy data to the intermediate upload heap and then schedule a copy
+       // from the upload heap to the vertex buffer.
+       UINT8* dstData;
+       D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
+
+       ID3D12Resource* dxUploadResource = uploadResourceRef.getResource();
+
+       SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
+       ::memcpy(dstData, srcData, srcDataSize);
+       dxUploadResource->Unmap(0, nullptr);
+
+       if (access == AccessFlag::None) {
+           auto encodeInfo = encodeResourceCommands();
+           encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
+           submitResourceCommandsAndWait(encodeInfo);
+       }
+   }
 
     return SLANG_OK;
 }
@@ -5334,8 +5324,11 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared,
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, initialState, buffer->m_resource, descIn.isShared,
         (AccessFlag::Enum)descIn.cpuAccessFlags));
+
+    // TODO: debugging.
+    buffer->m_flag = descIn.cpuAccessFlags;
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
@@ -5876,7 +5869,6 @@ Result D3D12Device::readBufferResource(
     size_t size,
     ISlangBlob** outBlob)
 {
-    auto encodeInfo = encodeResourceCommands();
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
@@ -5885,39 +5877,49 @@ Result D3D12Device::readBufferResource(
     // This will be slow!!! - it blocks CPU on GPU completion
     D3D12Resource& resource = buffer->m_resource;
 
-    // Readback heap
-    D3D12_HEAP_PROPERTIES heapProps;
-    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    // Resource to readback to
-    D3D12_RESOURCE_DESC stagingDesc;
-    _initBufferResourceDesc(size, stagingDesc);
-
     D3D12Resource stageBuf;
-    SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+    if (buffer->getDesc()->cpuAccessFlags != (int)AccessFlag::Read) {
+
+        auto encodeInfo = encodeResourceCommands();
 
 
-    //D3D12_RESOURCE_TRANSITION_BARRIER transitionBarrier;
-    //transitionBarrier.pResource = resource;
-    //transitionBarrier.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-    //transitionBarrier.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE | D3D12_RESOURCE_STATE_RESOLVE_DEST;
-    //transitionBarrier.Subresource = 0;
+        // Readback heap
+        D3D12_HEAP_PROPERTIES heapProps;
+        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
 
-    //D3D12_RESOURCE_BARRIER barrier;
-    //barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    //barrier.Transition = transitionBarrier;
-    //barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    //encodeInfo.d3dCommandList->ResourceBarrier(1, &barrier);
+        // Resource to readback to
+        D3D12_RESOURCE_DESC stagingDesc;
+        _initBufferResourceDesc(size, stagingDesc);
 
-    // Do the copy
-    encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
+        SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
 
-    // Wait until complete
-    submitResourceCommandsAndWait(encodeInfo);
+
+        //D3D12_RESOURCE_TRANSITION_BARRIER transitionBarrier;
+        //transitionBarrier.pResource = resource;
+        //transitionBarrier.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+        //transitionBarrier.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE | D3D12_RESOURCE_STATE_RESOLVE_DEST;
+        //transitionBarrier.Subresource = 0;
+
+        //D3D12_RESOURCE_BARRIER barrier;
+        //barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        //barrier.Transition = transitionBarrier;
+        //barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+        //encodeInfo.d3dCommandList->ResourceBarrier(1, &barrier);
+
+        // Do the copy
+        encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
+
+        // Wait until complete
+        submitResourceCommandsAndWait(encodeInfo);
+    }
+
+
+
+    D3D12Resource& stageBufRef = (buffer->getDesc()->cpuAccessFlags != (int)AccessFlag::Read) ? stageBuf : resource;
 
     // Map and copy
     RefPtr<ListBlob> blob = new ListBlob();
@@ -5925,13 +5927,13 @@ Result D3D12Device::readBufferResource(
         UINT8* data;
         D3D12_RANGE readRange = { 0, size };
 
-        SLANG_RETURN_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+        SLANG_RETURN_ON_FAIL(stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
         blob->m_data.setCount(size);
         ::memcpy(blob->m_data.getBuffer(), data, size);
 
-        stageBuf.getResource()->Unmap(0, nullptr);
+        stageBufRef.getResource()->Unmap(0, nullptr);
     }
     returnComPtr(outBlob, blob);
     return SLANG_OK;
