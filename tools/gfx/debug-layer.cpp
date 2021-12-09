@@ -370,6 +370,22 @@ Result DebugDevice::createTextureFromNativeHandle(
     return result;
 }
 
+Result DebugDevice::createTextureFromSharedHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    const size_t size,
+    ITextureResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
+    auto result = baseObject->createTextureFromSharedHandle(handle, srcDesc, size, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,
@@ -1275,6 +1291,18 @@ void DebugResourceCommandEncoder::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
     SLANG_GFX_API_FUNC;
+    switch (view->getViewDesc()->type)
+    {
+    case IResourceView::Type::DepthStencil:
+    case IResourceView::Type::RenderTarget:
+    case IResourceView::Type::UnorderedAccess:
+        break;
+    default:
+        GFX_DIAGNOSE_ERROR_FORMAT(
+            "Resource view %lld cannot be cleared. Only DepthStencil, "
+            "RenderTarget or UnorderedAccess views can be cleared.",
+            getDebugObj(view)->uid);
+    }
     baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
@@ -1473,7 +1501,8 @@ void DebugCommandQueue::waitOnHost()
     baseObject->waitOnHost();
 }
 
-Result DebugCommandQueue::waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+Result DebugCommandQueue::waitForFenceValuesOnDevice(
+    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
 {
     SLANG_GFX_API_FUNC;
     List<IFence*> innerFences;
@@ -1481,7 +1510,7 @@ Result DebugCommandQueue::waitForFences(uint32_t fenceCount, IFence** fences, ui
     {
         innerFences.add(getInnerObj(fences[i]));
     }
-    return baseObject->waitForFences(fenceCount, innerFences.getBuffer(), waitValues);
+    return baseObject->waitForFenceValuesOnDevice(fenceCount, innerFences.getBuffer(), waitValues);
 }
 
 Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)

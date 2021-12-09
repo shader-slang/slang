@@ -57,13 +57,26 @@ namespace gfx_test
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
-        programDesc.pipelineType = gfx::PipelineType::Compute;
         programDesc.slangProgram = composedProgram.get();
 
         auto shaderProgram = device->createProgram(programDesc);
 
         outShaderProgram = shaderProgram;
         return SLANG_OK;
+    }
+
+    void compareComputeResult(gfx::IDevice* device, gfx::ITextureResource* texture, gfx::ResourceState state, float* expectedResult, size_t expectedBufferSize)
+    {
+        // Read back the results.
+        ComPtr<ISlangBlob> resultBlob;
+        size_t rowPitch = 0;
+        size_t pixelSize = 0;
+        GFX_CHECK_CALL_ABORT(device->readTextureResource(
+            texture, state, resultBlob.writeRef(), &rowPitch, &pixelSize));
+        SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
+        auto result = (float*)resultBlob->getBufferPointer();
+        // Compare results.
+        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
     }
 
     void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)

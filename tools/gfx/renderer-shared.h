@@ -1008,6 +1008,15 @@ public:
     IQueryPool* getInterface(const Slang::Guid& guid);
 };
 
+enum class PipelineType
+{
+    Unknown,
+    Graphics,
+    Compute,
+    RayTracing,
+    CountOf,
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject
@@ -1204,6 +1213,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
         ITextureResource** outResource) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(

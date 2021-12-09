@@ -42,6 +42,8 @@ typedef SlangInt Int;
 typedef SlangUInt UInt;
 typedef uint64_t DeviceAddress;
 
+const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
+
 // Declare opaque type
 class IInputLayout: public ISlangUnknown
 {
@@ -50,15 +52,6 @@ class IInputLayout: public ISlangUnknown
     {                                                                                  \
         0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
     }
-
-enum class PipelineType
-{
-    Unknown,
-    Graphics,
-    Compute,
-    RayTracing,
-    CountOf,
-};
 
 enum class StageType
 {
@@ -121,7 +114,6 @@ class IShaderProgram: public ISlangUnknown
 public:
     struct Desc
     {
-        PipelineType        pipelineType;
         slang::IComponentType*  slangProgram;
     };
 };
@@ -1733,8 +1725,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
 
-    /// Queue a device side wait for the given fences.
-    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
+    /// Queues a device side wait for the given fences.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        waitForFenceValuesOnDevice(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
 #define SLANG_UUID_ICommandQueue                                                    \
     {                                                                               \
@@ -1953,6 +1946,12 @@ public:
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) = 0;
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
+        ITextureResource** outResource) = 0;
+
         /// Create a buffer resource
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
@@ -2153,6 +2152,8 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createFence(const IFence::Desc& desc, IFence** outFence) = 0;
 
+    /// Wait on the host for the fences to signals.
+    /// `timeout` is in nanoseconds, can be set to `kTimeoutInfinite`.
     virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
         uint32_t fenceCount,
         IFence** fences,

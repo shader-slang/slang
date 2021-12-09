@@ -314,11 +314,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
             ComPtr<ID3D12Device> pDevice;
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
-            outHandle->api = InteropHandleAPI::Win32;
+            outHandle->api = InteropHandleAPI::D3D12;
             return SLANG_OK;
         }
     };
@@ -2081,7 +2089,6 @@ public:
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        PipelineType m_pipelineType;
         List<ShaderBinary> m_shaders;
         RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     };
@@ -3682,10 +3689,88 @@ public:
                 ClearValue* clearValue,
                 ClearResourceViewFlags::Enum flags) override
             {
-                SLANG_UNUSED(view);
-                SLANG_UNUSED(clearValue);
-                SLANG_UNUSED(flags);
-                SLANG_UNIMPLEMENTED_X("clearResourceView");
+                auto viewImpl = static_cast<ResourceViewImpl*>(view);
+                switch (view->getViewDesc()->type)
+                {
+                case IResourceView::Type::RenderTarget:
+                    m_commandBuffer->m_cmdList->ClearRenderTargetView(
+                        viewImpl->m_descriptor.cpuHandle,
+                        clearValue->color.floatValues,
+                        0,
+                        nullptr);
+                    break;
+                case IResourceView::Type::DepthStencil:
+                    {
+                        D3D12_CLEAR_FLAGS clearFlags = (D3D12_CLEAR_FLAGS)0;
+                        if (flags & ClearResourceViewFlags::ClearDepth)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_DEPTH;
+                        }
+                        if (flags & ClearResourceViewFlags::ClearStencil)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+                        }
+                        m_commandBuffer->m_cmdList->ClearDepthStencilView(
+                            viewImpl->m_descriptor.cpuHandle,
+                            clearFlags,
+                            clearValue->depthStencil.depth,
+                            (UINT8)clearValue->depthStencil.stencil,
+                            0,
+                            nullptr);
+                        break;
+                    }
+                case IResourceView::Type::UnorderedAccess:
+                    {
+                        ID3D12Resource* d3dResource = nullptr;
+                        switch (viewImpl->m_resource->getType())
+                        {
+                        case IResource::Type::Buffer:
+                            d3dResource =
+                                static_cast<BufferResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        default:
+                            d3dResource =
+                                static_cast<TextureResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        }
+                        auto gpuHandleIndex =
+                            m_commandBuffer->m_transientHeap->m_viewHeap.allocate(1);
+                        this->m_commandBuffer->m_renderer->m_device->CopyDescriptorsSimple(
+                            1,
+                            m_commandBuffer->m_transientHeap->m_viewHeap.getCpuHandle(
+                                gpuHandleIndex),
+                            viewImpl->m_descriptor.cpuHandle,
+                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+                        if (flags & ClearResourceViewFlags::FloatClearValues)
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewFloat(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.floatValues,
+                                0,
+                                nullptr);
+                        }
+                        else
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewUint(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.uintValues,
+                                0,
+                                nullptr);
+                        }
+                        break;
+                    }
+                default:
+                    break;
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
@@ -3968,13 +4053,15 @@ public:
             WaitForSingleObject(globalWaitHandle, INFINITE);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
         {
             for (uint32_t i = 0; i < fenceCount; ++i)
             {
                 auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
-                m_d3dQueue->Wait(fenceImpl->m_fence.get(), waitValues[i]);
+                m_d3dQueue->Wait(
+                    fenceImpl->m_fence.get(),
+                    waitValues[i]);
             }
             return SLANG_OK;
         }
@@ -5086,7 +5173,7 @@ Result D3D12Device::getTextureAllocationInfo(
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
-    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
+    auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
     *outSize = (size_t)allocInfo.SizeInBytes;
     *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
@@ -5116,6 +5203,9 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (descIn.isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         D3D12_CLEAR_VALUE clearValue;
         D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
@@ -5130,7 +5220,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
-            D3D12_HEAP_FLAG_NONE,
+            flags,
             resourceDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             clearValuePtr));
@@ -5942,7 +6032,6 @@ Result D3D12Device::readBufferResource(
 Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
-    shaderProgram->m_pipelineType = desc.pipelineType;
     shaderProgram->slangProgram = desc.slangProgram;
     RootShaderObjectLayoutImpl::create(
         this,
@@ -6377,14 +6466,18 @@ Result D3D12Device::createFence(const IFence::Desc& desc, IFence** outFence)
 Result D3D12Device::waitForFences(
     uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
 {
-    List<HANDLE> waitHandles;
+    ShortList<HANDLE> waitHandles;
     for (uint32_t i = 0; i < fenceCount; ++i)
     {
         auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
         waitHandles.add(fenceImpl->getWaitEvent());
         SLANG_RETURN_ON_FAIL(fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
     }
-    auto result = WaitForMultipleObjects(fenceCount, waitHandles.getBuffer(), waitForAll ? TRUE : FALSE, (DWORD)timeout);
+    auto result = WaitForMultipleObjects(
+        fenceCount,
+        waitHandles.getArrayView().getBuffer(),
+        waitForAll ? TRUE : FALSE,
+        timeout == kTimeoutInfinite ? INFINITE : (DWORD)(timeout / 1000000));
     if (result == WAIT_TIMEOUT)
         return SLANG_E_TIME_OUT;
     return result == WAIT_FAILED ? SLANG_FAIL : SLANG_OK;

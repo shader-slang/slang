@@ -73,7 +73,6 @@ ComPtr<gfx::IShaderProgram> loadComputeProgram(slang::IModule* slangModule, char
     gGPUPrinting.loadStrings(linkedProgram->getLayout());
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.slangProgram = linkedProgram;
 
     auto shaderProgram = gDevice->createProgram(programDesc);

@@ -60,6 +60,11 @@ public:
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
@@ -561,8 +566,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override;
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+        uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };
 

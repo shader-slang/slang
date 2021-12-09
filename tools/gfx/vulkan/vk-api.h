@@ -79,6 +79,9 @@ namespace gfx {
     \
     x(vkCmdBindPipeline) \
     x(vkCmdClearAttachments) \
+    x(vkCmdClearColorImage) \
+    x(vkCmdClearDepthStencilImage) \
+    x(vkCmdFillBuffer) \
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
     x(vkCmdDraw) \

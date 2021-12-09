@@ -57,14 +57,12 @@ struct ShaderCompilerUtil
         SlangCompileTarget          target;
         SlangSourceLanguage         sourceLanguage;
         SlangPassThrough            passThrough;
-        PipelineType                pipelineType = PipelineType::Unknown;
         Slang::String               profile;
     };
 
     struct Output
     {
         void set(
-            PipelineType                        pipelineType,
             slang::IComponentType*              slangProgram);
         void reset();
         ~Output()
