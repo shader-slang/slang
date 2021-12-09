@@ -238,13 +238,6 @@ public:
         Buffer m_buffer;
         Buffer m_uploadBuffer;
 
-        const Buffer& uploadBuffer() {
-            if (m_desc.hasCpuAccessFlag(AccessFlag::Write) || m_desc.hasCpuAccessFlag(AccessFlag::Read)) {
-                return m_buffer;
-            }
-            return m_uploadBuffer;
-        }
-
         virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
         {
             if (!m_buffer.m_api->vkGetBufferDeviceAddress)
@@ -388,6 +381,12 @@ public:
                 vkAPI.vkFreeMemory(vkAPI.m_device, m_imageMemory, nullptr);
                 vkAPI.vkDestroyImage(vkAPI.m_device, m_image, nullptr);
             }
+            if (sharedHandle.handleValue != 0)
+            {
+#if SLANG_WINDOWS_FAMILY
+                CloseHandle((HANDLE)sharedHandle.handleValue);
+#endif
+            }
         }
 
         VkImage m_image = VK_NULL_HANDLE;
@@ -405,8 +404,31 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
+#if SLANG_WINDOWS_FAMILY
+            VkMemoryGetWin32HandleInfoKHR info = {};
+            info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+            info.pNext = nullptr;
+            info.memory = m_imageMemory;
+            info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+
+            auto& api = m_device->m_api;
+            PFN_vkGetMemoryWin32HandleKHR vkCreateSharedHandle;
+            vkCreateSharedHandle = api.vkGetMemoryWin32HandleKHR;
+            if (!vkCreateSharedHandle)
+            {
+                return SLANG_FAIL;
+            }
+            SLANG_RETURN_ON_FAIL(vkCreateSharedHandle(m_device->m_device, &info, (HANDLE*)&outHandle->handleValue) != VK_SUCCESS);
+#endif
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = 0;
             return SLANG_OK;
         }
     };
@@ -2257,9 +2279,8 @@ public:
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        ShaderProgramImpl(VKDevice* device, PipelineType pipelineType)
+        ShaderProgramImpl(VKDevice* device)
             : m_device(device)
-            , m_pipelineType(pipelineType)
         {
             for (auto& shaderModule : m_modules)
                 shaderModule = VK_NULL_HANDLE;
@@ -2283,8 +2304,6 @@ public:
         }
 
         BreakableReference<VKDevice> m_device;
-
-        PipelineType m_pipelineType;
 
         Array<VkPipelineShaderStageCreateInfo, 8> m_stageCreateInfos;
         Array<ComPtr<ISlangBlob>, 8> m_codeBlobs; //< To keep storage of code in scope
@@ -2338,19 +2357,13 @@ public:
         {
             auto& api = buffer->m_renderer->m_api;
 
-            const Buffer& uploadBuffer = buffer->uploadBuffer();
-
-            assert(uploadBuffer.isInitialized());
+            assert(buffer->m_uploadBuffer.isInitialized());
 
             void* mappedData = nullptr;
             SLANG_VK_CHECK(api.vkMapMemory(
-                api.m_device, uploadBuffer.m_memory, offset, size, 0, &mappedData));
+                api.m_device, buffer->m_uploadBuffer.m_memory, offset, size, 0, &mappedData));
             memcpy(mappedData, data, size);
-            api.vkUnmapMemory(api.m_device, uploadBuffer.m_memory);
-
-            if (uploadBuffer.m_buffer == buffer->m_buffer.m_buffer) {
-                return;
-            }
+            api.vkUnmapMemory(api.m_device, buffer->m_uploadBuffer.m_memory);
 
             // Copy from staging buffer to real buffer
             VkBufferCopy copyInfo = {};
@@ -4017,8 +4030,7 @@ public:
             void prepareDraw()
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-                if (!pipeline || static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())
-                                         ->m_pipelineType != PipelineType::Graphics)
+                if (!pipeline)
                 {
                     assert(!"Invalid render pipeline");
                     return;
@@ -4179,9 +4191,7 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchCompute(int x, int y, int z) override
             {
                 auto pipeline = static_cast<PipelineStateImpl*>(m_currentPipeline.Ptr());
-                if (!pipeline ||
-                    static_cast<ShaderProgramImpl*>(pipeline->m_program.Ptr())->m_pipelineType !=
-                        PipelineType::Compute)
+                if (!pipeline)
                 {
                     assert(!"Invalid compute pipeline");
                     return;
@@ -4515,15 +4525,213 @@ public:
                 SLANG_UNIMPLEMENTED_X("uploadTextureData");
             }
 
+            void _clearColorImage(TextureResourceViewImpl* viewImpl, ClearValue* clearValue)
+            {
+                auto& api = m_commandBuffer->m_renderer->m_api;
+                auto layout = viewImpl->m_layout;
+                if (layout != VK_IMAGE_LAYOUT_GENERAL &&
+                    layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+                {
+                    layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    m_commandBuffer->m_renderer->_transitionImageLayout(
+                        m_commandBuffer->m_commandBuffer,
+                        viewImpl->m_texture->m_image,
+                        viewImpl->m_texture->m_vkformat,
+                        *viewImpl->m_texture->getDesc(),
+                        viewImpl->m_layout,
+                        layout);
+                }
+
+                VkImageSubresourceRange subresourceRange = {};
+                subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                subresourceRange.baseArrayLayer = viewImpl->m_desc.renderTarget.arrayIndex;
+                subresourceRange.baseMipLevel = viewImpl->m_desc.renderTarget.mipSlice;
+                subresourceRange.layerCount = 1;
+                subresourceRange.levelCount = 1;
+
+                VkClearColorValue vkClearColor = {};
+                memcpy(vkClearColor.float32, clearValue->color.floatValues, sizeof(float) * 4);
+
+                api.vkCmdClearColorImage(
+                    m_commandBuffer->m_commandBuffer,
+                    viewImpl->m_texture->m_image,
+                    layout,
+                    &vkClearColor,
+                    1,
+                    &subresourceRange);
+
+                if (layout != viewImpl->m_layout)
+                {
+                    m_commandBuffer->m_renderer->_transitionImageLayout(
+                        m_commandBuffer->m_commandBuffer,
+                        viewImpl->m_texture->m_image,
+                        viewImpl->m_texture->m_vkformat,
+                        *viewImpl->m_texture->getDesc(),
+                        layout,
+                        viewImpl->m_layout);
+                }
+            }
+
+            void _clearDepthImage(
+                TextureResourceViewImpl* viewImpl,
+                ClearValue* clearValue,
+                ClearResourceViewFlags::Enum flags)
+            {
+                auto& api = m_commandBuffer->m_renderer->m_api;
+                auto layout = viewImpl->m_layout;
+                if (layout != VK_IMAGE_LAYOUT_GENERAL &&
+                    layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+                {
+                    layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+                    m_commandBuffer->m_renderer->_transitionImageLayout(
+                        m_commandBuffer->m_commandBuffer,
+                        viewImpl->m_texture->m_image,
+                        viewImpl->m_texture->m_vkformat,
+                        *viewImpl->m_texture->getDesc(),
+                        viewImpl->m_layout,
+                        layout);
+                }
+
+                VkImageSubresourceRange subresourceRange = {};
+                if (flags & ClearResourceViewFlags::ClearDepth)
+                    subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+                if (flags & ClearResourceViewFlags::ClearStencil)
+                    subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+                subresourceRange.baseArrayLayer = viewImpl->m_desc.renderTarget.arrayIndex;
+                subresourceRange.baseMipLevel = viewImpl->m_desc.renderTarget.mipSlice;
+                subresourceRange.layerCount = 1;
+                subresourceRange.levelCount = 1;
+
+                VkClearDepthStencilValue vkClearValue = {};
+                vkClearValue.depth = clearValue->depthStencil.depth;
+                vkClearValue.stencil = clearValue->depthStencil.stencil;
+
+                api.vkCmdClearDepthStencilImage(
+                    m_commandBuffer->m_commandBuffer,
+                    viewImpl->m_texture->m_image,
+                    layout,
+                    &vkClearValue,
+                    1,
+                    &subresourceRange);
+
+                if (layout != viewImpl->m_layout)
+                {
+                    m_commandBuffer->m_renderer->_transitionImageLayout(
+                        m_commandBuffer->m_commandBuffer,
+                        viewImpl->m_texture->m_image,
+                        viewImpl->m_texture->m_vkformat,
+                        *viewImpl->m_texture->getDesc(),
+                        layout,
+                        viewImpl->m_layout);
+                }
+            }
+
+            void _clearBuffer(VkBuffer buffer, uint64_t bufferSize, const IResourceView::Desc& desc, uint32_t clearValue)
+            {
+                auto& api = m_commandBuffer->m_renderer->m_api;
+
+                FormatInfo info = {};
+                gfxGetFormatInfo(desc.format, &info);
+                auto texelSize = info.blockSizeInBytes;
+                auto elementCount = desc.bufferRange.elementCount;
+                auto clearStart = (uint64_t)desc.bufferRange.firstElement * texelSize;
+                auto clearSize = bufferSize - clearStart;
+                if (elementCount != 0)
+                {
+                    clearSize = (uint64_t)elementCount * texelSize;
+                }
+                api.vkCmdFillBuffer(
+                    m_commandBuffer->m_commandBuffer,
+                    buffer,
+                    clearStart,
+                    clearSize,
+                    clearValue);
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
                 IResourceView* view,
                 ClearValue* clearValue,
                 ClearResourceViewFlags::Enum flags) override
             {
-                SLANG_UNUSED(view);
-                SLANG_UNUSED(clearValue);
-                SLANG_UNUSED(flags);
-                SLANG_UNIMPLEMENTED_X("clearResourceView");
+                auto& api = m_commandBuffer->m_renderer->m_api;
+                switch (view->getViewDesc()->type)
+                {
+                case IResourceView::Type::RenderTarget:
+                    {
+                        auto viewImpl = static_cast<TextureResourceViewImpl*>(view);
+                        _clearColorImage(viewImpl, clearValue);
+                    }
+                    break;
+                case IResourceView::Type::DepthStencil:
+                    {
+                        auto viewImpl = static_cast<TextureResourceViewImpl*>(view);
+                        _clearDepthImage(viewImpl, clearValue, flags);
+                    }
+                    break;
+                case IResourceView::Type::UnorderedAccess:
+                    {
+                        auto viewImplBase = static_cast<ResourceViewImpl*>(view);
+                        switch (viewImplBase->m_type)
+                        {
+                        case ResourceViewImpl::ViewType::Texture:
+                            {
+                            auto viewImpl = static_cast<TextureResourceViewImpl*>(viewImplBase);
+                            if ((flags & ClearResourceViewFlags::ClearDepth) ||
+                                (flags & ClearResourceViewFlags::ClearStencil))
+                            {
+                                _clearDepthImage(viewImpl, clearValue, flags);
+                            }
+                            else
+                            {
+                                _clearColorImage(viewImpl, clearValue);
+                            }
+                            }
+                            break;
+                        case ResourceViewImpl::ViewType::PlainBuffer:
+                            {
+                                assert(
+                                    clearValue->color.uintValues[1] ==
+                                        clearValue->color.uintValues[0] &&
+                                    clearValue->color.uintValues[2] ==
+                                        clearValue->color.uintValues[0] &&
+                                    clearValue->color.uintValues[3] ==
+                                        clearValue->color.uintValues[0]);
+                                auto viewImpl =
+                                    static_cast<PlainBufferResourceViewImpl*>(viewImplBase);
+                                uint64_t clearStart = viewImpl->m_desc.bufferRange.firstElement;
+                                uint64_t clearSize = viewImpl->m_desc.bufferRange.elementCount;
+                                if (clearSize == 0)
+                                    clearSize = viewImpl->m_buffer->getDesc()->sizeInBytes - clearStart;
+                                api.vkCmdFillBuffer(
+                                    m_commandBuffer->m_commandBuffer,
+                                    viewImpl->m_buffer->m_buffer.m_buffer,
+                                    clearStart,
+                                    clearSize,
+                                    clearValue->color.uintValues[0]);
+                            }
+                            break;
+                        case ResourceViewImpl::ViewType::TexelBuffer:
+                            {
+                                assert(
+                                    clearValue->color.uintValues[1] ==
+                                        clearValue->color.uintValues[0] &&
+                                    clearValue->color.uintValues[2] ==
+                                        clearValue->color.uintValues[0] &&
+                                    clearValue->color.uintValues[3] ==
+                                        clearValue->color.uintValues[0]);
+                                auto viewImpl =
+                                    static_cast<TexelBufferResourceViewImpl*>(viewImplBase);
+                                _clearBuffer(
+                                    viewImpl->m_buffer->m_buffer.m_buffer,
+                                    viewImpl->m_buffer->getDesc()->sizeInBytes,
+                                    viewImpl->m_desc,
+                                    clearValue->color.uintValues[0]);
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
@@ -4965,8 +5173,8 @@ public:
             return m_desc;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            waitForFences(uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
         {
             for (uint32_t i = 0; i < fenceCount; ++i)
             {
@@ -5558,6 +5766,13 @@ public:
         size_t location, int32_t msgCode, const char* pLayerPrefix, const char* pMsg, void* pUserData);
 
     void _transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void _transitionImageLayout(
+        VkCommandBuffer commandBuffer,
+        VkImage image,
+        VkFormat format,
+        const TextureResource::Desc& desc,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout);
 
     uint32_t getQueueFamilyIndex(ICommandQueue::QueueType queueType)
     {
@@ -5725,7 +5940,7 @@ Result VKDevice::Buffer::init(
         exportMemoryAllocateInfo.pNext =
             extMemHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
             ? &exportMemoryWin32HandleInfo
-            : NULL;
+            : nullptr;
         exportMemoryAllocateInfo.handleTypes = extMemHandleType;
         allocateInfo.pNext = &exportMemoryAllocateInfo;
     }
@@ -6714,7 +6929,13 @@ static VkImageUsageFlags _calcImageUsageFlags(
     return usage;
 }
 
-void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const TextureResource::Desc& desc, VkImageLayout oldLayout, VkImageLayout newLayout)
+void VKDevice::_transitionImageLayout(
+    VkCommandBuffer commandBuffer,
+    VkImage image,
+    VkFormat format,
+    const TextureResource::Desc& desc,
+    VkImageLayout oldLayout,
+    VkImageLayout newLayout)
 {
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -6747,7 +6968,9 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     }
-    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    else if (
+        oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+        newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -6796,8 +7019,7 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         sourceStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     }
-    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
-            newLayout == VK_IMAGE_LAYOUT_GENERAL)
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
     {
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
@@ -6805,7 +7027,8 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         destinationStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     }
-    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
+    else if (
+        oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_GENERAL)
     {
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
@@ -6819,9 +7042,19 @@ void VKDevice::_transitionImageLayout(VkImage image, VkFormat format, const Text
         return;
     }
 
-    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    m_api.vkCmdPipelineBarrier(
+        commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+}
 
-    m_api.vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+void VKDevice::_transitionImageLayout(
+        VkImage image,
+        VkFormat format,
+        const TextureResource::Desc& desc,
+        VkImageLayout oldLayout,
+        VkImageLayout newLayout)
+{
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    _transitionImageLayout(commandBuffer, image, format, desc, oldLayout, newLayout);
 }
 
 size_t calcRowSize(Format format, int width)
@@ -6934,78 +7167,99 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(desc, this));
     texture->m_vkformat = format;
     // Create the image
+
+    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    switch (desc.type)
     {
-        VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-        switch (desc.type)
+        case IResource::Type::Texture1D:
         {
-            case IResource::Type::Texture1D:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_1D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
-                break;
-            }
-            case IResource::Type::Texture2D:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_2D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
-                break;
-            }
-            case IResource::Type::TextureCube:
-            {
-                imageInfo.imageType = VK_IMAGE_TYPE_2D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
-                imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-                break;
-            }
-            case IResource::Type::Texture3D:
-            {
-                // Can't have an array and 3d texture
-                assert(desc.arraySize <= 1);
-
-                imageInfo.imageType = VK_IMAGE_TYPE_3D;
-                imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
-                break;
-            }
-            default:
-            {
-                assert(!"Unhandled type");
-                return SLANG_FAIL;
-            }
+            imageInfo.imageType = VK_IMAGE_TYPE_1D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), 1, 1 };
+            break;
         }
+        case IResource::Type::Texture2D:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+            break;
+        }
+        case IResource::Type::TextureCube:
+        {
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), 1 };
+            imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+            break;
+        }
+        case IResource::Type::Texture3D:
+        {
+            // Can't have an array and 3d texture
+            assert(desc.arraySize <= 1);
 
-        imageInfo.mipLevels = desc.numMipLevels;
-        imageInfo.arrayLayers = arraySize;
-
-        imageInfo.format = format;
-
-        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
-        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        
-        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-
-        SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
+            imageInfo.imageType = VK_IMAGE_TYPE_3D;
+            imageInfo.extent = VkExtent3D{ uint32_t(descIn.size.width), uint32_t(descIn.size.height), uint32_t(descIn.size.depth) };
+            break;
+        }
+        default:
+        {
+            assert(!"Unhandled type");
+            return SLANG_FAIL;
+        }
     }
+
+    imageInfo.mipLevels = desc.numMipLevels;
+    imageInfo.arrayLayers = arraySize;
+
+    imageInfo.format = format;
+
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO };
+#if SLANG_WINDOWS_FAMILY
+    VkExternalMemoryHandleTypeFlags extMemoryHandleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    if (descIn.isShared)
+    {
+        externalMemoryImageCreateInfo.pNext = nullptr;
+        externalMemoryImageCreateInfo.handleTypes = extMemoryHandleType;
+        imageInfo.pNext = &externalMemoryImageCreateInfo;
+    }
+#endif
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &texture->m_image));
 
     VkMemoryRequirements memRequirements;
     m_api.vkGetImageMemoryRequirements(m_device, texture->m_image, &memRequirements);
 
     // Allocate the memory
+    VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
+    assert(memoryTypeIndex >= 0);
+
+    VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
+    VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+#if SLANG_WINDOWS_FAMILY
+    VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
+    VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = { VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
+    if (descIn.isShared)
     {
-        VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        exportMemoryWin32HandleInfo.pNext = nullptr;
+        exportMemoryWin32HandleInfo.pAttributes = nullptr;
+        exportMemoryWin32HandleInfo.dwAccess = DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE;
+        exportMemoryWin32HandleInfo.name = NULL;
 
-        VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-
-        int memoryTypeIndex = m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
-        assert(memoryTypeIndex >= 0);
-
-        VkMemoryPropertyFlags actualMemoryProperites = m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-
-        allocInfo.allocationSize = memRequirements.size;
-        allocInfo.memoryTypeIndex = memoryTypeIndex;
-
-        SLANG_VK_RETURN_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
+        exportMemoryAllocateInfo.pNext =
+            extMemoryHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
+            ? &exportMemoryWin32HandleInfo
+            : nullptr;
+        exportMemoryAllocateInfo.handleTypes = extMemoryHandleType;
+        allocInfo.pNext = &exportMemoryAllocateInfo;
     }
+#endif
+    SLANG_VK_RETURN_ON_FAIL(m_api.vkAllocateMemory(m_device, &allocInfo, nullptr, &texture->m_imageMemory));
 
     // Bind the memory to the image
     m_api.vkBindImageMemory(m_device, texture->m_image, texture->m_imageMemory, 0);
@@ -7163,7 +7417,6 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
 Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const void* initData, IBufferResource** outResource)
 {
     BufferResource::Desc desc = fixupBufferDesc(descIn);
-    bool cpuVisible = (descIn.hasCpuAccessFlag(AccessFlag::Write) || descIn.hasCpuAccessFlag(AccessFlag::Read));
 
     const size_t bufferSize = desc.sizeInBytes;
 
@@ -7179,7 +7432,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
     {
         usage |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
     }
-    if (initData && !cpuVisible)
+    if (initData)
     {
         usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     }
@@ -7199,31 +7452,29 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if (((reqMemoryProperties & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) == 0) && initData)
+    if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
 
     if (initData)
     {
-        Buffer& copyBuffer = cpuVisible ? buffer->m_buffer : buffer->m_uploadBuffer;
-
+        // TODO: only create staging buffer if the memory type
+        // used for the buffer doesn't let us fill things in
+        // directly.
         // Copy into staging buffer
         void* mappedData = nullptr;
-
-        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, copyBuffer.m_memory, 0, bufferSize, 0, &mappedData));
+        SLANG_VK_CHECK(m_api.vkMapMemory(m_device, buffer->m_uploadBuffer.m_memory, 0, bufferSize, 0, &mappedData));
         ::memcpy(mappedData, initData, bufferSize);
-        m_api.vkUnmapMemory(m_device, copyBuffer.m_memory);
+        m_api.vkUnmapMemory(m_device, buffer->m_uploadBuffer.m_memory);
 
-        if (!cpuVisible) {
-            // Copy from staging buffer to real buffer (if they are different).
-            VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+        // Copy from staging buffer to real buffer
+        VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
 
-            VkBufferCopy copyInfo = {};
-            copyInfo.size = bufferSize;
-            m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
-            m_deviceQueue.flush();
-        }
+        VkBufferCopy copyInfo = {};
+        copyInfo.size = bufferSize;
+        m_api.vkCmdCopyBuffer(commandBuffer, buffer->m_uploadBuffer.m_buffer, buffer->m_buffer.m_buffer, 1, &copyInfo);
+        m_deviceQueue.flush();
     }
 
     returnComPtr(outResource, buffer);
@@ -7636,8 +7887,7 @@ static VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITe
 
 Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
-    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this, desc.pipelineType);
-    shaderProgram->m_pipelineType = desc.pipelineType;
+    RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->slangProgram = desc.slangProgram;
     m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
 
