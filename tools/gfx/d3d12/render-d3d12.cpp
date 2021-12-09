@@ -3661,10 +3661,88 @@ public:
                 ClearValue* clearValue,
                 ClearResourceViewFlags::Enum flags) override
             {
-                SLANG_UNUSED(view);
-                SLANG_UNUSED(clearValue);
-                SLANG_UNUSED(flags);
-                SLANG_UNIMPLEMENTED_X("clearResourceView");
+                auto viewImpl = static_cast<ResourceViewImpl*>(view);
+                switch (view->getViewDesc()->type)
+                {
+                case IResourceView::Type::RenderTarget:
+                    m_commandBuffer->m_cmdList->ClearRenderTargetView(
+                        viewImpl->m_descriptor.cpuHandle,
+                        clearValue->color.floatValues,
+                        0,
+                        nullptr);
+                    break;
+                case IResourceView::Type::DepthStencil:
+                    {
+                        D3D12_CLEAR_FLAGS clearFlags = (D3D12_CLEAR_FLAGS)0;
+                        if (flags & ClearResourceViewFlags::ClearDepth)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_DEPTH;
+                        }
+                        if (flags & ClearResourceViewFlags::ClearStencil)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+                        }
+                        m_commandBuffer->m_cmdList->ClearDepthStencilView(
+                            viewImpl->m_descriptor.cpuHandle,
+                            clearFlags,
+                            clearValue->depthStencil.depth,
+                            (UINT8)clearValue->depthStencil.stencil,
+                            0,
+                            nullptr);
+                        break;
+                    }
+                case IResourceView::Type::UnorderedAccess:
+                    {
+                        ID3D12Resource* d3dResource = nullptr;
+                        switch (viewImpl->m_resource->getType())
+                        {
+                        case IResource::Type::Buffer:
+                            d3dResource =
+                                static_cast<BufferResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        default:
+                            d3dResource =
+                                static_cast<TextureResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        }
+                        auto gpuHandleIndex =
+                            m_commandBuffer->m_transientHeap->m_viewHeap.allocate(1);
+                        this->m_commandBuffer->m_renderer->m_device->CopyDescriptorsSimple(
+                            1,
+                            m_commandBuffer->m_transientHeap->m_viewHeap.getCpuHandle(
+                                gpuHandleIndex),
+                            viewImpl->m_descriptor.cpuHandle,
+                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+                        if (flags & ClearResourceViewFlags::FloatClearValues)
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewFloat(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.floatValues,
+                                0,
+                                nullptr);
+                        }
+                        else
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewUint(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.uintValues,
+                                0,
+                                nullptr);
+                        }
+                        break;
+                    }
+                default:
+                    break;
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
