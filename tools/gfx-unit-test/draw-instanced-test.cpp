@@ -97,7 +97,7 @@ namespace gfx_test
         colorBufferDesc.numMipLevels = 1;
         colorBufferDesc.format = format;
         colorBufferDesc.defaultState = ResourceState::RenderTarget;
-        colorBufferDesc.allowedStates = { ResourceState::RenderTarget, ResourceState::CopySource, ResourceState::Present };
+        colorBufferDesc.allowedStates = { ResourceState::RenderTarget, ResourceState::CopySource };
         ComPtr<ITextureResource> colorBuffer = device->createTextureResource(colorBufferDesc, nullptr);
 
         gfx::IResourceView::Desc colorBufferViewDesc;
@@ -137,9 +137,9 @@ namespace gfx_test
         queue->executeCommandBuffer(commandBuffer);
         queue->waitOnHost();
 
-        float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-                                   0.0f, 0.0f, 1.0f, 1.0f, 0.5f, 0.5f, 0.5f, 1.0f };
-        compareComputeResult(device, colorBuffer, ResourceState::CopySource, expectedResult, sizeof(expectedResult));
+        float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+                                   1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f };
+        compareComputeResult(device, colorBuffer, ResourceState::CopySource, expectedResult, 32, 2);
     }
 
     SLANG_UNIT_TEST(drawInstancedD3D12)
@@ -147,8 +147,10 @@ namespace gfx_test
         runTestImpl(drawInstancedTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
+#if 0
     SLANG_UNIT_TEST(drawInstancedVulkan)
     {
         runTestImpl(drawInstancedTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-}
+#endif
+    }

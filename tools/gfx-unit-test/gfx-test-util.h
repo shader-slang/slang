@@ -39,7 +39,8 @@ namespace gfx_test
         gfx::ITextureResource* texture,
         gfx::ResourceState state,
         float* expectedResult,
-        size_t expectedBufferSize);
+        size_t expectedResultRowPitch,
+        size_t rowCount);
 
         /// Reads back the content of `buffer` and compares it against `expectedResult` with a set tolerance.
     void compareComputeResultFuzzy(
