@@ -4138,10 +4138,16 @@ public:
                 uint32_t pixelCount,
                 const SamplePosition* samplePositions) override
             {
-                SLANG_UNUSED(samplesPerPixel);
-                SLANG_UNUSED(pixelCount);
-                SLANG_UNUSED(samplePositions);
-                SLANG_UNIMPLEMENTED_X("setSamplePositions");
+                if (m_api->vkCmdSetSampleLocationsEXT)
+                {
+                    VkSampleLocationsInfoEXT sampleLocInfo = {};
+                    sampleLocInfo.sType = VK_STRUCTURE_TYPE_SAMPLE_LOCATIONS_INFO_EXT;
+                    sampleLocInfo.sampleLocationsCount = samplesPerPixel * pixelCount;
+                    sampleLocInfo.sampleLocationsPerPixel = (VkSampleCountFlagBits)samplesPerPixel;
+                    m_api->vkCmdSetSampleLocationsEXT(m_vkCommandBuffer, &sampleLocInfo);
+                    return SLANG_OK;
+                }
+                return SLANG_E_NOT_AVAILABLE;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
