@@ -661,22 +661,21 @@ public:
         memcpy((uint8_t*)uploadData + offset, data, size);
         uploadResourceRef.getResource()->Unmap(0, &readRange);
 
-        if (buffer->getDesc()->hasCpuAccessFlag(AccessFlag::Write)) {
-            // No need for the copy
-            return SLANG_OK;
+        if (!buffer->getDesc()->hasCpuAccessFlag(AccessFlag::Write)) {
+            {
+                D3D12BarrierSubmitter submitter(cmdList);
+                submitter.transition(
+                    buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
+            }
+            cmdList->CopyBufferRegion(
+                buffer->m_resource.getResource(),
+                offset,
+                uploadResource.getResource(),
+                offset,
+                size);
         }
 
-        {
-            D3D12BarrierSubmitter submitter(cmdList);
-            submitter.transition(
-                buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
-        }
-        cmdList->CopyBufferRegion(
-            buffer->m_resource.getResource(),
-            offset,
-           uploadResource.getResource(),
-            offset,
-            size);
+        // Should already be in COPY_DEST if write flag was set.
         {
             D3D12BarrierSubmitter submitter(cmdList);
             submitter.transition(
@@ -3451,29 +3450,12 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                prepareDraw();
-
-                D3D12_INDIRECT_ARGUMENT_DESC args[1];
-                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
-
-                D3D12_COMMAND_SIGNATURE_DESC desc;
-                desc.ByteStride = 36;
-                desc.NumArgumentDescs = 1;
-                desc.pArgumentDescs = args;
-
-                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
-                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
-                {
-                    return;
-                }
-
-                m_d3dCmdList->ExecuteIndirect(
-                    cmdSignature,
-                    maxDrawCount,
-                    (ID3D12Resource*)argBuffer,
-                    argOffset,
-                    (ID3D12Resource*)countBuffer,
-                    countOffset);
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -3483,29 +3465,12 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                prepareDraw();
-
-                D3D12_INDIRECT_ARGUMENT_DESC args[1];
-                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
-
-                D3D12_COMMAND_SIGNATURE_DESC desc;
-                desc.ByteStride = 36;
-                desc.NumArgumentDescs = 1;
-                desc.pArgumentDescs = args;
-
-                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
-                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
-                {
-                    return;
-                }
-
-                m_d3dCmdList->ExecuteIndirect(
-                    cmdSignature,
-                    maxDrawCount,
-                    (ID3D12Resource*)argBuffer,
-                    argOffset,
-                    (ID3D12Resource*)countBuffer,
-                    countOffset);
+                SLANG_UNUSED(maxDrawCount);
+                SLANG_UNUSED(argBuffer);
+                SLANG_UNUSED(argOffset);
+                SLANG_UNUSED(countBuffer);
+                SLANG_UNUSED(countOffset);
+                SLANG_UNIMPLEMENTED_X("drawIndirect");
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -3525,8 +3490,11 @@ public:
                 UInt startVertex,
                 UInt startInstanceLocation) override
             {
-                prepareDraw();
-                m_d3dCmdList->DrawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
+                SLANG_UNUSED(vertexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startVertex);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawInstanced");
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -3536,8 +3504,12 @@ public:
                 int32_t baseVertexLocation,
                 uint32_t startInstanceLocation) override
             {
-                prepareDraw();
-                m_d3dCmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
+                SLANG_UNUSED(indexCount);
+                SLANG_UNUSED(instanceCount);
+                SLANG_UNUSED(startIndexLocation);
+                SLANG_UNUSED(baseVertexLocation);
+                SLANG_UNUSED(startInstanceLocation);
+                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
             }
         };
 
@@ -4200,7 +4172,7 @@ public:
         AccessFlag::Enum access = AccessFlag::None);
 
     Result captureTextureToSurface(
-        TextureResourceImpl* resource,
+        D3D12Resource& resource,
         ResourceState state,
         ISlangBlob** blob,
         size_t* outRowPitch,
@@ -4575,17 +4547,14 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 }
 
 Result D3D12Device::captureTextureToSurface(
-    TextureResourceImpl* resourceImpl,
+    D3D12Resource& resource,
     ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    auto resource = resourceImpl->m_resource;
-
     const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
-    const ITextureResource::Desc& gfxDesc = *resourceImpl->getDesc();
     const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
 
     // Don't bother supporting MSAA for right now
@@ -4595,12 +4564,8 @@ Result D3D12Device::captureTextureToSurface(
         return SLANG_FAIL;
     }
 
-    FormatInfo formatInfo;
-    gfxGetFormatInfo(gfxDesc.format, &formatInfo);
-    size_t bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
+    size_t bytesPerPixel = sizeof(uint32_t);
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
-    static const size_t align = 256; // D3D requires minimum 256 byte alignment for texture data.
-    rowPitch = (rowPitch + align - 1) & ~(align - 1); // Bit trick for rounding up
     size_t bufferSize = rowPitch * int(desc.Height);
     if (outRowPitch)
         *outRowPitch = rowPitch;
@@ -5120,7 +5085,7 @@ SlangResult D3D12Device::readTextureResource(
     size_t* outPixelSize)
 {
     return captureTextureToSurface(
-        static_cast<TextureResourceImpl*>(resource),
+        static_cast<TextureResourceImpl*>(resource)->m_resource,
         state,
         outBlob,
         outRowPitch,
@@ -6204,7 +6169,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         }
         else
         {
-            psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+            psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
             if (framebufferLayout->m_renderTargets.getCount())
             {
                 psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;

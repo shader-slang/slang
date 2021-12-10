@@ -64,6 +64,5 @@ void computeMain(
     uniform ITransformer transformer)
 {
     var input = buffer[sv_dispatchThreadID.x];
-    // TODO: Restore
-    buffer[sv_dispatchThreadID.x] = transformer.transform(0.0f);
+    buffer[sv_dispatchThreadID.x] = transformer.transform(input);
 }
