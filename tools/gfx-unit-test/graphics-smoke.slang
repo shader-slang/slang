@@ -3,7 +3,8 @@
 // Per-vertex attributes to be assembled from bound vertex buffers.
 struct AssembledVertex
 {
-    float3	position : POSITION;
+    float3	positionA : POSITIONA;
+    float3  positionB : POSITIONB;
     float3	color    : COLOR;
 };
 
@@ -33,7 +34,7 @@ VertexStageOutput vertexMain(
 {
     VertexStageOutput output;
 
-    float3 position = assembledVertex.position;
+    float3 position = assembledVertex.positionA + assembledVertex.positionB;
     float3 color    = assembledVertex.color;
 
     output.coarseVertex.color = color;

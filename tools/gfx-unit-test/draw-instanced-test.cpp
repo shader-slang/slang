@@ -5,22 +5,58 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "external/stb/stb_image_write.h"
+
 using namespace gfx;
 
 namespace gfx_test
 {
+    /* static */ Slang::Result writeImage(
+        const char* filename,
+        ISlangBlob* pixels,
+        uint32_t width,
+        uint32_t height)
+    {
+        int stbResult =
+            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
+
+        return stbResult ? SLANG_OK : SLANG_FAIL;
+    }
+
     struct Vertex
+    {
+        float position[3];
+    };
+
+    struct Instance
     {
         float position[3];
         float color[3];
     };
 
-    static const int kVertexCount = 3;
+    static const int kVertexCount = 6;
     static const Vertex kVertexData[kVertexCount] =
     {
-        { { -1, -1, 0.5 }, { 1, 0, 0 } },
-        { { -1,  3, 0.5 }, { 1, 0, 0 } },
-        { {  3, -1, 0.5 }, { 1, 0, 0 } },
+        // Triangle 1
+        { 0, 0, 0.5 },
+        { 1, 0, 0.5 },
+        { 0, 1, 0.5 },
+
+        // Triangle 2
+        { -1, 0, 0.5 },
+        {  0, 0, 0.5 },
+        { -1, 1, 0.5 },
+    };
+
+    static const int kInstanceCount = 2;
+    static const Instance kInstanceData[kInstanceCount] =
+    {
+        { { 0,  0, 0 }, {1, 0, 0} },
+        { { 0, -1, 0 }, {0, 0, 1} },
     };
 
     void drawInstancedTestImpl(IDevice* device, UnitTestContext* context)
@@ -38,10 +74,14 @@ namespace gfx_test
         Format format = Format::R32G32B32A32_FLOAT;
 
         InputElementDesc inputElements[] = {
-            { "POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position) },
-            { "COLOR",    0, Format::R32G32B32_FLOAT, offsetof(Vertex, color) },
+            // Vertex buffer data
+            { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), InputSlotClass::PerVertex, 0 },
+
+            // Instance buffer data
+            { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), InputSlotClass::PerInstance, 1, 1 },
+            { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    InputSlotClass::PerInstance, 1, 1 },
         };
-        ComPtr<gfx::IInputLayout> inputLayout = device->createInputLayout(inputElements, 2);
+        ComPtr<gfx::IInputLayout> inputLayout = device->createInputLayout(inputElements, 3);
         SLANG_CHECK_ABORT(inputLayout != nullptr);
 
         IBufferResource::Desc vertexBufferDesc;
@@ -51,6 +91,14 @@ namespace gfx_test
         vertexBufferDesc.allowedStates = ResourceState::VertexBuffer;
         ComPtr<IBufferResource> vertexBuffer = device->createBufferResource(vertexBufferDesc, &kVertexData[0]);
         SLANG_CHECK_ABORT(vertexBuffer != nullptr);
+
+        IBufferResource::Desc instanceBufferDesc;
+        instanceBufferDesc.type = IResource::Type::Buffer;
+        instanceBufferDesc.sizeInBytes = kInstanceCount * sizeof(Instance);
+        instanceBufferDesc.defaultState = ResourceState::VertexBuffer;
+        instanceBufferDesc.allowedStates = ResourceState::VertexBuffer;
+        ComPtr<IBufferResource> instanceBuffer = device->createBufferResource(instanceBufferDesc, &kInstanceData[0]);
+        SLANG_CHECK_ABORT(instanceBuffer != nullptr);
 
         IFramebufferLayout::AttachmentLayout attachmentLayout;
         attachmentLayout.format = format;
@@ -86,8 +134,8 @@ namespace gfx_test
         renderPassDesc.renderTargetAccess = &renderTargetAccess;
         ComPtr<IRenderPassLayout> renderPass = device->createRenderPassLayout(renderPassDesc);
 
-        const int width = 2;
-        const int height = 2;
+        const int width = 256;
+        const int height = 256;
 
         gfx::ITextureResource::Desc colorBufferDesc;
         colorBufferDesc.type = IResource::Type::Texture2D;
@@ -118,28 +166,56 @@ namespace gfx_test
         auto encoder = commandBuffer->encodeRenderCommands(renderPass, framebuffer);
         auto rootObject = encoder->bindPipeline(pipelineState);
 
-        UInt vertexCount = 3;
-        UInt instanceCount = 1;
-        UInt startVertex = 0;
-        UInt startInstanceLocation = 0;
-
         gfx::Viewport viewport = {};
         viewport.maxZ = 1.0f;
         viewport.extentX = width;
         viewport.extentY = height;
         encoder->setViewportAndScissor(viewport);
 
+        UInt startVertex = 0;
+        UInt startInstanceLocation = 0;
+
         encoder->setVertexBuffer(0, vertexBuffer, sizeof(Vertex));
+        encoder->setVertexBuffer(1, instanceBuffer, sizeof(Instance));
         encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-        encoder->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
+        encoder->drawInstanced(kVertexCount, kInstanceCount, startVertex, startInstanceLocation);
         encoder->endEncoding();
         commandBuffer->close();
         queue->executeCommandBuffer(commandBuffer);
         queue->waitOnHost();
 
+        // Read texture values back from four specific pixels located within the triangles
+        // and compare against expected values (because testing every single pixel will be too long and tedious
+        // and requires maintaining reference images).
+        ComPtr<ISlangBlob> resultBlob;
+        size_t rowPitch = 0;
+        size_t pixelSize = 0;
+        GFX_CHECK_CALL_ABORT(device->readTextureResource(
+            colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
+        auto result = (float*)resultBlob->getBufferPointer();
+
+        const int kPixelCount = 4;
+        const int kChannelCount = 4;
+        int testXCoords[kPixelCount] = { 64, 192, 64, 192 };
+        int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
+        float testResults[kPixelCount * kChannelCount];
+
+        int cursor = 0;
+        for (int i = 0; i < kPixelCount; ++i)
+        {
+            auto x = testXCoords[i];
+            auto y = testYCoords[i];
+            auto pixelPtr = result + x * kChannelCount + y * rowPitch / sizeof(float);
+            for (int j = 0; j < kChannelCount; ++j)
+            {
+                testResults[cursor] = pixelPtr[j];
+                cursor++;
+            }
+        }
+
         float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-                                   1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f };
-        compareComputeResult(device, colorBuffer, ResourceState::CopySource, expectedResult, 32, 2);
+                                   0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
+        compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
     }
 
     SLANG_UNIT_TEST(drawInstancedD3D12)
