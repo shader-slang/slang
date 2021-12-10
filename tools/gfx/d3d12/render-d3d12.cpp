@@ -3453,7 +3453,7 @@ public:
                 prepareDraw();
 
                 D3D12_INDIRECT_ARGUMENT_DESC args[1];
-                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
 
                 D3D12_COMMAND_SIGNATURE_DESC desc;
                 desc.ByteStride = 36;
@@ -3482,12 +3482,29 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+
+                D3D12_INDIRECT_ARGUMENT_DESC args[1];
+                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+                D3D12_COMMAND_SIGNATURE_DESC desc;
+                desc.ByteStride = 36;
+                desc.NumArgumentDescs = 1;
+                desc.pArgumentDescs = args;
+
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
+                {
+                    return;
+                }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -4182,7 +4199,7 @@ public:
         AccessFlag::Enum access = AccessFlag::None);
 
     Result captureTextureToSurface(
-        D3D12Resource& resource,
+        TextureResourceImpl* resource,
         ResourceState state,
         ISlangBlob** blob,
         size_t* outRowPitch,
@@ -4557,14 +4574,17 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 }
 
 Result D3D12Device::captureTextureToSurface(
-    D3D12Resource& resource,
+    TextureResourceImpl* resourceImpl,
     ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
+    auto resource = resourceImpl->m_resource;
+
     const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
+    const ITextureResource::Desc& gfxDesc = *resourceImpl->getDesc();
     const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
 
     // Don't bother supporting MSAA for right now
@@ -4574,8 +4594,12 @@ Result D3D12Device::captureTextureToSurface(
         return SLANG_FAIL;
     }
 
-    size_t bytesPerPixel = sizeof(uint32_t);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(gfxDesc.format, &formatInfo);
+    size_t bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
+    static const size_t align = 256; // D3D requires minimum 256 byte alignment for texture data.
+    rowPitch = (rowPitch + align - 1) & ~(align - 1); // Bit trick for rounding up
     size_t bufferSize = rowPitch * int(desc.Height);
     if (outRowPitch)
         *outRowPitch = rowPitch;
@@ -5095,7 +5119,7 @@ SlangResult D3D12Device::readTextureResource(
     size_t* outPixelSize)
 {
     return captureTextureToSurface(
-        static_cast<TextureResourceImpl*>(resource)->m_resource,
+        static_cast<TextureResourceImpl*>(resource),
         state,
         outBlob,
         outRowPitch,
@@ -6179,7 +6203,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         }
         else
         {
-            psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+            psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
             if (framebufferLayout->m_renderTargets.getCount())
             {
                 psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
