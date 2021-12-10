@@ -3450,12 +3450,29 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+
+                D3D12_INDIRECT_ARGUMENT_DESC args[1];
+                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+                D3D12_COMMAND_SIGNATURE_DESC desc;
+                desc.ByteStride = 36;
+                desc.NumArgumentDescs = 1;
+                desc.pArgumentDescs = args;
+
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
+                {
+                    return;
+                }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -3490,11 +3507,8 @@ public:
                 UInt startVertex,
                 UInt startInstanceLocation) override
             {
-                SLANG_UNUSED(vertexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startVertex);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawInstanced");
+                prepareDraw();
+                m_d3dCmdList->DrawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -3504,12 +3518,8 @@ public:
                 int32_t baseVertexLocation,
                 uint32_t startInstanceLocation) override
             {
-                SLANG_UNUSED(indexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startIndexLocation);
-                SLANG_UNUSED(baseVertexLocation);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+                prepareDraw();
+                m_d3dCmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
             }
         };
 
