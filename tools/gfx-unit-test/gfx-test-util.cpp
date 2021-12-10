@@ -65,7 +65,61 @@ namespace gfx_test
         return SLANG_OK;
     }
 
-    void compareComputeResult(gfx::IDevice* device, gfx::ITextureResource* texture, gfx::ResourceState state, float* expectedResult, size_t expectedBufferSize)
+    Slang::Result loadGraphicsProgram(
+        gfx::IDevice* device,
+        Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
+        const char* shaderModuleName,
+        const char* vertexEntryPointName,
+        const char* fragmentEntryPointName,
+        slang::ProgramLayout*& slangReflection)
+    {
+        Slang::ComPtr<slang::ISession> slangSession;
+        SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
+        Slang::ComPtr<slang::IBlob> diagnosticsBlob;
+        slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        if (!module)
+            return SLANG_FAIL;
+
+        ComPtr<slang::IEntryPoint> vertexEntryPoint;
+        SLANG_RETURN_ON_FAIL(
+            module->findEntryPointByName(vertexEntryPointName, vertexEntryPoint.writeRef()));
+
+        ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+        SLANG_RETURN_ON_FAIL(
+            module->findEntryPointByName(fragmentEntryPointName, fragmentEntryPoint.writeRef()));
+
+        Slang::List<slang::IComponentType*> componentTypes;
+        componentTypes.add(module);
+        componentTypes.add(vertexEntryPoint);
+        componentTypes.add(fragmentEntryPoint);
+
+        Slang::ComPtr<slang::IComponentType> composedProgram;
+        SlangResult result = slangSession->createCompositeComponentType(
+            componentTypes.getBuffer(),
+            componentTypes.getCount(),
+            composedProgram.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+        slangReflection = composedProgram->getLayout();
+
+        gfx::IShaderProgram::Desc programDesc = {};
+        programDesc.slangProgram = composedProgram.get();
+
+        auto shaderProgram = device->createProgram(programDesc);
+
+        outShaderProgram = shaderProgram;
+        return SLANG_OK;
+    }
+
+    void compareComputeResult(
+        gfx::IDevice* device,
+        gfx::ITextureResource* texture,
+        gfx::ResourceState state,
+        float* expectedResult,
+        size_t expectedResultRowPitch,
+        size_t rowCount)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
@@ -73,10 +127,16 @@ namespace gfx_test
         size_t pixelSize = 0;
         GFX_CHECK_CALL_ABORT(device->readTextureResource(
             texture, state, resultBlob.writeRef(), &rowPitch, &pixelSize));
-        SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
         auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
-        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
+        for (size_t row = 0; row < rowCount; row++)
+        {
+            SLANG_CHECK(
+                memcmp(
+                    (uint8_t*)resultBlob->getBufferPointer() + rowPitch * row,
+                    (uint8_t*)expectedResult + expectedResultRowPitch * row,
+                    expectedResultRowPitch) == 0);
+        }
     }
 
     void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)

@@ -184,7 +184,8 @@ namespace gfx_test
                 dstTexture,
                 ResourceState::ShaderResource,
                 texData,
-                sizeof(texData));
+                32,
+                2);
 
             auto texView = createTexView(dstDevice, dstTexture);
             setUpAndRunShader(dstDevice, dstTexture, texView, floatBufferView, "copyTexFloat4");
