@@ -39,13 +39,16 @@ namespace gfx_test
             ResourceState::CopyDestination,
             ResourceState::CopySource);
         bufferDesc.defaultState = ResourceState::UnorderedAccess;
-        bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
+        bufferDesc.cpuAccessFlags = AccessFlag::None;
 
         ComPtr<IBufferResource> numbersBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
             bufferDesc,
             (void*)initialData,
             numbersBuffer.writeRef()));
+
+        // Transition to unorderedaccessview
+        // TODO: Zander
 
         ComPtr<IResourceView> bufferView;
         IResourceView::Desc viewDesc = {};

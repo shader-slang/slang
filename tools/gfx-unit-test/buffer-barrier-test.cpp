@@ -32,7 +32,7 @@ namespace gfx_test
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(float);
         bufferDesc.defaultState = unorderedAccess ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
-        bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
+        bufferDesc.cpuAccessFlags = AccessFlag::None;
         bufferDesc.allowedStates = ResourceStateSet(
             ResourceState::ShaderResource,
             ResourceState::CopyDestination,

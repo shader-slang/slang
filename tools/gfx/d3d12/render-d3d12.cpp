@@ -246,7 +246,6 @@ public:
             }
         }
 
-        int m_flag = -1;
         D3D12Resource m_resource;           ///< The resource typically in gpu memory
 
         D3D12_RESOURCE_STATES m_defaultState;
@@ -4507,9 +4506,8 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 
        if (access == AccessFlag::None) {
            // If the buffer is on the default heap, create upload buffer.
-           D3D12_RESOURCE_DESC uploadDesc;
-           _initBufferResourceDesc(bufferSize, uploadDesc);
-
+           D3D12_RESOURCE_DESC uploadDesc(resourceDesc);
+           uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
            heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
 
            SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
@@ -4532,8 +4530,18 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        if (access == AccessFlag::None) {
            auto encodeInfo = encodeResourceCommands();
            encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
+           // TODO: test.
+           {
+               D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
+               resourceOut.transition(D3D12_RESOURCE_STATE_COPY_DEST, finalState, submitter);
+           }
            submitResourceCommandsAndWait(encodeInfo);
        }
+
+
+
+
+
    }
 
     return SLANG_OK;
@@ -5417,9 +5425,6 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, initialState, buffer->m_resource, descIn.isShared,
         (AccessFlag::Enum)descIn.cpuAccessFlags));
 
-    // TODO: debugging.
-    buffer->m_flag = descIn.cpuAccessFlags;
-
     returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
@@ -5986,19 +5991,6 @@ Result D3D12Device::readBufferResource(
         _initBufferResourceDesc(size, stagingDesc);
 
         SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
-
-
-        //D3D12_RESOURCE_TRANSITION_BARRIER transitionBarrier;
-        //transitionBarrier.pResource = resource;
-        //transitionBarrier.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        //transitionBarrier.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE | D3D12_RESOURCE_STATE_RESOLVE_DEST;
-        //transitionBarrier.Subresource = 0;
-
-        //D3D12_RESOURCE_BARRIER barrier;
-        //barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        //barrier.Transition = transitionBarrier;
-        //barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-        //encodeInfo.d3dCommandList->ResourceBarrier(1, &barrier);
 
         // Do the copy
         encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
