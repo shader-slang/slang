@@ -3982,11 +3982,11 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-                UInt startSlot,
-                UInt slotCount,
+                uint32_t startSlot,
+                uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const UInt* strides,
-                const UInt* offsets) override
+                const uint32_t* strides,
+                const uint32_t* offsets) override
             {
                 {
                     const Index num = Index(startSlot + slotCount);
@@ -4007,9 +4007,7 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
-                IBufferResource* buffer,
-                Format indexFormat,
-                UInt offset = 0) override
+                IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override
             {
                 switch (indexFormat)
                 {
@@ -4039,7 +4037,7 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
-                draw(UInt vertexCount, UInt startVertex = 0) override
+                draw(uint32_t vertexCount, uint32_t startVertex = 0) override
             {
                 prepareDraw();
                 auto& api = *m_api;
@@ -4053,10 +4051,10 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(vertexCount), 1, 0, 0);
+                api.vkCmdDraw(m_vkCommandBuffer, vertexCount, 1, 0, 0);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(
+                uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) override
             {
                 prepareDraw();
                 auto& api = *m_api;
@@ -4075,7 +4073,7 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(indexCount), 1, 0, 0);
+                api.vkCmdDraw(m_vkCommandBuffer, indexCount, 1, 0, 0);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -4147,10 +4145,10 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-                UInt vertexCount,
-                UInt instanceCount,
-                UInt startVertex,
-                UInt startInstanceLocation) override
+                uint32_t vertexCount,
+                uint32_t instanceCount,
+                uint32_t startVertex,
+                uint32_t startInstanceLocation) override
             {
                 prepareDraw();
                 auto& api = *m_api;
@@ -4164,8 +4162,12 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(vertexCount), static_cast<uint32_t>(instanceCount),
-                    static_cast<uint32_t>(startVertex), static_cast<uint32_t>(startInstanceLocation));
+                api.vkCmdDraw(
+                    m_vkCommandBuffer,
+                    vertexCount,
+                    instanceCount,
+                    startVertex,
+                    startInstanceLocation);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -4192,8 +4194,12 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDraw(m_vkCommandBuffer, static_cast<uint32_t>(indexCount), static_cast<uint32_t>(instanceCount),
-                    static_cast<uint32_t>(baseVertexLocation), static_cast<uint32_t>(startInstanceLocation));
+                api.vkCmdDraw(
+                    m_vkCommandBuffer,
+                    indexCount,
+                    instanceCount,
+                    baseVertexLocation,
+                    startInstanceLocation);
             }
         };
 
@@ -4924,6 +4930,8 @@ public:
                     case QueryType::AccelerationStructureSerializedSize:
                         queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR;
                         break;
+                    case QueryType::AccelerationStructureCurrentSize:
+                        continue;
                     default:
                         getDebugCallback()->handleMessage(DebugMessageType::Error, DebugMessageSource::Layer,
                             "Invalid query type for use in queryAccelerationStructureProperties.");
@@ -5364,6 +5372,7 @@ public:
         Result init(const IQueryPool::Desc& desc, VKDevice* device)
         {
             m_device = device;
+            m_pool = VK_NULL_HANDLE;
             VkQueryPoolCreateInfo createInfo = {};
             createInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
             createInfo.queryCount = (uint32_t)desc.count;
@@ -5378,6 +5387,9 @@ public:
             case QueryType::AccelerationStructureSerializedSize:
                 createInfo.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_SERIALIZATION_SIZE_KHR;
                 break;
+            case QueryType::AccelerationStructureCurrentSize:
+                // Vulkan does not support CurrentSize query, will not create actual pools here.
+                return SLANG_OK;
             default:
                 return SLANG_E_INVALID_ARG;
             }
@@ -5392,6 +5404,14 @@ public:
     public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt index, SlangInt count, uint64_t* data) override
         {
+            if (!m_pool)
+            {
+                // Vulkan does not support CurrentSize query, return 0 here.
+                for (SlangInt i = 0; i < count; i++)
+                    data[i] = 0;
+                return SLANG_OK;
+            }
+
             SLANG_VK_RETURN_ON_FAIL(m_device->m_api.vkGetQueryPoolResults(
                 m_device->m_api.m_device,
                 m_pool,
