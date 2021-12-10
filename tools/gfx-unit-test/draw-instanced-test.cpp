@@ -5,28 +5,10 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
-
 using namespace gfx;
 
 namespace gfx_test
 {
-    /* static */ Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
-
     struct Vertex
     {
         float position[3];
