@@ -673,14 +673,16 @@ public:
                 uploadResource.getResource(),
                 offset,
                 size);
+
+            // Should already be in COPY_DEST if write flag was set.
+            {
+                D3D12BarrierSubmitter submitter(cmdList);
+                submitter.transition(
+                    buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
+            }
         }
 
-        // Should already be in COPY_DEST if write flag was set.
-        {
-            D3D12BarrierSubmitter submitter(cmdList);
-            submitter.transition(
-                buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
-        }
+
         return SLANG_OK;
     }
     
