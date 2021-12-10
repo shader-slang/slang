@@ -3669,6 +3669,33 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
+
+                List<D3D12_RESOURCE_BARRIER> barriers;
+                barriers.reserve(count);
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
+
+                    D3D12_RESOURCE_BARRIER barrier = {};
+                    // If the src == dst, it must be a UAV barrier.
+                    barrier.Type = (src == dst) ? D3D12_RESOURCE_BARRIER_TYPE_UAV : D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+                    if (barrier.Type == D3D12_RESOURCE_BARRIER_TYPE_UAV) {
+                        barrier.UAV.pResource = bufferImpl->m_resource;
+                    }
+                    else {
+                        barrier.Transition.pResource = bufferImpl->m_resource;
+                        barrier.Transition.StateBefore = D3DUtil::translateResourceState(src);
+                        barrier.Transition.StateAfter = D3DUtil::translateResourceState(dst);
+                        barrier.Transition.Subresource = 0;
+                    }
+
+                    barriers.add(barrier);
+                }
+
+                m_commandBuffer->m_cmdList4->ResourceBarrier((UINT)count, barriers.getArrayView().getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
