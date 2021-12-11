@@ -2757,8 +2757,8 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
     buffer->m_d3dUsage = bufferDesc.Usage;
 
-    if ((srcDesc.cpuAccessFlags & AccessFlag::Read) ||
-        ((srcDesc.cpuAccessFlags & AccessFlag::Write) && bufferDesc.Usage != D3D11_USAGE_DYNAMIC))
+    // TODO: test.
+    if (srcDesc.cpuAccessFlags & AccessFlag::Read || bufferDesc.Usage != D3D11_USAGE_DYNAMIC)
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;
