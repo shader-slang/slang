@@ -47,9 +47,6 @@ namespace gfx_test
             (void*)initialData,
             numbersBuffer.writeRef()));
 
-        // Transition to unorderedaccessview
-        // TODO: Zander
-
         ComPtr<IResourceView> bufferView;
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;

@@ -4585,11 +4585,6 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        if (access == AccessFlag::None) {
            auto encodeInfo = encodeResourceCommands();
            encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
-           // TODO: test.
-           {
-               D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
-               resourceOut.transition(D3D12_RESOURCE_STATE_COPY_DEST, finalState, submitter);
-           }
            submitResourceCommandsAndWait(encodeInfo);
        }
 

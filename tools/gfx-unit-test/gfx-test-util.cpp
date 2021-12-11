@@ -162,8 +162,6 @@ namespace gfx_test
         for (int i = 0; i < expectedBufferSize / sizeof(float); ++i)
         {
             SLANG_CHECK(abs(result[i] - expectedResult[i]) <= 0.01);
-            // TODO: remove
-            printf("%f, %f\n", result[i], expectedResult[i]);
         }
     }
 
