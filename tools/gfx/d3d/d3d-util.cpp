@@ -635,6 +635,18 @@ int D3DUtil::getShaderModelFromProfileName(const char* name)
     return 0;
 }
 
+uint32_t D3DUtil::getPlaneSliceCount(DXGI_FORMAT format)
+{
+    switch (format)
+    {
+    case DXGI_FORMAT_D24_UNORM_S8_UINT:
+    case DXGI_FORMAT_D32_FLOAT_S8X24_UINT:
+        return 2;
+    default:
+        return 1;
+    }
+}
+
 uint32_t D3DUtil::getPlaneSlice(DXGI_FORMAT format, TextureAspect aspect)
 {
     switch (aspect)
@@ -770,6 +782,68 @@ D3D12_BLEND D3DUtil::getBlendFactor(BlendFactor factor)
     default:
         SLANG_ASSERT_FAILURE("Unknown blend factor.");
         return D3D12_BLEND_ZERO;
+    }
+}
+
+uint32_t D3DUtil::getSubresourceIndex(
+    uint32_t mipIndex,
+    uint32_t arrayIndex,
+    uint32_t planeIndex,
+    uint32_t mipLevelCount,
+    uint32_t arraySize)
+{
+    return mipIndex + arrayIndex * mipLevelCount + planeIndex * mipLevelCount * arraySize;
+}
+
+uint32_t D3DUtil::getSubresourceMipLevel(uint32_t subresourceIndex, uint32_t mipLevelCount)
+{
+    return subresourceIndex % mipLevelCount;
+}
+
+D3D12_RESOURCE_STATES D3DUtil::getResourceState(ResourceState state)
+{
+    switch (state)
+    {
+    case ResourceState::Undefined:
+        return D3D12_RESOURCE_STATE_COMMON;
+    case ResourceState::General:
+        return D3D12_RESOURCE_STATE_COMMON;
+    case ResourceState::PreInitialized:
+        return D3D12_RESOURCE_STATE_COMMON;
+    case ResourceState::VertexBuffer:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    case ResourceState::IndexBuffer:
+        return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    case ResourceState::ConstantBuffer:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    case ResourceState::StreamOutput:
+        return D3D12_RESOURCE_STATE_STREAM_OUT;
+    case ResourceState::ShaderResource:
+        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    case ResourceState::UnorderedAccess:
+        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    case ResourceState::RenderTarget:
+        return D3D12_RESOURCE_STATE_RENDER_TARGET;
+    case ResourceState::DepthRead:
+        return D3D12_RESOURCE_STATE_DEPTH_READ;
+    case ResourceState::DepthWrite:;
+        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    case ResourceState::Present:
+        return D3D12_RESOURCE_STATE_PRESENT;
+    case ResourceState::IndirectArgument:
+        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    case ResourceState::CopySource:
+        return D3D12_RESOURCE_STATE_COPY_SOURCE;
+    case ResourceState::CopyDestination:
+        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case ResourceState::ResolveSource:
+        return D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
+    case ResourceState::ResolveDestination:
+        return D3D12_RESOURCE_STATE_RESOLVE_DEST;
+    case ResourceState::AccelerationStructure:
+        return D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
+    default:
+        return D3D12_RESOURCE_STATE_COMMON;
     }
 }
 

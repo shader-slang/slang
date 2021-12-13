@@ -3632,7 +3632,49 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                assert(!"Unimplemented");
+                ShortList<D3D12_RESOURCE_BARRIER> barriers;
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto textureImpl = static_cast<TextureResourceImpl*>(textures[i]);
+                    auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
+                    auto textureDesc = textureImpl->getDesc();
+                    D3D12_RESOURCE_BARRIER barrier;
+                    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                    if (src == dst && src == ResourceState::UnorderedAccess)
+                    {
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+                        barrier.UAV.pResource = textureImpl->m_resource.getResource();
+                    }
+                    else
+                    {
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
+                        barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
+                        barrier.Transition.pResource = textureImpl->m_resource.getResource();
+                        auto planeCount = D3DUtil::getPlaneSliceCount(
+                            D3DUtil::getMapFormat(textureImpl->getDesc()->format));
+                        for (uint32_t planeIndex = 0; planeIndex < planeCount; planeIndex++)
+                        {
+                            for (int layer = 0; layer < textureDesc->arraySize; layer++)
+                            {
+                                for (int mip = 0; mip < textureDesc->numMipLevels; mip++)
+                                {
+                                    barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
+                                        mip,
+                                        layer,
+                                        planeIndex,
+                                        textureImpl->getDesc()->numMipLevels,
+                                        textureImpl->getDesc()->arraySize);
+                                    barriers.add(barrier);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                m_commandBuffer->m_cmdList->ResourceBarrier(
+                    (UINT)barriers.getCount(), barriers.getArrayView().getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
                 size_t count,
@@ -3655,14 +3697,70 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstSubresource);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTexture");
+                auto dstTexture = static_cast<TextureResourceImpl*>(dst);
+                auto srcTexture = static_cast<TextureResourceImpl*>(src);
+
+                if (dstSubresource.layerCount == 0 && dstSubresource.mipLevelCount == 0 &&
+                    srcSubresource.layerCount == 0 && srcSubresource.mipLevelCount == 0)
+                {
+                    m_commandBuffer->m_cmdList->CopyResource(
+                        dstTexture->m_resource.getResource(), srcTexture->m_resource.getResource());
+                    return;
+                }
+
+                auto d3dFormat = D3DUtil::getMapFormat(dstTexture->getDesc()->format);
+                auto aspectMask = (int32_t)dstSubresource.aspectMask;
+                if (dstSubresource.aspectMask == TextureAspect::Default)
+                    aspectMask = (int32_t)TextureAspect::Color;
+                while (aspectMask)
+                {
+                    auto aspect = (int32_t)aspectMask & (-(int32_t)aspectMask); // get lowest bit of aspectMask.
+                    aspectMask &= ~aspect;
+                    auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
+                    for (uint32_t layer = 0; layer < dstSubresource.layerCount; layer++)
+                    {
+                        for (uint32_t mipLevel = 0; mipLevel < dstSubresource.mipLevelCount;
+                             mipLevel++)
+                        {
+                            D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+
+                            dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                            dstRegion.pResource = dstTexture->m_resource.getResource();
+                            dstRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                                dstSubresource.mipLevel + mipLevel,
+                                dstSubresource.baseArrayLayer + layer,
+                                planeIndex,
+                                dstTexture->getDesc()->numMipLevels,
+                                dstTexture->getDesc()->arraySize);
+
+                            D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                            srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                            srcRegion.pResource = srcTexture->m_resource.getResource();
+                            srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                                srcSubresource.mipLevel + mipLevel,
+                                srcSubresource.baseArrayLayer + layer,
+                                planeIndex,
+                                srcTexture->getDesc()->numMipLevels,
+                                srcTexture->getDesc()->arraySize);
+
+                            D3D12_BOX srcBox = {};
+                            srcBox.left = srcOffset.x;
+                            srcBox.top = srcOffset.y;
+                            srcBox.front = srcOffset.z;
+                            srcBox.right = srcBox.left + extent.width;
+                            srcBox.bottom = srcBox.top + extent.height;
+                            srcBox.back = srcBox.front + extent.depth;
+
+                            m_commandBuffer->m_cmdList->CopyTextureRegion(
+                                &dstRegion,
+                                dstOffset.x,
+                                dstOffset.y,
+                                dstOffset.z,
+                                &srcRegion,
+                                &srcBox);
+                        }
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
@@ -3673,13 +3771,100 @@ public:
                 ITextureResource::SubresourceData* subResourceData,
                 size_t subResourceDataCount) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(subResourceRange);
-                SLANG_UNUSED(offset);
-                SLANG_UNUSED(extent);
-                SLANG_UNUSED(subResourceData);
-                SLANG_UNUSED(subResourceDataCount);
-                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+                auto dstTexture = static_cast<TextureResourceImpl*>(dst);
+                auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
+                    subResourceRange.mipLevel,
+                    subResourceRange.baseArrayLayer,
+                    0,
+                    dstTexture->getDesc()->numMipLevels,
+                    dstTexture->getDesc()->arraySize);
+                auto textureSize = dstTexture->getDesc()->size;
+                FormatInfo formatInfo = {};
+                gfxGetFormatInfo(dstTexture->getDesc()->format, &formatInfo);
+                for (uint32_t i = 0; i < (uint32_t)subResourceDataCount; i++)
+                {
+                    auto subresourceIndex = baseSubresourceIndex + i;
+                    // Get the footprint
+                    D3D12_RESOURCE_DESC texDesc = dstTexture->m_resource.getResource()->GetDesc();
+
+                    D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+
+                    dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                    dstRegion.SubresourceIndex = subresourceIndex;
+                    dstRegion.pResource = dstTexture->m_resource.getResource();
+
+                    D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                    srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = srcRegion.PlacedFootprint;
+                    
+                    footprint.Offset = 0;
+                    footprint.Footprint.Format = texDesc.Format;
+                    uint32_t mipLevel = D3DUtil::getSubresourceMipLevel(
+                        subresourceIndex, dstTexture->getDesc()->numMipLevels);
+                    if (extent.x != 0xFFFFFFFF)
+                    {
+                        footprint.Footprint.Width = extent.x;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Width = Math::Max(1, (textureSize.width >> mipLevel)) - offset.x;
+                    }
+                    if (extent.y != 0xFFFFFFFF)
+                    {
+                        footprint.Footprint.Height = extent.y;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Height =
+                            Math::Max(1, (textureSize.height >> mipLevel)) - offset.y;
+                    }
+                    if (extent.z != 0xFFFFFFFF)
+                    {
+                        footprint.Footprint.Depth = extent.z;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Depth =
+                            Math::Max(1, (textureSize.depth >> mipLevel)) - offset.z;
+                    }
+                    footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
+                        footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
+                        (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                    auto bufferSize = footprint.Footprint.RowPitch * footprint.Footprint.Height *
+                                      footprint.Footprint.Depth;
+
+                    IBufferResource* stagingBuffer;
+                    m_commandBuffer->m_transientHeap->allocateStagingBuffer(
+                        bufferSize, stagingBuffer, ResourceState::CopySource);
+
+                    BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(stagingBuffer);
+                    uint8_t* bufferData = nullptr;
+                    D3D12_RANGE mapRange = {0, 0};
+                    bufferImpl->m_resource.getResource()->Map(0, &mapRange, (void**)&bufferData);
+                    for (uint32_t z = 0; z < footprint.Footprint.Depth; z++)
+                    {
+                        auto imageStart = bufferData + footprint.Footprint.RowPitch *
+                                                           footprint.Footprint.Height * (size_t)z;
+                        auto srcData =
+                            (uint8_t*)subResourceData->data + subResourceData->strideZ * z;
+                        for (uint32_t row = 0; row < footprint.Footprint.Height; row++)
+                        {
+                            memcpy(
+                                imageStart + row * (size_t)footprint.Footprint.RowPitch,
+                                srcData + subResourceData->strideY * row,
+                                subResourceData->strideY);
+                        }
+                    }
+                    bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
+
+                    srcRegion.pResource = bufferImpl->m_resource.getResource();
+                    D3D12_BOX srcBox = {};
+                    srcBox.right = (UINT)bufferSize;
+                    srcBox.bottom = srcBox.back = 1;
+                    m_commandBuffer->m_cmdList->CopyTextureRegion(
+                        &dstRegion, offset.x, offset.y, offset.z, &srcRegion, &srcBox);
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
@@ -3793,14 +3978,93 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(dstSize);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+                auto srcTexture = static_cast<TextureResourceImpl*>(src);
+                auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
+                auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
+                    srcSubresource.mipLevel,
+                    srcSubresource.baseArrayLayer,
+                    0,
+                    srcTexture->getDesc()->numMipLevels,
+                    srcTexture->getDesc()->arraySize);
+                auto textureSize = srcTexture->getDesc()->size;
+                FormatInfo formatInfo = {};
+                gfxGetFormatInfo(srcTexture->getDesc()->format, &formatInfo);
+                if (srcSubresource.mipLevelCount == 0)
+                    srcSubresource.mipLevelCount = srcTexture->getDesc()->numMipLevels;
+                if (srcSubresource.layerCount == 0)
+                    srcSubresource.layerCount = srcTexture->getDesc()->arraySize;
+
+                for (uint32_t layer = 0; layer < srcSubresource.layerCount; layer++)
+                {
+                    for (uint32_t mipId = 0; mipId < srcSubresource.mipLevelCount; mipId++)
+                    {
+                        // Get the footprint
+                        D3D12_RESOURCE_DESC texDesc =
+                            srcTexture->m_resource.getResource()->GetDesc();
+
+                        D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+                        dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        dstRegion.pResource = dstBuffer->m_resource.getResource();
+                        D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = dstRegion.PlacedFootprint;
+
+                        D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                        srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                            mipId + srcSubresource.mipLevel,
+                            layer + srcSubresource.baseArrayLayer,
+                            0,
+                            srcTexture->getDesc()->numMipLevels,
+                            srcTexture->getDesc()->arraySize);
+                        srcRegion.pResource = srcTexture->m_resource.getResource();
+
+                        footprint.Offset = 0;
+                        footprint.Footprint.Format = texDesc.Format;
+                        uint32_t mipLevel = mipId + srcSubresource.mipLevel;
+                        if (extent.width != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Width = extent.width;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Width =
+                                Math::Max(1, (textureSize.width >> mipLevel)) - srcOffset.x;
+                        }
+                        if (extent.height != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Height = extent.height;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Height =
+                                Math::Max(1, (textureSize.height >> mipLevel)) - srcOffset.y;
+                        }
+                        if (extent.depth != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Depth = extent.depth;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Depth =
+                                Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
+                        }
+                        footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
+                            footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
+                            (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                        auto bufferSize = footprint.Footprint.RowPitch *
+                                          footprint.Footprint.Height * footprint.Footprint.Depth;
+
+                        D3D12_BOX srcBox = {};
+                        srcBox.left = srcOffset.x;
+                        srcBox.top = srcOffset.y;
+                        srcBox.front = srcOffset.z;
+                        srcBox.right = srcOffset.x + extent.width;
+                        srcBox.bottom = srcOffset.y + extent.height;
+                        srcBox.back = srcOffset.z + extent.depth;
+                        m_commandBuffer->m_cmdList->CopyTextureRegion(
+                            &dstRegion, (UINT)dstOffset, 0, 0, &srcRegion, &srcBox);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
@@ -3809,11 +4073,55 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                SLANG_UNUSED(texture);
-                SLANG_UNUSED(subresourceRange);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(dst);
-                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
+                auto textureImpl = static_cast<TextureResourceImpl*>(texture);
+
+                if (subresourceRange.mipLevelCount == 0)
+                    subresourceRange.mipLevelCount = textureImpl->getDesc()->numMipLevels;
+                if (subresourceRange.layerCount == 0)
+                    subresourceRange.layerCount = textureImpl->getDesc()->arraySize;
+
+                auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
+
+                ShortList<D3D12_RESOURCE_BARRIER> barriers;
+                D3D12_RESOURCE_BARRIER barrier;
+                barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                if (src == dst && src == ResourceState::UnorderedAccess)
+                {
+                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+                    barrier.UAV.pResource = textureImpl->m_resource.getResource();
+                }
+                else
+                {
+                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
+                    barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
+                    barrier.Transition.pResource = textureImpl->m_resource.getResource();
+                    auto aspectMask = (int32_t)subresourceRange.aspectMask;
+                    if (subresourceRange.aspectMask == TextureAspect::Default)
+                        aspectMask = (int32_t)TextureAspect::Color;
+                    while (aspectMask)
+                    {
+                        auto aspect = (int32_t)aspectMask &
+                                      (-(int32_t)aspectMask); // get lowest bit of aspectMask.
+                        aspectMask &= ~aspect;
+                        auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
+                        for (uint32_t layer = 0; layer < subresourceRange.baseArrayLayer; layer++)
+                        {
+                            for (uint32_t mip = 0; mip < subresourceRange.mipLevelCount; mip++)
+                            {
+                                barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
+                                    mip + subresourceRange.mipLevel,
+                                    layer + subresourceRange.baseArrayLayer,
+                                    planeIndex,
+                                    textureImpl->getDesc()->numMipLevels,
+                                    textureImpl->getDesc()->arraySize);
+                                barriers.add(barrier);
+                            }
+                        }
+                    }
+                }
+                m_commandBuffer->m_cmdList->ResourceBarrier(
+                    (UINT)barriers.getCount(), barriers.getArrayView().getBuffer());
             }
         };
 

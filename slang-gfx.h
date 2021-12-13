@@ -1524,6 +1524,9 @@ public:
         IBufferResource* src,
         size_t srcOffset,
         size_t size) = 0;
+
+    /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0 and layerCount = 0,
+    /// the entire resource is being copied and dstOffset, srcOffset and extent arguments are ignored.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
         SubresourceRange dstSubresource,
