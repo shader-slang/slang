@@ -3717,7 +3717,7 @@ public:
                     aspectMask = (int32_t)TextureAspect::Color;
                 while (aspectMask)
                 {
-                    auto aspect = (int32_t)aspectMask & (-(int32_t)aspectMask); // get lowest bit of aspectMask.
+                    auto aspect = Math::getLowestBit((int32_t)aspectMask);
                     aspectMask &= ~aspect;
                     auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
                     for (uint32_t layer = 0; layer < dstSubresource.layerCount; layer++)
@@ -3770,7 +3770,7 @@ public:
                 ITextureResource* dst,
                 SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
-                ITextureResource::Offset3D extent,
+                ITextureResource::Size extent,
                 ITextureResource::SubresourceData* subResourceData,
                 size_t subResourceDataCount) override
             {
@@ -3804,35 +3804,36 @@ public:
                     footprint.Footprint.Format = texDesc.Format;
                     uint32_t mipLevel = D3DUtil::getSubresourceMipLevel(
                         subresourceIndex, dstTexture->getDesc()->numMipLevels);
-                    if (extent.x != 0xFFFFFFFF)
+                    if (extent.width != ITextureResource::kRemainingTextureSize)
                     {
-                        footprint.Footprint.Width = extent.x;
+                        footprint.Footprint.Width = extent.width;
                     }
                     else
                     {
                         footprint.Footprint.Width = Math::Max(1, (textureSize.width >> mipLevel)) - offset.x;
                     }
-                    if (extent.y != 0xFFFFFFFF)
+                    if (extent.height != ITextureResource::kRemainingTextureSize)
                     {
-                        footprint.Footprint.Height = extent.y;
+                        footprint.Footprint.Height = extent.height;
                     }
                     else
                     {
                         footprint.Footprint.Height =
                             Math::Max(1, (textureSize.height >> mipLevel)) - offset.y;
                     }
-                    if (extent.z != 0xFFFFFFFF)
+                    if (extent.depth != ITextureResource::kRemainingTextureSize)
                     {
-                        footprint.Footprint.Depth = extent.z;
+                        footprint.Footprint.Depth = extent.depth;
                     }
                     else
                     {
                         footprint.Footprint.Depth =
                             Math::Max(1, (textureSize.depth >> mipLevel)) - offset.z;
                     }
+                    auto rowSize = (footprint.Footprint.Width + formatInfo.blockWidth - 1) /
+                                   formatInfo.blockWidth * formatInfo.blockSizeInBytes;
                     footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
-                        footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
-                        (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+                        rowSize, (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 
                     auto bufferSize = footprint.Footprint.RowPitch * footprint.Footprint.Height *
                                       footprint.Footprint.Depth;
@@ -3856,7 +3857,7 @@ public:
                             memcpy(
                                 imageStart + row * (size_t)footprint.Footprint.RowPitch,
                                 srcData + subResourceData->strideY * row,
-                                subResourceData->strideY);
+                                rowSize);
                         }
                     }
                     bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
@@ -4104,8 +4105,7 @@ public:
                         aspectMask = (int32_t)TextureAspect::Color;
                     while (aspectMask)
                     {
-                        auto aspect = (int32_t)aspectMask &
-                                      (-(int32_t)aspectMask); // get lowest bit of aspectMask.
+                        auto aspect = Math::getLowestBit((int32_t)aspectMask);
                         aspectMask &= ~aspect;
                         auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
                         for (uint32_t layer = 0; layer < subresourceRange.baseArrayLayer; layer++)
