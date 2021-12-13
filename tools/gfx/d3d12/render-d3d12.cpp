@@ -3265,11 +3265,11 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-                UInt startSlot,
-                UInt slotCount,
+                uint32_t startSlot,
+                uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const UInt* strides,
-                const UInt* offsets) override
+                const uint32_t* strides,
+                const uint32_t* offsets) override
             {
                 {
                     const Index num = startSlot + slotCount;
@@ -3291,13 +3291,11 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
-                IBufferResource* buffer,
-                Format indexFormat,
-                UInt offset = 0) override
+                IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override
             {
                 m_boundIndexBuffer = (BufferResourceImpl*)buffer;
                 m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
-                m_boundIndexOffset = UINT(offset);
+                m_boundIndexOffset = offset;
             }
 
             void prepareDraw()
@@ -3357,17 +3355,16 @@ public:
                 }
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                draw(UInt vertexCount, UInt startVertex = 0) override
+                draw(uint32_t vertexCount, uint32_t startVertex = 0) override
             {
                 prepareDraw();
-                m_d3dCmdList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
+                m_d3dCmdList->DrawInstanced(vertexCount, 1, startVertex, 0);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(
+                uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) override
             {
                 prepareDraw();
-                m_d3dCmdList->DrawIndexedInstanced(
-                    (UINT)indexCount, 1, (UINT)startIndex, (UINT)baseVertex, 0);
+                m_d3dCmdList->DrawIndexedInstanced(indexCount, 1, startIndex, baseVertex, 0);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -3493,13 +3490,14 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-                UInt vertexCount,
-                UInt instanceCount,
-                UInt startVertex,
-                UInt startInstanceLocation) override
+                uint32_t vertexCount,
+                uint32_t instanceCount,
+                uint32_t startVertex,
+                uint32_t startInstanceLocation) override
             {
                 prepareDraw();
-                m_d3dCmdList->DrawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
+                m_d3dCmdList->DrawInstanced(
+                    vertexCount, instanceCount, startVertex, startInstanceLocation);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -6696,6 +6694,7 @@ Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** o
     {
     case QueryType::AccelerationStructureCompactedSize:
     case QueryType::AccelerationStructureSerializedSize:
+    case QueryType::AccelerationStructureCurrentSize:
         {
             RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
                 new PlainBufferProxyQueryPoolImpl();
@@ -6818,6 +6817,15 @@ void translatePostBuildInfoDescs(
         case QueryType::AccelerationStructureCompactedSize:
             postBuildInfoDescs[i].InfoType =
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        case QueryType::AccelerationStructureCurrentSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_CURRENT_SIZE;
             postBuildInfoDescs[i].DestBuffer =
                 static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
                     ->m_bufferResource->getDeviceAddress() +

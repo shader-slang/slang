@@ -166,17 +166,19 @@ public:
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual void setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
+        uint32_t startSlot,
+        uint32_t slotCount,
         IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) override;
-    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
+        const uint32_t* strides,
+        const uint32_t* offsets) override;
+    virtual void setIndexBuffer(
+        IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
     virtual void setViewports(UInt count, Viewport const* viewports) override;
     virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
-    virtual void draw(UInt vertexCount, UInt startVertex) override;
-    virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
+    virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
+    virtual void drawIndexed(
+        uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
@@ -2597,11 +2599,11 @@ void GLDevice::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void GLDevice::setVertexBuffers(
-    UInt startSlot,
-    UInt slotCount,
+    uint32_t startSlot,
+    uint32_t slotCount,
     IBufferResource* const* buffers,
-    const UInt* strides,
-    const UInt* offsets)
+    const uint32_t* strides,
+    const uint32_t* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
@@ -2616,7 +2618,7 @@ void GLDevice::setVertexBuffers(
     }
 }
 
-void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
+void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset)
 {
     auto bufferImpl = static_cast<BufferResourceImpl*>(buffer);
     m_boundIndexBuffer = bufferImpl->m_handle;
@@ -2675,14 +2677,14 @@ void GLDevice::setPipelineState(IPipelineState* state)
     glUseProgram(programID);
 }
 
-void GLDevice::draw(UInt vertexCount, UInt startVertex = 0)
+void GLDevice::draw(uint32_t vertexCount, uint32_t startVertex = 0)
 {
     flushStateForDraw();
 
     glDrawArrays(m_boundPrimitiveTopology, (GLint)startVertex, (GLsizei)vertexCount);
 }
 
-void GLDevice::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+void GLDevice::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
 {
     flushStateForDraw();
 
