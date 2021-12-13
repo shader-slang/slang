@@ -550,7 +550,7 @@ class ITextureResource: public IResource
 {
 public:
     static const uint32_t kTexturePitchAlignment = 256;
-
+    static const uint32_t kRemainingTextureSize = 0xFFFFFFFF;
     struct Offset3D
     {
         uint32_t x = 0;
@@ -1551,7 +1551,7 @@ public:
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extent,
+        ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL

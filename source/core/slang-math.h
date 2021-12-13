@@ -163,6 +163,11 @@ namespace Slang
             }
         }
 
+        template <typename T>
+        static T getLowestBit(T val)
+        {
+            return val & (-val);
+        }
 	};
     inline int FloatAsInt(float val)
 	{

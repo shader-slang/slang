@@ -428,7 +428,7 @@ public:
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extent,
+        ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) override;
 
