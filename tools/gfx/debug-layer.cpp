@@ -662,6 +662,7 @@ Result DebugDevice::createMutableRootShaderObject(
         return result;
     outObject->m_device = this;
     outObject->m_slangType = nullptr;
+    outObject->m_rootComponentType = getDebugObj(program)->m_slangProgram;
     returnComPtr(outRootObject, outObject);
     return result;
 }

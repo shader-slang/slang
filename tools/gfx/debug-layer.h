@@ -301,7 +301,7 @@ public:
 
     // The slang program from which a root shader object is created, this is null for ordinary
     // objects.
-    slang::IComponentType* m_rootComponentType = nullptr;
+    Slang::ComPtr<slang::IComponentType> m_rootComponentType;
 
     DebugDevice* m_device;
 
