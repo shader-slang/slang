@@ -652,17 +652,25 @@ Result DebugDevice::createMutableShaderObject(
 }
 
 Result DebugDevice::createMutableRootShaderObject(
-    IShaderProgram* program, IShaderObject** outObject)
+    IShaderProgram* program, IShaderObject** outRootObject)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->createMutableRootShaderObject(program, outObject);
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createMutableRootShaderObject(
+        getInnerObj(program), outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    outObject->m_device = this;
+    outObject->m_slangType = nullptr;
+    returnComPtr(outRootObject, outObject);
+    return result;
 }
 
 Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     SLANG_GFX_API_FUNC;
 
-    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram();
+    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram(desc);
     auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
@@ -1834,6 +1842,11 @@ Result DebugFence::setCurrentValue(uint64_t value)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->setCurrentValue(value);
+}
+
+DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
+{
+    m_slangProgram = desc.slangProgram;
 }
 
 } // namespace gfx
