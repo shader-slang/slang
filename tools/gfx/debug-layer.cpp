@@ -1084,11 +1084,11 @@ void DebugRenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void DebugRenderCommandEncoder::setVertexBuffers(
-    UInt startSlot,
-    UInt slotCount,
+    uint32_t startSlot,
+    uint32_t slotCount,
     IBufferResource* const* buffers,
-    const UInt* strides,
-    const UInt* offsets)
+    const uint32_t* strides,
+    const uint32_t* offsets)
 {
     SLANG_GFX_API_FUNC;
 
@@ -1101,22 +1101,21 @@ void DebugRenderCommandEncoder::setVertexBuffers(
 }
 
 void DebugRenderCommandEncoder::setIndexBuffer(
-    IBufferResource* buffer,
-    Format indexFormat,
-    UInt offset)
+    IBufferResource* buffer, Format indexFormat, uint32_t offset)
 {
     SLANG_GFX_API_FUNC;
     auto innerBuffer = static_cast<DebugBufferResource*>(buffer)->baseObject.get();
     baseObject->setIndexBuffer(innerBuffer, indexFormat, offset);
 }
 
-void DebugRenderCommandEncoder::draw(UInt vertexCount, UInt startVertex)
+void DebugRenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
 {
     SLANG_GFX_API_FUNC;
     baseObject->draw(vertexCount, startVertex);
 }
 
-void DebugRenderCommandEncoder::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+void DebugRenderCommandEncoder::drawIndexed(
+    uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
 {
     SLANG_GFX_API_FUNC;
     baseObject->drawIndexed(indexCount, startIndex, baseVertex);
@@ -1166,7 +1165,10 @@ Result DebugRenderCommandEncoder::setSamplePositions(
 }
 
 void DebugRenderCommandEncoder::drawInstanced(
-    UInt vertexCount, UInt instanceCount, UInt startVertex, UInt startInstanceLocation)
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startInstanceLocation)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawInstanced(
@@ -1278,7 +1280,7 @@ void DebugResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Offset3D extent,
+    ITextureResource::Size extent,
     ITextureResource::SubresourceData* subResourceData,
     size_t subResourceDataCount)
 {

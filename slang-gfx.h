@@ -551,7 +551,7 @@ class ITextureResource: public IResource
 {
 public:
     static const uint32_t kTexturePitchAlignment = 256;
-
+    static const uint32_t kRemainingTextureSize = 0xFFFFFFFF;
     struct Offset3D
     {
         uint32_t x = 0;
@@ -1452,21 +1452,23 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL setPrimitiveTopology(PrimitiveTopology topology) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
+        uint32_t startSlot,
+        uint32_t slotCount,
         IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) = 0;
-    inline void setVertexBuffer(UInt slot, IBufferResource* buffer, UInt stride, UInt offset = 0)
+        const uint32_t* strides,
+        const uint32_t* offsets) = 0;
+    inline void setVertexBuffer(
+        uint32_t slot, IBufferResource* buffer, uint32_t stride, uint32_t offset = 0)
     {
         setVertexBuffers(slot, 1, &buffer, &stride, &offset);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset = 0) = 0;
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex = 0) = 0;
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) = 0;
+        draw(uint32_t vertexCount, uint32_t startVertex = 0) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        drawIndexed(uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
@@ -1483,10 +1485,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
         uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-        UInt vertexCount,
-        UInt instanceCount,
-        UInt startVertex,
-        UInt startInstanceLocation) = 0;
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
         uint32_t indexCount,
         uint32_t instanceCount,
@@ -1525,6 +1527,9 @@ public:
         IBufferResource* src,
         size_t srcOffset,
         size_t size) = 0;
+
+    /// Copies texture from src to dst. If dstSubresource and srcSubresource has mipLevelCount = 0 and layerCount = 0,
+    /// the entire resource is being copied and dstOffset, srcOffset and extent arguments are ignored.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
         SubresourceRange dstSubresource,
@@ -1547,7 +1552,7 @@ public:
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extent,
+        ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL
