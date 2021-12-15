@@ -131,6 +131,8 @@ public:
         override;
     virtual Result createMutableShaderObject(
         ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
@@ -141,6 +143,16 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc, IQueryPool** outState) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createFence(const IFence::Desc& desc, IFence** outFence) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFences(
+        uint32_t fenceCount,
+        IFence** fences,
+        uint64_t* fenceValues,
+        bool waitForAll,
+        uint64_t timeout) override;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
         ITextureResource* resource,
@@ -302,11 +314,19 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
         {
+            // Check if a shared handle already exists for this resource.
+            if (sharedHandle.handleValue != 0)
+            {
+                *outHandle = sharedHandle;
+                return SLANG_OK;
+            }
+
+            // If a shared handle doesn't exist, create one and store it.
             ComPtr<ID3D12Device> pDevice;
             auto pResource = m_resource.getResource();
             pResource->GetDevice(IID_PPV_ARGS(pDevice.writeRef()));
             SLANG_RETURN_ON_FAIL(pDevice->CreateSharedHandle(pResource, NULL, GENERIC_ALL, nullptr, (HANDLE*)&outHandle->handleValue));
-            outHandle->api = InteropHandleAPI::Win32;
+            outHandle->api = InteropHandleAPI::D3D12;
             return SLANG_OK;
         }
     };
@@ -2041,7 +2061,6 @@ public:
     class ShaderProgramImpl : public ShaderProgramBase
     {
     public:
-        PipelineType m_pipelineType;
         List<ShaderBinary> m_shaders;
         RefPtr<RootShaderObjectLayoutImpl> m_rootObjectLayout;
     };
@@ -2819,6 +2838,21 @@ public:
             return SLANG_OK;
         }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override
+        {
+            SLANG_RETURN_ON_FAIL(Super::copyFrom(object, transientHeap));
+            if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+            {
+                for (Index i = 0; i < srcObj->m_entryPoints.getCount(); i++)
+                {
+                    m_entryPoints[i]->copyFrom(srcObj->m_entryPoints[i], transientHeap);
+                }
+                return SLANG_OK;
+            }
+            return SLANG_FAIL;
+        }
+
     public:
         Result bindAsRoot(
             BindingContext*             context,
@@ -3002,6 +3036,7 @@ public:
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
+        ComPtr<ID3D12GraphicsCommandList1> m_cmdList1;
         ComPtr<ID3D12GraphicsCommandList4> m_cmdList4;
 
         BreakableReference<TransientResourceHeapImpl> m_transientHeap;
@@ -3029,6 +3064,7 @@ public:
 #if SLANG_GFX_HAS_DXR_SUPPORT
             m_cmdList->QueryInterface<ID3D12GraphicsCommandList4>(m_cmdList4.writeRef());
 #endif
+            m_cmdList->QueryInterface<ID3D12GraphicsCommandList1>(m_cmdList1.writeRef());
         }
 
         class RenderCommandEncoderImpl
@@ -3231,11 +3267,11 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-                UInt startSlot,
-                UInt slotCount,
+                uint32_t startSlot,
+                uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const UInt* strides,
-                const UInt* offsets) override
+                const uint32_t* strides,
+                const uint32_t* offsets) override
             {
                 {
                     const Index num = startSlot + slotCount;
@@ -3257,13 +3293,11 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
-                IBufferResource* buffer,
-                Format indexFormat,
-                UInt offset = 0) override
+                IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override
             {
                 m_boundIndexBuffer = (BufferResourceImpl*)buffer;
                 m_boundIndexFormat = D3DUtil::getMapFormat(indexFormat);
-                m_boundIndexOffset = UINT(offset);
+                m_boundIndexOffset = offset;
             }
 
             void prepareDraw()
@@ -3323,17 +3357,16 @@ public:
                 }
             }
             virtual SLANG_NO_THROW void SLANG_MCALL
-                draw(UInt vertexCount, UInt startVertex = 0) override
+                draw(uint32_t vertexCount, uint32_t startVertex = 0) override
             {
                 prepareDraw();
-                m_d3dCmdList->DrawInstanced(UINT(vertexCount), 1, UINT(startVertex), 0);
+                m_d3dCmdList->DrawInstanced(vertexCount, 1, startVertex, 0);
             }
-            virtual SLANG_NO_THROW void SLANG_MCALL
-                drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override
+            virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(
+                uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) override
             {
                 prepareDraw();
-                m_d3dCmdList->DrawIndexedInstanced(
-                    (UINT)indexCount, 1, (UINT)startIndex, (UINT)baseVertex, 0);
+                m_d3dCmdList->DrawIndexedInstanced(indexCount, 1, startIndex, baseVertex, 0);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() override
             {
@@ -3390,12 +3423,29 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+
+                D3D12_INDIRECT_ARGUMENT_DESC args[1];
+                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+                D3D12_COMMAND_SIGNATURE_DESC desc;
+                desc.ByteStride = 36;
+                desc.NumArgumentDescs = 1;
+                desc.pArgumentDescs = args;
+
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
+                {
+                    return;
+                }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -3405,12 +3455,29 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
-                SLANG_UNUSED(maxDrawCount);
-                SLANG_UNUSED(argBuffer);
-                SLANG_UNUSED(argOffset);
-                SLANG_UNUSED(countBuffer);
-                SLANG_UNUSED(countOffset);
-                SLANG_UNIMPLEMENTED_X("drawIndirect");
+                prepareDraw();
+
+                D3D12_INDIRECT_ARGUMENT_DESC args[1];
+                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+                D3D12_COMMAND_SIGNATURE_DESC desc;
+                desc.ByteStride = 36;
+                desc.NumArgumentDescs = 1;
+                desc.pArgumentDescs = args;
+
+                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
+                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
+                {
+                    return;
+                }
+
+                m_d3dCmdList->ExecuteIndirect(
+                    cmdSignature,
+                    maxDrawCount,
+                    (ID3D12Resource*)argBuffer,
+                    argOffset,
+                    (ID3D12Resource*)countBuffer,
+                    countOffset);
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -3418,23 +3485,24 @@ public:
                 uint32_t pixelCount,
                 const SamplePosition* samplePositions) override
             {
-                SLANG_UNUSED(samplesPerPixel);
-                SLANG_UNUSED(pixelCount);
-                SLANG_UNUSED(samplePositions);
-                SLANG_UNIMPLEMENTED_X("setSamplePositions");
+                if (m_commandBuffer->m_cmdList1)
+                {
+                    m_commandBuffer->m_cmdList1->SetSamplePositions(
+                        samplesPerPixel, pixelCount, (D3D12_SAMPLE_POSITION*)samplePositions);
+                    return SLANG_OK;
+                }
+                return SLANG_E_NOT_AVAILABLE;
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-                UInt vertexCount,
-                UInt instanceCount,
-                UInt startVertex,
-                UInt startInstanceLocation) override
+                uint32_t vertexCount,
+                uint32_t instanceCount,
+                uint32_t startVertex,
+                uint32_t startInstanceLocation) override
             {
-                SLANG_UNUSED(vertexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startVertex);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawInstanced");
+                prepareDraw();
+                m_d3dCmdList->DrawInstanced(
+                    vertexCount, instanceCount, startVertex, startInstanceLocation);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -3444,12 +3512,8 @@ public:
                 int32_t baseVertexLocation,
                 uint32_t startInstanceLocation) override
             {
-                SLANG_UNUSED(indexCount);
-                SLANG_UNUSED(instanceCount);
-                SLANG_UNUSED(startIndexLocation);
-                SLANG_UNUSED(baseVertexLocation);
-                SLANG_UNUSED(startInstanceLocation);
-                SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+                prepareDraw();
+                m_d3dCmdList->DrawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
             }
         };
 
@@ -3571,7 +3635,49 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                assert(!"Unimplemented");
+                ShortList<D3D12_RESOURCE_BARRIER> barriers;
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto textureImpl = static_cast<TextureResourceImpl*>(textures[i]);
+                    auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
+                    auto textureDesc = textureImpl->getDesc();
+                    D3D12_RESOURCE_BARRIER barrier;
+                    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                    if (src == dst && src == ResourceState::UnorderedAccess)
+                    {
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+                        barrier.UAV.pResource = textureImpl->m_resource.getResource();
+                    }
+                    else
+                    {
+                        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                        barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
+                        barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
+                        barrier.Transition.pResource = textureImpl->m_resource.getResource();
+                        auto planeCount = D3DUtil::getPlaneSliceCount(
+                            D3DUtil::getMapFormat(textureImpl->getDesc()->format));
+                        for (uint32_t planeIndex = 0; planeIndex < planeCount; planeIndex++)
+                        {
+                            for (int layer = 0; layer < textureDesc->arraySize; layer++)
+                            {
+                                for (int mip = 0; mip < textureDesc->numMipLevels; mip++)
+                                {
+                                    barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
+                                        mip,
+                                        layer,
+                                        planeIndex,
+                                        textureImpl->getDesc()->numMipLevels,
+                                        textureImpl->getDesc()->arraySize);
+                                    barriers.add(barrier);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                m_commandBuffer->m_cmdList->ResourceBarrier(
+                    (UINT)barriers.getCount(), barriers.getArrayView().getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL bufferBarrier(
                 size_t count,
@@ -3594,31 +3700,175 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstSubresource);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTexture");
+                auto dstTexture = static_cast<TextureResourceImpl*>(dst);
+                auto srcTexture = static_cast<TextureResourceImpl*>(src);
+
+                if (dstSubresource.layerCount == 0 && dstSubresource.mipLevelCount == 0 &&
+                    srcSubresource.layerCount == 0 && srcSubresource.mipLevelCount == 0)
+                {
+                    m_commandBuffer->m_cmdList->CopyResource(
+                        dstTexture->m_resource.getResource(), srcTexture->m_resource.getResource());
+                    return;
+                }
+
+                auto d3dFormat = D3DUtil::getMapFormat(dstTexture->getDesc()->format);
+                auto aspectMask = (int32_t)dstSubresource.aspectMask;
+                if (dstSubresource.aspectMask == TextureAspect::Default)
+                    aspectMask = (int32_t)TextureAspect::Color;
+                while (aspectMask)
+                {
+                    auto aspect = Math::getLowestBit((int32_t)aspectMask);
+                    aspectMask &= ~aspect;
+                    auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
+                    for (uint32_t layer = 0; layer < dstSubresource.layerCount; layer++)
+                    {
+                        for (uint32_t mipLevel = 0; mipLevel < dstSubresource.mipLevelCount;
+                             mipLevel++)
+                        {
+                            D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+
+                            dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                            dstRegion.pResource = dstTexture->m_resource.getResource();
+                            dstRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                                dstSubresource.mipLevel + mipLevel,
+                                dstSubresource.baseArrayLayer + layer,
+                                planeIndex,
+                                dstTexture->getDesc()->numMipLevels,
+                                dstTexture->getDesc()->arraySize);
+
+                            D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                            srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                            srcRegion.pResource = srcTexture->m_resource.getResource();
+                            srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                                srcSubresource.mipLevel + mipLevel,
+                                srcSubresource.baseArrayLayer + layer,
+                                planeIndex,
+                                srcTexture->getDesc()->numMipLevels,
+                                srcTexture->getDesc()->arraySize);
+
+                            D3D12_BOX srcBox = {};
+                            srcBox.left = srcOffset.x;
+                            srcBox.top = srcOffset.y;
+                            srcBox.front = srcOffset.z;
+                            srcBox.right = srcBox.left + extent.width;
+                            srcBox.bottom = srcBox.top + extent.height;
+                            srcBox.back = srcBox.front + extent.depth;
+
+                            m_commandBuffer->m_cmdList->CopyTextureRegion(
+                                &dstRegion,
+                                dstOffset.x,
+                                dstOffset.y,
+                                dstOffset.z,
+                                &srcRegion,
+                                &srcBox);
+                        }
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
                 ITextureResource* dst,
                 SubresourceRange subResourceRange,
                 ITextureResource::Offset3D offset,
-                ITextureResource::Offset3D extent,
+                ITextureResource::Size extent,
                 ITextureResource::SubresourceData* subResourceData,
                 size_t subResourceDataCount) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(subResourceRange);
-                SLANG_UNUSED(offset);
-                SLANG_UNUSED(extent);
-                SLANG_UNUSED(subResourceData);
-                SLANG_UNUSED(subResourceDataCount);
-                SLANG_UNIMPLEMENTED_X("uploadTextureData");
+                auto dstTexture = static_cast<TextureResourceImpl*>(dst);
+                auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
+                    subResourceRange.mipLevel,
+                    subResourceRange.baseArrayLayer,
+                    0,
+                    dstTexture->getDesc()->numMipLevels,
+                    dstTexture->getDesc()->arraySize);
+                auto textureSize = dstTexture->getDesc()->size;
+                FormatInfo formatInfo = {};
+                gfxGetFormatInfo(dstTexture->getDesc()->format, &formatInfo);
+                for (uint32_t i = 0; i < (uint32_t)subResourceDataCount; i++)
+                {
+                    auto subresourceIndex = baseSubresourceIndex + i;
+                    // Get the footprint
+                    D3D12_RESOURCE_DESC texDesc = dstTexture->m_resource.getResource()->GetDesc();
+
+                    D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+
+                    dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                    dstRegion.SubresourceIndex = subresourceIndex;
+                    dstRegion.pResource = dstTexture->m_resource.getResource();
+
+                    D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                    srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = srcRegion.PlacedFootprint;
+                    
+                    footprint.Offset = 0;
+                    footprint.Footprint.Format = texDesc.Format;
+                    uint32_t mipLevel = D3DUtil::getSubresourceMipLevel(
+                        subresourceIndex, dstTexture->getDesc()->numMipLevels);
+                    if (extent.width != ITextureResource::kRemainingTextureSize)
+                    {
+                        footprint.Footprint.Width = extent.width;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Width = Math::Max(1, (textureSize.width >> mipLevel)) - offset.x;
+                    }
+                    if (extent.height != ITextureResource::kRemainingTextureSize)
+                    {
+                        footprint.Footprint.Height = extent.height;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Height =
+                            Math::Max(1, (textureSize.height >> mipLevel)) - offset.y;
+                    }
+                    if (extent.depth != ITextureResource::kRemainingTextureSize)
+                    {
+                        footprint.Footprint.Depth = extent.depth;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Depth =
+                            Math::Max(1, (textureSize.depth >> mipLevel)) - offset.z;
+                    }
+                    auto rowSize = (footprint.Footprint.Width + formatInfo.blockWidth - 1) /
+                                   formatInfo.blockWidth * formatInfo.blockSizeInBytes;
+                    footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
+                        rowSize, (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                    auto bufferSize = footprint.Footprint.RowPitch * footprint.Footprint.Height *
+                                      footprint.Footprint.Depth;
+
+                    IBufferResource* stagingBuffer;
+                    m_commandBuffer->m_transientHeap->allocateStagingBuffer(
+                        bufferSize, stagingBuffer, ResourceState::CopySource);
+
+                    BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(stagingBuffer);
+                    uint8_t* bufferData = nullptr;
+                    D3D12_RANGE mapRange = {0, 0};
+                    bufferImpl->m_resource.getResource()->Map(0, &mapRange, (void**)&bufferData);
+                    for (uint32_t z = 0; z < footprint.Footprint.Depth; z++)
+                    {
+                        auto imageStart = bufferData + footprint.Footprint.RowPitch *
+                                                           footprint.Footprint.Height * (size_t)z;
+                        auto srcData =
+                            (uint8_t*)subResourceData->data + subResourceData->strideZ * z;
+                        for (uint32_t row = 0; row < footprint.Footprint.Height; row++)
+                        {
+                            memcpy(
+                                imageStart + row * (size_t)footprint.Footprint.RowPitch,
+                                srcData + subResourceData->strideY * row,
+                                rowSize);
+                        }
+                    }
+                    bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
+
+                    srcRegion.pResource = bufferImpl->m_resource.getResource();
+                    D3D12_BOX srcBox = {};
+                    srcBox.right = (UINT)bufferSize;
+                    srcBox.bottom = srcBox.back = 1;
+                    m_commandBuffer->m_cmdList->CopyTextureRegion(
+                        &dstRegion, offset.x, offset.y, offset.z, &srcRegion, &srcBox);
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
@@ -3626,10 +3876,88 @@ public:
                 ClearValue* clearValue,
                 ClearResourceViewFlags::Enum flags) override
             {
-                SLANG_UNUSED(view);
-                SLANG_UNUSED(clearValue);
-                SLANG_UNUSED(flags);
-                SLANG_UNIMPLEMENTED_X("clearResourceView");
+                auto viewImpl = static_cast<ResourceViewImpl*>(view);
+                switch (view->getViewDesc()->type)
+                {
+                case IResourceView::Type::RenderTarget:
+                    m_commandBuffer->m_cmdList->ClearRenderTargetView(
+                        viewImpl->m_descriptor.cpuHandle,
+                        clearValue->color.floatValues,
+                        0,
+                        nullptr);
+                    break;
+                case IResourceView::Type::DepthStencil:
+                    {
+                        D3D12_CLEAR_FLAGS clearFlags = (D3D12_CLEAR_FLAGS)0;
+                        if (flags & ClearResourceViewFlags::ClearDepth)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_DEPTH;
+                        }
+                        if (flags & ClearResourceViewFlags::ClearStencil)
+                        {
+                            clearFlags |= D3D12_CLEAR_FLAG_STENCIL;
+                        }
+                        m_commandBuffer->m_cmdList->ClearDepthStencilView(
+                            viewImpl->m_descriptor.cpuHandle,
+                            clearFlags,
+                            clearValue->depthStencil.depth,
+                            (UINT8)clearValue->depthStencil.stencil,
+                            0,
+                            nullptr);
+                        break;
+                    }
+                case IResourceView::Type::UnorderedAccess:
+                    {
+                        ID3D12Resource* d3dResource = nullptr;
+                        switch (viewImpl->m_resource->getType())
+                        {
+                        case IResource::Type::Buffer:
+                            d3dResource =
+                                static_cast<BufferResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        default:
+                            d3dResource =
+                                static_cast<TextureResourceImpl*>(viewImpl->m_resource.Ptr())
+                                    ->m_resource.getResource();
+                            break;
+                        }
+                        auto gpuHandleIndex =
+                            m_commandBuffer->m_transientHeap->m_viewHeap.allocate(1);
+                        this->m_commandBuffer->m_renderer->m_device->CopyDescriptorsSimple(
+                            1,
+                            m_commandBuffer->m_transientHeap->m_viewHeap.getCpuHandle(
+                                gpuHandleIndex),
+                            viewImpl->m_descriptor.cpuHandle,
+                            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+                        if (flags & ClearResourceViewFlags::FloatClearValues)
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewFloat(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.floatValues,
+                                0,
+                                nullptr);
+                        }
+                        else
+                        {
+                            m_commandBuffer->m_cmdList->ClearUnorderedAccessViewUint(
+                                m_commandBuffer->m_transientHeap->m_viewHeap.getGpuHandle(
+                                    gpuHandleIndex),
+                                viewImpl->m_descriptor.cpuHandle,
+                                d3dResource,
+                                clearValue->color.uintValues,
+                                0,
+                                nullptr);
+                        }
+                        break;
+                    }
+                default:
+                    break;
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
@@ -3654,14 +3982,93 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(dstSize);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+                auto srcTexture = static_cast<TextureResourceImpl*>(src);
+                auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
+                auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
+                    srcSubresource.mipLevel,
+                    srcSubresource.baseArrayLayer,
+                    0,
+                    srcTexture->getDesc()->numMipLevels,
+                    srcTexture->getDesc()->arraySize);
+                auto textureSize = srcTexture->getDesc()->size;
+                FormatInfo formatInfo = {};
+                gfxGetFormatInfo(srcTexture->getDesc()->format, &formatInfo);
+                if (srcSubresource.mipLevelCount == 0)
+                    srcSubresource.mipLevelCount = srcTexture->getDesc()->numMipLevels;
+                if (srcSubresource.layerCount == 0)
+                    srcSubresource.layerCount = srcTexture->getDesc()->arraySize;
+
+                for (uint32_t layer = 0; layer < srcSubresource.layerCount; layer++)
+                {
+                    for (uint32_t mipId = 0; mipId < srcSubresource.mipLevelCount; mipId++)
+                    {
+                        // Get the footprint
+                        D3D12_RESOURCE_DESC texDesc =
+                            srcTexture->m_resource.getResource()->GetDesc();
+
+                        D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+                        dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                        dstRegion.pResource = dstBuffer->m_resource.getResource();
+                        D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = dstRegion.PlacedFootprint;
+
+                        D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                        srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                        srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                            mipId + srcSubresource.mipLevel,
+                            layer + srcSubresource.baseArrayLayer,
+                            0,
+                            srcTexture->getDesc()->numMipLevels,
+                            srcTexture->getDesc()->arraySize);
+                        srcRegion.pResource = srcTexture->m_resource.getResource();
+
+                        footprint.Offset = 0;
+                        footprint.Footprint.Format = texDesc.Format;
+                        uint32_t mipLevel = mipId + srcSubresource.mipLevel;
+                        if (extent.width != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Width = extent.width;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Width =
+                                Math::Max(1, (textureSize.width >> mipLevel)) - srcOffset.x;
+                        }
+                        if (extent.height != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Height = extent.height;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Height =
+                                Math::Max(1, (textureSize.height >> mipLevel)) - srcOffset.y;
+                        }
+                        if (extent.depth != 0xFFFFFFFF)
+                        {
+                            footprint.Footprint.Depth = extent.depth;
+                        }
+                        else
+                        {
+                            footprint.Footprint.Depth =
+                                Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
+                        }
+                        footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
+                            footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
+                            (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                        auto bufferSize = footprint.Footprint.RowPitch *
+                                          footprint.Footprint.Height * footprint.Footprint.Depth;
+
+                        D3D12_BOX srcBox = {};
+                        srcBox.left = srcOffset.x;
+                        srcBox.top = srcOffset.y;
+                        srcBox.front = srcOffset.z;
+                        srcBox.right = srcOffset.x + extent.width;
+                        srcBox.bottom = srcOffset.y + extent.height;
+                        srcBox.back = srcOffset.z + extent.depth;
+                        m_commandBuffer->m_cmdList->CopyTextureRegion(
+                            &dstRegion, (UINT)dstOffset, 0, 0, &srcRegion, &srcBox);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
@@ -3670,11 +4077,54 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                SLANG_UNUSED(texture);
-                SLANG_UNUSED(subresourceRange);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(dst);
-                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
+                auto textureImpl = static_cast<TextureResourceImpl*>(texture);
+
+                if (subresourceRange.mipLevelCount == 0)
+                    subresourceRange.mipLevelCount = textureImpl->getDesc()->numMipLevels;
+                if (subresourceRange.layerCount == 0)
+                    subresourceRange.layerCount = textureImpl->getDesc()->arraySize;
+
+                auto d3dFormat = D3DUtil::getMapFormat(textureImpl->getDesc()->format);
+
+                ShortList<D3D12_RESOURCE_BARRIER> barriers;
+                D3D12_RESOURCE_BARRIER barrier;
+                barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                if (src == dst && src == ResourceState::UnorderedAccess)
+                {
+                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+                    barrier.UAV.pResource = textureImpl->m_resource.getResource();
+                }
+                else
+                {
+                    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
+                    barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
+                    barrier.Transition.pResource = textureImpl->m_resource.getResource();
+                    auto aspectMask = (int32_t)subresourceRange.aspectMask;
+                    if (subresourceRange.aspectMask == TextureAspect::Default)
+                        aspectMask = (int32_t)TextureAspect::Color;
+                    while (aspectMask)
+                    {
+                        auto aspect = Math::getLowestBit((int32_t)aspectMask);
+                        aspectMask &= ~aspect;
+                        auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
+                        for (uint32_t layer = 0; layer < subresourceRange.baseArrayLayer; layer++)
+                        {
+                            for (uint32_t mip = 0; mip < subresourceRange.mipLevelCount; mip++)
+                            {
+                                barrier.Transition.Subresource = D3DUtil::getSubresourceIndex(
+                                    mip + subresourceRange.mipLevel,
+                                    layer + subresourceRange.baseArrayLayer,
+                                    planeIndex,
+                                    textureImpl->getDesc()->numMipLevels,
+                                    textureImpl->getDesc()->arraySize);
+                                barriers.add(barrier);
+                            }
+                        }
+                    }
+                }
+                m_commandBuffer->m_cmdList->ResourceBarrier(
+                    (UINT)barriers.getCount(), barriers.getArrayView().getBuffer());
             }
         };
 
@@ -3763,6 +4213,65 @@ public:
         }
     };
 
+    class FenceImpl : public FenceBase
+    {
+    public:
+        ComPtr<ID3D12Fence> m_fence;
+        HANDLE m_waitEvent = 0;
+
+        ~FenceImpl()
+        {
+            if (m_waitEvent)
+                CloseHandle(m_waitEvent);
+        }
+
+        HANDLE getWaitEvent()
+        {
+            if (m_waitEvent)
+                return m_waitEvent;
+            m_waitEvent = CreateEventEx(
+                nullptr,
+                nullptr,
+                0,
+                EVENT_ALL_ACCESS);
+            return m_waitEvent;
+        }
+
+        Result init(D3D12Device* device, const IFence::Desc& desc)
+        {
+            SLANG_RETURN_ON_FAIL(device->m_device->CreateFence(
+                desc.initialValue,
+                desc.isShared ? D3D12_FENCE_FLAG_SHARED : D3D12_FENCE_FLAG_NONE,
+                IID_PPV_ARGS(m_fence.writeRef())));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentValue(uint64_t* outValue) override
+        {
+            *outValue = m_fence->GetCompletedValue();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL setCurrentValue(uint64_t value) override
+        {
+            SLANG_RETURN_ON_FAIL(m_fence->Signal(value));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) override
+        {
+            outHandle->handleValue = 0;
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getNativeHandle(InteropHandle* outNativeHandle) override
+        {
+            outNativeHandle->handleValue = 0;
+            return SLANG_FAIL;
+        }
+    };
+
     class CommandQueueImpl
         : public ICommandQueue
         , public ComObject
@@ -3806,7 +4315,7 @@ public:
         }
         ~CommandQueueImpl()
         {
-            wait();
+            waitOnHost();
             CloseHandle(globalWaitHandle);
             m_renderer->m_queueIndexAllocator.free((int)m_queueIndex, 1);
         }
@@ -3844,13 +4353,26 @@ public:
             ResetEvent(globalWaitHandle);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL wait() override
+        virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override
         {
             m_fenceValue++;
             m_d3dQueue->Signal(m_fence, m_fenceValue);
             ResetEvent(globalWaitHandle);
             m_fence->SetEventOnCompletion(m_fenceValue, globalWaitHandle);
             WaitForSingleObject(globalWaitHandle, INFINITE);
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+            uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+        {
+            for (uint32_t i = 0; i < fenceCount; ++i)
+            {
+                auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
+                m_d3dQueue->Wait(
+                    fenceImpl->m_fence.get(),
+                    waitValues[i]);
+            }
+            return SLANG_OK;
         }
 
         virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -3961,7 +4483,7 @@ public:
         bool isShared = false);
 
     Result captureTextureToSurface(
-        D3D12Resource& resource,
+        TextureResourceImpl* resource,
         ResourceState state,
         ISlangBlob** blob,
         size_t* outRowPitch,
@@ -4301,14 +4823,17 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 }
 
 Result D3D12Device::captureTextureToSurface(
-    D3D12Resource& resource,
+    TextureResourceImpl* resourceImpl,
     ResourceState state,
     ISlangBlob** outBlob,
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
+    auto resource = resourceImpl->m_resource;
+
     const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
+    const ITextureResource::Desc& gfxDesc = *resourceImpl->getDesc();
     const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
 
     // Don't bother supporting MSAA for right now
@@ -4318,8 +4843,12 @@ Result D3D12Device::captureTextureToSurface(
         return SLANG_FAIL;
     }
 
-    size_t bytesPerPixel = sizeof(uint32_t);
+    FormatInfo formatInfo;
+    gfxGetFormatInfo(gfxDesc.format, &formatInfo);
+    size_t bytesPerPixel = formatInfo.blockSizeInBytes / formatInfo.pixelsPerBlock;
     size_t rowPitch = int(desc.Width) * bytesPerPixel;
+    static const size_t align = 256; // D3D requires minimum 256 byte alignment for texture data.
+    rowPitch = (rowPitch + align - 1) & ~(align - 1); // Bit trick for rounding up
     size_t bufferSize = rowPitch * int(desc.Height);
     if (outRowPitch)
         *outRowPitch = rowPitch;
@@ -4839,7 +5368,7 @@ SlangResult D3D12Device::readTextureResource(
     size_t* outPixelSize)
 {
     return captureTextureToSurface(
-        static_cast<TextureResourceImpl*>(resource)->m_resource,
+        static_cast<TextureResourceImpl*>(resource),
         state,
         outBlob,
         outRowPitch,
@@ -4934,9 +5463,9 @@ Result D3D12Device::getTextureAllocationInfo(
     TextureResource::Desc srcDesc = fixupTextureDesc(desc);
     D3D12_RESOURCE_DESC resourceDesc = {};
     setupResourceDesc(resourceDesc, srcDesc);
-    auto allocInfo = m_device->GetResourceAllocationInfo(0xFF, 1, &resourceDesc);
-    *outSize = allocInfo.SizeInBytes;
-    *outAlignment = allocInfo.Alignment;
+    auto allocInfo = m_device->GetResourceAllocationInfo(0, 1, &resourceDesc);
+    *outSize = (size_t)allocInfo.SizeInBytes;
+    *outAlignment = (size_t)allocInfo.Alignment;
     return SLANG_OK;
 }
 
@@ -4964,6 +5493,9 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         heapProps.CreationNodeMask = 1;
         heapProps.VisibleNodeMask = 1;
 
+        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+        if (descIn.isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+
         D3D12_CLEAR_VALUE clearValue;
         D3D12_CLEAR_VALUE* clearValuePtr = &clearValue;
         if ((resourceDesc.Flags & (D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
@@ -4978,7 +5510,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
         SLANG_RETURN_ON_FAIL(texture->m_resource.initCommitted(
             m_device,
             heapProps,
-            D3D12_HEAP_FLAG_NONE,
+            flags,
             resourceDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             clearValuePtr));
@@ -5764,7 +6296,6 @@ Result D3D12Device::readBufferResource(
 Result D3D12Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
-    shaderProgram->m_pipelineType = desc.pipelineType;
     shaderProgram->slangProgram = desc.slangProgram;
     RootShaderObjectLayoutImpl::create(
         this,
@@ -5843,6 +6374,14 @@ Result D3D12Device::createMutableShaderObject(
     return SLANG_OK;
 }
 
+Result D3D12Device::createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject)
+{
+    RefPtr<MutableRootShaderObject> result =
+        new MutableRootShaderObject(this, static_cast<ShaderProgramBase*>(program));
+    returnComPtr(outObject, result);
+    return SLANG_OK;
+}
+
 Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
@@ -5903,7 +6442,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         }
         else
         {
-            psoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+            psoDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
             if (framebufferLayout->m_renderTargets.getCount())
             {
                 psoDesc.SampleDesc.Count = framebufferLayout->m_renderTargets[0].sampleCount;
@@ -5942,6 +6481,7 @@ Result D3D12Device::createGraphicsPipelineState(const GraphicsPipelineStateDesc&
         D3D12_BLEND_DESC& blend = psoDesc.BlendState;
         blend.IndependentBlendEnable = FALSE;
         blend.AlphaToCoverageEnable = desc.blend.alphaToCoverageEnable ? TRUE : FALSE;
+        blend.RenderTarget[0].RenderTargetWriteMask = (uint8_t)RenderTargetWriteMask::EnableAll;
         for (uint32_t i = 0; i < desc.blend.targetCount; i++)
         {
             auto& d3dDesc = blend.RenderTarget[i];
@@ -6159,6 +6699,7 @@ Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** o
     {
     case QueryType::AccelerationStructureCompactedSize:
     case QueryType::AccelerationStructureSerializedSize:
+    case QueryType::AccelerationStructureCurrentSize:
         {
             RefPtr<PlainBufferProxyQueryPoolImpl> queryPoolImpl =
                 new PlainBufferProxyQueryPoolImpl();
@@ -6177,6 +6718,34 @@ Result D3D12Device::createQueryPool(const IQueryPool::Desc& desc, IQueryPool** o
             return SLANG_OK;
         }
     }   
+}
+
+Result D3D12Device::createFence(const IFence::Desc& desc, IFence** outFence)
+{
+    RefPtr<FenceImpl> fence = new FenceImpl();
+    SLANG_RETURN_ON_FAIL(fence->init(this, desc));
+    returnComPtr(outFence, fence);
+    return SLANG_OK;
+}
+
+Result D3D12Device::waitForFences(
+    uint32_t fenceCount, IFence** fences, uint64_t* fenceValues, bool waitForAll, uint64_t timeout)
+{
+    ShortList<HANDLE> waitHandles;
+    for (uint32_t i = 0; i < fenceCount; ++i)
+    {
+        auto fenceImpl = static_cast<FenceImpl*>(fences[i]);
+        waitHandles.add(fenceImpl->getWaitEvent());
+        SLANG_RETURN_ON_FAIL(fenceImpl->m_fence->SetEventOnCompletion(fenceValues[i], fenceImpl->getWaitEvent()));
+    }
+    auto result = WaitForMultipleObjects(
+        fenceCount,
+        waitHandles.getArrayView().getBuffer(),
+        waitForAll ? TRUE : FALSE,
+        timeout == kTimeoutInfinite ? INFINITE : (DWORD)(timeout / 1000000));
+    if (result == WAIT_TIMEOUT)
+        return SLANG_E_TIME_OUT;
+    return result == WAIT_FAILED ? SLANG_FAIL : SLANG_OK;
 }
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -6253,6 +6822,15 @@ void translatePostBuildInfoDescs(
         case QueryType::AccelerationStructureCompactedSize:
             postBuildInfoDescs[i].InfoType =
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE;
+            postBuildInfoDescs[i].DestBuffer =
+                static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
+                    ->m_bufferResource->getDeviceAddress() +
+                sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_COMPACTED_SIZE_DESC) *
+                    queryDescs[i].firstQueryIndex;
+            break;
+        case QueryType::AccelerationStructureCurrentSize:
+            postBuildInfoDescs[i].InfoType =
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_POSTBUILD_INFO_CURRENT_SIZE;
             postBuildInfoDescs[i].DestBuffer =
                 static_cast<D3D12Device::PlainBufferProxyQueryPoolImpl*>(queryDescs[i].queryPool)
                     ->m_bufferResource->getDeviceAddress() +

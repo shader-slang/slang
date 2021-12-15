@@ -79,9 +79,14 @@ namespace gfx {
     \
     x(vkCmdBindPipeline) \
     x(vkCmdClearAttachments) \
+    x(vkCmdClearColorImage) \
+    x(vkCmdClearDepthStencilImage) \
+    x(vkCmdFillBuffer) \
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
     x(vkCmdDraw) \
+    x(vkCmdDrawIndirect) \
+    x(vkCmdDrawIndexedIndirect) \
     x(vkCmdSetScissor) \
     x(vkCmdSetViewport) \
     x(vkCmdBindVertexBuffers) \
@@ -179,6 +184,13 @@ namespace gfx {
     x(vkCreateAccelerationStructureKHR) \
     x(vkDestroyAccelerationStructureKHR) \
     x(vkGetAccelerationStructureBuildSizesKHR) \
+    x(vkGetSemaphoreCounterValue) \
+    x(vkGetSemaphoreCounterValueKHR) \
+    x(vkSignalSemaphore) \
+    x(vkSignalSemaphoreKHR) \
+    x(vkWaitSemaphores) \
+    x(vkWaitSemaphoresKHR) \
+    x(vkCmdSetSampleLocationsEXT) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \

@@ -275,15 +275,18 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\buffer-barrier-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\draw-instanced-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-unit-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-shared-handle.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -291,7 +294,9 @@
     <None Include="..\..\..\tools\gfx-unit-test\compute-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\compute-trivial.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\core\core.vcxproj">

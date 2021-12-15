@@ -65,6 +65,13 @@ return gfx::StageType::TO
     }
 }
 
+IFence* FenceBase::getInterface(const Slang::Guid& guid)
+{
+    if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IFence)
+        return static_cast<IFence*>(this);
+    return nullptr;
+}
+
 IResource* BufferResource::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IResource ||
@@ -358,6 +365,19 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromNativeHandle(
     return SLANG_E_NOT_AVAILABLE;
 }
 
+SLANG_NO_THROW Result SLANG_MCALL RendererBase::createTextureFromSharedHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    const size_t size,
+    ITextureResource** outResource)
+{
+    SLANG_UNUSED(handle);
+    SLANG_UNUSED(srcDesc);
+    SLANG_UNUSED(size);
+    SLANG_UNUSED(outResource);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::createBufferFromNativeHandle(
     InteropHandle handle,
     const IBufferResource::Desc& srcDesc,
@@ -374,6 +394,7 @@ SLANG_NO_THROW Result SLANG_MCALL RendererBase::createBufferFromSharedHandle(
     const IBufferResource::Desc& srcDesc,
     IBufferResource** outResource)
 {
+    SLANG_UNUSED(handle);
     SLANG_UNUSED(srcDesc);
     SLANG_UNUSED(outResource);
     return SLANG_E_NOT_AVAILABLE;
@@ -731,7 +752,6 @@ Result RendererBase::maybeSpecializePipeline(
             ComPtr<IShaderProgram> specializedProgram;
             IShaderProgram::Desc specializedProgramDesc = {};
             specializedProgramDesc.slangProgram = specializedComponentType;
-            specializedProgramDesc.pipelineType = pipelineType;
             SLANG_RETURN_ON_FAIL(createProgram(specializedProgramDesc, specializedProgram.writeRef()));
 
             // Create specialized pipeline state.
@@ -797,6 +817,34 @@ IDebugCallback* _getNullDebugCallback()
 {
     static NullDebugCallback result = {};
     return &result;
+}
+
+Result ShaderObjectBase::copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap)
+{
+    if (auto srcObj = dynamic_cast<MutableRootShaderObject*>(object))
+    {
+        setData(gfx::ShaderOffset(), srcObj->m_data.begin(), (size_t)srcObj->m_data.getCount());
+        for (auto& kv : srcObj->m_objects)
+        {
+            ComPtr<IShaderObject> subObject;
+            SLANG_RETURN_ON_FAIL(kv.Value->getCurrentVersion(transientHeap, subObject.writeRef()));
+            setObject(kv.Key, subObject);
+        }
+        for (auto& kv : srcObj->m_resources)
+        {
+            setResource(kv.Key, kv.Value.Ptr());
+        }
+        for (auto& kv : srcObj->m_samplers)
+        {
+            setSampler(kv.Key, kv.Value.Ptr());
+        }
+        for (auto& kv : srcObj->m_specializationArgs)
+        {
+            setSpecializationArgs(kv.Key, kv.Value.begin(), (uint32_t)kv.Value.getCount());
+        }
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
 }
 
 } // namespace gfx

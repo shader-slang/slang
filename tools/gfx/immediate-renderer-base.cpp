@@ -116,29 +116,30 @@ public:
             m_writer->setPrimitiveTopology(topology);
         }
         virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-            UInt startSlot,
-            UInt slotCount,
+            uint32_t startSlot,
+            uint32_t slotCount,
             IBufferResource* const* buffers,
-            const UInt* strides,
-            const UInt* offsets) override
+            const uint32_t* strides,
+            const uint32_t* offsets) override
         {
             m_writer->setVertexBuffers(startSlot, slotCount, buffers, strides, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override
+            setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset) override
         {
             m_writer->setIndexBuffer(buffer, indexFormat, offset);
         }
 
-        virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex) override
+        virtual SLANG_NO_THROW void SLANG_MCALL
+            draw(uint32_t vertexCount, uint32_t startVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->draw(vertexCount, startVertex);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
-            drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override
+            drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override
         {
             m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
             m_writer->drawIndexed(indexCount, startIndex, baseVertex);
@@ -196,10 +197,10 @@ public:
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-            UInt vertexCount,
-            UInt instanceCount,
-            UInt startVertex,
-            UInt startInstanceLocation) override
+            uint32_t vertexCount,
+            uint32_t instanceCount,
+            uint32_t startVertex,
+            uint32_t startInstanceLocation) override
         {
             SLANG_UNUSED(vertexCount);
             SLANG_UNUSED(instanceCount);
@@ -362,7 +363,7 @@ public:
             ITextureResource* dst,
             SubresourceRange subResourceRange,
             ITextureResource::Offset3D offset,
-            ITextureResource::Offset3D extend,
+            ITextureResource::Size extend,
             ITextureResource::SubresourceData* subResourceData,
             size_t subResourceDataCount) override
         {
@@ -496,11 +497,11 @@ public:
                             m_writer.getObject<BufferResource>(cmd.operands[2] + i));
                     }
                     m_renderer->setVertexBuffers(
-                        (UInt)cmd.operands[0],
-                        (UInt)cmd.operands[1],
+                        cmd.operands[0],
+                        cmd.operands[1],
                         bufferResources.getArrayView().getBuffer(),
-                        m_writer.getData<UInt>(cmd.operands[3]),
-                        m_writer.getData<UInt>(cmd.operands[4]));
+                        m_writer.getData<uint32_t>(cmd.operands[3]),
+                        m_writer.getData<uint32_t>(cmd.operands[4]));
                 }
                 break;
             case CommandName::SetIndexBuffer:
@@ -510,11 +511,11 @@ public:
                     (UInt)cmd.operands[2]);
                 break;
             case CommandName::Draw:
-                m_renderer->draw((UInt)cmd.operands[0], (UInt)cmd.operands[1]);
+                m_renderer->draw(cmd.operands[0], cmd.operands[1]);
                 break;
             case CommandName::DrawIndexed:
                 m_renderer->drawIndexed(
-                    (UInt)cmd.operands[0], (UInt)cmd.operands[1], (UInt)cmd.operands[2]);
+                    cmd.operands[0], cmd.operands[1], cmd.operands[2]);
                 break;
             case CommandName::SetStencilReference:
                 m_renderer->setStencilReference(cmd.operands[0]);
@@ -593,7 +594,13 @@ public:
         static_cast<ImmediateRendererBase*>(m_renderer.get())->endCommandBuffer(info);
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL wait() override { getRenderer()->waitForGpu(); }
+    virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override { getRenderer()->waitForGpu(); }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+        uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override
+    {
+        return SLANG_FAIL;
+    }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
         getNativeHandle(NativeHandle* outHandle) override

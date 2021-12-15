@@ -185,6 +185,13 @@ void returnRefPtrMove(TDest** outPtr, Slang::RefPtr<TImpl>& refPtr)
 
 gfx::StageType translateStage(SlangStage slangStage);
 
+class FenceBase : public IFence, public Slang::ComObject
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IFence* getInterface(const Slang::Guid& guid);
+};
+
 class Resource : public Slang::ComObject
 {
 public:
@@ -533,15 +540,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override
     {
-        SLANG_UNUSED(outObject);
-        return SLANG_E_NOT_AVAILABLE;
+        returnComPtr(outObject, this);
+        return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override
-    {
-        SLANG_UNUSED(other);
-        return SLANG_E_NOT_AVAILABLE;
-    }
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        copyFrom(IShaderObject* object, ITransientResourceHeap* transientHeap) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
     {
@@ -1004,6 +1008,15 @@ public:
     IQueryPool* getInterface(const Slang::Guid& guid);
 };
 
+enum class PipelineType
+{
+    Unknown,
+    Graphics,
+    Compute,
+    RayTracing,
+    CountOf,
+};
+
 class PipelineStateBase
     : public IPipelineState
     , public Slang::ComObject
@@ -1200,6 +1213,12 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromNativeHandle(
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
+        ITextureResource** outResource) SLANG_OVERRIDE;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
         ITextureResource** outResource) SLANG_OVERRIDE;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferFromNativeHandle(

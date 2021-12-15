@@ -9,7 +9,7 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    void computeSmokeTestImpl(IDevice* device, UnitTestContext* context)
+    void mutableRootShaderObjectTestImpl(IDevice* device, UnitTestContext* context)
     {
         Slang::ComPtr<ITransientResourceHeap> transientHeap;
         ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -19,7 +19,7 @@ namespace gfx_test
 
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
-        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "compute-smoke", "computeMain", slangReflection));
+        GFX_CHECK_CALL_ABORT(loadComputeProgram(device, shaderProgram, "mutable-shader-object", "computeMain", slangReflection));
 
         ComputePipelineStateDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
@@ -27,10 +27,10 @@ namespace gfx_test
         GFX_CHECK_CALL_ABORT(
             device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
-        const int numberCount = 4;
         float initialData[] = { 0.0f, 1.0f, 2.0f, 3.0f };
+        const int numberCount = SLANG_COUNT_OF(initialData);
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.sizeInBytes = numberCount * sizeof(float);
+        bufferDesc.sizeInBytes = sizeof(initialData);
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(float);
         bufferDesc.allowedStates = ResourceStateSet(
@@ -53,38 +53,50 @@ namespace gfx_test
         viewDesc.format = Format::Unknown;
         GFX_CHECK_CALL_ABORT(device->createBufferView(numbersBuffer, viewDesc, bufferView.writeRef()));
 
-        // We have done all the set up work, now it is time to start recording a command buffer for
-        // GPU execution.
+        ComPtr<IShaderObject> rootObject;
+        device->createMutableRootShaderObject(shaderProgram, rootObject.writeRef());
+        auto entryPointCursor = ShaderCursor(rootObject->getEntryPoint(0));
+        entryPointCursor.getPath("buffer").setResource(bufferView);
+
+        slang::TypeReflection* addTransformerType =
+            slangReflection->findTypeByName("AddTransformer");
+        ComPtr<IShaderObject> transformer;
+        GFX_CHECK_CALL_ABORT(device->createMutableShaderObject(
+            addTransformerType, ShaderObjectContainerType::None, transformer.writeRef()));
+        entryPointCursor.getPath("transformer").setObject(transformer);
+
+        // Set the `c` field of the `AddTransformer`.
+        float c = 1.0f;
+        ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
+
         {
             ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
             auto queue = device->createCommandQueue(queueDesc);
 
             auto commandBuffer = transientHeap->createCommandBuffer();
-            auto encoder = commandBuffer->encodeComputeCommands();
+            {
+                auto encoder = commandBuffer->encodeComputeCommands();
+                auto root = encoder->bindPipeline(pipelineState);
+                root->copyFrom(rootObject, transientHeap);
+                encoder->dispatchCompute(1, 1, 1);
+                encoder->endEncoding();
+            }
 
-            auto rootObject = encoder->bindPipeline(pipelineState);
+            auto barrierEncoder = commandBuffer->encodeResourceCommands();
+            barrierEncoder->bufferBarrier(1, numbersBuffer.readRef(), ResourceState::UnorderedAccess, ResourceState::UnorderedAccess);
+            barrierEncoder->endEncoding();
 
-            slang::TypeReflection* addTransformerType =
-                slangReflection->findTypeByName("AddTransformer");
-
-            // Now we can use this type to create a shader object that can be bound to the root object.
-            ComPtr<IShaderObject> transformer;
-            GFX_CHECK_CALL_ABORT(device->createShaderObject(
-                addTransformerType, ShaderObjectContainerType::None, transformer.writeRef()));
-            // Set the `c` field of the `AddTransformer`.
-            float c = 1.0f;
+            // Mutate `transformer` object and run again.
+            c = 2.0f;
             ShaderCursor(transformer).getPath("c").setData(&c, sizeof(float));
+            {
+                auto encoder = commandBuffer->encodeComputeCommands();
+                auto root = encoder->bindPipeline(pipelineState);
+                root->copyFrom(rootObject, transientHeap);
+                encoder->dispatchCompute(1, 1, 1);
+                encoder->endEncoding();
+            }
 
-            ShaderCursor entryPointCursor(
-                rootObject->getEntryPoint(0)); // get a cursor the the first entry-point.
-            // Bind buffer view to the entry point.
-            entryPointCursor.getPath("buffer").setResource(bufferView);
-
-            // Bind the previously created transformer object to root object.
-            entryPointCursor.getPath("transformer").setObject(transformer);
-
-            encoder->dispatchCompute(1, 1, 1);
-            encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
             queue->waitOnHost();
@@ -93,17 +105,16 @@ namespace gfx_test
         compareComputeResult(
             device,
             numbersBuffer,
-            Slang::makeArray<float>(11.0f, 12.0f, 13.0f, 14.0f));
+            Slang::makeArray<float>(3.0f, 4.0f, 5.0f, 6.0f));
     }
 
-    SLANG_UNIT_TEST(computeSmokeD3D11)
+    SLANG_UNIT_TEST(mutableRootShaderObjectD3D12)
     {
-        runTestImpl(computeSmokeTestImpl, unitTestContext, Slang::RenderApiFlag::D3D11);
+        runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-    SLANG_UNIT_TEST(computeSmokeVulkan)
+    SLANG_UNIT_TEST(mutableRootShaderObjectVulkan)
     {
-        runTestImpl(computeSmokeTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+        runTestImpl(mutableRootShaderObjectTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-
 }

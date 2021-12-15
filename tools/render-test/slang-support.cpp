@@ -51,18 +51,15 @@ gfx::StageType translateStage(SlangStage slangStage)
 }
 
 void ShaderCompilerUtil::Output::set(
-    PipelineType                        pipelineType,
     slang::IComponentType*              inSlangProgram)
 {
     slangProgram = inSlangProgram;
-    desc.pipelineType = pipelineType;
     desc.slangProgram = inSlangProgram;
 }
 
 void ShaderCompilerUtil::Output::reset()
 {
     {
-        desc.pipelineType = PipelineType::Unknown;
         desc.slangProgram = nullptr;
     }
 
@@ -266,7 +263,7 @@ void ShaderCompilerUtil::Output::reset()
             outDiagnostic.writeRef());
         linkedSlangProgram = newProgram;
     }
-    out.set(input.pipelineType, linkedSlangProgram);
+    out.set(linkedSlangProgram);
     return SLANG_OK;
 }
 

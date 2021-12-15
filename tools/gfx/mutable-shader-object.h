@@ -220,4 +220,167 @@ namespace gfx
             return m_shaderObjectVersions.getLastAllocation().object;
         }
     };
+
+    // A proxy shader object to hold mutable shader parameters for global scope and entry-points.
+    class MutableRootShaderObject : public ShaderObjectBase
+    {
+    public:
+        Slang::List<uint8_t> m_data;
+        Slang::OrderedDictionary<ShaderOffset, Slang::RefPtr<ResourceViewBase>> m_resources;
+        Slang::OrderedDictionary<ShaderOffset, Slang::RefPtr<SamplerStateBase>> m_samplers;
+        Slang::OrderedDictionary<ShaderOffset, Slang::RefPtr<ShaderObjectBase>> m_objects;
+        Slang::OrderedDictionary<ShaderOffset, Slang::List<slang::SpecializationArg>> m_specializationArgs;
+        Slang::List<Slang::RefPtr<MutableRootShaderObject>> m_entryPoints;
+        Slang::RefPtr<BufferResource> m_constantBufferOverride;
+        slang::TypeLayoutReflection* m_elementTypeLayout;
+
+        MutableRootShaderObject(RendererBase* device, slang::TypeLayoutReflection* entryPointLayout)
+        {
+            this->m_device = device;
+            m_elementTypeLayout = entryPointLayout;
+            m_data.setCount(entryPointLayout->getSize());
+            memset(m_data.begin(), 0, m_data.getCount());
+        }
+
+        MutableRootShaderObject(RendererBase* device, Slang::RefPtr<ShaderProgramBase> program)
+        {
+            this->m_device = device;
+            auto programLayout = program->slangProgram->getLayout();
+            SlangInt entryPointCount = programLayout->getEntryPointCount();
+            for (SlangInt e = 0; e < entryPointCount; ++e)
+            {
+                auto slangEntryPoint = programLayout->getEntryPointByIndex(e);
+                Slang::RefPtr<MutableRootShaderObject> entryPointObject =
+                    new MutableRootShaderObject(device, slangEntryPoint->getTypeLayout()->getElementTypeLayout());
+
+                m_entryPoints.add(entryPointObject);
+            }
+            m_data.setCount(programLayout->getGlobalParamsTypeLayout()->getSize());
+            memset(m_data.begin(), 0, m_data.getCount());
+            m_elementTypeLayout = programLayout->getGlobalParamsTypeLayout();
+        }
+
+
+        virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL
+            getElementTypeLayout() override
+        {
+            return m_elementTypeLayout;
+        }
+
+        virtual SLANG_NO_THROW ShaderObjectContainerType SLANG_MCALL getContainerType() override
+        {
+            return ShaderObjectContainerType::None;
+        }
+
+        virtual SLANG_NO_THROW UInt SLANG_MCALL getEntryPointCount() override
+        {
+            return (UInt)m_entryPoints.getCount();
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getEntryPoint(UInt index, IShaderObject** entryPoint) override
+        {
+            returnComPtr(entryPoint, m_entryPoints[index]);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            setData(ShaderOffset const& offset, void const* data, size_t size) override
+        {
+            auto newSize = Slang::Index(size + offset.uniformOffset);
+            if (newSize > m_data.getCount())
+                m_data.setCount((Slang::Index)newSize);
+            memcpy(m_data.begin() + offset.uniformOffset, data, size);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            getObject(ShaderOffset const& offset, IShaderObject** object) override
+        {
+            *object = nullptr;
+
+            Slang::RefPtr<ShaderObjectBase> subObject;
+            if (m_objects.TryGetValue(offset, subObject))
+            {
+                returnComPtr(object, subObject);
+            }
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            setObject(ShaderOffset const& offset, IShaderObject* object) override
+        {
+            m_objects[offset] = static_cast<ShaderObjectBase*>(object);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            setResource(ShaderOffset const& offset, IResourceView* resourceView) override
+        {
+            m_resources[offset] = static_cast<ResourceViewBase*>(resourceView);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            setSampler(ShaderOffset const& offset, ISamplerState* sampler) override
+        {
+            m_samplers[offset] = static_cast<SamplerStateBase*>(sampler);
+            return SLANG_OK;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
+            ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override
+        {
+            m_resources[offset] = static_cast<ResourceViewBase*>(textureView);
+            m_samplers[offset] = static_cast<SamplerStateBase*>(sampler);
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL setSpecializationArgs(
+            ShaderOffset const& offset,
+            const slang::SpecializationArg* args,
+            uint32_t count) override
+        {
+            Slang::List<slang::SpecializationArg> specArgs;
+            specArgs.addRange(args, count);
+            m_specializationArgs[offset] = specArgs;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
+            ITransientResourceHeap* transientHeap, IShaderObject** outObject) override
+        {
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap) override
+        {
+            auto otherObject = static_cast<MutableRootShaderObject*>(other);
+            *this = *otherObject;
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override
+        {
+            return m_data.begin();
+        }
+
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override
+        {
+            return (size_t)m_data.getCount();
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            setConstantBufferOverride(IBufferResource* constantBuffer) override
+        {
+            m_constantBufferOverride = static_cast<BufferResource*>(constantBuffer);
+            return SLANG_OK;
+        }
+
+        virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override
+        {
+            SLANG_UNUSED(args);
+            return SLANG_OK;
+        }
+    };
+
 }

@@ -155,9 +155,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 
 // Load and compile shader code from souce.
 gfx::Result loadShaderProgram(
-    gfx::IDevice*         device,
-    gfx::PipelineType pipelineType,
-    gfx::IShaderProgram**   outProgram)
+    gfx::IDevice* device, bool isComputePipeline, gfx::IShaderProgram** outProgram)
 {
     ComPtr<slang::ISession> slangSession;
     slangSession = device->getSlangSession();
@@ -170,7 +168,7 @@ gfx::Result loadShaderProgram(
 
     Slang::List<slang::IComponentType*> componentTypes;
     componentTypes.add(module);
-    if (pipelineType == PipelineType::Compute)
+    if (isComputePipeline)
     {
         ComPtr<slang::IEntryPoint> computeEntryPoint;
         SLANG_RETURN_ON_FAIL(module->findEntryPointByName("computeMain", computeEntryPoint.writeRef()));
@@ -195,7 +193,6 @@ gfx::Result loadShaderProgram(
     SLANG_RETURN_ON_FAIL(result);
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = pipelineType;
     programDesc.slangProgram = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
@@ -397,7 +394,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
@@ -419,7 +416,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     // Build top level acceleration structure.
@@ -483,7 +480,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     IBufferResource::Desc fullScreenVertexBufferDesc;
@@ -504,7 +501,7 @@ Slang::Result initialize()
         return SLANG_FAIL;
 
     ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, PipelineType::Graphics, shaderProgram.writeRef()));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, false, shaderProgram.writeRef()));
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
@@ -514,8 +511,7 @@ Slang::Result initialize()
         return SLANG_FAIL;
 
     ComPtr<IShaderProgram> computeProgram;
-    SLANG_RETURN_ON_FAIL(
-        loadShaderProgram(gDevice, PipelineType::Compute, computeProgram.writeRef()));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, true, computeProgram.writeRef()));
     ComputePipelineStateDesc computeDesc;
     computeDesc.program = computeProgram;
     gRenderPipelineState = gDevice->createComputePipelineState(computeDesc);

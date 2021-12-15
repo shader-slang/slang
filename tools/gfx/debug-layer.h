@@ -60,6 +60,11 @@ public:
         InteropHandle handle,
         const ITextureResource::Desc& srcDesc,
         ITextureResource** outResource) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createTextureFromSharedHandle(
+        InteropHandle handle,
+        const ITextureResource::Desc& srcDesc,
+        const size_t size,
+        ITextureResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferResource(
         const IBufferResource::Desc& desc,
         const void* initData,
@@ -280,7 +285,8 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getCurrentVersion(
         ITransientResourceHeap* transientHeap, IShaderObject** outObject) override;
-    virtual SLANG_NO_THROW Result SLANG_MCALL copyFrom(IShaderObject* other) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap) override;
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
@@ -339,16 +345,17 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         setPrimitiveTopology(PrimitiveTopology topology) override;
     virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
+        uint32_t startSlot,
+        uint32_t slotCount,
         IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) override;
+        const uint32_t* strides,
+        const uint32_t* offsets) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset = 0) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL draw(UInt vertexCount, UInt startVertex = 0) override;
+        setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-        drawIndexed(UInt indexCount, UInt startIndex = 0, UInt baseVertex = 0) override;
+        draw(uint32_t vertexCount, uint32_t startVertex = 0) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+        drawIndexed(uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) override;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndirect(
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
@@ -368,10 +375,10 @@ public:
         uint32_t pixelCount,
         const SamplePosition* samplePositions) override;
     virtual SLANG_NO_THROW void SLANG_MCALL drawInstanced(
-        UInt vertexCount,
-        UInt instanceCount,
-        UInt startVertex,
-        UInt startInstanceLocation) override;
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
         uint32_t indexCount,
@@ -421,7 +428,7 @@ public:
         ITextureResource* dst,
         SubresourceRange subResourceRange,
         ITextureResource::Offset3D offset,
-        ITextureResource::Offset3D extent,
+        ITextureResource::Size extent,
         ITextureResource::SubresourceData* subResourceData,
         size_t subResourceDataCount) override;
 
@@ -559,7 +566,9 @@ public:
     virtual SLANG_NO_THROW const Desc& SLANG_MCALL getDesc() override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override;
-    virtual SLANG_NO_THROW void SLANG_MCALL wait() override;
+    virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL waitForFenceValuesOnDevice(
+        uint32_t fenceCount, IFence** fences, uint64_t* waitValues) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) override;
 };
 

@@ -80,6 +80,13 @@ struct ShaderOutputPlan
     List<Item> items;
 };
 
+enum class PipelineType
+{
+    Graphics,
+    Compute,
+    RayTracing,
+};
+
 class RenderTestApp
 {
 public:
@@ -751,7 +758,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
@@ -774,7 +781,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
     }
 
     // Build top level acceleration structure.
@@ -813,13 +820,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         m_tlasBuffer = m_device->createBufferResource(asBufferDesc);
 
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = m_device->createBufferResource(scratchBufferDesc);
 
         IAccelerationStructure::CreateDesc createDesc;
@@ -840,7 +847,7 @@ void RenderTestApp::_initializeAccelerationStructure()
         encoder->endEncoding();
         commandBuffer->close();
         m_queue->executeCommandBuffer(commandBuffer);
-        m_queue->wait();
+        m_queue->waitOnHost();
     }
 }
 
@@ -883,7 +890,7 @@ void RenderTestApp::finalize()
 Result RenderTestApp::writeBindingOutput(const String& fileName)
 {
     // Wait until everything is complete
-    m_queue->wait();
+    m_queue->waitOnHost();
 
     FILE * f = fopen(fileName.getBuffer(), "wb");
     if (!f)
@@ -993,7 +1000,7 @@ Result RenderTestApp::update()
 
     m_startTicks = Process::getClockTick();
     m_queue->executeCommandBuffer(commandBuffer);
-    m_queue->wait();
+    m_queue->waitOnHost();
 
     // If we are in a mode where output is requested, we need to snapshot the back buffer here
     if (m_options.outputPath.getLength() || m_options.performanceProfile)
@@ -1227,25 +1234,6 @@ static SlangResult _innerMain(Slang::StdWriters* stdWriters, SlangSession* sessi
 
         default:
             break;
-    }
-
-    switch( options.shaderType )
-    {
-    case Options::ShaderProgramType::Graphics:
-    case Options::ShaderProgramType::GraphicsCompute:
-        input.pipelineType = PipelineType::Graphics;
-        break;
-
-    case Options::ShaderProgramType::Compute:
-        input.pipelineType = PipelineType::Compute;
-        break;
-
-    case Options::ShaderProgramType::RayTracing:
-        input.pipelineType = PipelineType::RayTracing;
-        break;
-
-    default:
-        break;
     }
 
     if (options.sourceLanguage != SLANG_SOURCE_LANGUAGE_UNKNOWN)

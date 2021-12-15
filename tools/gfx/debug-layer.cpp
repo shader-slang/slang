@@ -370,6 +370,22 @@ Result DebugDevice::createTextureFromNativeHandle(
     return result;
 }
 
+Result DebugDevice::createTextureFromSharedHandle(
+    InteropHandle handle,
+    const ITextureResource::Desc& srcDesc,
+    const size_t size,
+    ITextureResource** outResource)
+{
+    SLANG_GFX_API_FUNC;
+
+    RefPtr<DebugTextureResource> outObject = new DebugTextureResource();
+    auto result = baseObject->createTextureFromSharedHandle(handle, srcDesc, size, outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    returnComPtr(outResource, outObject);
+    return result;
+}
+
 Result DebugDevice::createBufferResource(
     const IBufferResource::Desc& desc,
     const void* initData,
@@ -1068,11 +1084,11 @@ void DebugRenderCommandEncoder::setPrimitiveTopology(PrimitiveTopology topology)
 }
 
 void DebugRenderCommandEncoder::setVertexBuffers(
-    UInt startSlot,
-    UInt slotCount,
+    uint32_t startSlot,
+    uint32_t slotCount,
     IBufferResource* const* buffers,
-    const UInt* strides,
-    const UInt* offsets)
+    const uint32_t* strides,
+    const uint32_t* offsets)
 {
     SLANG_GFX_API_FUNC;
 
@@ -1085,22 +1101,21 @@ void DebugRenderCommandEncoder::setVertexBuffers(
 }
 
 void DebugRenderCommandEncoder::setIndexBuffer(
-    IBufferResource* buffer,
-    Format indexFormat,
-    UInt offset)
+    IBufferResource* buffer, Format indexFormat, uint32_t offset)
 {
     SLANG_GFX_API_FUNC;
     auto innerBuffer = static_cast<DebugBufferResource*>(buffer)->baseObject.get();
     baseObject->setIndexBuffer(innerBuffer, indexFormat, offset);
 }
 
-void DebugRenderCommandEncoder::draw(UInt vertexCount, UInt startVertex)
+void DebugRenderCommandEncoder::draw(uint32_t vertexCount, uint32_t startVertex)
 {
     SLANG_GFX_API_FUNC;
     baseObject->draw(vertexCount, startVertex);
 }
 
-void DebugRenderCommandEncoder::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+void DebugRenderCommandEncoder::drawIndexed(
+    uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
 {
     SLANG_GFX_API_FUNC;
     baseObject->drawIndexed(indexCount, startIndex, baseVertex);
@@ -1150,7 +1165,10 @@ Result DebugRenderCommandEncoder::setSamplePositions(
 }
 
 void DebugRenderCommandEncoder::drawInstanced(
-    UInt vertexCount, UInt instanceCount, UInt startVertex, UInt startInstanceLocation)
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startInstanceLocation)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->drawInstanced(
@@ -1262,7 +1280,7 @@ void DebugResourceCommandEncoder::uploadTextureData(
     ITextureResource* dst,
     SubresourceRange subResourceRange,
     ITextureResource::Offset3D offset,
-    ITextureResource::Offset3D extent,
+    ITextureResource::Size extent,
     ITextureResource::SubresourceData* subResourceData,
     size_t subResourceDataCount)
 {
@@ -1275,6 +1293,18 @@ void DebugResourceCommandEncoder::clearResourceView(
     IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags)
 {
     SLANG_GFX_API_FUNC;
+    switch (view->getViewDesc()->type)
+    {
+    case IResourceView::Type::DepthStencil:
+    case IResourceView::Type::RenderTarget:
+    case IResourceView::Type::UnorderedAccess:
+        break;
+    default:
+        GFX_DIAGNOSE_ERROR_FORMAT(
+            "Resource view %lld cannot be cleared. Only DepthStencil, "
+            "RenderTarget or UnorderedAccess views can be cleared.",
+            getDebugObj(view)->uid);
+    }
     baseObject->clearResourceView(getInnerObj(view), clearValue, flags);
 }
 
@@ -1467,10 +1497,27 @@ void DebugCommandQueue::executeCommandBuffers(uint32_t count, ICommandBuffer* co
     baseObject->executeCommandBuffers(count, innerCommandBuffers.getBuffer(), getInnerObj(fence), valueToSignal);
 }
 
-void DebugCommandQueue::wait() { baseObject->wait(); }
+void DebugCommandQueue::waitOnHost()
+{
+    SLANG_GFX_API_FUNC;
+    baseObject->waitOnHost();
+}
+
+Result DebugCommandQueue::waitForFenceValuesOnDevice(
+    uint32_t fenceCount, IFence** fences, uint64_t* waitValues)
+{
+    SLANG_GFX_API_FUNC;
+    List<IFence*> innerFences;
+    for (uint32_t i = 0; i < fenceCount; ++i)
+    {
+        innerFences.add(getInnerObj(fences[i]));
+    }
+    return baseObject->waitForFenceValuesOnDevice(fenceCount, innerFences.getBuffer(), waitValues);
+}
 
 Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
 }
 
@@ -1686,10 +1733,10 @@ Result DebugShaderObject::getCurrentVersion(
     return SLANG_OK;
 }
 
-Result DebugShaderObject::copyFrom(IShaderObject* other)
+Result DebugShaderObject::copyFrom(IShaderObject* other, ITransientResourceHeap* transientHeap)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->copyFrom(getInnerObj(other));
+    return baseObject->copyFrom(getInnerObj(other), getInnerObj(transientHeap));
 }
 
 const void* DebugShaderObject::getRawData()

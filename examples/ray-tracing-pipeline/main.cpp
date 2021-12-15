@@ -155,9 +155,7 @@ void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob)
 
 // Load and compile shader code from souce.
 gfx::Result loadShaderProgram(
-    gfx::IDevice*         device,
-    gfx::PipelineType pipelineType,
-    gfx::IShaderProgram**   outProgram)
+    gfx::IDevice* device, bool isRayTracingPipeline, gfx::IShaderProgram** outProgram)
 {
     ComPtr<slang::ISession> slangSession;
     slangSession = device->getSlangSession();
@@ -170,7 +168,7 @@ gfx::Result loadShaderProgram(
 
     Slang::List<slang::IComponentType*> componentTypes;
     componentTypes.add(module);
-    if (pipelineType == PipelineType::RayTracing)
+    if (isRayTracingPipeline)
     {
         ComPtr<slang::IEntryPoint> entryPoint;
         SLANG_RETURN_ON_FAIL(module->findEntryPointByName("rayGenShader", entryPoint.writeRef()));
@@ -203,7 +201,6 @@ gfx::Result loadShaderProgram(
     SLANG_RETURN_ON_FAIL(result);
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = pipelineType;
     programDesc.slangProgram = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
@@ -367,12 +364,12 @@ Slang::Result initialize()
         IBufferResource::Desc asDraftBufferDesc;
         asDraftBufferDesc.type = IResource::Type::Buffer;
         asDraftBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asDraftBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asDraftBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         ComPtr<IBufferResource> draftBuffer = gDevice->createBufferResource(asDraftBufferDesc);
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = gDevice->createBufferResource(scratchBufferDesc);
 
         // Build acceleration structure.
@@ -405,20 +402,20 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
 
         uint64_t compactedSize = 0;
         compactedSizeQuery->getResult(0, 1, &compactedSize);
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = compactedSize;
+        asBufferDesc.sizeInBytes = (size_t)compactedSize;
         gBLASBuffer = gDevice->createBufferResource(asBufferDesc);
         IAccelerationStructure::CreateDesc createDesc;
         createDesc.buffer = gBLASBuffer;
         createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
         createDesc.offset = 0;
-        createDesc.size = compactedSize;
+        createDesc.size = (size_t)compactedSize;
         gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
 
         commandBuffer = gTransientHeaps[0]->createCommandBuffer();
@@ -427,7 +424,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     // Build top level acceleration structure.
@@ -465,20 +462,20 @@ Slang::Result initialize()
         IBufferResource::Desc asBufferDesc;
         asBufferDesc.type = IResource::Type::Buffer;
         asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-        asBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        asBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         gTLASBuffer = gDevice->createBufferResource(asBufferDesc);
 
         IBufferResource::Desc scratchBufferDesc;
         scratchBufferDesc.type = IResource::Type::Buffer;
         scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
-        scratchBufferDesc.sizeInBytes = accelerationStructurePrebuildInfo.scratchDataSize;
+        scratchBufferDesc.sizeInBytes = (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
         ComPtr<IBufferResource> scratchBuffer = gDevice->createBufferResource(scratchBufferDesc);
 
         IAccelerationStructure::CreateDesc createDesc;
         createDesc.buffer = gTLASBuffer;
         createDesc.kind = IAccelerationStructure::Kind::TopLevel;
         createDesc.offset = 0;
-        createDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
+        createDesc.size = (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
         SLANG_RETURN_ON_FAIL(gDevice->createAccelerationStructure(createDesc, gTLAS.writeRef()));
 
         auto commandBuffer = gTransientHeaps[0]->createCommandBuffer();
@@ -491,7 +488,7 @@ Slang::Result initialize()
         encoder->endEncoding();
         commandBuffer->close();
         gQueue->executeCommandBuffer(commandBuffer);
-        gQueue->wait();
+        gQueue->waitOnHost();
     }
 
     IBufferResource::Desc fullScreenVertexBufferDesc;
@@ -512,7 +509,7 @@ Slang::Result initialize()
         return SLANG_FAIL;
 
     ComPtr<IShaderProgram> shaderProgram;
-    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, PipelineType::Graphics, shaderProgram.writeRef()));
+    SLANG_RETURN_ON_FAIL(loadShaderProgram(gDevice, false, shaderProgram.writeRef()));
     GraphicsPipelineStateDesc desc;
     desc.inputLayout = inputLayout;
     desc.program = shaderProgram;
@@ -523,7 +520,7 @@ Slang::Result initialize()
 
     ComPtr<IShaderProgram> rayTracingProgram;
     SLANG_RETURN_ON_FAIL(
-        loadShaderProgram(gDevice, PipelineType::RayTracing, rayTracingProgram.writeRef()));
+        loadShaderProgram(gDevice, true, rayTracingProgram.writeRef()));
     RayTracingPipelineStateDesc rtpDesc = {};
     rtpDesc.program = rayTracingProgram;
     rtpDesc.hitGroupCount = 2;
