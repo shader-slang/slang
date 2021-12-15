@@ -190,6 +190,7 @@ namespace gfx {
     x(vkSignalSemaphoreKHR) \
     x(vkWaitSemaphores) \
     x(vkWaitSemaphoresKHR) \
+    x(vkCmdSetSampleLocationsEXT) \
     /* */
 
 #define VK_API_ALL_GLOBAL_PROCS(x) \
