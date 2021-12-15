@@ -62,8 +62,8 @@ namespace gfx_test
     static const int kIndexCount = 6;
     static const uint32_t kIndexData[kIndexCount] =
     {
+        0, 2, 5,
         0, 1, 2,
-        3, 4, 5,
     };
 
     const int kWidth = 256;
@@ -99,8 +99,8 @@ namespace gfx_test
         IBufferResource::Desc indexBufferDesc;
         indexBufferDesc.type = IResource::Type::Buffer;
         indexBufferDesc.sizeInBytes = kIndexCount * sizeof(uint32_t);
-        indexBufferDesc.defaultState = ResourceState::VertexBuffer;
-        indexBufferDesc.allowedStates = ResourceState::VertexBuffer;
+        indexBufferDesc.defaultState = ResourceState::IndexBuffer;
+        indexBufferDesc.allowedStates = ResourceState::IndexBuffer;
         ComPtr<IBufferResource> indexBuffer = device->createBufferResource(indexBufferDesc, &kIndexData[0]);
         SLANG_CHECK_ABORT(indexBuffer != nullptr);
         return indexBuffer;
@@ -143,8 +143,11 @@ namespace gfx_test
             this->context = context;
         }
 
-        void createRequiredDrawCallResources()
+        void createRequiredResources()
         {
+            vertexBuffer = createVertexBuffer(device);
+            colorBuffer = createColorBuffer(device);
+
             ITransientResourceHeap::Desc transientHeapDesc = {};
             transientHeapDesc.constantBufferSize = 4096;
             GFX_CHECK_CALL_ABORT(
@@ -197,18 +200,44 @@ namespace gfx_test
             framebufferDesc.renderTargetViews = rtv.readRef();
             framebufferDesc.layout = framebufferLayout;
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
-        }  
+        }
+
+        void getTestResults(int pixelCount, int channelCount, const int* testXCoords, const int* testYCoords, float* testResults)
+        {
+            // Read texture values back from four specific pixels located within the triangles
+            // and compare against expected values (because testing every single pixel will be too long and tedious
+            // and requires maintaining reference images).
+            ComPtr<ISlangBlob> resultBlob;
+            size_t rowPitch = 0;
+            size_t pixelSize = 0;
+            GFX_CHECK_CALL_ABORT(device->readTextureResource(
+                colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
+            auto result = (float*)resultBlob->getBufferPointer();
+
+
+            int cursor = 0;
+            for (int i = 0; i < pixelCount; ++i)
+            {
+                auto x = testXCoords[i];
+                auto y = testYCoords[i];
+                auto pixelPtr = result + x * channelCount + y * rowPitch / sizeof(float);
+                for (int j = 0; j < channelCount; ++j)
+                {
+                    testResults[cursor] = pixelPtr[j];
+                    cursor++;
+                }
+            }
+        }
     };
 
     struct DrawInstancedTest : BaseDrawTest
     {
         ComPtr<IBufferResource> instanceBuffer;
 
-        void setUpAndRunTest(
-            IBufferResource* vertexBuffer,
+        void setUpAndDraw(
             IBufferResource* instanceBuffer)
         {
-            createRequiredDrawCallResources();
+            createRequiredResources();
 
             ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
             auto queue = device->createCommandQueue(queueDesc);
@@ -250,23 +279,9 @@ namespace gfx_test
             inputLayout = device->createInputLayout(inputElements, 3);
             SLANG_CHECK_ABORT(inputLayout != nullptr);
 
-            vertexBuffer = createVertexBuffer(device);
             instanceBuffer = createInstanceBuffer(device);
-            colorBuffer = createColorBuffer(device);
 
-            setUpAndRunTest(vertexBuffer, instanceBuffer);
-
-            // Read texture values back from four specific pixels located within the triangles
-            // and compare against expected values (because testing every single pixel will be too long and tedious
-            // and requires maintaining reference images).
-            ComPtr<ISlangBlob> resultBlob;
-            size_t rowPitch = 0;
-            size_t pixelSize = 0;
-            GFX_CHECK_CALL_ABORT(device->readTextureResource(
-                colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
-            auto result = (float*)resultBlob->getBufferPointer();
-
-            writeImage("C:/Users/lucchen/Documents/dump.hdr", resultBlob, kWidth, kHeight);
+            setUpAndDraw(instanceBuffer);
 
             const int kPixelCount = 4;
             const int kChannelCount = 4;
@@ -274,18 +289,7 @@ namespace gfx_test
             int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            int cursor = 0;
-            for (int i = 0; i < kPixelCount; ++i)
-            {
-                auto x = testXCoords[i];
-                auto y = testYCoords[i];
-                auto pixelPtr = result + x * kChannelCount + y * rowPitch / sizeof(float);
-                for (int j = 0; j < kChannelCount; ++j)
-                {
-                    testResults[cursor] = pixelPtr[j];
-                    cursor++;
-                }
-            }
+            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
 
             float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                        0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
@@ -298,12 +302,11 @@ namespace gfx_test
         ComPtr<IBufferResource> instanceBuffer;
         ComPtr<IBufferResource> indexBuffer;
 
-        void setUpAndRunTest(
-            IBufferResource* vertexBuffer,
+        void setUpAndDraw(
             IBufferResource* instanceBuffer,
             IBufferResource* indexBuffer)
         {
-            createRequiredDrawCallResources();
+            createRequiredResources();
 
             ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
             auto queue = device->createCommandQueue(queueDesc);
@@ -324,7 +327,7 @@ namespace gfx_test
 
             encoder->setVertexBuffer(0, vertexBuffer, sizeof(Vertex));
             encoder->setVertexBuffer(1, instanceBuffer, sizeof(Instance));
-            encoder->setVertexBuffer(2, indexBuffer, sizeof(uint32_t));
+            encoder->setIndexBuffer(indexBuffer, Format::R32_UINT);
             encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
             encoder->drawIndexedInstanced(kIndexCount, kInstanceCount, startIndex, startVertex, startInstanceLocation);
@@ -347,43 +350,18 @@ namespace gfx_test
             inputLayout = device->createInputLayout(inputElements, 3);
             SLANG_CHECK_ABORT(inputLayout != nullptr);
 
-            vertexBuffer = createVertexBuffer(device);
             instanceBuffer = createInstanceBuffer(device);
             indexBuffer = createIndexBuffer(device);
-            colorBuffer = createColorBuffer(device);
 
-            setUpAndRunTest(vertexBuffer, instanceBuffer, indexBuffer);
-
-            // Read texture values back from four specific pixels located within the triangles
-            // and compare against expected values (because testing every single pixel will be too long and tedious
-            // and requires maintaining reference images).
-            ComPtr<ISlangBlob> resultBlob;
-            size_t rowPitch = 0;
-            size_t pixelSize = 0;
-            GFX_CHECK_CALL_ABORT(device->readTextureResource(
-                colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
-            auto result = (float*)resultBlob->getBufferPointer();
-
-            writeImage("C:/Users/lucchen/Documents/dump.hdr", resultBlob, kWidth, kHeight);
+            setUpAndDraw(instanceBuffer, indexBuffer);
 
             const int kPixelCount = 4;
             const int kChannelCount = 4;
             int testXCoords[kPixelCount] = { 64, 192, 64, 192 };
-            int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
+            int testYCoords[kPixelCount] = { 32, 100, 150, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            int cursor = 0;
-            for (int i = 0; i < kPixelCount; ++i)
-            {
-                auto x = testXCoords[i];
-                auto y = testYCoords[i];
-                auto pixelPtr = result + x * kChannelCount + y * rowPitch / sizeof(float);
-                for (int j = 0; j < kChannelCount; ++j)
-                {
-                    testResults[cursor] = pixelPtr[j];
-                    cursor++;
-                }
-            }
+            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
 
             float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
                                        0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
