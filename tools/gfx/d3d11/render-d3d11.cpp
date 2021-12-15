@@ -135,17 +135,19 @@ public:
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
     virtual void setVertexBuffers(
-        UInt startSlot,
-        UInt slotCount,
+        uint32_t startSlot,
+        uint32_t slotCount,
         IBufferResource* const* buffers,
-        const UInt* strides,
-        const UInt* offsets) override;
-    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset) override;
+        const uint32_t* strides,
+        const uint32_t* offsets) override;
+    virtual void setIndexBuffer(
+        IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
     virtual void setViewports(UInt count, Viewport const* viewports) override;
     virtual void setScissorRects(UInt count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
-    virtual void draw(UInt vertexCount, UInt startVertex) override;
-    virtual void drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex) override;
+    virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
+    virtual void drawIndexed(
+        uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override
@@ -3241,7 +3243,12 @@ void D3D11Device::setPrimitiveTopology(PrimitiveTopology topology)
     m_immediateContext->IASetPrimitiveTopology(D3DUtil::getPrimitiveTopology(topology));
 }
 
-void D3D11Device::setVertexBuffers(UInt startSlot, UInt slotCount, IBufferResource*const* buffersIn, const UInt* stridesIn, const UInt* offsetsIn)
+void D3D11Device::setVertexBuffers(
+    uint32_t startSlot,
+    uint32_t slotCount,
+    IBufferResource* const* buffersIn,
+    const uint32_t* stridesIn,
+    const uint32_t* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
@@ -3262,7 +3269,7 @@ void D3D11Device::setVertexBuffers(UInt startSlot, UInt slotCount, IBufferResour
     m_immediateContext->IASetVertexBuffers((UINT)startSlot, (UINT)slotCount, dxBuffers, &vertexStrides[0], &vertexOffsets[0]);
 }
 
-void D3D11Device::setIndexBuffer(IBufferResource* buffer, Format indexFormat, UInt offset)
+void D3D11Device::setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset)
 {
     DXGI_FORMAT dxFormat = D3DUtil::getMapFormat(indexFormat);
     m_immediateContext->IASetIndexBuffer(((BufferResourceImpl*)buffer)->m_buffer, dxFormat, UINT(offset));
@@ -3382,16 +3389,16 @@ void D3D11Device::setPipelineState(IPipelineState* state)
     /// ...
 }
 
-void D3D11Device::draw(UInt vertexCount, UInt startVertex)
+void D3D11Device::draw(uint32_t vertexCount, uint32_t startVertex)
 {
     _flushGraphicsState();
-    m_immediateContext->Draw((UINT)vertexCount, (UINT)startVertex);
+    m_immediateContext->Draw(vertexCount, startVertex);
 }
 
-void D3D11Device::drawIndexed(UInt indexCount, UInt startIndex, UInt baseVertex)
+void D3D11Device::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex)
 {
     _flushGraphicsState();
-    m_immediateContext->DrawIndexed((UINT)indexCount, (UINT)startIndex, (INT)baseVertex);
+    m_immediateContext->DrawIndexed(indexCount, startIndex, baseVertex);
 }
 
 Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
