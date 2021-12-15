@@ -15,17 +15,19 @@ using namespace gfx;
 
 namespace gfx_test
 {
-    /* static */ Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
+    // Testing only code used to dump images to visually confirm correctness.
+    // Will be removed once all draw tests are complete.
+//     Slang::Result writeImage(
+//         const char* filename,
+//         ISlangBlob* pixels,
+//         uint32_t width,
+//         uint32_t height)
+//     {
+//         int stbResult =
+//             stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
+// 
+//         return stbResult ? SLANG_OK : SLANG_FAIL;
+//     }
 
     struct Vertex
     {
