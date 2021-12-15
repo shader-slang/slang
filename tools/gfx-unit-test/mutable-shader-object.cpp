@@ -39,7 +39,7 @@ namespace gfx_test
             ResourceState::CopyDestination,
             ResourceState::CopySource);
         bufferDesc.defaultState = ResourceState::UnorderedAccess;
-        bufferDesc.cpuAccessFlags = AccessFlag::None;
+        bufferDesc.cpuAccessFlags = MemoryType::GpuOnly;
 
         ComPtr<IBufferResource> numbersBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
