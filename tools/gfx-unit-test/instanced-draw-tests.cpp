@@ -216,7 +216,7 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
         }
 
-        void getTestResults(int pixelCount, int channelCount, const int* testXCoords, const int* testYCoords, float* testResults)
+        void checkTestResults(int pixelCount, int channelCount, const int* testXCoords, const int* testYCoords, float* testResults)
         {
             // Read texture values back from four specific pixels located within the triangles
             // and compare against expected values (because testing every single pixel will be too long and tedious
@@ -243,6 +243,10 @@ namespace gfx_test
                     cursor++;
                 }
             }
+
+            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
+            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
         }
     };
 
@@ -289,11 +293,7 @@ namespace gfx_test
             int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
-
-            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
-            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
+            checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
         }
     };
 
@@ -346,11 +346,7 @@ namespace gfx_test
             int testYCoords[kPixelCount] = { 32, 100, 150, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
-
-            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
-            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
+            checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
         }
     };
 
@@ -428,11 +424,7 @@ namespace gfx_test
             int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
-
-            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
-            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
+            checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
         }
     };
 
@@ -513,11 +505,7 @@ namespace gfx_test
             int testYCoords[kPixelCount] = { 32, 100, 150, 250 };
             float testResults[kPixelCount * kChannelCount];
 
-            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
-
-            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
-            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
+            checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
         }
     };
 
