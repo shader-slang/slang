@@ -53,7 +53,7 @@ struct WrapStructuredBuffersContext
     //
     void processModule()
     {
-        processInstRec(m_module->moduleInst);
+        processInstRec(m_module->getModuleInst());
     }
 
     void processInstRec(IRInst* inst)
@@ -83,13 +83,10 @@ struct WrapStructuredBuffersContext
         // Having found a `*StructuredBuffer<M>` we will now
         // need an IR builder to help us construct the wrapper code.
         //
-        SharedIRBuilder sharedBuilderStorage;
+        SharedIRBuilder sharedBuilderStorage(m_module);
         auto sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = m_module;
-        sharedBuilder->session = m_module->getSession();
-        IRBuilder builderStorage;
+        IRBuilder builderStorage(sharedBuilder);
         auto builder = &builderStorage;
-        builder->sharedBuilder = sharedBuilder;
 
         // We begin by constructing a structure type that wraps
         // our `matrixType`, into something like:

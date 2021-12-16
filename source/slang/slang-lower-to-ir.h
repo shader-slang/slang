@@ -26,7 +26,7 @@ namespace Slang
         /// module must be linked against other IR modules that define any symbols
         /// that are imported before code generation can be performed.
         ///
-    IRModule* generateIRForTranslationUnit(
+    RefPtr<IRModule> generateIRForTranslationUnit(
         ASTBuilder*             astBuilder,
         TranslationUnitRequest* translationUnit);
 

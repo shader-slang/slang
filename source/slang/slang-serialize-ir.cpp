@@ -676,15 +676,46 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
     typedef Ser::Inst::PayloadType PayloadType;
 
     m_serialData = &data;
- 
-    auto module = new IRModule();
+
+    auto module = IRModule::create(session);
     outModule = module;
     m_module = module;
 
-    module->session = session;
-
     // Convert m_stringTable into StringSlicePool.
     SerialStringTableUtil::decodeStringTable(data.m_stringTable.getBuffer(), data.m_stringTable.getCount(), m_stringTable);
+
+    // Each IR instruction has:
+    //
+    // * An opcode
+    // * Zero or more operands
+    // * Zero or more children
+    //
+    // Most instructions are entirely defined by those properties.
+    // 
+    // The instructions that represent simple constants (integers, strings, etc.) are
+    // unique in that they have "payload" data that holds their value, instead of having
+    // any operands.
+    //
+    // The deserialization logic here is set up to handle an arbitrary configuration
+    // of IR instructions, which means it can handle cases where:
+    //
+    // * An instruction earlier in the serialized stream might refer to an instruction
+    //   later in the stream, as one of its operands or (transitive) children.
+    //
+    // * An instruction in the stream transitively depends on itself via operand
+    //   and/or child relationships.
+    //
+    // In order to handle these cases, deserialization proceeds in multiple passes.
+    // In the first pass, `IRInst`s are allocated for each instruction in the stream,
+    // based on their memory requirements (number of operands in the ordinary case
+    // and payload size in the case of simple constants). Subsequent passes then
+    // fill in the operands and/or children.
+    //
+    // Note that as a result of the strategy used here, it is not possible for the
+    // deserialization logic to interact with any systems for deduplication or
+    // simplification of instructions. An alternative version of the deserializer that
+    // uses the `IRBuilder` interface instead might be possible, but would need a
+    // plan for how to handle forward and/or circular references in the IR module.
 
     // Add all the instructions
     List<IRInst*> insts;
@@ -704,10 +735,10 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         SLANG_RELEASE_ASSERT(srcInst.m_op == kIROp_Module);
         SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Empty);
 
-        // Create the module inst
-        auto moduleInst = static_cast<IRModuleInst*>(createEmptyInstWithSize(module, kIROp_Module, sizeof(IRModuleInst)));
-        module->moduleInst = moduleInst;
-        moduleInst->module = module;
+        // The root IR instruction for the module will already have
+        // been created as part of creating `module` above.
+        //
+        auto moduleInst = module->getModuleInst();
 
         // Set the IRModuleInst
         insts[1] = moduleInst; 
@@ -726,34 +757,41 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
             // Calculate the minimum object size (ie not including the payload of value)    
             const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
 
+            // All IR constants have zero operands.
+            Int operandCount = 0;
+
             IRConstant* irConst = nullptr;
             switch (op)
             {                    
                 case kIROp_BoolLit:
                 {
+                    // TODO: Most of these cases could use the templated `_allocateInst<T>`
+                    // *if* we had distinct `IRConstant` subtypes to represent these
+                    // cases and their subtype-specific payloads.
+
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::UInt32);
-                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(IRIntegerValue)));
                     irConst->value.intVal = srcInst.m_payload.m_uint32 != 0;
                     break;
                 }
                 case kIROp_IntLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(IRIntegerValue)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(IRIntegerValue)));
                     irConst->value.intVal = srcInst.m_payload.m_int64; 
                     break;
                 }
                 case kIROp_PtrLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Int64);
-                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, prefixSize + sizeof(void*)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, prefixSize + sizeof(void*)));
                     irConst->value.ptrVal = (void*) (intptr_t) srcInst.m_payload.m_int64; 
                     break;
                 }
                 case kIROp_FloatLit:
                 {
                     SLANG_ASSERT(srcInst.m_payloadType == PayloadType::Float64);
-                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op,  prefixSize + sizeof(IRFloatingPointValue)));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount,  prefixSize + sizeof(IRFloatingPointValue)));
                     irConst->value.floatVal = srcInst.m_payload.m_float64;
                     break;
                 }
@@ -766,7 +804,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
                     const size_t sliceSize = slice.getLength();
                     const size_t instSize = prefixSize + SLANG_OFFSET_OF(IRConstant::StringValue, chars) + sliceSize;
 
-                    irConst = static_cast<IRConstant*>(createEmptyInstWithSize(module, op, instSize));
+                    irConst = static_cast<IRConstant*>(module->_allocateInst(op, operandCount, instSize));
 
                     IRConstant::StringValue& dstString = irConst->value.stringVal;
 
@@ -788,7 +826,12 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         }
         else if (_isTextureTypeBase(op))
         {
-            IRTextureTypeBase* inst = static_cast<IRTextureTypeBase*>(createEmptyInst(module, op, 1));
+            // TODO: We should clean up the IR encoding of texture types so that
+            // they do not need to have special-case suport in the serialization layer.
+
+            // All IR texture types currently have a single operand
+            Int operandCount = 1;
+            IRTextureTypeBase* inst = module->_allocateInst<IRTextureTypeBase>(op, operandCount);
             SLANG_ASSERT(srcInst.m_payloadType == PayloadType::OperandAndUInt32);
 
             // Reintroduce the texture type bits into the the
@@ -800,7 +843,7 @@ Result IRSerialReader::read(const IRSerialData& data, Session* session, SerialSo
         else
         {
             int numOperands = srcInst.getNumOperands();
-            insts[i] = createEmptyInst(module, op, numOperands);
+            insts[i] = module->_allocateInst(op, numOperands);
         }
     }
 

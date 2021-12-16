@@ -216,14 +216,14 @@ namespace Slang
         context->module = module;
         context->sink = sink;
 
-        auto moduleInst = module->moduleInst;
+        auto moduleInst = module->getModuleInst();
 
         validate(context, moduleInst != nullptr,            moduleInst, "module instruction");
         validate(context, moduleInst->parent == nullptr,    moduleInst, "module instruction parent");
         validate(context, moduleInst->prev == nullptr,      moduleInst, "module instruction prev");
         validate(context, moduleInst->next == nullptr,      moduleInst, "module instruction next");
 
-        validateIRInst(context, module->moduleInst);
+        validateIRInst(context, moduleInst);
     }
 
     void validateIRModuleIfEnabled(

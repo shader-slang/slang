@@ -107,8 +107,7 @@ namespace Slang
     void workOnModule(SharedGenericsLoweringContext* sharedContext, const TFunc& func)
     {
         SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-        sharedBuilder->module = sharedContext->module;
-        sharedBuilder->session = sharedContext->module->session;
+        sharedBuilder->init(sharedContext->module);
 
         sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 

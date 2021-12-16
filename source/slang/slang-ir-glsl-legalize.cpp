@@ -17,14 +17,9 @@ IRGlobalParam* addGlobalParam(
     IRModule*   module,
     IRType*     valueType)
 {
-    auto session = module->session;
+    SharedIRBuilder shared(module);
+    IRBuilder builder(shared);
 
-    SharedIRBuilder shared;
-    shared.module = module;
-    shared.session = session;
-
-    IRBuilder builder;
-    builder.sharedBuilder = &shared;
     return builder.createGlobalParam(valueType);
 }
 
@@ -1597,8 +1592,7 @@ void legalizeEntryPointParameterForGLSL(
             // disrupt the source location it is using for inserting
             // temporary variables at the top of the function.
             //
-            IRBuilder terminatorBuilder;
-            terminatorBuilder.sharedBuilder = builder->sharedBuilder;
+            IRBuilder terminatorBuilder(builder->getSharedBuilder());
             terminatorBuilder.setInsertBefore(terminatorInst);
 
             // Assign from the local variabel to the global output
@@ -1668,11 +1662,8 @@ void legalizeEntryPointForGLSL(
     //
     // TODO: make some of these free functions...
     //
-    SharedIRBuilder shared;
-    shared.module = module;
-    shared.session = session;
-    IRBuilder builder;
-    builder.sharedBuilder = &shared;
+    SharedIRBuilder shared(module);
+    IRBuilder builder(shared);
     builder.setInsertInto(func);
 
     context.builder = &builder;

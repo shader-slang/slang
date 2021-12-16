@@ -44,8 +44,7 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
         return;
     }
 
-    IRBuilder builder;
-    builder.sharedBuilder = &sharedBuilder;
+    IRBuilder builder(sharedBuilder);
     
     // 
     IRModule* module = builder.getModule();
@@ -55,7 +54,16 @@ void addGlobalHashedStringLiterals(const StringSlicePool& pool, SharedIRBuilder&
 
     const Index slicesCount = slices.getCount();
 
-    IRInst* globalHashedInst = createEmptyInst(module, kIROp_GlobalHashedStringLiterals, int(slicesCount));
+    // Note: This pass is using the extremely low-level `_allocateInst` operation on `IRModule`
+    // as an optimization. By allocating the instruction here in an "empty" state and then filling
+    // its operands in in place, we can avoid allocating space for a temporary `List<IRInst*>` to
+    // hold the IR string values created in the loop below.
+    //
+    // TODO: We should probably either eliminate this micro-optimization and just use a `List<IRInst*>`
+    // here, *or* we should devise a more first-class system for doing in-place instruction creation
+    // like that that can be compatible with desirable features like automatic deduplication.
+    //
+    IRInst* globalHashedInst = module->_allocateInst(kIROp_GlobalHashedStringLiterals, int(slicesCount));
     builder.addInst(globalHashedInst);
 
     auto operands = globalHashedInst->getOperands();

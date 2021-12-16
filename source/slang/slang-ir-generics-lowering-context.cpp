@@ -57,9 +57,8 @@ namespace Slang
         IRInst* result = nullptr;
         if (mapTypeToRTTIObject.TryGetValue(typeInst, result))
             return result;
-        IRBuilder builderStorage;
+        IRBuilder builderStorage(sharedBuilderStorage);
         auto builder = &builderStorage;
-        builder->sharedBuilder = &sharedBuilderStorage;
         builder->setInsertBefore(typeInst->next);
 
         result = builder->emitMakeRTTIObject(typeInst);

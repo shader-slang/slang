@@ -115,8 +115,7 @@ struct ResourceOutputSpecializationPass
     {
         // We start by setting up the shared IR building state.
         //
-        sharedBuilder.module = module;
-        sharedBuilder.session = module->getSession();
+        sharedBuilder.init(module);
 
         // The main logic consists of iterating over all functions
         // (which must appear at the global level) and specializing
