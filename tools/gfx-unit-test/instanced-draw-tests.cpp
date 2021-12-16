@@ -17,17 +17,17 @@ namespace gfx_test
 {
     // Testing only code used to dump images to visually confirm correctness.
     // Will be removed once all draw tests are complete.
-    Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
+//     Slang::Result writeImage(
+//         const char* filename,
+//         ISlangBlob* pixels,
+//         uint32_t width,
+//         uint32_t height)
+//     {
+//         int stbResult =
+//             stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
+// 
+//         return stbResult ? SLANG_OK : SLANG_FAIL;
+//     }
 
     struct Vertex
     {
@@ -134,7 +134,6 @@ namespace gfx_test
         ComPtr<IPipelineState> pipelineState;
         ComPtr<IRenderPassLayout> renderPass;
         ComPtr<IFramebuffer> framebuffer;
-        ComPtr<IInputLayout> inputLayout;
 
         ComPtr<IBufferResource> vertexBuffer;
         ComPtr<IBufferResource> instanceBuffer;
@@ -148,7 +147,19 @@ namespace gfx_test
 
         void createRequiredResources()
         {
+            InputElementDesc inputElements[] = {
+                // Vertex buffer data
+                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), InputSlotClass::PerVertex, 0 },
+
+                // Instance buffer data
+                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), InputSlotClass::PerInstance, 1, 1 },
+                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    InputSlotClass::PerInstance, 1, 1 },
+            };
+            auto inputLayout = device->createInputLayout(inputElements, SLANG_COUNT_OF(inputElements));
+            SLANG_CHECK_ABORT(inputLayout != nullptr);
+
             vertexBuffer = createVertexBuffer(device);
+            instanceBuffer = createInstanceBuffer(device);
             colorBuffer = createColorBuffer(device);
 
             ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -217,7 +228,8 @@ namespace gfx_test
                 colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
             auto result = (float*)resultBlob->getBufferPointer();
 
-            writeImage("C:/Users/lucchen/Documents/dump.hdr", resultBlob, kWidth, kHeight);
+            // Dump image to disk so we can visually confirm the output
+            //writeImage("C:/Users/lucchen/Documents/dump.hdr", resultBlob, kWidth, kHeight);
 
             int cursor = 0;
             for (int i = 0; i < pixelCount; ++i)
@@ -253,8 +265,8 @@ namespace gfx_test
             viewport.extentY = kHeight;
             encoder->setViewportAndScissor(viewport);
 
-            UInt startVertex = 0;
-            UInt startInstanceLocation = 0;
+            uint32_t startVertex = 0;
+            uint32_t startInstanceLocation = 0;
 
             encoder->setVertexBuffer(0, vertexBuffer, sizeof(Vertex));
             encoder->setVertexBuffer(1, instanceBuffer, sizeof(Instance));
@@ -269,19 +281,6 @@ namespace gfx_test
 
         void run()
         {
-            InputElementDesc inputElements[] = {
-                // Vertex buffer data
-                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), InputSlotClass::PerVertex, 0 },
-
-                // Instance buffer data
-                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), InputSlotClass::PerInstance, 1, 1 },
-                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    InputSlotClass::PerInstance, 1, 1 },
-            };
-            inputLayout = device->createInputLayout(inputElements, 3);
-            SLANG_CHECK_ABORT(inputLayout != nullptr);
-
-            instanceBuffer = createInstanceBuffer(device);
-
             setUpAndDraw();
 
             const int kPixelCount = 4;
@@ -337,18 +336,6 @@ namespace gfx_test
 
         void run()
         {
-            InputElementDesc inputElements[] = {
-                // Vertex buffer data
-                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), InputSlotClass::PerVertex, 0 },
-
-                // Instance buffer data
-                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), InputSlotClass::PerInstance, 1, 1 },
-                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    InputSlotClass::PerInstance, 1, 1 },
-            };
-            inputLayout = device->createInputLayout(inputElements, 3);
-            SLANG_CHECK_ABORT(inputLayout != nullptr);
-
-            instanceBuffer = createInstanceBuffer(device);
             indexBuffer = createIndexBuffer(device);
 
             setUpAndDraw();
@@ -389,7 +376,7 @@ namespace gfx_test
 
             IBufferResource::Desc indirectBufferDesc;
             indirectBufferDesc.type = IResource::Type::Buffer;
-            indirectBufferDesc.sizeInBytes = kIndexCount * sizeof(uint32_t);
+            indirectBufferDesc.sizeInBytes = sizeof(IndirectArgData);
             indirectBufferDesc.defaultState = ResourceState::IndirectArgument;
             indirectBufferDesc.allowedStates = ResourceState::IndirectArgument;
             ComPtr<IBufferResource> indexBuffer = device->createBufferResource(indirectBufferDesc, &kIndirectData);
@@ -431,18 +418,6 @@ namespace gfx_test
 
         void run()
         {
-            InputElementDesc inputElements[] = {
-                // Vertex buffer data
-                { "POSITIONA", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position), InputSlotClass::PerVertex, 0 },
-
-                // Instance buffer data
-                { "POSITIONB", 0, Format::R32G32B32_FLOAT, offsetof(Instance, position), InputSlotClass::PerInstance, 1, 1 },
-                { "COLOR",     0, Format::R32G32B32_FLOAT, offsetof(Instance, color),    InputSlotClass::PerInstance, 1, 1 },
-            };
-            inputLayout = device->createInputLayout(inputElements, SLANG_COUNT_OF(inputElements));
-            SLANG_CHECK_ABORT(inputLayout != nullptr);
-
-            instanceBuffer = createInstanceBuffer(device);
             indirectBuffer = createIndirectBuffer(device);
 
             setUpAndDraw();
@@ -451,6 +426,91 @@ namespace gfx_test
             const int kChannelCount = 4;
             int testXCoords[kPixelCount] = { 64, 192, 64, 192 };
             int testYCoords[kPixelCount] = { 100, 100, 250, 250 };
+            float testResults[kPixelCount * kChannelCount];
+
+            getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
+
+            float expectedResult[] = { 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+                                       0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f };
+            compareComputeResultFuzzy(testResults, expectedResult, sizeof(expectedResult));
+        }
+    };
+
+    struct DrawIndexedIndirectTest : BaseDrawTest
+    {
+        ComPtr<IBufferResource> indexBuffer;
+        ComPtr<IBufferResource> indirectBuffer;
+
+        struct IndexedIndirectArgData
+        {
+            float padding; // Ensure args and count don't start at 0 offset for testing purposes
+            IndirectDrawIndexedArguments args;
+            uint32_t count;
+        };
+
+        ComPtr<IBufferResource> createIndirectBuffer(IDevice* device)
+        {
+            static const IndexedIndirectArgData kIndexedIndirectData =
+            {
+                42.0f, // padding
+                {6, 2, 0, 0, 0}, // args
+                1, // count
+            };
+
+            IBufferResource::Desc indirectBufferDesc;
+            indirectBufferDesc.type = IResource::Type::Buffer;
+            indirectBufferDesc.sizeInBytes = sizeof(IndexedIndirectArgData);
+            indirectBufferDesc.defaultState = ResourceState::IndirectArgument;
+            indirectBufferDesc.allowedStates = ResourceState::IndirectArgument;
+            ComPtr<IBufferResource> indexBuffer = device->createBufferResource(indirectBufferDesc, &kIndexedIndirectData);
+            SLANG_CHECK_ABORT(indexBuffer != nullptr);
+            return indexBuffer;
+        }
+
+        void setUpAndDraw()
+        {
+            createRequiredResources();
+
+            ICommandQueue::Desc queueDesc = { ICommandQueue::QueueType::Graphics };
+            auto queue = device->createCommandQueue(queueDesc);
+            auto commandBuffer = transientHeap->createCommandBuffer();
+
+            auto encoder = commandBuffer->encodeRenderCommands(renderPass, framebuffer);
+            auto rootObject = encoder->bindPipeline(pipelineState);
+
+            gfx::Viewport viewport = {};
+            viewport.maxZ = 1.0f;
+            viewport.extentX = kWidth;
+            viewport.extentY = kHeight;
+            encoder->setViewportAndScissor(viewport);
+
+            encoder->setVertexBuffer(0, vertexBuffer, sizeof(Vertex));
+            encoder->setVertexBuffer(1, instanceBuffer, sizeof(Instance));
+            encoder->setIndexBuffer(indexBuffer, Format::R32_UINT);
+            encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+
+            uint32_t maxDrawCount = 1;
+            uint64_t argOffset = offsetof(IndexedIndirectArgData, args);
+            uint64_t countOffset = offsetof(IndexedIndirectArgData, count);
+
+            encoder->drawIndexedIndirect(maxDrawCount, indirectBuffer, argOffset, indirectBuffer, countOffset);
+            encoder->endEncoding();
+            commandBuffer->close();
+            queue->executeCommandBuffer(commandBuffer);
+            queue->waitOnHost();
+        }
+
+        void run()
+        {
+            indexBuffer = createIndexBuffer(device);
+            indirectBuffer = createIndirectBuffer(device);
+
+            setUpAndDraw();
+
+            const int kPixelCount = 4;
+            const int kChannelCount = 4;
+            int testXCoords[kPixelCount] = { 64, 192, 64, 192 };
+            int testYCoords[kPixelCount] = { 32, 100, 150, 250 };
             float testResults[kPixelCount * kChannelCount];
 
             getTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
@@ -482,6 +542,13 @@ namespace gfx_test
         test.run();
     }
 
+    void drawIndexedIndirectTestImpl(IDevice* device, UnitTestContext* context)
+    {
+        DrawIndexedIndirectTest test;
+        test.init(device, context);
+        test.run();
+    }
+
     SLANG_UNIT_TEST(drawInstancedD3D12)
     {
         runTestImpl(drawInstancedTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
@@ -497,6 +564,11 @@ namespace gfx_test
         runTestImpl(drawIndirectTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
+    SLANG_UNIT_TEST(drawIndexedIndirectD3D12)
+    {
+        runTestImpl(drawIndexedIndirectTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
+
 #if 0
     SLANG_UNIT_TEST(drawInstancedVulkan)
     {
@@ -506,6 +578,16 @@ namespace gfx_test
     SLANG_UNIT_TEST(drawIndexedInstancedVulkan)
     {
         runTestImpl(drawIndexedInstancedTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(drawIndirectVulkan)
+    {
+        runTestImpl(drawIndirectTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    }
+
+    SLANG_UNIT_TEST(drawIndexedIndirectVulkan)
+    {
+        runTestImpl(drawIndexedIndirectTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
 #endif
     }
