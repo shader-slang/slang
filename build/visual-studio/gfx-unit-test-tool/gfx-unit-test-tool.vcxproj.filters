@@ -62,7 +62,7 @@
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\draw-instanced-test.cpp">
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

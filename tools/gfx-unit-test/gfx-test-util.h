@@ -42,6 +42,11 @@ namespace gfx_test
         size_t expectedResultRowPitch,
         size_t rowCount);
 
+    void compareComputeResultFuzzy(
+        const float* result,
+        float* expectedResult,
+        size_t expectedBufferSize);
+
         /// Reads back the content of `buffer` and compares it against `expectedResult` with a set tolerance.
     void compareComputeResultFuzzy(
         gfx::IDevice* device,
