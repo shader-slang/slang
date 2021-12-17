@@ -3,7 +3,8 @@
 /* The purpose of these tests is to use generics to be able to traverse
 a 'linked list' of different related types. 
 
-Different versions show different types of compilation errors.
+tests/current-bugs/generic/byte-address-ptr-2.slang(75): note 99999: an internal error threw an exception while working on code near this location
+(0): error 99999: Slang compilation aborted due to an exception of class Slang::InternalError: assert failure: witnessTableVal->getOp() != kIROp_StructKey
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
