@@ -305,6 +305,151 @@ public:
     }
 };
 
+    /// A marker for a place where IR instructions can be inserted
+    ///
+    /// An insertion location is defined relative to an existing IR
+    /// instruction, along with an enumeration that specifies where
+    /// new instructions should be inserted relative to the existing one.
+    ///
+    /// Available options are:
+    ///
+    /// * `None`, meaning the instruction is null/absent. This can either
+    ///   represent an invalid/unitialized location, or an intention for
+    ///   new instructions to be created without any parent.
+    ///
+    /// * `AtEnd`, meaning new instructions will be inserted as the last
+    ///   child of the existing instruction. This is useful for filling
+    ///   in the children of a basic block or other container for a sequence
+    ///   of instructions. Note that since each new instruction will become
+    ///   the last one in the parent, instructions emitted at such a location
+    ///   will appear in the same order that they were emitted.
+    ///
+    /// * `Before`, meaning new instructions will be inserted before the existing
+    ///   one. This is useful for inserting new instructions to compute a value
+    ///   needed during optimization of an existing instruction (including when
+    ///   the new instructions will *replace* the existing one). Because each
+    ///   new instruction is inserted right before the existing one, the instructions
+    ///   will appear in the same order that they were emitted.
+    ///
+    /// * `AtStart`, meaning new instructions will be inserted as the first
+    ///   child of the existing instruction. This is useful for adding things
+    ///   like decorations to an existing instruction (since decorations are
+    ///   currently required to precede all other kinds of child instructions).
+    ///   Note that if multiple new instructions are inserted in this mode they
+    ///   will appear in the *reverse* of the order they were emitted.
+    ///
+    /// * `After`, meaning new instructions will be inserted as the next child
+    ///   after the existing instruction.
+    ///   Note that if multiple new instructions are inserted in this mode they
+    ///   will appear in the *reverse* of the order they were emitted.
+    ///
+    /// An insertion location is usable and valid so long as the instruction it is
+    /// defined relative to is valid to insert into or next to. If the reference
+    /// instruction is moved, subsequent insertions will use its new location, but
+    /// already-inserted instructions will *not*.
+    ///
+    /// Note that at present there is no way to construct an `IRInsertLoc` that
+    /// can reliably be used to insert at certain locations that can be clearly
+    /// defined verbally (e.g., "at the end of the parameter list of this function").
+    /// Often a suitable approximation will work inside a specific pass (e.g., when
+    /// first constructing a function, the `AtEnd` mode could be used to insert
+    /// all parameters before any body instructions are inserted, and for an existing
+    /// function new parameters could be inserted `Before` the first existing body
+    /// instruction). Such approximations require knowing which kinds of IR modifications
+    /// will and will not be performed while the location is in use.
+    ///
+struct IRInsertLoc
+{
+public:
+        /// The different kinds of insertion locations.
+    enum class Mode
+    {
+        None,       //< Don't insert new instructions at all; just create them
+        Before,     //< Insert immediately before the existing instruction
+        After,      //< Insert immediately after the existing instruction
+        AtStart,    //< Insert at the start of the existing instruction's child list
+        AtEnd,      //< Insert at the start of the existing instruction's child list
+    };
+
+        /// Construct a default insertion location in the `None` mode.
+    IRInsertLoc()
+    {}
+
+        /// Construct a location that inserts before `inst`
+    static IRInsertLoc before(IRInst* inst)
+    {
+        SLANG_ASSERT(inst);
+        return IRInsertLoc(Mode::Before, inst);
+    }
+
+        /// Construct a location that inserts after `inst`
+        ///
+        /// Note: instructions inserted at this location will appear in the opposite
+        /// of the order they were emitted.
+    static IRInsertLoc after(IRInst* inst)
+    {
+        SLANG_ASSERT(inst);
+        return IRInsertLoc(Mode::After, inst);
+    }
+
+        /// Construct a location that inserts at the start of the child list for `parent`
+        ///
+        /// Note: instructions inserted at this location will appear in the opposite
+        /// of the order they were emitted.
+    static IRInsertLoc atStart(IRInst* parent)
+    {
+        SLANG_ASSERT(parent);
+        return IRInsertLoc(Mode::AtStart, parent);
+    }
+
+        /// Construct a location that inserts at the end of the child list for `parent`
+    static IRInsertLoc atEnd(IRInst* parent)
+    {
+        SLANG_ASSERT(parent);
+        return IRInsertLoc(Mode::AtEnd, parent);
+    }
+
+        /// Get the insertion mode for this location
+    Mode getMode() const { return m_mode; }
+
+        /// Get the instruction that this location inserts relative to
+    IRInst* getInst() const { return m_inst; }
+
+        /// Get the parent instruction that new instructions will insert into.
+        ///
+        /// For the `AtStart` and `AtEnd` modes, this returns `getInst()`.
+        /// For the `Before` and `After` modes, this returns `getInst()->getParent()`
+    IRInst* getParent() const;
+
+        /// Get the parent basic block, if any, that new instructions will insert into.
+        ///
+        /// This returns the same instruction as `getParent()` if the parent is a basic block.
+        /// Otherwise, returns null.
+    IRBlock* getBlock() const;
+
+        /// Get the enclosing function (or other code-bearing value) that instructions are inserted into.
+        ///
+        /// This searches up the parent chain starting with `getParent()` looking for a code-bearing
+        /// value that things are being inserted into (could be a function, generic, etc.)
+        ///
+    IRGlobalValueWithCode* getFunc() const;
+
+private:
+        /// Internal constructor
+    IRInsertLoc(Mode mode, IRInst* inst)
+        : m_mode(mode)
+        , m_inst(inst)
+    {}
+
+        /// The insertion mode
+    Mode m_mode = Mode::None;
+
+        /// The instruction that insertions will be made relative to.
+        ///
+        /// Should always be null for the `None` mode and non-null for all other modes.
+    IRInst* m_inst = nullptr;
+};
+
 // Every value in the IR is an instruction (even things
 // like literal values).
 //
@@ -474,6 +619,8 @@ struct IRInst
     // Replace all uses of this value with `other`, so
     // that this value will now have no uses.
     void replaceUsesWith(IRInst* other);
+
+    void insertAt(IRInsertLoc const& loc);
 
     // Insert this instruction into the same basic block
     // as `other`, right before/after it.
@@ -1469,27 +1616,78 @@ struct IRModuleInst : IRInst
 
 struct IRModule : RefObject
 {
+public:
     enum 
     {
         kMemoryArenaBlockSize = 16 * 1024,           ///< Use 16k block size for memory arena
     };
 
-    SLANG_FORCE_INLINE Session* getSession() const { return session; }
-    SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return moduleInst;  }
+    static RefPtr<IRModule> create(Session* session);
+
+    SLANG_FORCE_INLINE Session* getSession() const { return m_session; }
+    SLANG_FORCE_INLINE IRModuleInst* getModuleInst() const { return m_moduleInst;  }
+    SLANG_FORCE_INLINE MemoryArena& getMemoryArena() { return m_memoryArena; }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
+        /// Create an empty instruction with the `op` opcode and space for
+        /// a number of operands given by `operandCount`.
+        ///
+        /// The memory allocation will be *at least* `minSizeInBytes`, so
+        /// if `sizeof(T)` is passed in the reuslt is guaranteed to be big
+        /// enough for a `T` instance. It is safe to leave `minSizeInBytes` as zero
+        /// for instructions where the only additional space they require is
+        /// for their operands (which is most of them).
+        ///
+        /// The returned instruction is "empty" in thes sense that the `IRUse`s
+        /// for its type and operands are *not* initialized. The caller takes
+        /// full responsibility for initializing those uses as needed.
+        ///
+        /// This function does not (and cannot) perform any kind of deduplication
+        /// or simplification. Clients take responsibility for only using this
+        /// operation when they genuinely want a fresh instruction to be allocated.
+        ///
+        /// Note: the `_` prefix indicates that this is a low-level operation that
+        /// must cient code should not be invoking. When in doubt, plase try to
+        /// operations in `IRBuilder` to emit an instruction whenever possible.
+        ///
+    IRInst* _allocateInst(
+        IROp    op,
+        Int     operandCount,
+        size_t  minSizeInBytes = 0);
+
+    template<typename T>
+    T* _allocateInst(
+        IROp    op,
+        Int     operandCount)
+    {
+        return (T*) _allocateInst(op, operandCount, sizeof(T));
+    }
+
+private:
+    IRModule() = delete;
+
         /// Ctor
-    IRModule():
-        memoryArena(kMemoryArenaBlockSize)
+    IRModule(Session* session)
+        : m_session(session)
+        , m_memoryArena(kMemoryArenaBlockSize)
     {
     }
 
-    MemoryArena memoryArena;
+        // The compilation session in use.
+    Session*    m_session = nullptr;
 
-    // The compilation session in use.
-    Session*    session;
-    IRModuleInst* moduleInst;
+        /// The root IR instruction for the module.
+        ///
+        /// All other IR instructions that make up the state/contents of the module are
+        /// descendents of this instruction. Thus if we follow the chain of parent
+        /// instructions from an arbitrary IR instruction we expect to find the
+        /// `IRModuleInst` for the module the instruction belongs to, if any.
+        ///
+    IRModuleInst* m_moduleInst = nullptr;
+
+        /// The memory arena from which all IR instructions (and any associated state) in this module are allocated.
+    MemoryArena m_memoryArena;
 };
 
 
@@ -1542,16 +1740,6 @@ String getSlangIRAssembly(IRModule* module, const IRDumpOptions& options, Source
 void dumpIR(IRModule* module, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
 void dumpIR(IRInst* globalVal, const IRDumpOptions& options, SourceManager* sourceManager, ISlangWriter* writer);
 void dumpIR(IRModule* module, const IRDumpOptions& options, char const* label, SourceManager* sourceManager, ISlangWriter* writer);
-
-IRInst* createEmptyInst(
-    IRModule*   module,
-    IROp        op,
-    int         totalArgCount);
-
-IRInst* createEmptyInstWithSize(
-    IRModule*   module,
-    IROp        op,
-    size_t      totalSizeInBytes);
 
     /// True if the op type can be handled 'nominally' meaning that pointer identity is applicable. 
 bool isNominalOp(IROp op);

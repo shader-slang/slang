@@ -85,9 +85,8 @@ namespace Slang
 
         void processMakeTuple(IRMakeTuple* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             auto info = getLoweredTupleType(builder, inst->getDataType());
@@ -104,9 +103,8 @@ namespace Slang
 
         void processGetTupleElement(IRGetTupleElement* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             auto base = inst->getTuple();
@@ -123,9 +121,8 @@ namespace Slang
 
         void processTupleType(IRTupleType* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             auto loweredTupleInfo = getLoweredTupleType(builder, inst);
@@ -154,8 +151,7 @@ namespace Slang
         void processModule()
         {
             SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-            sharedBuilder->module = module;
-            sharedBuilder->session = module->session;
+            sharedBuilder->init(module);
 
             // Deduplicate equivalent types.
             sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();

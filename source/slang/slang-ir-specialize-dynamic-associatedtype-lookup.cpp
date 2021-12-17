@@ -13,8 +13,7 @@ struct AssociatedTypeLookupSpecializationContext
 
     IRFunc* createWitnessTableLookupFunc(IRInterfaceType* interfaceType, IRInst* key)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+        IRBuilder builder(sharedContext->sharedBuilderStorage);
         builder.setInsertBefore(interfaceType);
 
         auto inputWitnessTableIDType = builder.getWitnessTableIDType(interfaceType);
@@ -123,8 +122,7 @@ struct AssociatedTypeLookupSpecializationContext
         // Ignore lookups for RTTI objects for now, since they are not used anywhere.
         if (!as<IRWitnessTableType>(inst->getDataType()))
         {
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(inst);
             auto uint2Type = builder.getVectorType(
                 builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
@@ -150,8 +148,7 @@ struct AssociatedTypeLookupSpecializationContext
             func = createWitnessTableLookupFunc(interfaceType, key);
             sharedContext->mapInterfaceRequirementKeyToDispatchMethods[key] = func;
         }
-        IRBuilder builder;
-        builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+        IRBuilder builder(sharedContext->sharedBuilderStorage);
         builder.setInsertBefore(inst);
         auto witnessTableArg = inst->getWitnessTable();
         if (witnessTableArg->getDataType()->getOp() == kIROp_WitnessTableType)
@@ -178,8 +175,7 @@ struct AssociatedTypeLookupSpecializationContext
             // at this point, where the first element in the uint2 is the id of the
             // witness table.
             auto vectorType = inst->getRTTIOperand()->getDataType();
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(inst);
             UInt index = 0;
             auto id = builder.emitSwizzle(as<IRVectorType>(vectorType)->getElementType(), inst->getRTTIOperand(), 1, &index);
@@ -210,8 +206,7 @@ struct AssociatedTypeLookupSpecializationContext
                 for (auto use = inst->firstUse; use; )
                 {
                     auto nextUse = use->nextUse;
-                    IRBuilder builder;
-                    builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+                    IRBuilder builder(sharedContext->sharedBuilderStorage);
                     builder.setInsertBefore(use->getUser());
                     auto uint2Type = builder.getVectorType(
                         builder.getUIntType(), builder.getIntValue(builder.getIntType(), 2));
@@ -231,8 +226,7 @@ struct AssociatedTypeLookupSpecializationContext
         {
             if (globalInst->getOp() == kIROp_WitnessTableType)
             {
-                IRBuilder builder;
-                builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+                IRBuilder builder(sharedContext->sharedBuilderStorage);
                 builder.setInsertBefore(globalInst);
                 auto witnessTableIDType = builder.getWitnessTableIDType(
                     (IRType*)cast<IRWitnessTableType>(globalInst)->getConformanceType());

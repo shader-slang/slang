@@ -39,9 +39,8 @@ struct DesugarUnionTypesContext
     {
         // We start by initializing our IR building state.
         //
-        sharedBuilderStorage.session = module->session;
-        sharedBuilderStorage.module = module;
-        builderStorage.sharedBuilder = &sharedBuilderStorage;
+        sharedBuilderStorage.init(module);
+        builderStorage.init(sharedBuilderStorage);
 
         // Next, we will search for any instruction that create or use
         // union types, and process them accordingingly (usually by
