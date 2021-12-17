@@ -230,11 +230,8 @@ struct InliningPassBase
         // and will set it up to insert before the `call` that
         // is going to be replaced.
         //
-        SharedIRBuilder sharedBuilder;
-        sharedBuilder.session = m_module->getSession();
-        sharedBuilder.module = m_module;
-        IRBuilder builder;
-        builder.sharedBuilder = &sharedBuilder;
+        SharedIRBuilder sharedBuilder(m_module);
+        IRBuilder builder(sharedBuilder);
         builder.setInsertBefore(call);
 
         // If the callee is a generic function, then we will

@@ -1209,8 +1209,7 @@ struct SPIRVEmitContext
     {
         if (!inst)
         {
-            IRBuilder builder;
-            builder.sharedBuilder = &m_sharedIRBuilder;
+            IRBuilder builder(m_sharedIRBuilder);
             builder.setInsertInto(m_irModule->getModuleInst());
             inst = builder.getVectorType(
                 builder.getBasicType(baseType),
@@ -1970,8 +1969,7 @@ struct SPIRVEmitContext
         {
             return result;
         }
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertBefore(type);
         auto ptrType = as<IRPtrTypeBase>(type);
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
@@ -1995,8 +1993,7 @@ struct SPIRVEmitContext
 
     SpvInst* maybeEmitSystemVal(IRInst* inst)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertBefore(inst);
         if (auto layout = getVarLayout(inst))
         {
@@ -2214,8 +2211,7 @@ struct SPIRVEmitContext
         {
             for (auto storageClass : snippet->usedResultTypeStorageClasses)
             {
-                IRBuilder builder;
-                builder.sharedBuilder = &m_sharedIRBuilder;
+                IRBuilder builder(m_sharedIRBuilder);
                 builder.setInsertBefore(inst);
                 auto newPtrType = builder.getPtrType(
                     oldPtrType->getOp(), oldPtrType->getValueType(), storageClass);
@@ -2234,8 +2230,7 @@ struct SPIRVEmitContext
         if (m_spvSnippetConstantInsts.TryGetValue(constant, result))
             return result;
 
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertInto(m_irModule->getModuleInst());
         switch (constant.type)
         {
@@ -2282,8 +2277,7 @@ struct SPIRVEmitContext
     // Emit SPV Inst that represents a type defined in a SpvSnippet.
     void emitSpvSnippetASMTypeOperand(SpvSnippet::ASMType type)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertInto(m_irModule->getModuleInst());
         IRType* irType = nullptr;
         switch (type)
@@ -2449,8 +2443,7 @@ struct SPIRVEmitContext
 
     SpvInst* emitFieldAddress(SpvInstParent* parent, IRFieldAddress* fieldAddress)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertBefore(fieldAddress);
 
         auto base = fieldAddress->getBase();
@@ -2493,8 +2486,7 @@ struct SPIRVEmitContext
 
     SpvInst* emitFieldExtract(SpvInstParent* parent, IRFieldExtract* inst)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertBefore(inst);
 
         IRStructType* baseStructType = as<IRStructType>(inst->getBase()->getDataType());
@@ -2566,8 +2558,7 @@ struct SPIRVEmitContext
         }
         SLANG_ASSERT(baseArrayType && "getElement require base to be an array.");
 
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedIRBuilder;
+        IRBuilder builder(m_sharedIRBuilder);
         builder.setInsertBefore(inst);
 
         auto ptr = emitInst(

@@ -3425,26 +3425,15 @@ public:
             {
                 prepareDraw();
 
-                D3D12_INDIRECT_ARGUMENT_DESC args[1];
-                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
-
-                D3D12_COMMAND_SIGNATURE_DESC desc;
-                desc.ByteStride = 36;
-                desc.NumArgumentDescs = 1;
-                desc.pArgumentDescs = args;
-
-                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
-                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
-                {
-                    return;
-                }
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
 
                 m_d3dCmdList->ExecuteIndirect(
-                    cmdSignature,
+                    m_renderer->drawIndirectCmdSignature,
                     maxDrawCount,
-                    (ID3D12Resource*)argBuffer,
+                    argBufferImpl->m_resource,
                     argOffset,
-                    (ID3D12Resource*)countBuffer,
+                    countBufferImpl->m_resource,
                     countOffset);
             }
 
@@ -3457,26 +3446,15 @@ public:
             {
                 prepareDraw();
 
-                D3D12_INDIRECT_ARGUMENT_DESC args[1];
-                args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
-
-                D3D12_COMMAND_SIGNATURE_DESC desc;
-                desc.ByteStride = 36;
-                desc.NumArgumentDescs = 1;
-                desc.pArgumentDescs = args;
-
-                ComPtr<ID3D12CommandSignature> cmdSignature = nullptr;
-                if (FAILED(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(cmdSignature.writeRef()))))
-                {
-                    return;
-                }
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                auto countBufferImpl = static_cast<BufferResourceImpl*>(countBuffer);
 
                 m_d3dCmdList->ExecuteIndirect(
-                    cmdSignature,
+                    m_renderer->drawIndexedIndirectCmdSignature,
                     maxDrawCount,
-                    (ID3D12Resource*)argBuffer,
+                    argBufferImpl->m_resource,
                     argOffset,
-                    (ID3D12Resource*)countBuffer,
+                    countBufferImpl->m_resource,
                     countOffset);
             }
 
@@ -4549,6 +4527,9 @@ public:
     PFN_D3D12_SERIALIZE_ROOT_SIGNATURE m_D3D12SerializeRootSignature = nullptr;
 
     bool m_nvapi = false;
+
+    ComPtr<ID3D12CommandSignature> drawIndirectCmdSignature;
+    ComPtr<ID3D12CommandSignature> drawIndexedIndirectCmdSignature;
 };
 
 SLANG_NO_THROW Result SLANG_MCALL D3D12Device::TransientResourceHeapImpl::synchronizeAndReset()
@@ -5327,6 +5308,32 @@ Result D3D12Device::initialize(const Desc& desc)
         compileTarget,
         profileName,
         makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
+
+    {
+        D3D12_INDIRECT_ARGUMENT_DESC args[1];
+        args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+        D3D12_COMMAND_SIGNATURE_DESC desc;
+        desc.ByteStride = 36;
+        desc.NumArgumentDescs = 1;
+        desc.pArgumentDescs = args;
+        desc.NodeMask = 0;
+
+        SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
+    }
+
+    {
+        D3D12_INDIRECT_ARGUMENT_DESC args[1];
+        args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+
+        D3D12_COMMAND_SIGNATURE_DESC desc;
+        desc.ByteStride = 36;
+        desc.NumArgumentDescs = 1;
+        desc.pArgumentDescs = args;
+        desc.NodeMask = 0;
+
+        SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
+    }
 
     m_isInitialized = true;
     return SLANG_OK;

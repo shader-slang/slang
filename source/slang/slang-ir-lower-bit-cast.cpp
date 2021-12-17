@@ -43,8 +43,7 @@ struct BitCastLoweringContext
     void processModule()
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = module;
-        sharedBuilder->session = module->session;
+        sharedBuilder->init(module);
 
         // Deduplicate equivalent types.
         sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();
@@ -239,8 +238,7 @@ struct BitCastLoweringContext
             return;
         }
         // Enumerate all fields in to-type and obtain its value from operand object.
-        IRBuilder builder;
-        builder.sharedBuilder = &sharedBuilderStorage;
+        IRBuilder builder(sharedBuilderStorage);
         builder.setInsertBefore(inst);
         auto finalObject = readObject(builder, operand, toType, 0);
         inst->replaceUsesWith(finalObject);

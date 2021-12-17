@@ -573,7 +573,7 @@ struct SCCPContext
     {
         // We start with the busy-work of setting up our IR builder.
         //
-        builderStorage.sharedBuilder = &shared->sharedBuilder;
+        builderStorage.init(shared->sharedBuilder);
 
         // We expect the caller to have filtered out functions with
         // no bodies, so there should always be at least one basic block.
@@ -940,8 +940,7 @@ void applySparseConditionalConstantPropagation(
 {
     SharedSCCPContext shared;
     shared.module = module;
-    shared.sharedBuilder.module = module;
-    shared.sharedBuilder.session = module->getSession();
+    shared.sharedBuilder.init(module);
 
     applySparseConditionalConstantPropagationRec(&shared, module->getModuleInst());
 }
