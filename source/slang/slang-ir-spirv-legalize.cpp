@@ -70,8 +70,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
             // Make a pointer type of storageClass.
-            IRBuilder builder;
-            builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+            IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
             builder.setInsertBefore(inst);
             ptrType = builder.getPtrType(kIROp_PtrType, inst->getFullType(), storageClass);
             inst->setFullType(ptrType);
@@ -141,8 +140,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             storageClass = SpvStorageClassWorkgroup;
         }
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+        IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
         builder.setInsertBefore(inst);
         auto newPtrType =
             builder.getPtrType(oldPtrType->getOp(), oldPtrType->getValueType(), storageClass);
@@ -165,8 +163,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
                 if (!ptrType)
                     return;
-                IRBuilder builder;
-                builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+                IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
                 builder.setInsertBefore(inst);
                 auto qualPtrType = builder.getPtrType(
                     ptrType->getOp(), ptrType->getValueType(), snippet->resultStorageClass);
@@ -190,8 +187,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto oldResultType = as<IRPtrTypeBase>(inst->getDataType());
             if (oldResultType->getAddressSpace() != ptrType->getAddressSpace())
             {
-                IRBuilder builder;
-                builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+                IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
                 builder.setInsertBefore(inst);
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
@@ -215,8 +211,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto oldResultType = as<IRPtrTypeBase>(inst->getDataType());
             if (oldResultType->getAddressSpace() != ptrType->getAddressSpace())
             {
-                IRBuilder builder;
-                builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+                IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
                 builder.setInsertBefore(inst);
                 auto newPtrType = builder.getPtrType(
                     oldResultType->getOp(),
@@ -233,8 +228,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
     void processStructuredBufferType(IRHLSLStructuredBufferTypeBase* inst)
     {
-        IRBuilder builder;
-        builder.sharedBuilder = &m_sharedContext->m_sharedIRBuilder;
+        IRBuilder builder(m_sharedContext->m_sharedIRBuilder);
         builder.setInsertBefore(inst);
         auto arrayType = builder.getUnsizedArrayType(inst->getElementType());
         auto structType = builder.createStructType();

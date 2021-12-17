@@ -16,9 +16,8 @@ namespace Slang
 
         void processMakeExistential(IRMakeExistentialWithRTTI* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             auto value = inst->getWrappedValue();
@@ -52,9 +51,8 @@ namespace Slang
         // existential value.
         void processCreateExistentialObject(IRCreateExistentialObject* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             // The result type of this `createExistentialObject` inst should already
@@ -103,9 +101,8 @@ namespace Slang
 
         void processExtractExistentialElement(IRInst* extractInst, UInt elementId)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(extractInst);
 
             auto element = extractTupleElement(builder, extractInst->getOperand(0), elementId);
@@ -130,9 +127,8 @@ namespace Slang
 
         void processGetValueFromBoundInterface(IRGetValueFromBoundInterface* inst)
         {
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(inst);
 
             // A value of interface will lower as a tuple, and
@@ -212,8 +208,7 @@ namespace Slang
             // generate along the way.
             //
             SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->module = sharedContext->module;
-            sharedBuilder->session = sharedContext->module->session;
+            sharedBuilder->init(sharedContext->module);
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 

@@ -1787,79 +1787,194 @@ struct IRConstantKey
 
 struct SharedIRBuilder
 {
+public:
     SharedIRBuilder()
     {}
 
-    SharedIRBuilder(Session* session, IRModule* module)
-        : session(session)
-        , module(module)
-    {}
-
     explicit SharedIRBuilder(IRModule* module)
-        : session(module->getSession())
-        , module(module)
-    {}
-
-    // The parent compilation session
-    Session* session;
-    Session* getSession()
     {
-        return session;
+        init(module);
     }
 
-    // The module that will own all of the IR
-    IRModule*       module;
+    void init(IRModule* module)
+    {
+        m_module = module;
+        m_session = module->getSession();
 
-    Dictionary<IRInstKey,       IRInst*>    globalValueNumberingMap;
-    Dictionary<IRConstantKey,   IRConstant*>    constantMap;
+        m_globalValueNumberingMap.Clear();
+        m_constantMap.Clear();
+    }
+
+    IRModule* getModule()
+    {
+        return m_module;
+    }
+
+    Session* getSession()
+    {
+        return m_session;
+    }
 
     void insertBlockAlongEdge(IREdge const& edge);
 
     // Rebuilds `globalValueNumberingMap`. This is necessary if any existing
     // keys are modified (thus its hash code is changed).
     void deduplicateAndRebuildGlobalNumberingMap();
+
+    typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
+    typedef Dictionary<IRConstantKey, IRConstant*> ConstantMap;
+
+    GlobalValueNumberingMap& getGlobalValueNumberingMap() { return m_globalValueNumberingMap; }
+    ConstantMap& getConstantMap() { return m_constantMap; }
+
+private:
+    // The module that will own all of the IR
+    IRModule* m_module;
+
+    // The parent compilation session
+    Session* m_session;
+
+    GlobalValueNumberingMap m_globalValueNumberingMap;
+    ConstantMap m_constantMap;
 };
 
 struct IRBuilderSourceLocRAII;
 
 struct IRBuilder
 {
+private:
+        /// Shared state for all IR builders working on the same module
+    SharedIRBuilder*    m_sharedBuilder = nullptr;
+
+        /// Default location for inserting new instructions as they are emitted
+    IRInsertLoc m_insertLoc;
+
+        /// Information that controls how source locations are associatd with instructions that get emitted
+    IRBuilderSourceLocRAII* m_sourceLocInfo = nullptr;
+
+public:
     IRBuilder()
     {}
 
-    IRBuilder(SharedIRBuilder* sharedBuilder)
-        : sharedBuilder(sharedBuilder)
+    explicit IRBuilder(SharedIRBuilder* sharedBuilder)
+        : m_sharedBuilder(sharedBuilder)
     {}
 
-    // Shared state for all IR builders working on the same module
-    SharedIRBuilder*    sharedBuilder = nullptr;
+    explicit IRBuilder(SharedIRBuilder& sharedBuilder)
+        : m_sharedBuilder(&sharedBuilder)
+    {}
 
-    Session* getSession()
+    void init(SharedIRBuilder* sharedBuilder)
     {
-        return sharedBuilder->getSession();
+        *this = IRBuilder(sharedBuilder);
     }
 
-    IRModule* getModule() { return sharedBuilder->module; }
+    void init(SharedIRBuilder& sharedBuilder)
+    {
+        *this = IRBuilder(sharedBuilder);
+    }
 
-    // The current parent being inserted into (this might
-    // be the global scope, a function, a block inside
-    // a function, etc.)
-    IRInst*   insertIntoParent = nullptr;
-    //
-    // An instruction in the current parent that we should insert before
-    IRInst*         insertBeforeInst = nullptr;
+    SharedIRBuilder* getSharedBuilder() const
+    {
+        return m_sharedBuilder;
+    }
+
+    Session* getSession() const
+    {
+        return m_sharedBuilder->getSession();
+    }
+
+    IRModule* getModule() const
+    {
+        return m_sharedBuilder->getModule();
+    }
+
+    IRInsertLoc const& getInsertLoc() const { return m_insertLoc; }
+
+    void setInsertLoc(IRInsertLoc const& loc) { m_insertLoc = loc; }
 
     // Get the current basic block we are inserting into (if any)
-    IRBlock*                getBlock();
+    IRBlock*                getBlock() { return m_insertLoc.getBlock(); }
 
     // Get the current function (or other value with code)
     // that we are inserting into (if any).
-    IRGlobalValueWithCode*  getFunc();
+    IRGlobalValueWithCode*  getFunc() { return m_insertLoc.getFunc(); }
 
-    void setInsertInto(IRInst* insertInto);
-    void setInsertBefore(IRInst* insertBefore);
+    void setInsertInto(IRInst* insertInto) { setInsertLoc(IRInsertLoc::atEnd(insertInto)); }
+    void setInsertBefore(IRInst* insertBefore) { setInsertLoc(IRInsertLoc::before(insertBefore)); }
 
-    IRBuilderSourceLocRAII* sourceLocInfo = nullptr;
+    void setInsertInto(IRModule* module) { setInsertInto(module->getModuleInst()); }
+
+    IRBuilderSourceLocRAII* getSourceLocInfo() const { return m_sourceLocInfo; }
+    void setSourceLocInfo(IRBuilderSourceLocRAII* sourceLocInfo) { m_sourceLocInfo = sourceLocInfo; }
+
+    //
+    // Low-level interface for instruction creation/insertion.
+    //
+
+        /// Either find or create an `IRConstant` that matches the value of `keyInst`.
+        ///
+        /// This operation will re-use an existing constant with the same type and
+        /// value if one can be found (currently identified through the `SharedIRBuilder`).
+        /// Otherwise it will create a new `IRConstant` with the given value and register it.
+        ///
+    IRConstant* _findOrEmitConstant(
+        IRConstant&     keyInst);
+
+        /// Create a new instruction with the given `type` and `op`, with an allocated
+        /// size of at least `minSizeInBytes`, and with its operand list initialized
+        /// from the provided lists of "fixed" and "variable" operands.
+        ///
+        /// The `fixedArgs` array must contain `fixedArgCount` operands, and will be
+        /// the initial operands in the operand list of the instruction.
+        ///
+        /// After the fixed arguments, the instruction may have zero or more additional
+        /// lists of "variable" operands, which are all concatenated. The total number
+        /// of such additional lists is given by `varArgsListCount`. The number of
+        /// operands in list `i` is given by `listArgCounts[i]`, and the arguments in
+        /// list `i` are pointed to by `listArgs[i]`.
+        ///
+        /// The allocation for the instruction created will be at least `minSizeInBytes`,
+        /// but may be larger if the total number of operands provided implies a larger
+        /// size.
+        ///
+        /// Note: This is an extremely low-level operation and clients of an `IRBuilder`
+        /// should not be using it when other options are available.
+        ///
+    IRInst* _createInst(
+        size_t                  minSizeInBytes,
+        IRType*                 type,
+        IROp                    op,
+        Int                     fixedArgCount,
+        IRInst* const*          fixedArgs,
+        Int                     varArgListCount,
+        Int const*              listArgCounts,
+        IRInst* const* const*   listArgs);
+
+
+
+        /// Create a new instruction with the given `type` and `op`, with an allocated
+        /// size of at least `minSizeInBytes`, and with zero operands.
+        ///
+    IRInst* _createInst(
+        size_t          minSizeInBytes,
+        IRType*         type,
+        IROp            op)
+    {
+        return _createInst(minSizeInBytes, type, op, 0, nullptr, 0, nullptr, nullptr);
+    }
+
+        /// Attempt to attach a useful source location to `inst`.
+        ///
+        /// This operation looks at the source location information that has been
+        /// attached to the builder. If it finds a valid source location, it will
+        /// attach that location to `inst`.
+        ///
+    void _maybeSetSourceLoc(
+        IRInst*     inst);
+
+
+    //
 
     void addInst(IRInst* inst);
 
@@ -2188,8 +2303,6 @@ struct IRBuilder
         IRInst*         operand,
         UInt            operandCount,
         IRInst* const*  operands);
-
-    IRModule* createModule();
 
     IRFunc* createFunc();
     IRGlobalVar* createGlobalVar(
@@ -2716,14 +2829,14 @@ struct IRBuilderSourceLocRAII
         , sourceLoc(sourceLoc)
         , next(nullptr)
     {
-        next = builder->sourceLocInfo;
-        builder->sourceLocInfo = this;
+        next = builder->getSourceLocInfo();
+        builder->setSourceLocInfo(this);
     }
 
     ~IRBuilderSourceLocRAII()
     {
-        SLANG_ASSERT(builder->sourceLocInfo == this);
-        builder->sourceLocInfo = next;
+        SLANG_ASSERT(builder->getSourceLocInfo() == this);
+        builder->setSourceLocInfo(next);
     }
 };
 

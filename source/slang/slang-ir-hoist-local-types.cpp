@@ -38,21 +38,20 @@ struct HoistLocalTypesContext
         if (inst->getParent() == module->getModuleInst())
             return;
         IRInstKey key = {inst};
-        if (auto value = sharedBuilder->globalValueNumberingMap.TryGetValue(key))
+        if (auto value = sharedBuilder->getGlobalValueNumberingMap().TryGetValue(key))
         {
             inst->replaceUsesWith(*value);
             inst->removeAndDeallocate();
             return;
         }
-        IRBuilder builder;
-        builder.sharedBuilder = sharedBuilder;
+        IRBuilder builder(sharedBuilder);
         builder.setInsertInto(module->getModuleInst());
         bool hoistable = true;
         ShortList<IRInst*> mappedOperands;
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             IRInstKey opKey = {inst->getOperand(i)};
-            if (auto value = sharedBuilder->globalValueNumberingMap.TryGetValue(opKey))
+            if (auto value = sharedBuilder->getGlobalValueNumberingMap().TryGetValue(opKey))
             {
                 mappedOperands.add(*value);
             }
@@ -75,8 +74,7 @@ struct HoistLocalTypesContext
     void processModule()
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = module;
-        sharedBuilder->session = module->session;
+        sharedBuilder->init(module);
 
         // Deduplicate equivalent types and build numbering map for global types.
         sharedBuilder->deduplicateAndRebuildGlobalNumberingMap();

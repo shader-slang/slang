@@ -203,9 +203,7 @@ public:
         // shared builder to avoid unnecessary duplication of
         // types/constants.
         //
-        SharedIRBuilder sharedBuilderStorage;
-        sharedBuilderStorage.module = module;
-        sharedBuilderStorage.session = module->getSession();
+        SharedIRBuilder sharedBuilderStorage(module);
         m_sharedBuilder = &sharedBuilderStorage;
 
         // Once the basic initialization is done, we will allow

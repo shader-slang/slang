@@ -134,9 +134,8 @@ static void _cloneInstDecorationsAndChildren(
     // We will set up an IR builder that inserts
     // into the new parent instruction.
     //
-    IRBuilder builderStorage;
+    IRBuilder builderStorage(sharedBuilder);
     auto builder = &builderStorage;
-    builder->sharedBuilder = sharedBuilder;
     builder->setInsertInto(newInst);
 
     // If `newInst` already has non-decoration children, we want to
@@ -264,7 +263,7 @@ IRInst* cloneInst(
     env->mapOldValToNew.Add(oldInst, newInst);
 
     cloneInstDecorationsAndChildren(
-        env, builder->sharedBuilder, oldInst, newInst);
+        env, builder->getSharedBuilder(), oldInst, newInst);
 
     return newInst;
 }
@@ -274,11 +273,8 @@ void cloneDecoration(
     IRInst*         newParent,
     IRModule*       module)
 {
-    SharedIRBuilder sharedBuilder;
-    sharedBuilder.module = module;
-
-    IRBuilder builder;
-    builder.sharedBuilder = &sharedBuilder;
+    SharedIRBuilder sharedBuilder(module);
+    IRBuilder builder(sharedBuilder);
 
     if(auto first = newParent->getFirstDecorationOrChild())
         builder.setInsertBefore(first);

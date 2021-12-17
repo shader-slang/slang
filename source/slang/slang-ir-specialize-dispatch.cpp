@@ -42,9 +42,8 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     }
     SLANG_ASSERT(callInst && lookupInst && returnInst);
 
-    IRBuilder builderStorage;
+    IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
     auto builder = &builderStorage;
-    builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
     builder->setInsertBefore(dispatchFunc);
 
     // Create a new dispatch func to replace the existing one.
@@ -209,8 +208,7 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             }
 
             // Add a decoration to the inst.
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(inst);
             builder.addSequentialIDDecoration(inst, seqID);
         }
@@ -232,8 +230,7 @@ void fixupDispatchFuncCall(SharedGenericsLoweringContext* sharedContext, IRFunc*
         {
             if (call->getCallee() != newDispatchFunc)
                 continue;
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(call);
             List<IRInst*> args;
             for (UInt i = 0; i < call->getArgCount(); i++)

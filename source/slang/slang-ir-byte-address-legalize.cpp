@@ -39,10 +39,8 @@ struct ByteAddressBufferLegalizationContext
     //
     void processModule(IRModule* module)
     {
-        m_sharedBuilder.session = m_session;
-        m_sharedBuilder.module = module;
-
-        m_builder.sharedBuilder = &m_sharedBuilder;
+        m_sharedBuilder.init(module);
+        m_builder.init(m_sharedBuilder);
 
         processInstRec(module->getModuleInst());
     }
@@ -704,8 +702,7 @@ struct ByteAddressBufferLegalizationContext
         // of legalizing a load or store, and we don't want to mess with
         // the insertion location of `m_builder`.
         //
-        IRBuilder paramBuilder;
-        paramBuilder.sharedBuilder = &m_sharedBuilder;
+        IRBuilder paramBuilder(m_sharedBuilder);
         paramBuilder.setInsertBefore(byteAddressBufferParam);
 
         auto structuredBufferParam = paramBuilder.createGlobalParam(structuredBufferParamType);

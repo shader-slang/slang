@@ -2040,7 +2040,7 @@ void FrontEndCompileRequest::generateIR()
             // Verify debug information
             if (SLANG_FAILED(SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
-                getSink()->diagnose(irModule->moduleInst->sourceLoc, Diagnostics::serialDebugVerificationFailed);
+                getSink()->diagnose(irModule->getModuleInst()->sourceLoc, Diagnostics::serialDebugVerificationFailed);
             }
         }
 

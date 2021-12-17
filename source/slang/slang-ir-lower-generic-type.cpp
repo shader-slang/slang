@@ -29,9 +29,8 @@ namespace Slang
             if (as<IRType>(inst))
                 return;
 
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(inst);
            
             auto newType = sharedContext->lowerType(builder, inst->getFullType());
@@ -61,8 +60,7 @@ namespace Slang
             // generate along the way.
             //
             SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->module = sharedContext->module;
-            sharedBuilder->session = sharedContext->module->session;
+            sharedBuilder->init(sharedContext->module);
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 

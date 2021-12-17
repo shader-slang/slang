@@ -159,9 +159,8 @@ namespace Slang
             for (UInt i = 0; i < funcType->getParamCount(); i++)
                 paramTypes.add(funcType->getParamType(i));
 
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(callInst);
 
             // Process the argument list of the call.
@@ -285,9 +284,8 @@ namespace Slang
             if (isBuiltin(interfaceType))
                 return;
 
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(callInst);
 
             // Create interface dispatch method that bottlenecks the dispatch logic.
@@ -346,8 +344,7 @@ namespace Slang
             // generate along the way.
             //
             SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->module = sharedContext->module;
-            sharedBuilder->session = sharedContext->module->session;
+            sharedBuilder->init(sharedContext->module);
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 

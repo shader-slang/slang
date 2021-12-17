@@ -24,9 +24,8 @@ struct AugmentMakeExistentialContext
 
     void processMakeExistential(IRMakeExistential* inst)
     {
-        IRBuilder builderStorage;
+        IRBuilder builderStorage(sharedBuilderStorage);
         auto builder = &builderStorage;
-        builder->sharedBuilder = &sharedBuilderStorage;
         builder->setInsertBefore(inst);
 
         auto augInst = builder->emitMakeExistentialWithRTTI(
@@ -53,8 +52,7 @@ struct AugmentMakeExistentialContext
     void processModule()
     {
         SharedIRBuilder* sharedBuilder = &sharedBuilderStorage;
-        sharedBuilder->module = module;
-        sharedBuilder->session = module->session;
+        sharedBuilder->init(module);
 
         addToWorkList(module->getModuleInst());
 

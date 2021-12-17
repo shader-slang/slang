@@ -1279,24 +1279,24 @@ void insertGlobalValueSymbols(
 void initializeSharedSpecContext(
     IRSharedSpecContext*    sharedContext,
     Session*                session,
-    IRModule*               module,
+    IRModule*               inModule,
     CodeGenTarget           target,
     TargetRequest*          targetReq)
 {
 
     SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-    sharedBuilder->module = nullptr;
-    sharedBuilder->session = session;
 
     IRBuilder* builder = &sharedContext->builderStorage;
-    builder->sharedBuilder = sharedBuilder;
 
+    RefPtr<IRModule> module = inModule;
     if( !module )
     {
-        module = builder->createModule();
+        module = IRModule::create(session);
     }
 
-    sharedBuilder->module = module;
+    sharedBuilder->init(module);
+    builder->init(sharedBuilder);
+
     sharedContext->module = module;
     sharedContext->target = target;
     sharedContext->targetReq = targetReq;
@@ -1399,7 +1399,7 @@ LinkedIR linkIR(
         {
             findGlobalHashedStringLiterals(irModule, pool);
         }
-        addGlobalHashedStringLiterals(pool, *builder.sharedBuilder);
+        addGlobalHashedStringLiterals(pool, *builder.getSharedBuilder());
     }
 
     // Set up shared and builder insert point
