@@ -42,8 +42,6 @@ struct B : IHasType
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
     int index = dispatchThreadID.x;
-   
-    B b;
     
     let e = B::Type::kE;
     
