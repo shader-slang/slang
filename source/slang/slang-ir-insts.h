@@ -1856,12 +1856,6 @@ public:
     IRBuilder()
     {}
 
-    IRBuilder(IRBuilder const& builder)
-        : m_sharedBuilder(builder.getSharedBuilder())
-        , m_insertLoc(builder.getInsertLoc())
-        , m_sourceLocInfo(builder.getSourceLocInfo())
-    {}
-
     explicit IRBuilder(SharedIRBuilder* sharedBuilder)
         : m_sharedBuilder(sharedBuilder)
     {}
