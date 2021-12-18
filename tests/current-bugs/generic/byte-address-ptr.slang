@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
 /* The purpose of these tests is to use generics to be able to traverse
 a 'linked list' of different related types. 
