@@ -1,7 +1,7 @@
 //TEST_TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2
 
 /* 
-Testing how an associated type can be used.
+Testing returning an interface type.
  
 Works.
 
