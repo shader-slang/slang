@@ -2,7 +2,7 @@
 
 /* A test of a generic functions with type inference.
 
-Works(!) (even though any sizzle does not)
+Works(!) (even though any swizzle does not)
  */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

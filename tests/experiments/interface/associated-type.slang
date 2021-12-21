@@ -1,25 +1,23 @@
-//DISABLE_TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2
+//TEST_TEST:SIMPLE:-target dxil -entry computeMain -profile cs_6_2
 
 /* 
+Testing how an associated type can be used.
 
-Doesn't work:
+In this example because we get the Type from the interface, it doesn't know what actual type it is.
 
-.slang(51): error 30027: 'getValue' is not a member of 'Type'.
+.slang(43): error 30027: 'getValue' is not a member of 'Type'.
     outputBuffer[dispatchThreadID.x] = x + r.getValue(x);
-                                            ^                 
-    */
 
-interface ISomeInterface
-{
-    int getValue(int index);
-};
+From an error message point of view this perhaps somewhat confusing because there aren't any methods on Type in this context. 
 
-struct SomeType : ISomeInterface
+It would be possible for an implementation to determine intf is impl, and do the right thing, although not in general. 
+*/
+
+struct SomeType
 {
-    int getValue(int index) { return data.Load(index + offset); }
+    int getValue(int index) { return index + offset; }
     
     int offset;
-    ByteAddressBuffer data;     
 };
 
 interface IInterface
@@ -35,14 +33,12 @@ struct InterfaceImpl : IInterface
     
     Type get(int offset) 
     {
-        Type a;
-        a.offset = offset;
-        a.data = byteAddressBuffer;
-        return a;
+        Type v;
+        v.offset = offset;
+        return v;
     }; 
 };
 
-ByteAddressBuffer byteAddressBuffer;
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 4, 1)]
