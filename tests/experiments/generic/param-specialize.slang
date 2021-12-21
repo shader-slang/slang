@@ -5,12 +5,13 @@
 Using parameters in this way ensures the algorithm in function form 
 will have those values known at compile time, and presumably lead to a specialized version.
 
-Here (with 1 == 1) it's testing if a compile time knowable expression can be used.
-
 Does not work because
 
-.slang(25): note 99999: an internal error threw an exception while working on code near this location
-(0): error 99999: Slang compilation aborted due to an exception of class Slang::InternalError: unexpected: ErrorType
+.slang(24): error 30019: expected an expression of type 'int', got 'Enum'
+    let v = doThing<true, false, Enum::A>();
+                                     ^      
+                                   
+Note that docs say doesn't support any other than int, but error is a bit confusing. No error at declaration.
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -21,23 +22,23 @@ enum class Enum
     A, B
 };
 
-int doThing<a : bool, b : int, c : Enum>()
+int doThing<let a : bool, let b : int, let c : Enum>()
 {
-    //if (a)
+    if (a)
     {
         return 1;
     }
     return 0;
+    // A more complex scenario
     //return a ? b + b + int(c) : b - int(c);
 }
-
 
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {    
     int index = dispatchThreadID.x;
     
-    let v = doThing<1 == 1, false, Enum::A>();
+    let v = doThing<true, false, Enum::A>();
     
     outputBuffer[dispatchThreadID.x] = v;
 }
