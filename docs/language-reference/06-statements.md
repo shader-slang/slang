@@ -93,10 +93,10 @@ case 1:
     doBasicThing();
     break;
 
-// this is another swithc case clause
+// this is another switch case clause
 default:
-	doAnotherThing();
-	break;
+    doAnotherThing();
+    break;
 ```
 
 A _case label_ consists of the keyword `case` followed by an expresison and a colon (`:`).
@@ -105,7 +105,7 @@ The expression must evaluate to a compile-time constant integer.
 A _default label_ consists of the keyword `default` followed by a colon (`:`).
 
 It is an error for a case label or default label to appear anywhere other than the body of a `switch` statement.
-It is an error for a statement to appear inside the body of a `switch` statemetn that is no part of a switch case clause.
+It is an error for a statement to appear inside the body of a `switch` statement that is no part of a switch case clause.
 
 Each switch case clause must exit the `switch` statement via a `break` or other control transfer statement.
 "Fall-through" from one switch case clause to another is not allowed.
@@ -172,7 +172,7 @@ A `break` statement transfers control to after the end of the closest lexically 
 break;
 ```
 
-### Continute Statement
+### Continue Statement
 
 A `continue` statement transfers control to the start of the next iteration of a loop statement.
 In a for statement with a side effect expression, the side effect expression is evaluated when `continue` is used:

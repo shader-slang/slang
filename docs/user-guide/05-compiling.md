@@ -7,7 +7,7 @@ Compiling Code with Slang
 
 This chapter presents the ways that the Slang system supports compiling and composing shader code.
 We will start with a discussion of the mental model that Slang uses for compilation.
-Next we will cover the command-line Slang compiler, `slangc`, and how to use it to perform offline compialtion.
+Next we will cover the command-line Slang compiler, `slangc`, and how to use it to perform offline compilation.
 Finally we will discuss the Slang compilation API, which can be used to integrate Slang compilation into an application at runtime, or to build custom tools that implement application-specific compilation policy.
 
 Concepts
@@ -51,7 +51,7 @@ float scaleValue(float value)
 In this example, the `scaleValue()` function in `B.slang` can freely refer to the `getFactor()` function in `A.slang` because they are part of the same translation unit.
 
 It is allowed, and indeed common, for a translation unit to contain only a single source unit.
-For example, when adapting an existing codebase with many `.hlsl` files, it is appropraite to compile each `.hlsl` file as its own translation unit.
+For example, when adapting an existing codebase with many `.hlsl` files, it is appropriate to compile each `.hlsl` file as its own translation unit.
 A modernized codebase might decide to compile multiple `.slang` files in a single directory as a single translation unit.
 
 The result of compiling a translation unit is a module in Slang's internal intermediate representation (IR).
@@ -117,7 +117,7 @@ For the purposes of the compilation model it is important to note that the layou
 
 * The rules and constraints that the target imposes on layout.
 
-An important design choice in Slng is give the user of the compiler control over these choices.
+An important design choice in Slang is give the user of the compiler control over these choices.
 
 ### Composition
 
@@ -133,7 +133,7 @@ Once a programmer has formed a composite of all the code they intend to use toge
 A _kernel_ is generated code for an entry point.
 The same entry point can be used to generate many different kernels.
 First, and entry point can be compiled for different targets, resulting in different kernels in the appropriate format for each target.
-Second, different compositions of shade rcode can result in different layouts, which leads to different kernels being required.
+Second, different compositions of shader code can result in different layouts, which leads to different kernels being required.
 
 Command-Line Compilation with `slangc`
 --------------------------------------
@@ -219,7 +219,7 @@ For example:
 
 * If there are multiple input files, then an `-entry` option applies to the preceding input file
 
-* If there are mutliple entry points, then a `-stage` option applies to the preceding `-entry` option
+* If there are multiple entry points, then a `-stage` option applies to the preceding `-entry` option
 
 * If there are multiple targets, then a `-profile` option applies to the preceding `-target` option
 
@@ -260,7 +260,7 @@ Notable features that Slang supports which cannot be accessed from `slangc` incl
 
 * Slang can provide _reflection_ information about shader parameters and their layouts for particular targets; this information is not currently output by `slangc`.
 
-* Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader codce.
+* Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader code.
 
 Applications that more control over compilation are encouraged to use the C++ compilation API described in the next section.
 
@@ -297,7 +297,7 @@ The standard library can take a significant amount of time to load, so applicati
 
 > #### Note ####
 > Currently, the global session type is *not* thread-safe.
-> Applications that wish to compile on multiple threads will need to ensure that each concurrent thread copmiles with a distinct global session.
+> Applications that wish to compile on multiple threads will need to ensure that each concurrent thread compiles with a distinct global session.
 
 ### Creating a Session
 

@@ -45,7 +45,7 @@ All arithmetic operations on integers (both signed and unsigned) wrap on overflo
 All target platforms must support the `int` and `uint` types.
 Specific target platforms may not support the other integer types.
 
-All integer types are stored in memory with their natural size and alignment on all targes that support them.
+All integer types are stored in memory with their natural size and alignment on all targets that support them.
 
 ### Floating-Point Types
 
@@ -210,7 +210,7 @@ D3D constant buffer layout is similar to standard layout with two differences:
 
 * The initial alignment is 16 instead of one
 
-* If a field would have _improper straddle_, where the interval `(fieldOffset, fieldOffset+fieldSize)` (eclusive on both sides) contains any multiple of 16, *and* the field offset is not already a multiple of 16, then the offset of the field is adjusted to the next multiple of 16
+* If a field would have _improper straddle_, where the interval `(fieldOffset, fieldOffset+fieldSize)` (exclusive on both sides) contains any multiple of 16, *and* the field offset is not already a multiple of 16, then the offset of the field is adjusted to the next multiple of 16
 
 Array Types
 -----------
@@ -261,7 +261,7 @@ var a : int[10];
 When a variable is declared with an unknown-size array type, and also includes an initial-value expression:
 
 ```hlsl
-int a[] = { 0xA, 0XB, 0xC, 0xD };
+int a[] = { 0xA, 0xB, 0xC, 0xD };
 ```
 
 The compiler will attempt to infer an element count based on the type and/or structure of the initial-value expression.

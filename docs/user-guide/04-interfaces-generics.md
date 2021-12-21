@@ -18,7 +18,7 @@ interface IFoo
 }
 ```
 
-Slang's syntax for defining interfaces are similar to `interface`s in C# and `protocal`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
+Slang's syntax for defining interfaces are similar to `interface`s in C# and `protocol`s in Swift. In this example, the `IFoo` interface establishes a contract that any type conforming to this interface must provide a method named `myMethod` that accepts a `float` argument and returns an `int` value.
 
 A `struct` type may declare its conformance to an `interface` via the following syntax:
 ```csharp
@@ -91,7 +91,7 @@ You may explicitly specify the concrete type to used for the generic type argume
 
 Note that it is important to associate a generic type parameter with a type constraint. In the above example, although the definition of `myGenericMethod` is agnostic of the concrete type `T` will stand for, knowing that `T` conforms to `IFoo` allows the compiler to type-check and pre-compile `myGenericMethod` without needing to substitute `T` with any concrete types first. Similar to languages like C#, Rust, Swift and Java, leaving out the type constraint declaration on type parameter `T` will result in a compile error at the line calling `arg.myMethod` since the compiler cannot verify that `arg` has a member named `myMethod` without any knowledge on `T`. This is a major difference of Slang's generics compared to _templates_ in C++. 
 
-While C++ templates is a powerful language mechanism, Slang has followed the path of many other modern programming langauges to adopt the more structural and restricted generics feature instead. This enables the Slang compiler to perform type checking early to give more readable error messages, and to speed-up compilation by reusing a lot of work for different instantiations of `myGenericMethod`.
+While C++ templates are a powerful language mechanism, Slang has followed the path of many other modern programming languages to adopt the more structural and restricted generics feature instead. This enables the Slang compiler to perform type checking early to give more readable error messages, and to speed-up compilation by reusing a lot of work for different instantiations of `myGenericMethod`.
 
 
 Supported Constructs in Interface Definitions
