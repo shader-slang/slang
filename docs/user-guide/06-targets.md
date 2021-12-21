@@ -21,7 +21,7 @@ GPU APIs usually define an _intermediate language_ that sits between a high-leve
 
 GPU code execution occurs in the context of a _pipeline_.
 A pipeline comprises one or more _stages_ and dataflow connections between them.
-Some stages are _programmable_ and run a user-defined _kernel_ that has been compiled from a language like Slang, while others are _fixed-function_ and can only be congfigured, rather than programmed, by the user.
+Some stages are _programmable_ and run a user-defined _kernel_ that has been compiled from a language like Slang, while others are _fixed-function_ and can only be configured, rather than programmed, by the user.
 Slang supports three different pipelines.
 
 #### Rasterization
@@ -61,7 +61,7 @@ In contrast, an application programmer typically needs to manually prepare shade
 On platforms that provide a CPU-like "flat" memory model with a single virtual address space, and where any kind of data can be stored at any address, passing shader parameters can be almost trivial.
 Current graphics APIs provide far more complicated and less uniform mechanisms for passing shader parameters.
 
-A high-level langauge compiler like Slang handles the task of _binding_ each user-defined shader parameter to one or more of the parameter-passing resources defined by a target platform.
+A high-level language compiler like Slang handles the task of _binding_ each user-defined shader parameter to one or more of the parameter-passing resources defined by a target platform.
 For example, the Slang compiler might bindg a global `Texture2D` parameter called `gDiffuse` to the `t1` register defined by the Direct3D 11 API.
 
 An application is responsible for passing the argument data for a parameter using the using the corresponding platform-specific resource it was bound to.
@@ -131,7 +131,7 @@ The D3D11 rasterization pipeline can include up to five programmable stages, alt
 Shader parameters are passed to each D3D11 stage via slots.
 Each stage has its own slots of the following types:
 
-* **Constant bufffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
+* **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant bufers are passed via `b` registers.
 
 * **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types thare are read or sampled by GPU code. SRVs use `t` registers.
 
@@ -155,7 +155,7 @@ Direct3D 12 (D3D12) is the current major version of the Direct2D API.
 
 D3D12 kernels must be compiled to the DirectX Intermediate Language (DXIL).
 DXIL is a layered encoding based off of LLVM bitcode; it introduces additional formatting rules and constraints which are loosely documented.
-A DXIL binary may be signed, and the runtime API only accepts appropriately signed binaries (unless a devleoper mode is enabled on the host machine).
+A DXIL binary may be signed, and the runtime API only accepts appropriately signed binaries (unless a developer mode is enabled on the host machine).
 A DXIL validator `dxil.dll` is included in SDK releases, and this validator can sign binaries that pass validation.
 While DXIL can in principle be generated from multiple compiler front-ends, support for other compilers is not prioritized.
 
@@ -184,7 +184,7 @@ Compared to the D3D11 pipeline with tessellation, an amplification shader is kin
 The DirectX Ray Tracing (DXR) feature added a ray tracing pipeline to D3D12.
 The D3D12 ray tracing pipeline exposes the following programmable stages:
 
-* The ray generation (`raygeneration`) stage is similar to a compute stage, but can trace zero or more rays and make use of the resutls of those traces.
+* The ray generation (`raygeneration`) stage is similar to a compute stage, but can trace zero or more rays and make use of the results of those traces.
 
 * The `intersection` stage runs kernels to compute whether a ray intersects a user-defined primitive type. The system also includes a default intersector that handles triangle meshes.
 
@@ -211,13 +211,13 @@ Most opaque types (texture, resources, samplers) must be set into blocks (D3D12 
 Each pipeline supports a fixed amount of storage for "root parameters," and allows those root parameters to be configured as root constants, slots for blocks, or slots for a limited number of opaque types (primarily just flat buffers).
 
 Shader parameters are still grouped and bound to registers as in D3D11; for example, a `Texture2D` parameter is considered as an SRV and uses a `t` register.
-D3D12 additionally associates binds shader parametes to "spaces" which are expressed similarly to registers (e.g., `space2`), but represent an orthogonal "axis" of binding.
+D3D12 additionally associates binds shader parameters to "spaces" which are expressed similarly to registers (e.g., `space2`), but represent an orthogonal "axis" of binding.
 
 While shader parameters are bound registers and spaces, those registers and spaces do not directly correspond to slots provided by the D3D12 API the way registers do in D3D11.
-Instead, the configuration of the root parameters and the correspondance of registers/spaces to root parameters, blocks, and/or slots are defined by a _pipeline layout_ that D3D12 calls a "root signature."
+Instead, the configuration of the root parameters and the correspondence of registers/spaces to root parameters, blocks, and/or slots are defined by a _pipeline layout_ that D3D12 calls a "root signature."
 
 Unlike D3D11, all of the stages in a D3D12 pipeline share the same root parameters.
-A D3D12 pipeline layout can specify that certain root parameters or certain slots within blocks will only be acccessed by a subset of stages, and can map the *same* register/space pair to different paramters/blocks/slots as long as this is done for disjoint subset of stages.
+A D3D12 pipeline layout can specify that certain root parameters or certain slots within blocks will only be accessed by a subset of stages, and can map the *same* register/space pair to different parameters/blocks/slots as long as this is done for disjoint subset of stages.
 
 #### Ray Tracing Specifics
 
@@ -249,12 +249,12 @@ Vulkan includes rasterization, compute, and ray tracing pipelines with the same 
 
 ### Parameter Passing
 
-Like D3D12, Vulkan uess blocks (called "descriptor sets") to organize groups of bindings for opaque types (textures, buffers, samplers).
+Like D3D12, Vulkan uses blocks (called "descriptor sets") to organize groups of bindings for opaque types (textures, buffers, samplers).
 Similar to D3D12, a Vulkan pipeline supports a limited number of slots for passing blocks to the pipeline, and these slots are shared across all stages.
 Vulkan also supports a limited number of bytes reserved for passing root constants (called "push constants").
 Vulkan uses pipeline layouts to describe configurations of usage for blocks and root constants.
 
-High-level-language shader parameters are bound to a combination of a "binding" and a "set" for Vulkan, which are superficially similar to the reigsters and spaces of D3D12.
+High-level-language shader parameters are bound to a combination of a "binding" and a "set" for Vulkan, which are superficially similar to the registers and spaces of D3D12.
 Unlike D3D12, however, bindings and sets in Vulkan directly correspond to the API-provided parameter-passing mechanism.
 The set index of a parameter indicates the zero-based index of a slot where a block must be passed, and the binding index is the zero-based index of a particular opaque value set into the block.
 A shader parameter that will be passed using root constants (rather than via blocks) must be bound to a root-constant offset as part of compilation.
@@ -290,7 +290,7 @@ OpenGL uses slots for binding.
 There are distinct kinds of slots for buffers and textures/images, and each set of slots is shared by all pipeline stages.
 
 High-level-language shader parameters are bounding to a "binding" index for OpenGL.
-The binding index of a parmeter is the zero-based index of the slot (of the appropriate kind) that must be used to pass an argument value.
+The binding index of a parameter is the zero-based index of the slot (of the appropriate kind) that must be used to pass an argument value.
 
 Note that while OpenGL and Vulkan both use binding indices for shader parameters like textures, the semantics of those are different because OpenGL uses distinct slots for passing buffers and textures.
 For OpenGL is is legal to have a texture that uses `binding=2` and a buffer that uses `binding=2` in the same kernel, because those are indices of distinct kinds of slots, while this scenario would typically be invalid for Vulkan.
