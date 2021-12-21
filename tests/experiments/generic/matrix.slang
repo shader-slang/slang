@@ -2,16 +2,13 @@
 
 /* A test to use generics around resource/built in types. 
 
-Doesn't work
-
-.slang(5): error 30019: expected an expression of type 'int', got 'typeof(W)'
-    matrix<float, W, H> values;
+CRASHES the compiler. 
  */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-struct Another<W : int, H : int>
+struct Another<let W : int, let H : int>
 {
     matrix<float, W, H> values;
 };

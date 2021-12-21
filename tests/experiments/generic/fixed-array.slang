@@ -2,14 +2,19 @@
 
 /* A test around use of an array like container. 
 
-Doesn't work because SIZE can't be used to set the element array size */
+Has error:
+
+.slang(5): error 30019: expected an expression of type 'int', got 'typeof(SIZE)'
+    T elements[SIZE];
+
+Problem here is SIZE doesn't have *let* in front. The error doesn't provide any useful insight into that. It's also not entirely clear *why* let is needed. Presumably because it's not a type?
+*/
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct FixedArray<T, SIZE : int> 
-{
-    
+{   
     T elements[SIZE];
 };
 

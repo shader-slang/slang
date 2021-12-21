@@ -2,11 +2,9 @@
 
 /* A test for equality around interface types
 
-Doesn't work because
+This style is discussed in the documentation here:
 
-.slang(8): error 38100: type 'A' does not provide required interface member 'isEqual'
-struct A : IEquality
-           ^~~~~~~~~
+Still has limitiation that it only works for an an implementation of an interface.  
  */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
@@ -14,15 +12,14 @@ RWStructuredBuffer<float> outputBuffer;
 
 interface IEquality
 {
-    bool isEqual(IEquality rhs);
-};
+    bool isEqual(This other);
+}
 
 struct A : IEquality
 {
-    bool isEqual(IEquality rhs)
+    bool isEqual(This other)
     {
-        // Hmm. How can I cant query rhs, and then cast, so how to implement
-        return true;
+        return value == other.value;
     }
     int value;
 };
