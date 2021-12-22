@@ -106,7 +106,7 @@ void test()
 
 ## Properties
 
-Properties provide a convienient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift. 
+Properties provide a convenient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift. 
 ```csharp
 struct MyType
 {
@@ -296,7 +296,7 @@ This feature is similar to extensions in Swift and partial classes in C#.
 Modules
 -------
 
-While you can still organize code using preprocssor `#include`s, Slang also supports a _module_ system.
+While you can still organize code using preprocessor `#include`s, Slang also supports a _module_ system.
 
 ### Importing a Module
 

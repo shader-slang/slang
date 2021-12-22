@@ -11,7 +11,7 @@ Why use Slang?
 --------------
 
 The Slang system helps real-time graphics developers write cleaner and more maintainable GPU code, without sacrificing run-time performance.
-Slang extends the HLSL language with thoughtfully selected features from modern general-purpose langauges that support improved developer productivity and code quality.
+Slang extends the HLSL language with thoughtfully selected features from modern general-purpose languages that support improved developer productivity and code quality.
 These features have been carefully implemented with an understanding of GPU performance.
 
 Some of the benefits of Slang include:
@@ -20,7 +20,7 @@ Some of the benefits of Slang include:
 
 * _Parameter blocks_ allow shader parameters to be grouped by update rate in order to take advantage of Direct3D 12 descriptor tables and Vulkan descriptor sets, without verbose and error-prone per-parameter markup
 
-* _Interfaces_ and _generics_ provide first-class alternative to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feaure already used in Rust, Swift, C#, Java, and more.
+* _Interfaces_ and _generics_ provide first-class alternative to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feature already used in Rust, Swift, C#, Java, and more.
 
 * Slang supports a first class _module_ system, which enables true separate compilation and semantic checking of shader code. 
 
@@ -81,7 +81,7 @@ Goals and Non-Goals
 -------------------
 
 The rest of this guide introduces the services provided by the Slang system and explains how to use them to solve challenges in real-time graphics programming.
-When servics are introduced one after another, it may be hard to glimpse the bigger picture: why these particular services? Why these implementation? Why these APIs?
+When services are introduced one after another, it may be hard to glimpse the bigger picture: why these particular services? Why these implementations? Why these APIs?
 
 Before we dive into actually _using_ Slang, let us step back and highlight some of the key design goals (and non-goals) that motivate the design:
 
@@ -89,7 +89,7 @@ Before we dive into actually _using_ Slang, let us step back and highlight some 
 
 * **Productivity**: Modern GPU codebases are large and growing. Productivity in a large codebase is less about _writing_ code quickly, and more about having code that is understandable, maintainable, reusable, and extensible. Language concepts like "modularity" or "separate compilation" are valuable if they foster greater developer productivity.
 
-* **Portability**: Real-time graphics developers need to suport a wide variety of hardware, graphics APIs, and operating systems. These platforms differ greatly in the level of funcationality they provide. Some system hand-wave portability concerns out of existence by enforcing a "lowest common denominator" approach and/or raising their "min spec" to exclude older or less capable platforms; our goals differ greatly. We aspire to keep our "min spec" as low as is practical (e.g., supporting Direct3D 11 and not just Direct3D 12), while also allowing each target to expose its distinguishing capabilities.
+* **Portability**: Real-time graphics developers need to support a wide variety of hardware, graphics APIs, and operating systems. These platforms differ greatly in the level of functionality they provide. Some systems hand-wave portability concerns out of existence by enforcing a "lowest common denominator" approach and/or raising their "min spec" to exclude older or less capable platforms; our goals differ greatly. We aspire to keep our "min spec" as low as is practical (e.g., supporting Direct3D 11 and not just Direct3D 12), while also allowing each target to expose its distinguishing capabilities.
 
 * **Ease of Adoption**: A language feature or service is worthless if nobody can use it. When possible, the system should be compatible with existing code and approaches. New language features should borrow syntax and semantics from other languages users might be familiar with. APIs and tools might need to support complicated and detailed use-cases, but should also provide conveniences and short-cuts for the most common cases.
 

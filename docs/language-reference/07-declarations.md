@@ -314,10 +314,7 @@ struct Person : IHasAge, IHasName
 { .... }
 ```
 
-Currently only interface types may be named in the inheritance clause of a structure type.
 When a structure type declares that it inherits from an interface, the programmer asserts that the structure type implements the required members of the interface.
-
-> Note: A future version of Slang may allow a structure type to inherit from another structure type.
 
 ### Syntax Details
 
