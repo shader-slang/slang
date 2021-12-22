@@ -35,7 +35,7 @@ public struct A : IInterface
 public struct B : IInterface
 {
     typedef SomeData Type;
-    IGetTexture getType() { Type t = { gTexA }; return t; }
+    IGetTexture getType() { Type t = { gTexB }; return t; }
 };
 
 Texture2D<float> gTexA, gTexB;
