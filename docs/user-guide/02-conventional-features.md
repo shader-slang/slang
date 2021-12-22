@@ -6,9 +6,9 @@ Conventional Language Features
 ==============================
 
 Many of the language concepts in Slang are similar to those in other real-time shading languages like HLSL and GLSL, and also to general-purpose programming languages in the "C family."
-This chapter covers those parts of the Slang language that are _conventional_ and thus unlikley to surprise users who are already familiar with other shading languages, or languages in the C family.
+This chapter covers those parts of the Slang language that are _conventional_ and thus unlikely to surprise users who are already familiar with other shading languages, or languages in the C family.
 
-Readers who are comfortable with HLSL variables, types, functions, statements, as well as concentions for shader parameters and entry points may prefer to skip this chapter.
+Readers who are comfortable with HLSL variables, types, functions, statements, as well as conventions for shader parameters and entry points may prefer to skip this chapter.
 Readers who are not familiar with HLSL, but who are comfortable with GLSL and/or C/C++, may want to carefully read the sections on types, expressions, shader parameters, and entry points while skimming the others.
 
 Types
@@ -39,7 +39,7 @@ The following integer types are provided:
 
 All targets support the 32-bit `int` and `uint` types, but support for the other types depends on the capabilities of each target platform.
 
-Integer literals can be both decimal and hexidecimal, and default to the `int` type.
+Integer literals can be both decimal and hexadecimal, and default to the `int` type.
 A literal can be explicitly made unsigned with a `u` suffix.
 
 The following floating-point type are provided:
@@ -66,7 +66,7 @@ Vector types can be written as `vector<T,N>` where `T` is a scalar type and `N` 
 The type `vector<T,N>` is a vector of `N` _elements_ (also called _components_) each of type `T`.
 
 As a convenience, pre-defined vector types exist for each scalar type and valid element count, with a name using the formula `<<scalar-type>><<element-count>>`.
-For example, `float3` is a convient name for `vector<float,3>`.
+For example, `float3` is a convenient name for `vector<float,3>`.
 
 ### Matrix Types
 
@@ -74,7 +74,7 @@ Matrix types can be written as `matrix<T,R,C>` where `T` is a scalar type and bo
 The type `matrix<T,R,C>` is a matrix with _elements_ of type `T`, and comprising `R` rows and `C` columns.
 
 As a convenience, pre-defined matrix types exist for each scalar type and valid row/column count, with a name using the formula `<<scalar-type>><<row-count>>x<<column-count>>`.
-For example, a `float3x4` is a convient name for `matrix<float,3,4>`.
+For example, a `float3x4` is a convenient name for `matrix<float,3,4>`.
 
 > #### Note ####
 > Readers familiar with GLSL should be aware that a Slang `float3x4` represents a matrix with three rows and four columns, while a GLSL `mat3x4` represents a matrix with three *columns* and four *rows*.
@@ -209,13 +209,13 @@ Flat buffers are either _structured_ buffers or _byte-addressed_ buffers.
 
 Structured buffer types like `StructuredBuffer<T>` include an explicit element type `T` that will be loaded and stored from the buffer.
 Byte-addressed buffer types like `ByteAddressBuffer` do not specify any particular element type, and instead allow for values to be loaded or stored from any (suitably aligned) byte offset in the buffer.
-Both structured and byte-addressed bufers can use an _access_ to distinguish between read-only and read-write usage.
+Both structured and byte-addressed buffers can use an _access_ to distinguish between read-only and read-write usage.
 
 ##### Constant Buffers
 
 Constant buffers (sometimes also called "uniform buffers") are typically used to pass immutable parameter data from a host application to GPU code.
 The constant buffer type `ConstantBuffer<T>` includes an explicit element type.
-Unlike formatted or flat buffers, a constant buffer conceptualy contains only a *single* value of its element type, rather than one or more values.
+Unlike formatted or flat buffers, a constant buffer conceptually contains only a *single* value of its element type, rather than one or more values.
 
 Expressions
 -----------
@@ -233,7 +233,7 @@ Slang supports the following expression forms with nearly identical syntax to HL
 
 * Vector/matrix initialization: `int4(1, 2, 3, 4)`
 
-* Casts: `(int) x`, `double(0.0)`
+* Casts: `(int)x`, `double(0.0)`
 
 * Subscript (indexing): `a[i]`
 
@@ -290,7 +290,7 @@ Slang supports the following statement forms with nearly identical syntax to HLS
 
 > #### Note ####
 > Unlike C/C++, `case` and `default` statements must be directly nested under a `switch`, rather than being allowed under nested control flow (Duff's Device and similar idioms are not allowed).
-> In addition, while multiple `case`s can be grouped together, all other forms of "fallthrough" are unsupported.
+> In addition, while multiple `case`s can be grouped together, all other forms of "fall through" are unsupported.
 
 * `for` statements
 
@@ -356,8 +356,7 @@ Slang supports a C-style preprocessor with the following directives;
 * `#line`
 * `#pragma`, including `#pragma once`
 
-> #### Note ####
-> Variadic macros are not currently supported by the Slang preprocessor.
+Variadic macros are supported by the Slang preprocessor.
 
 Attributes
 ----------
@@ -417,7 +416,7 @@ Each logical thread of shader execution initiated by the GPU will be allocated f
 Global shader parameters may use any type, including both opaque and non-opaque types:
 
 ```hlsl
-ConstantBufer<MyData> c;
+ConstantBuffer<MyData> c;
 Texture2D t;
 float4 color;
 ```
@@ -542,7 +541,7 @@ Standard system-defined semantics are distinguished by the `SV_` prefix.
 A system-defined binding semantic on an input parameter indicates that the parameter should receive specific data from the GPU as defined by the pipeline and stage being used.
 For example, in a vertex shader the `SV_VertexID` binding semantic on an input yields the ID of the particular vertex being processed on the current thread.
 
-A system-defined binding semantic on an ouptput parameter or function result indicates that when a shader thread returns from the entry point the value stored in that output should be used by the GPU in a specific way defined by the pipeline and stage being used.
+A system-defined binding semantic on an output parameter or function result indicates that when a shader thread returns from the entry point the value stored in that output should be used by the GPU in a specific way defined by the pipeline and stage being used.
 For example, in a vertex shader the `SV_Position` binding semantic on an output indicates that it represents a clip-space position that should be communicated to the rasterizer.
 
 The set of allowed system-defined binding semantics for inputs and outputs depends on the pipeline and stage of an entry point.
