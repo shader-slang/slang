@@ -2,7 +2,13 @@
 
 /* A test to use generics to treat an enum as a set.
 
-Doesn't work because the integer ops required for Flags impl, can't be seen */
+.slang(15): error 30060: expected a type, got a '__BuiltinIntegerType'
+    B value = 0;
+    
+.slang(23): error 30019: expected an expression of type 'int', got 'typeof(uint8_t)'
+    Flags<Enum, uint8_t> flags;
+                ^~~~~~~    
+*/
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -14,7 +20,7 @@ enum Enum
     C = 0x4,
 };
 
-__generic<E, B : __BuiltinIntegerType>
+__generic<E, let B : __BuiltinIntegerType>
 struct Flags
 {
     [mutating] void set(E e) { value |= (B)e; }
