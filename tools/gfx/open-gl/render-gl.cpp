@@ -133,8 +133,7 @@ public:
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
@@ -169,7 +168,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override;
     virtual void setIndexBuffer(
         IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
@@ -206,6 +204,7 @@ public:
     protected:
     enum
     {
+        kMaxVertexAttributes = 16,
         kMaxVertexStreams = 16,
         kMaxDescriptorSetCount = 8,
     };
@@ -226,8 +225,10 @@ public:
     class InputLayoutImpl : public InputLayoutBase
 	{
     public:
-        VertexAttributeDesc m_attributes[kMaxVertexStreams];
+        VertexAttributeDesc m_attributes[kMaxVertexAttributes];
+        VertexStreamDesc m_streams[kMaxVertexStreams];
         UInt m_attributeCount = 0;
+        UInt m_streamCount = 0;
     };
 
 	class BufferResourceImpl: public BufferResource
@@ -1590,7 +1591,6 @@ public:
 
     GLenum m_boundPrimitiveTopology = GL_TRIANGLES;
     GLuint  m_boundVertexStreamBuffers[kMaxVertexStreams];
-    UInt    m_boundVertexStreamStrides[kMaxVertexStreams];
     UInt    m_boundVertexStreamOffsets[kMaxVertexStreams];
     GLuint m_boundIndexBuffer = 0;
     UInt m_boundIndexBufferOffset = 0;
@@ -1702,6 +1702,8 @@ void GLDevice::flushStateForDraw()
 
         auto streamIndex = attr.streamIndex;
 
+        auto stride = inputLayout->m_streams[streamIndex].stride;
+
         glBindBuffer(GL_ARRAY_BUFFER, m_boundVertexStreamBuffers[streamIndex]);
 
         glVertexAttribPointer(
@@ -1709,7 +1711,7 @@ void GLDevice::flushStateForDraw()
             attr.format.componentCount,
             attr.format.componentType,
             attr.format.normalized,
-            (GLsizei)m_boundVertexStreamStrides[streamIndex],
+            (GLsizei)stride,
             (GLvoid*)(attr.offset + m_boundVertexStreamOffsets[streamIndex]));
 
         glEnableVertexAttribArray((GLuint)ii);
@@ -2534,19 +2536,28 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createInputLayout(
-    const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout)
+    IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> inputLayout = new InputLayoutImpl;
 
+    auto inputElements = desc.inputElements;
+    Int inputElementCount = desc.inputElementCount;
     inputLayout->m_attributeCount = inputElementCount;
-    for (UInt ii = 0; ii < inputElementCount; ++ii)
+    for (Int ii = 0; ii < inputElementCount; ++ii)
     {
         auto& inputAttr = inputElements[ii];
         auto& glAttr = inputLayout->m_attributes[ii];
 
-        glAttr.streamIndex = 0;
+        glAttr.streamIndex = (GLuint)inputAttr.bufferSlotIndex;
         glAttr.format = getVertexAttributeFormat(inputAttr.format);
         glAttr.offset = (GLsizei)inputAttr.offset;
+    }
+
+    Int inputStreamCount = desc.vertexStreamCount;
+    inputLayout->m_streamCount = inputStreamCount;
+    for (Int i = 0; i < inputStreamCount; ++i)
+    {
+        inputLayout->m_streams[i].stride = desc.vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, inputLayout);
@@ -2602,7 +2613,6 @@ void GLDevice::setVertexBuffers(
     uint32_t startSlot,
     uint32_t slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* strides,
     const uint32_t* offsets)
 {
     for (UInt ii = 0; ii < slotCount; ++ii)
@@ -2613,7 +2623,6 @@ void GLDevice::setVertexBuffers(
         GLuint bufferID = buffer ? buffer->m_handle : 0;
 
         m_boundVertexStreamBuffers[slot] = bufferID;
-        m_boundVertexStreamStrides[slot] = strides[ii];
         m_boundVertexStreamOffsets[slot] = offsets[ii];
     }
 }

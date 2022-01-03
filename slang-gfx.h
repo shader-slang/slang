@@ -44,15 +44,6 @@ typedef uint64_t DeviceAddress;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
-// Declare opaque type
-class IInputLayout: public ISlangUnknown
-{
-};
-#define SLANG_UUID_IInputLayout                                                         \
-    {                                                                                  \
-        0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
-    }
-
 enum class StageType
 {
     Unknown,
@@ -352,9 +343,14 @@ struct InputElementDesc
     UInt semanticIndex;
     Format format;
     UInt offset;
-    InputSlotClass slotClass;
     UInt bufferSlotIndex;
-    UInt instanceDataStepRate;
+};
+
+struct VertexStreamDesc
+{
+    uint32_t stride;
+    InputSlotClass slotClass = InputSlotClass::PerVertex;
+    UInt instanceDataStepRate = 1;
 };
 
 enum class PrimitiveType
@@ -443,6 +439,23 @@ struct InteropHandle
     InteropHandleAPI api = InteropHandleAPI::Unknown;
     uint64_t handleValue = 0;
 };
+
+// Declare opaque type
+class IInputLayout : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        InputElementDesc const* inputElements = nullptr;
+        Int inputElementCount = 0;
+        VertexStreamDesc const* vertexStreams = nullptr;
+        Int vertexStreamCount = 0;
+    };
+};
+#define SLANG_UUID_IInputLayout                                                         \
+    {                                                                                  \
+        0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
+    }
 
 class IResource: public ISlangUnknown
 {
@@ -1455,12 +1468,11 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) = 0;
     inline void setVertexBuffer(
-        uint32_t slot, IBufferResource* buffer, uint32_t stride, uint32_t offset = 0)
+        uint32_t slot, IBufferResource* buffer, uint32_t offset = 0)
     {
-        setVertexBuffers(slot, 1, &buffer, &stride, &offset);
+        setVertexBuffers(slot, 1, &buffer, &offset);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -2050,12 +2062,31 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout) = 0;
+        IInputLayout::Desc const& desc, IInputLayout** outLayout) = 0;
 
-    inline ComPtr<IInputLayout> createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
+    inline ComPtr<IInputLayout> createInputLayout(IInputLayout::Desc const& desc)
     {
         ComPtr<IInputLayout> layout;
-        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(inputElements, inputElementCount, layout.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(desc, layout.writeRef()));
+        return layout;
+    }
+
+    inline Result createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
+    {
+        VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex };
+
+        IInputLayout::Desc inputLayoutDesc = {};
+        inputLayoutDesc.inputElementCount = inputElementCount;
+        inputLayoutDesc.inputElements = inputElements;
+        inputLayoutDesc.vertexStreamCount = 1;
+        inputLayoutDesc.vertexStreams = &streamDesc;
+        return createInputLayout(inputLayoutDesc, outLayout);
+    }
+
+    inline ComPtr<IInputLayout> createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount)
+    {
+        ComPtr<IInputLayout> layout;
+        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(vertexSize, inputElements, inputElementCount, layout.writeRef()));
         return layout;
     }
 

@@ -198,7 +198,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets)
     {
         uint32_t bufferOffset = 0;
@@ -208,14 +207,12 @@ public:
             if (i == 0)
                 bufferOffset = offset;
         }
-        uint32_t stridesOffset = encodeData(strides, sizeof(uint32_t) * slotCount);
         uint32_t offsetsOffset = encodeData(offsets, sizeof(uint32_t) * slotCount);
         m_commands.add(Command(
             CommandName::SetVertexBuffers,
             startSlot,
             slotCount,
             bufferOffset,
-            stridesOffset,
             offsetsOffset));
     }
 

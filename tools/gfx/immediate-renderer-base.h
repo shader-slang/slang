@@ -63,7 +63,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) = 0;
     virtual void setIndexBuffer(
         IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) = 0;
@@ -142,13 +141,11 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override
     {
         SLANG_UNUSED(startSlot);
         SLANG_UNUSED(slotCount);
         SLANG_UNUSED(buffers);
-        SLANG_UNUSED(strides);
         SLANG_UNUSED(offsets);
     }
     virtual void setIndexBuffer(
@@ -211,12 +208,10 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override
     {
-        SLANG_UNUSED(inputElements);
-        SLANG_UNUSED(inputElementCount);
+        SLANG_UNUSED(desc);
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }

@@ -107,6 +107,7 @@ GUI::GUI(
         {"U", 2, Format::R8G8B8A8_UNORM,  offsetof(ImDrawVert, col) },
     };
     auto inputLayout = device->createInputLayout(
+        sizeof(ImDrawVert),
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
 
@@ -287,7 +288,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
     renderEncoder->bindPipeline(pipelineState);
 
-    renderEncoder->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
+    renderEncoder->setVertexBuffer(0, vertexBuffer);
     renderEncoder->setIndexBuffer(
         indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
@@ -319,7 +320,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
                 // TODO: set parameter into root shader object.
                 
-                renderEncoder->drawIndexed(command->ElemCount, indexOffset, vertexOffset);
+                renderEncoder->drawIndexed(command->ElemCount, (uint32_t)indexOffset, (uint32_t)vertexOffset);
             }
             indexOffset += command->ElemCount;
         }

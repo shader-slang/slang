@@ -97,8 +97,7 @@ public:
         IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
@@ -138,7 +137,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override;
     virtual void setIndexBuffer(
         IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
@@ -3069,7 +3067,7 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
     }
 }
 
-Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, UInt inputElementCount, IInputLayout** outLayout)
+Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     D3D11_INPUT_ELEMENT_DESC inputElements[16] = {};
 
@@ -3078,6 +3076,8 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
 
     hlslCursor += sprintf(hlslCursor, "float4 main(\n");
 
+    auto inputElementCount = desc.inputElementCount;
+    auto inputElementsIn = desc.inputElements;
     for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
         inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
@@ -3246,7 +3246,6 @@ void D3D11Device::setVertexBuffers(
     uint32_t startSlot,
     uint32_t slotCount,
     IBufferResource* const* buffersIn,
-    const uint32_t* stridesIn,
     const uint32_t* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
@@ -3260,7 +3259,7 @@ void D3D11Device::setVertexBuffers(
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
-        vertexStrides[ii] = (UINT)stridesIn[ii];
+        // FIXME: vertexhate
         vertexOffsets[ii] = (UINT)offsetsIn[ii];
 		dxBuffers[ii] = buffers[ii]->m_buffer;
 	}

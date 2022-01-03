@@ -95,8 +95,7 @@ public:
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
@@ -208,8 +207,8 @@ public:
     class InputLayoutImpl : public InputLayoutBase
     {
     public:
-        List<VkVertexInputAttributeDescription> m_vertexDescs;
-        int m_vertexSize;
+        List<VkVertexInputAttributeDescription> m_attributeDescs;
+        List<VkVertexInputBindingDescription> m_streamDescs;
     };
 
     class BufferResourceImpl: public BufferResource
@@ -835,7 +834,6 @@ public:
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
-        int m_stride;
         int m_offset;
     };
 
@@ -3985,7 +3983,6 @@ public:
                 uint32_t startSlot,
                 uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const uint32_t* strides,
                 const uint32_t* offsets) override
             {
                 {
@@ -4001,7 +3998,6 @@ public:
                     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
-                    boundBuffer.m_stride = int(strides[i]);
                     boundBuffer.m_offset = int(offsets[i]);
                 }
             }
@@ -4021,7 +4017,6 @@ public:
                     assert(!"unsupported index format");
                 }
                 m_boundIndexBuffer.m_buffer = static_cast<BufferResourceImpl*>(buffer);
-                m_boundIndexBuffer.m_stride = 0;
                 m_boundIndexBuffer.m_offset = int(offset);
             }
 
@@ -4103,7 +4098,13 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndirectCommand));
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                api.vkCmdDrawIndirect(
+                    m_vkCommandBuffer,
+                    argBufferImpl->m_buffer.m_buffer,
+                    argOffset,
+                    maxDrawCount, // Should be countBuffer + countOffset?
+                    sizeof(VkDrawIndirectCommand));
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -4130,7 +4131,13 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                api.vkCmdDrawIndexedIndirect(
+                    m_vkCommandBuffer,
+                    argBufferImpl->m_buffer.m_buffer,
+                    argOffset,
+                    maxDrawCount, // Should be countBuffer + countOffset?
+                    sizeof(VkDrawIndexedIndirectCommand));
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -4159,14 +4166,17 @@ public:
                 prepareDraw();
                 auto& api = *m_api;
                 // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                for (int i = 0; i < m_boundVertexBuffers.getCount(); ++i)
                 {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+                    if (m_boundVertexBuffers[i].m_buffer)
+                    {
+                        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
 
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+                        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
 
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                        api.vkCmdBindVertexBuffers(m_vkCommandBuffer, i, 1, vertexBuffers, offsets);
+                    }
                 }
                 api.vkCmdDraw(
                     m_vkCommandBuffer,
@@ -6777,6 +6787,20 @@ Result VKDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer*
     return SLANG_OK;
 }
 
+size_t calcRowSize(Format format, int width)
+{
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
+}
+
+size_t calcNumRows(Format format, int height)
+{
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+}
+
 SlangResult VKDevice::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
@@ -6784,11 +6808,111 @@ SlangResult VKDevice::readTextureResource(
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    SLANG_UNUSED(texture);
-    SLANG_UNUSED(outBlob);
-    SLANG_UNUSED(outRowPitch);
-    SLANG_UNUSED(outPixelSize);
-    return SLANG_FAIL;
+    auto textureImpl = static_cast<TextureResourceImpl*>(texture);
+    RefPtr<ListBlob> blob = new ListBlob();
+
+    auto desc = textureImpl->getDesc();
+    auto width = desc->size.width;
+    auto height = desc->size.height;
+    FormatInfo sizeInfo;
+    SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
+    size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
+    size_t rowPitch = width * pixelSize;
+    size_t bufferSize = height * rowPitch;
+
+//     List<TextureResource::Size> mipSizes;
+// 
+//     const int numMipMaps = desc->numMipLevels;
+//     auto arraySize = calcEffectiveArraySize(*desc);
+// 
+//     // Calculate how large the buffer has to be
+//     size_t bufferSize = 0;
+//     // Calculate how large an array entry is
+//     for (int j = 0; j < numMipMaps; ++j)
+//     {
+//         const TextureResource::Size mipSize = calcMipSize(desc->size, j);
+// 
+//         auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+//         auto numRows = calcNumRows(desc->format, mipSize.height);
+// 
+//         mipSizes.add(mipSize);
+// 
+//         bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+//     }
+//     // Calculate the total size taking into account the array
+//     bufferSize *= arraySize;
+    blob->m_data.setCount(Index(bufferSize));
+
+    Buffer staging;
+    SLANG_RETURN_ON_FAIL(staging.init(
+        m_api,
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    VkImage srcImage = textureImpl->m_image;
+    VkImageLayout srcImageLayout = VulkanUtil::getImageLayoutFromState(state);
+
+    size_t dstOffset = 0;
+    
+    VkBufferImageCopy region = {};
+    region.bufferOffset = dstOffset;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = { 0, 0, 0 };
+    region.imageExtent = { (uint32_t)width, (uint32_t)height, 1 };
+
+    m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
+
+
+//     for (int i = 0; i < arraySize; ++i)
+//     {
+//         for (Index j = 0; j < mipSizes.getCount(); ++j)
+//         {
+//             const auto& mipSize = mipSizes[j];
+// 
+//             auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+//             auto numRows = calcNumRows(desc->format, mipSize.height);
+// 
+//             VkBufferImageCopy region = {};
+// 
+//             region.bufferOffset = dstOffset;
+//             region.bufferRowLength = 0;
+//             region.bufferImageHeight = 0;
+// 
+//             region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+//             region.imageSubresource.mipLevel = uint32_t(j);
+//             region.imageSubresource.baseArrayLayer = i;
+//             region.imageSubresource.layerCount = 1;
+//             region.imageOffset = { 0, 0, 0 };
+//             region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
+// 
+//             m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
+// 
+//             dstOffset += rowSizeInBytes * numRows * mipSize.depth;
+//         }
+//     }
+
+    m_deviceQueue.flushAndWait();
+
+    // Write out the data from the buffer
+    void* mappedData = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+
+    ::memcpy(blob->m_data.getBuffer(), mappedData, bufferSize);
+    m_api.vkUnmapMemory(m_device, staging.m_memory);
+
+    *outPixelSize = pixelSize;
+    *outRowPitch = rowPitch;
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 SlangResult VKDevice::readBufferResource(
@@ -7122,20 +7246,6 @@ void VKDevice::_transitionImageLayout(
 {
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
     _transitionImageLayout(commandBuffer, image, format, desc, oldLayout, newLayout);
-}
-
-size_t calcRowSize(Format format, int width)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
-}
-
-size_t calcNumRows(Format format, int height)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
 
 Result VKDevice::getTextureAllocationInfo(
@@ -7890,22 +8000,40 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
     }
 }
 
-Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numElements, IInputLayout** outLayout)
+Result VKDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
-    List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
+    List<VkVertexInputAttributeDescription>& dstAttributes = layout->m_attributeDescs;
+    List<VkVertexInputBindingDescription>& dstStreams = layout->m_streamDescs;
 
-    size_t vertexSize = 0;
-    dstVertexDescs.setCount(numElements);
+    auto elements = desc.inputElements;
+    Int numElements = desc.inputElementCount;
 
-    for (UInt i = 0; i <  numElements; ++i)
+    auto srcVertexStreams = desc.vertexStreams;
+    Int vertexStreamCount = desc.vertexStreamCount;
+
+    dstAttributes.setCount(numElements);
+    dstStreams.setCount(vertexStreamCount);
+
+    for (Int i = 0; i < vertexStreamCount; i++)
+    {
+        auto& dstStream = dstStreams[i];
+        auto& srcStream = srcVertexStreams[i];
+        dstStream.stride = srcStream.stride;
+        dstStream.binding = i;
+        dstStream.inputRate = (srcStream.slotClass == InputSlotClass::PerInstance) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+
+    for (Int i = 0; i < numElements; ++i)
     {
         const InputElementDesc& srcDesc = elements[i];
-        VkVertexInputAttributeDescription& dstDesc = dstVertexDescs[i];
+        auto streamIndex = srcDesc.bufferSlotIndex;
+
+        VkVertexInputAttributeDescription& dstDesc = dstAttributes[i];
 
         dstDesc.location = uint32_t(i);
-        dstDesc.binding = 0;
+        dstDesc.binding = streamIndex;
         dstDesc.format = VulkanUtil::getVkFormat(srcDesc.format);
         if (dstDesc.format == VK_FORMAT_UNDEFINED)
         {
@@ -7913,18 +8041,9 @@ Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numEle
         }
 
         dstDesc.offset = uint32_t(srcDesc.offset);
-
-        FormatInfo sizeInfo;
-        gfxGetFormatInfo(srcDesc.format, &sizeInfo);
-        const size_t elementSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
-        assert(elementSize > 0);
-        const size_t endElement = srcDesc.offset + elementSize;
-
-        vertexSize = (vertexSize < endElement) ? endElement : vertexSize;
     }
 
     // Work out the overall size
-    layout->m_vertexSize = int(vertexSize);
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
@@ -8078,20 +8197,15 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     vertexInputInfo.vertexBindingDescriptionCount = 0;
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
 
-    VkVertexInputBindingDescription vertexInputBindingDescription;
-
     if (inputLayoutImpl)
     {
-        vertexInputBindingDescription.binding = 0;
-        vertexInputBindingDescription.stride = inputLayoutImpl->m_vertexSize;
-        vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        const auto& srcAttributeDescs = inputLayoutImpl->m_attributeDescs;
+        const auto& srcStreamDescs = inputLayoutImpl->m_streamDescs;
 
-        const auto& srcAttributeDescs = inputLayoutImpl->m_vertexDescs;
+        vertexInputInfo.vertexBindingDescriptionCount = (uint32_t)srcStreamDescs.getCount();
+        vertexInputInfo.pVertexBindingDescriptions = srcStreamDescs.getBuffer();
 
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
-
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.getCount());
+        vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)srcAttributeDescs.getCount();
         vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.getBuffer();
     }
 

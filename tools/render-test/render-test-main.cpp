@@ -553,7 +553,7 @@ SlangResult RenderTestApp::initialize(
 
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
-                    inputElements, SLANG_COUNT_OF(inputElements), inputLayout.writeRef()));
+                    sizeof(Vertex), inputElements, SLANG_COUNT_OF(inputElements), inputLayout.writeRef()));
 
                 IBufferResource::Desc vertexBufferDesc;
                 vertexBufferDesc.type = IResource::Type::Buffer;
@@ -865,7 +865,7 @@ void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
     auto pipelineType = PipelineType::Graphics;
 
 	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-    encoder->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
+    encoder->setVertexBuffer(0, m_vertexBuffer);
 
     applyBinding(pipelineType, encoder);
 

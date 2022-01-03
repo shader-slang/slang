@@ -119,10 +119,9 @@ public:
             uint32_t startSlot,
             uint32_t slotCount,
             IBufferResource* const* buffers,
-            const uint32_t* strides,
             const uint32_t* offsets) override
         {
-            m_writer->setVertexBuffers(startSlot, slotCount, buffers, strides, offsets);
+            m_writer->setVertexBuffers(startSlot, slotCount, buffers, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
@@ -500,8 +499,7 @@ public:
                         cmd.operands[0],
                         cmd.operands[1],
                         bufferResources.getArrayView().getBuffer(),
-                        m_writer.getData<uint32_t>(cmd.operands[3]),
-                        m_writer.getData<uint32_t>(cmd.operands[4]));
+                        m_writer.getData<uint32_t>(cmd.operands[3]));
                 }
                 break;
             case CommandName::SetIndexBuffer:
