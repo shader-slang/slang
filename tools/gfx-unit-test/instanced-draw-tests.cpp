@@ -368,7 +368,6 @@ namespace gfx_test
         {
             float padding; // Ensure args and count don't start at 0 offset for testing purposes
             IndirectDrawArguments args;
-            uint32_t count;
         };
 
         ComPtr<IBufferResource> createIndirectBuffer(IDevice* device)
@@ -377,7 +376,6 @@ namespace gfx_test
             {
                 42.0f, // padding
                 {6, 2, 0, 0}, // args
-                1, // count
             };
 
             IBufferResource::Desc indirectBufferDesc;
@@ -413,9 +411,8 @@ namespace gfx_test
 
             uint32_t maxDrawCount = 1;
             uint64_t argOffset = offsetof(IndirectArgData, args);
-            uint64_t countOffset = offsetof(IndirectArgData, count);
 
-            encoder->drawIndirect(maxDrawCount, indirectBuffer, argOffset, indirectBuffer, countOffset);
+            encoder->drawIndirect(maxDrawCount, indirectBuffer, argOffset);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
@@ -447,7 +444,6 @@ namespace gfx_test
         {
             float padding; // Ensure args and count don't start at 0 offset for testing purposes
             IndirectDrawIndexedArguments args;
-            uint32_t count;
         };
 
         ComPtr<IBufferResource> createIndirectBuffer(IDevice* device)
@@ -456,7 +452,6 @@ namespace gfx_test
             {
                 42.0f, // padding
                 {6, 2, 0, 0, 0}, // args
-                1, // count
             };
 
             IBufferResource::Desc indirectBufferDesc;
@@ -493,9 +488,8 @@ namespace gfx_test
 
             uint32_t maxDrawCount = 1;
             uint64_t argOffset = offsetof(IndexedIndirectArgData, args);
-            uint64_t countOffset = offsetof(IndexedIndirectArgData, count);
 
-            encoder->drawIndexedIndirect(maxDrawCount, indirectBuffer, argOffset, indirectBuffer, countOffset);
+            encoder->drawIndexedIndirect(maxDrawCount, indirectBuffer, argOffset);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);

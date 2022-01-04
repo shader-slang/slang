@@ -3449,7 +3449,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 
@@ -3470,7 +3470,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 

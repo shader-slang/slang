@@ -1485,14 +1485,14 @@ public:
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
         uint64_t argOffset,
-        IBufferResource* countBuffer,
-        uint64_t countOffset) = 0;
+        IBufferResource* countBuffer = nullptr,
+        uint64_t countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
         uint64_t argOffset,
-        IBufferResource* countBuffer,
-        uint64_t countOffset) = 0;
+        IBufferResource* countBuffer = nullptr,
+        uint64_t countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
         uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;

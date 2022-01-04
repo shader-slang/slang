@@ -3860,9 +3860,9 @@ public:
         public:
             List<VkViewport> m_viewports;
             List<VkRect2D> m_scissorRects;
-            List<BoundVertexBuffer> m_boundVertexBuffers;
-            BoundVertexBuffer m_boundIndexBuffer;
-            VkIndexType m_boundIndexFormat;
+//             List<BoundVertexBuffer> m_boundVertexBuffers;
+//             BoundVertexBuffer m_boundIndexBuffer;
+//             VkIndexType m_boundIndexFormat;
 
         public:
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
@@ -3985,39 +3985,43 @@ public:
                 IBufferResource* const* buffers,
                 const uint32_t* offsets) override
             {
-                {
-                    const Index num = Index(startSlot + slotCount);
-                    if (num > m_boundVertexBuffers.getCount())
-                    {
-                        m_boundVertexBuffers.setCount(num);
-                    }
-                }
-
                 for (Index i = 0; i < Index(slotCount); i++)
                 {
+                    Index slotIndex = startSlot + i;
                     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-                    BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
-                    boundBuffer.m_buffer = buffer;
-                    boundBuffer.m_offset = int(offsets[i]);
+                    if (buffer)
+                    {
+                        VkBuffer vertexBuffers[] = { buffer->m_buffer.m_buffer };
+                        VkDeviceSize offset = VkDeviceSize(offsets[i]);
+
+                        m_api->vkCmdBindVertexBuffers(m_vkCommandBuffer, (uint32_t)slotIndex, 1, vertexBuffers, &offset);
+                    }
                 }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
                 IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override
             {
+                VkIndexType indexType = VK_INDEX_TYPE_UINT16;
                 switch (indexFormat)
                 {
                 case Format::R16_UINT:
-                    m_boundIndexFormat = VK_INDEX_TYPE_UINT16;
+                    indexType = VK_INDEX_TYPE_UINT16;
                     break;
                 case Format::R32_UINT:
-                    m_boundIndexFormat = VK_INDEX_TYPE_UINT32;
+                    indexType = VK_INDEX_TYPE_UINT32;
                     break;
                 default:
                     assert(!"unsupported index format");
                 }
-                m_boundIndexBuffer.m_buffer = static_cast<BufferResourceImpl*>(buffer);
-                m_boundIndexBuffer.m_offset = int(offset);
+
+                BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+
+                m_api->vkCmdBindIndexBuffer(
+                    m_vkCommandBuffer,
+                    bufferImpl->m_buffer.m_buffer,
+                    (VkDeviceSize)offset,
+                    indexType);
             }
 
             void prepareDraw()
@@ -4036,16 +4040,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
-                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 api.vkCmdDraw(m_vkCommandBuffer, vertexCount, 1, 0, 0);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(
@@ -4053,21 +4047,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
-                    m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
-                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 api.vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, 1, startIndex, baseVertex, 0);
             }
 
@@ -4086,18 +4065,11 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
+                // Vulkan does not support sourcing the count from a buffer.
+                assert(!countBuffer);
+
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
                 api.vkCmdDrawIndirect(
                     m_vkCommandBuffer,
@@ -4114,23 +4086,11 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
+                // Vulkan does not support sourcing the count from a buffer.
+                assert(!countBuffer);
+
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
-                    m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
                 api.vkCmdDrawIndexedIndirect(
                     m_vkCommandBuffer,
@@ -4165,19 +4125,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                for (int i = 0; i < m_boundVertexBuffers.getCount(); ++i)
-                {
-                    if (m_boundVertexBuffers[i].m_buffer)
-                    {
-                        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
-
-                        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                        api.vkCmdBindVertexBuffers(m_vkCommandBuffer, i, 1, vertexBuffers, offsets);
-                    }
-                }
                 api.vkCmdDraw(
                     m_vkCommandBuffer,
                     vertexCount,
@@ -4195,24 +4142,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
-                    m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                for (int i = 0; i < m_boundVertexBuffers.getCount(); ++i)
-                {
-                    if (m_boundVertexBuffers[i].m_buffer)
-                    {
-                        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
-
-                        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                        api.vkCmdBindVertexBuffers(m_vkCommandBuffer, i, 1, vertexBuffers, offsets);
-                    }
-                }
                 api.vkCmdDrawIndexed(
                     m_vkCommandBuffer,
                     indexCount,
