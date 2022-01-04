@@ -350,7 +350,7 @@ struct VertexStreamDesc
 {
     uint32_t stride;
     InputSlotClass slotClass = InputSlotClass::PerVertex;
-    UInt instanceDataStepRate = 1;
+    UInt instanceDataStepRate = 0;
 };
 
 enum class PrimitiveType

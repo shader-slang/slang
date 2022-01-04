@@ -3917,9 +3917,9 @@ public:
                     auto& vkViewport = m_viewports[ii];
 
                     vkViewport.x = inViewport.originX;
-                    vkViewport.y = inViewport.originY;
+                    vkViewport.y = inViewport.originY + inViewport.extentY;
                     vkViewport.width = inViewport.extentX;
-                    vkViewport.height = inViewport.extentY;
+                    vkViewport.height = -inViewport.extentY;
                     vkViewport.minDepth = inViewport.minZ;
                     vkViewport.maxDepth = inViewport.maxZ;
                 }
@@ -6616,7 +6616,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
         m_info.bindingStyle = BindingStyle::Vulkan;
         m_info.projectionStyle = ProjectionStyle::Vulkan;
         m_info.deviceType = DeviceType::Vulkan;
-        static const float kIdentity[] = {1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
     }
 
