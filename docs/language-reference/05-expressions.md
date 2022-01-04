@@ -92,7 +92,7 @@ If the base expression of a member reference is a _pointer-like type_ such as `C
 
 ### Vector Swizzles
 
-When the base expression of a member expression is of a vetor type `vector<T,N>` then a member expression is a _vector swizzle expression_.
+When the base expression of a member expression is of a vector type `vector<T,N>` then a member expression is a _vector swizzle expression_.
 The member name must conform to these constraints:
 
 * The member name must comprise between one and four ASCII characters
@@ -268,7 +268,7 @@ The following prefix operators are supported:
 
 A prefix operator expression like `+val` is equivalent to a call expression to a function of the matching name `operator+(val)`, except that lookup for the function only considers functions marked with the `__prefix` keyword.
 
-The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as folows:
+The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as follows:
 
 * Evaluate the operand to produce an l-value
 * Read from the l-value to yield an _old value_
@@ -287,7 +287,7 @@ The following postfix operators are supported:
 
 A postfix operator expression like `val++` is equivalent to a call expression to a function of the matching name `operator++(val)`, except that lookup for the function only considers functions marked with the `__postfix` keyword.
 
-The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as folows:
+The built-in prefix `++` and `--` operators require that their operand is an l-value, and work as follows:
 
 * Evaluate the operand to produce an l-value
 * Read from the l-value to yield an _old value_
@@ -316,9 +316,9 @@ The follow infix binary operators are supported:
 | `!=`		| Equality 			| not equal to |
 | `&`		| BitAnd 			| bitwise and |
 | `^`		| BitXor			| bitwise exclusive or |
-| `|`		| BitOr 			| bitwise or |
+| `\|`		| BitOr 			| bitwise or |
 | `&&`		| And 				| logical and |
-| `||`		| Or 				| logical or |
+| `\|\|`	| Or 				| logical or |
 | `+=`		| Assignment  		| compound add/assign |
 | `-=`      | Assignment  		| compound subtract/assign |
 | `*=`      | Assignment  		| compound multiply/assign |
@@ -327,7 +327,7 @@ The follow infix binary operators are supported:
 | `<<=`     | Assignment  		| compound left shift/assign |
 | `>>=`     | Assignment  		| compound right shift/assign |
 | `&=`      | Assignment  		| compound bitwise and/assign |
-| `|=`      | Assignment  		| compound bitwise or/assign |
+| `\|=`     | Assignment  		| compound bitwise or/assign |
 | `^=`      | Assignment  		| compound bitwise xor/assign |
 | `=`       | Assignment  		| assignment |
 | `,`		| Sequencing  		| sequence |
@@ -342,10 +342,10 @@ The conditonal operator, `?:`, is used to select between two expressions based o
 useNegative ? -1.0f : 1.0f
 ```
 
-The condition may be either a single value of type `bool`, or a vetor of `bool`.
+The condition may be either a single value of type `bool`, or a vector of `bool`.
 When a vector of `bool` is used, the two values being selected between must be vectors, and selection is performed component-wise.
 
-> Note: Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent of HLSL where `?:` does not short-cirucuit.
+> Note: Unlike C, C++, GLSL, and most other C-family languages, Slang currently follows the precedent of HLSL where `?:` does not short-circuit.
 >
 > This decision may change (for the scalar case) in a future version of the language.
 > Programmer are encouraged to write code that does not depend on whether or not `?:` short-circuits.

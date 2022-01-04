@@ -7,7 +7,7 @@ Modules
 A module consists of one or more source units that are compiled together.
 The global declarations in those source units comprise the body of the module.
 
-In general, the order of declarations within a source unit does not matter; declarations can refer to other decalrations (of types, functions, variables, etc.) later in the same source unit.
+In general, the order of declarations within a source unit does not matter; declarations can refer to other declarations (of types, functions, variables, etc.) later in the same source unit.
 Declarations (other than `import` declarations) may freely be defined in any source unit in a module; declarations in one source unit of a module may freely refer to declarations in other source units.
 
 Imports
@@ -90,7 +90,7 @@ let x : int = 7;
 var y : float = 9.0;
 ```
 
-If no type is spefified for a variable, then a type will be inferred from the initial-value expression.
+If no type is specified for a variable, then a type will be inferred from the initial-value expression.
 It is an error to declare a variable that has neither a type specifier or an initial-value expression.
 It is an error to declare a variable with `let` without an initial-value expression.
 
@@ -104,7 +104,7 @@ In this case the variable is _uninitialized_ at the point of declaration, and mu
 Code that uses the value of an uninitialized variable may produce arbitrary results, or even exhibit undefined behavior depending on the type of the variable.
 Implementations *may* issue an error or warning for code that might make use of an uninitialized variable.
 
-### Tradtional Syntax
+### Traditional Syntax
 
 Variables may also be declared with traditional C-style syntax:
 
@@ -127,7 +127,7 @@ Variables declared at global scope may be either a global constant, a static glo
 
 A variable declared at global scope and marked with `static` and `const` is a _global constant_.
 
-A global constant must include an initial-value expression, and that initial-value expression must be a compile-time constant expression.
+A global constant must have an initial-value expression, and that initial-value expression must be a compile-time constant expression.
 
 #### Static Global Variables
 
@@ -167,7 +167,7 @@ Semantically, a function-scope constant behaves like a global constant except th
 
 #### Function-Scope Static Variables
 
-A variable declared at function scoep and marked with `static` (but not `const`) is a _function-scope static variable_.
+A variable declared at function scope and marked with `static` (but not `const`) is a _function-scope static variable_.
 Semantically, a function-scope static variable behaves like a global static variable except that its name is only visible in the local scope.
 
 The initial-value expression for a function-scope static variable may refer to non-static variables in the body of the function.
@@ -175,7 +175,7 @@ In these cases initialization of the variable is guaranteed not to occur until a
 
 #### Local Variables
 
-A variable declared at function scope and not marke with `static` (even if marked with `const`) is a _local variable_.
+A variable declared at function scope and not marked with `static` (even if marked with `const`) is a _local variable_.
 A local variable has unique storage for each _activation_ of a function by an invocation.
 When a function is called recursively, each call produces a distinct activation with its own copies of local variables.
 
@@ -287,7 +287,7 @@ The body of a structure type declaration may include variable, type, function, a
 
 Variable declarations in the body of a structure type declaration are also referred to as _fields_.
 
-A field that is marked `static` is shared between all instaces of the type, and is semantically like a global variable marked `static`.
+A field that is marked `static` is shared between all instances of the type, and is semantically like a global variable marked `static`.
 
 A non-`static` field is also called an _instance field_.
 
@@ -314,10 +314,7 @@ struct Person : IHasAge, IHasName
 { .... }
 ```
 
-Currently only interface types may be named in the inheritance clause of a structure type.
 When a structure type declares that it inherits from an interface, the programmer asserts that the structure type implements the required members of the interface.
-
-> Note: A future version of Slang may allow a structure type to inherit from another structure type.
 
 ### Syntax Details
 
@@ -331,7 +328,7 @@ struct Stuff { ... };
 struct Things { ... }
 ```
 
-When a structure deeclarations ends without a semicolon, the closing curly brace (`}`) must be the last non-comment, non-whitespace token on its line.
+When a structure declarations ends without a semicolon, the closing curly brace (`}`) must be the last non-comment, non-whitespace token on its line.
 
 For compatiblity with C-style code, a structure type declaration may be used as the type specifier in a traditional-style variable declaration:
 
@@ -631,7 +628,7 @@ An extension declaration names the type being extended after the `extension` key
 The body of an extension declaration may include type declarations, functions, initializers, and subscripts.
 
 > Note: The body of an extension may *not* include variable declarations.
-> An extension cannot introduce members that would change teh in-memory layout of the type being extended.
+> An extension cannot introduce members that would change the in-memory layout of the type being extended.
 
 The members of an extension are accessed through the type that is being extended.
 For example, for the above extension of `MyVector`, the introduced methods are accessed as follows:
@@ -644,7 +641,7 @@ int n = MyVector.getDimensionality();
 ```
 
 An extension declaration need not be placed in the same module as the type being extended; it is possible to extend a type from third-party or standard-library code.
-The members of an extension are only visible inside of modules that `import` the module delcaring the extension;
+The members of an extension are only visible inside of modules that `import` the module declaring the extension;
 extension members are *not* automatically visible wherever the type being extended is visible.
 
 An extension declaration may include an inheritance clause:
@@ -721,10 +718,10 @@ anotherFunction<int, 3>
 
 Specialization produces a reference to the declaration with all generic parameters bound to concrete arguments.
 
-When specializing a generic, generic type parameters mus be matched with type arguments that conform to the constraints on the parameter, if any.
+When specializing a generic, generic type parameters must be matched with type arguments that conform to the constraints on the parameter, if any.
 Generic value parameters must be matched with value arguments of the appropriate type, and that are specialization-time constants.
 
-An explicitly specialized function, type, etc. may be used wherever a non-generic funciton, type, etc. is expected:
+An explicitly specialized function, type, etc. may be used wherever a non-generic function, type, etc. is expected:
 
 ```hlsl
 int i = anotherFunction<int,3>( int3(99) );
