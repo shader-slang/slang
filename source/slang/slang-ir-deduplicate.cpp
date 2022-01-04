@@ -18,9 +18,9 @@ namespace Slang
         {
             IRConstantKey key = { value };
             value->setFullType((IRType*)addValue(value->getFullType()));
-            if (auto newValue = builder->constantMap.TryGetValue(key))
+            if (auto newValue = builder->getConstantMap().TryGetValue(key))
                 return *newValue;
-            builder->constantMap[key] = value;
+            builder->getConstantMap()[key] = value;
             return value;
         }
         IRInst* addTypeValue(IRInst* value)
@@ -41,9 +41,9 @@ namespace Slang
             }
             value->setFullType((IRType*)addValue(value->getFullType()));
             IRInstKey key = { value };
-            if (auto newValue = builder->globalValueNumberingMap.TryGetValue(key))
+            if (auto newValue = builder->getGlobalValueNumberingMap().TryGetValue(key))
                 return *newValue;
-            builder->globalValueNumberingMap[key] = value;
+            builder->getGlobalValueNumberingMap()[key] = value;
             return value;
         }
     };
@@ -52,9 +52,9 @@ namespace Slang
         DeduplicateContext context;
         context.builder = this;
         bool changed = true;
-        constantMap.Clear();
-        globalValueNumberingMap.Clear();
-        for (auto inst : module->getGlobalInsts())
+        m_constantMap.Clear();
+        m_globalValueNumberingMap.Clear();
+        for (auto inst : m_module->getGlobalInsts())
         {
             if (auto constVal = as<IRConstant>(inst))
             {
@@ -62,7 +62,7 @@ namespace Slang
             }
         }
         List<IRInst*> instToRemove;
-        for (auto inst : module->getGlobalInsts())
+        for (auto inst : m_module->getGlobalInsts())
         {
             if (as<IRType>(inst))
             {

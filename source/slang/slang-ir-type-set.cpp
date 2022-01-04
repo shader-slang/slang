@@ -9,14 +9,10 @@ namespace Slang
 
 IRTypeSet::IRTypeSet(Session* session)
 {
-    m_sharedBuilder.module = nullptr;
-    m_sharedBuilder.session = session;
+    m_module = IRModule::create(session);
 
-    m_builder.sharedBuilder = &m_sharedBuilder;
-
-    m_module = m_builder.createModule();
-
-    m_sharedBuilder.module = m_module;
+    m_sharedBuilder.init(m_module);
+    m_builder.init(m_sharedBuilder);
 
     m_builder.setInsertInto(m_module->getModuleInst());
 }
@@ -32,8 +28,11 @@ void IRTypeSet::clear()
 
     m_cloneMap.Clear();
 
-    m_module = m_builder.createModule();
-    m_sharedBuilder.module = m_module;
+    m_module = IRModule::create(m_sharedBuilder.getSession());
+
+    m_sharedBuilder.init(m_module);
+    m_builder.init(m_sharedBuilder);
+
     m_builder.setInsertInto(m_module->getModuleInst());
 }
 

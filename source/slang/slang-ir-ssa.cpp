@@ -921,8 +921,7 @@ void SharedIRBuilder::insertBlockAlongEdge(
     auto succ = edge.getSuccessor();
     auto edgeUse = edge.getUse();
 
-    IRBuilder builder;
-    builder.sharedBuilder = this;
+    IRBuilder builder(this);
     builder.setInsertInto(pred);
 
     // Create a new block that will sit "along" the edge
@@ -1065,7 +1064,7 @@ void constructSSA(ConstructSSAContext* context)
         auto blockInfo = new SSABlockInfo();
         blockInfo->block = bb;
 
-        blockInfo->builder.sharedBuilder = &context->sharedBuilder;
+        blockInfo->builder.init(context->sharedBuilder);
         blockInfo->builder.setInsertBefore(bb->getLastInst());
 
         context->blockInfos.Add(bb, blockInfo);
@@ -1196,11 +1195,10 @@ void constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
     ConstructSSAContext context;
     context.globalVal = globalVal;
 
-    context.sharedBuilder.module = module;
-    context.sharedBuilder.session = module->session;
+    context.sharedBuilder.init(module);
 
-    context.builder.sharedBuilder = &context.sharedBuilder;
-    context.builder.setInsertInto(module->moduleInst);
+    context.builder.init(context.sharedBuilder);
+    context.builder.setInsertInto(module);
 
     constructSSA(&context);
 }

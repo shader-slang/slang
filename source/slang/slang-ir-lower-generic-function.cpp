@@ -45,8 +45,7 @@ namespace Slang
                 return genericValue;
             }
             IRCloneEnv cloneEnv;
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(genericParent);
             auto loweredFunc = cast<IRFunc>(cloneInstAndOperands(&cloneEnv, &builder, func));
             auto loweredGenericType =
@@ -155,8 +154,7 @@ namespace Slang
                 return interfaceType;
             List<IRInterfaceRequirementEntry*> newEntries;
 
-            IRBuilder builder;
-            builder.sharedBuilder = &sharedContext->sharedBuilderStorage;
+            IRBuilder builder(sharedContext->sharedBuilderStorage);
             builder.setInsertBefore(interfaceType);
 
             // Translate IRFuncType in interface requirements.
@@ -214,9 +212,8 @@ namespace Slang
         void lowerWitnessTable(IRWitnessTable* witnessTable)
         {
             auto interfaceType = maybeLowerInterfaceType(cast<IRInterfaceType>(witnessTable->getConformanceType()));
-            IRBuilder builderStorage;
+            IRBuilder builderStorage(sharedContext->sharedBuilderStorage);
             auto builder = &builderStorage;
-            builder->sharedBuilder = &sharedContext->sharedBuilderStorage;
             builder->setInsertBefore(witnessTable);
             if (interfaceType != witnessTable->getConformanceType())
             {
@@ -322,8 +319,7 @@ namespace Slang
             // generate along the way.
             //
             SharedIRBuilder* sharedBuilder = &sharedContext->sharedBuilderStorage;
-            sharedBuilder->module = sharedContext->module;
-            sharedBuilder->session = sharedContext->module->session;
+            sharedBuilder->init(sharedContext->module);
 
             sharedContext->addToWorkList(sharedContext->module->getModuleInst());
 
