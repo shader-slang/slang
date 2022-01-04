@@ -4068,7 +4068,7 @@ public:
 
                     api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
                 }
-                api.vkCmdDraw(m_vkCommandBuffer, indexCount, 1, 0, 0);
+                api.vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, 1, startIndex, baseVertex, 0);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -4201,19 +4201,23 @@ public:
                     m_boundIndexBuffer.m_offset,
                     m_boundIndexFormat);
                 // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
+                for (int i = 0; i < m_boundVertexBuffers.getCount(); ++i)
                 {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
+                    if (m_boundVertexBuffers[i].m_buffer)
+                    {
+                        const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[i];
 
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
+                        VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
+                        VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
 
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
+                        api.vkCmdBindVertexBuffers(m_vkCommandBuffer, i, 1, vertexBuffers, offsets);
+                    }
                 }
-                api.vkCmdDraw(
+                api.vkCmdDrawIndexed(
                     m_vkCommandBuffer,
                     indexCount,
                     instanceCount,
+                    startIndexLocation,
                     baseVertexLocation,
                     startInstanceLocation);
             }
@@ -8021,7 +8025,7 @@ Result VKDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout*
         auto& dstStream = dstStreams[i];
         auto& srcStream = srcVertexStreams[i];
         dstStream.stride = srcStream.stride;
-        dstStream.binding = i;
+        dstStream.binding = (uint32_t)i;
         dstStream.inputRate = (srcStream.slotClass == InputSlotClass::PerInstance) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
     }
 
@@ -8033,7 +8037,7 @@ Result VKDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout*
         VkVertexInputAttributeDescription& dstDesc = dstAttributes[i];
 
         dstDesc.location = uint32_t(i);
-        dstDesc.binding = streamIndex;
+        dstDesc.binding = (uint32_t)streamIndex;
         dstDesc.format = VulkanUtil::getVkFormat(srcDesc.format);
         if (dstDesc.format == VK_FORMAT_UNDEFINED)
         {
