@@ -292,8 +292,8 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
         indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
-    UInt vertexOffset = 0;
-    UInt indexOffset = 0;
+    uint32_t vertexOffset = 0;
+    uint32_t indexOffset = 0;
     ImVec2 pos = draw_data->DisplayPos;
     for(int ii = 0; ii < commandListCount; ++ii)
     {

@@ -293,9 +293,18 @@ public:
         setConstantBufferOverride(IBufferResource* constantBuffer) override;
 
 public:
+    // Type name of an ordinary shader object.
     Slang::String m_typeName;
+
+    // The slang Type of an ordinary shader object. This is null for root objects.
     slang::TypeReflection* m_slangType = nullptr;
+
+    // The slang program from which a root shader object is created, this is null for ordinary
+    // objects.
+    Slang::ComPtr<slang::IComponentType> m_rootComponentType;
+
     DebugDevice* m_device;
+
     Slang::List<Slang::RefPtr<DebugShaderObject>> m_entryPoints;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugShaderObject>> m_objects;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugResourceView>> m_resources;
@@ -626,6 +635,10 @@ public:
 public:
     IShaderProgram* getInterface(const Slang::Guid& guid);
 
+    DebugShaderProgram(const IShaderProgram::Desc& desc);
+
+public:
+    Slang::ComPtr<slang::IComponentType> m_slangProgram;
 };
 
 class DebugTransientResourceHeap : public DebugObject<ITransientResourceHeap>
