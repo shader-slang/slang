@@ -1437,8 +1437,8 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
 void DebugRayTracingCommandEncoder::memoryBarrier(
     int count,
     IAccelerationStructure* const* structures,
-    AccessFlag::Enum sourceAccess,
-    AccessFlag::Enum destAccess)
+    MemoryType::Enum sourceAccess,
+    MemoryType::Enum destAccess)
 {
     SLANG_GFX_API_FUNC;
     List<IAccelerationStructure*> innerAS;
