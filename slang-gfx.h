@@ -417,13 +417,14 @@ private:
 };
 
 
-/// Combinations describe how a resource can be accessed (typically by the host/cpu)
-struct AccessFlag
+/// Describes how memory for the resource should be allocated for CPU access.
+struct MemoryType
 {
     enum Enum
     {
-        Read = 0x1,
-        Write = 0x2
+        GpuOnly = 0x0,
+        CpuRead = 0x1,
+        CpuWrite = 0x2
     };
 };
 
@@ -462,7 +463,7 @@ public:
         /// Base class for Descs
     struct DescBase
     {
-        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
+        bool hasCpuAccessFlag(MemoryType::Enum accessFlag) const { return (cpuAccessFlags & accessFlag) != 0; }
 
         Type type = Type::Unknown;
         ResourceState defaultState = ResourceState::Undefined;
@@ -1618,8 +1619,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        AccessFlag::Enum sourceAccess,
-        AccessFlag::Enum destAccess) = 0;
+        MemoryType::Enum sourceAccess,
+        MemoryType::Enum destAccess) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;

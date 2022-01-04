@@ -4856,13 +4856,13 @@ public:
         public:
             void init(CommandBufferImpl* commandBuffer) { m_commandBuffer = commandBuffer; }
 
-            inline VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag::Enum access)
+            inline VkAccessFlags translateAccelerationStructureAccessFlag(MemoryType::Enum access)
             {
                 VkAccessFlags result = 0;
-                if (access & AccessFlag::Read)
+                if (access & MemoryType::CpuRead)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
                               VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-                if (access & AccessFlag::Write)
+                if (access & MemoryType::CpuWrite)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
                 return result;
             }
@@ -4870,8 +4870,8 @@ public:
             inline void _memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                AccessFlag::Enum srcAccess,
-                AccessFlag::Enum destAccess)
+                MemoryType::Enum srcAccess,
+                MemoryType::Enum destAccess)
             {
                 ShortList<VkBufferMemoryBarrier> memBarriers;
                 memBarriers.setCount(count);
@@ -4998,7 +4998,7 @@ public:
 
                 if (propertyQueryCount)
                 {
-                    _memoryBarrier(1, &desc.dest, AccessFlag::Write, AccessFlag::Read);
+                    _memoryBarrier(1, &desc.dest, MemoryType::CpuWrite, MemoryType::CpuRead);
                     _queryAccelerationStructureProperties(
                         1, &desc.dest, propertyQueryCount, queryDescs);
                 }
@@ -5071,8 +5071,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                AccessFlag::Enum srcAccess,
-                AccessFlag::Enum destAccess) override
+                MemoryType::Enum srcAccess,
+                MemoryType::Enum destAccess) override
             {
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
@@ -6988,7 +6988,7 @@ static VkImageUsageFlags _calcImageUsageFlags(
 {
     VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
-    if ((cpuAccessFlags & AccessFlag::Write) || initData)
+    if ((cpuAccessFlags & MemoryType::CpuWrite) || initData)
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
@@ -7519,7 +7519,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
+    if ((desc.cpuAccessFlags & MemoryType::CpuWrite) || initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }

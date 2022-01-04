@@ -490,8 +490,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        AccessFlag::Enum sourceAccess,
-        AccessFlag::Enum destAccess) override;
+        MemoryType::Enum sourceAccess,
+        MemoryType::Enum destAccess) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(

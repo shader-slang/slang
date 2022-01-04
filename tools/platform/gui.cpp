@@ -216,7 +216,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     vertexBufferDesc.allowedStates =
         ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
     vertexBufferDesc.sizeInBytes = vertexCount * sizeof(ImDrawVert);
-    vertexBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    vertexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto vertexBuffer = device->createBufferResource(vertexBufferDesc);
 
     gfx::IBufferResource::Desc indexBufferDesc;
@@ -225,7 +225,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     indexBufferDesc.allowedStates =
         ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
     indexBufferDesc.defaultState = ResourceState::IndexBuffer;
-    indexBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    indexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto indexBuffer = device->createBufferResource(indexBufferDesc);
     auto cmdBuf = transientHeap->createCommandBuffer();
     auto encoder = cmdBuf->encodeResourceCommands();
@@ -253,7 +253,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
         ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
     constantBufferDesc.defaultState = ResourceState::ConstantBuffer;
     constantBufferDesc.sizeInBytes = sizeof(glm::mat4x4);
-    constantBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    constantBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto constantBuffer = device->createBufferResource(constantBufferDesc);
 
     {
