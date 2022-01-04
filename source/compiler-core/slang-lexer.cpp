@@ -874,7 +874,6 @@ namespace Slang
             // Hexadecimal escape: any number of characters
             case 'x':
                 {
-                    cursor--;
                     int value = 0;
                     for(;;)
                     {
