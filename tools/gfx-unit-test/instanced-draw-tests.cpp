@@ -128,7 +128,7 @@ namespace gfx_test
         void createRequiredResources()
         {
             VertexStreamDesc vertexStreams[] = {
-                { sizeof(Vertex), InputSlotClass::PerVertex },
+                { sizeof(Vertex), InputSlotClass::PerVertex, 0 },
                 { sizeof(Instance), InputSlotClass::PerInstance, 1 },
             };
 

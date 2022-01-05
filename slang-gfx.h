@@ -349,8 +349,8 @@ struct InputElementDesc
 struct VertexStreamDesc
 {
     uint32_t stride;
-    InputSlotClass slotClass = InputSlotClass::PerVertex;
-    UInt instanceDataStepRate = 0;
+    InputSlotClass slotClass;
+    UInt instanceDataStepRate;
 };
 
 enum class PrimitiveType
@@ -2073,8 +2073,7 @@ public:
 
     inline Result createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
     {
-        VertexStreamDesc streamDesc = {};
-        streamDesc.stride = (uint32_t)vertexSize;
+        VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex, 0 };
 
         IInputLayout::Desc inputLayoutDesc = {};
         inputLayoutDesc.inputElementCount = inputElementCount;
