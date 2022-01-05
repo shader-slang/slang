@@ -2462,7 +2462,9 @@ SlangResult D3D11Device::readTextureResource(
         return E_INVALIDARG;
     }
 
-    size_t bytesPerPixel = sizeof(uint32_t);
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(texture->getDesc()->format, &sizeInfo);
+    size_t bytesPerPixel = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     size_t rowPitch = int(texture->getDesc()->size.width) * bytesPerPixel;
     size_t bufferSize = rowPitch * int(texture->getDesc()->size.height);
     if (outRowPitch)

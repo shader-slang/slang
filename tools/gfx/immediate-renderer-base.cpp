@@ -212,12 +212,8 @@ public:
             int32_t baseVertexLocation,
             uint32_t startInstanceLocation) override
         {
-            SLANG_UNUSED(indexCount);
-            SLANG_UNUSED(instanceCount);
-            SLANG_UNUSED(startIndexLocation);
-            SLANG_UNUSED(baseVertexLocation);
-            SLANG_UNUSED(startInstanceLocation);
-            SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
+            m_writer->drawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
         }
     };
 
