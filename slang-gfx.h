@@ -2073,7 +2073,7 @@ public:
 
     inline Result createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
     {
-        VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex };
+        VertexStreamDesc streamDesc = { (uint32_t)vertexSize };
 
         IInputLayout::Desc inputLayoutDesc = {};
         inputLayoutDesc.inputElementCount = inputElementCount;
