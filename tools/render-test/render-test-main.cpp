@@ -863,11 +863,10 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
+    applyBinding(pipelineType, encoder);
 
 	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->setVertexBuffer(0, m_vertexBuffer);
-
-    applyBinding(pipelineType, encoder);
 
 	encoder->draw(3);
 }
