@@ -3338,6 +3338,7 @@ public:
 
                 // Set up vertex buffer views
                 {
+                    auto inputLayout = (InputLayoutImpl*)pipelineState->inputLayout.Ptr();
                     int numVertexViews = 0;
                     D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
                     for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
@@ -3352,8 +3353,7 @@ public:
                                 boundVertexBuffer.m_offset;
                             vertexView.SizeInBytes =
                                 UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
-                            // FIXME: vertexhate
-                            //vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
+                            vertexView.StrideInBytes = inputLayout->m_vertexStreamStrides[i];
                         }
                     }
                     m_d3dCmdList->IASetVertexBuffers(0, numVertexViews, vertexViews);
@@ -6295,7 +6295,6 @@ Result D3D12Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
     layout->m_text.setCount(textSize);
     char* textPos = layout->m_text.getBuffer();
 
-    //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
     elements.setCount(inputElementCount);
 
@@ -6325,9 +6324,11 @@ Result D3D12Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
         dstEle.InstanceDataStepRate = (UINT)srcStream.instanceDataStepRate;
     }
 
+    auto& vertexStreamStrides = layout->m_vertexStreamStrides;
+    vertexStreamStrides.setCount(vertexStreamCount);
     for (UInt i = 0; i < vertexStreamCount; ++i)
     {
-        layout->m_vertexStreamStrides[i] = vertexStreams[i].stride;
+        vertexStreamStrides[i] = vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, layout);

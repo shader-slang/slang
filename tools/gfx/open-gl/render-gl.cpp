@@ -177,6 +177,17 @@ public:
     virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
     virtual void drawIndexed(
         uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
+    virtual void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) override;
+    virtual void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override {}
@@ -2703,6 +2714,25 @@ void GLDevice::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t ba
         GL_UNSIGNED_INT,
         (GLvoid*)(startIndex*sizeof(uint32_t)),
         (GLint)baseVertex);
+}
+
+void GLDevice::drawInstanced(
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startInstanceLocation)
+{
+    SLANG_UNIMPLEMENTED_X("drawInstanced");
+}
+
+void GLDevice::drawIndexedInstanced(
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startIndexLocation,
+    int32_t baseVertexLocation,
+    uint32_t startInstanceLocation)
+{
+    SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
 }
 
 void GLDevice::dispatchCompute(int x, int y, int z)

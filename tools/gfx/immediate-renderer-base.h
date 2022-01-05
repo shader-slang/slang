@@ -69,6 +69,17 @@ public:
     virtual void draw(uint32_t vertexCount, uint32_t startVertex = 0) = 0;
     virtual void drawIndexed(
         uint32_t indexCount, uint32_t startIndex = 0, uint32_t baseVertex = 0) = 0;
+    virtual void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) = 0;
+    virtual void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) = 0;
     virtual void setStencilReference(uint32_t referenceValue) = 0;
     virtual void dispatchCompute(int x, int y, int z) = 0;
     virtual void copyBuffer(
@@ -167,6 +178,31 @@ public:
         SLANG_UNUSED(indexCount);
         SLANG_UNUSED(startIndex);
         SLANG_UNUSED(baseVertex);
+    }
+    virtual void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) override
+    {
+        SLANG_UNUSED(vertexCount);
+        SLANG_UNUSED(instanceCount);
+        SLANG_UNUSED(startVertex);
+        SLANG_UNUSED(startInstanceLocation);
+    }
+
+    virtual void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) override
+    {
+        SLANG_UNUSED(indexCount);
+        SLANG_UNUSED(instanceCount);
+        SLANG_UNUSED(startIndexLocation);
+        SLANG_UNUSED(baseVertexLocation);
+        SLANG_UNUSED(startInstanceLocation);
     }
     virtual void setStencilReference(uint32_t referenceValue) override
     {

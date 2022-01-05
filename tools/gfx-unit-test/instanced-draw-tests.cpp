@@ -521,6 +521,20 @@ namespace gfx_test
         test.run();
     }
 
+#if 0
+    // D3D11's readTextureResource() currently only supports 32 bit formats, resulting in the tests breaking on D3D11
+    // as these tests use 128 bit.
+    SLANG_UNIT_TEST(drawInstancedD3D11)
+    {
+        runTestImpl(drawTestImpl<DrawInstancedTest>, unitTestContext, Slang::RenderApiFlag::D3D11);
+    }
+
+    SLANG_UNIT_TEST(drawIndexedInstancedD3D11)
+    {
+        runTestImpl(drawTestImpl<DrawIndexedInstancedTest>, unitTestContext, Slang::RenderApiFlag::D3D11);
+    }
+#endif
+
     SLANG_UNIT_TEST(drawInstancedD3D12)
     {
         runTestImpl(drawTestImpl<DrawInstancedTest>, unitTestContext, Slang::RenderApiFlag::D3D12);

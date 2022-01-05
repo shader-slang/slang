@@ -146,6 +146,17 @@ public:
     virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
     virtual void drawIndexed(
         uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
+    virtual void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) override;
+    virtual void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override
@@ -348,6 +359,7 @@ protected:
 	{
     public:
 		ComPtr<ID3D11InputLayout> m_layout;
+        List<UINT> m_vertexStreamStrides;
 	};
 
     class QueryPoolImpl : public QueryPoolBase
@@ -2410,7 +2422,7 @@ Result D3D11Device::createFramebuffer(
         framebuffer->d3dRenderTargetViews[i] = framebuffer->renderTargetViews[i]->m_rtv;
     }
     framebuffer->depthStencilView = static_cast<DepthStencilViewImpl*>(desc.depthStencilView);
-    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView->m_dsv;
+    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView ? framebuffer->depthStencilView->m_dsv : nullptr;
     returnComPtr(outFramebuffer, framebuffer);
     return SLANG_OK;
 }
@@ -3080,13 +3092,17 @@ Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
     auto inputElementsIn = desc.inputElements;
     for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
+        auto vertexStreamIndex = inputElementsIn[ii].bufferSlotIndex;
+        auto& vertexStream = desc.vertexStreams[vertexStreamIndex];
+
         inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
         inputElements[ii].SemanticIndex = (UINT)inputElementsIn[ii].semanticIndex;
         inputElements[ii].Format = D3DUtil::getMapFormat(inputElementsIn[ii].format);
-        inputElements[ii].InputSlot = 0;
+        inputElements[ii].InputSlot = vertexStreamIndex;
         inputElements[ii].AlignedByteOffset = (UINT)inputElementsIn[ii].offset;
-        inputElements[ii].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-        inputElements[ii].InstanceDataStepRate = 0;
+        inputElements[ii].InputSlotClass =
+            (vertexStream.slotClass == InputSlotClass::PerInstance) ? D3D11_INPUT_PER_INSTANCE_DATA : D3D11_INPUT_PER_VERTEX_DATA;
+        inputElements[ii].InstanceDataStepRate = vertexStream.instanceDataStepRate;
 
         if (ii != 0)
         {
@@ -3131,6 +3147,13 @@ Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
 
     RefPtr<InputLayoutImpl> impl = new InputLayoutImpl;
     impl->m_layout.swap(inputLayout);
+
+    auto vertexStreamCount = desc.vertexStreamCount;
+    impl->m_vertexStreamStrides.setCount(vertexStreamCount);
+    for (Int i = 0; i < vertexStreamCount; ++i)
+    {
+        impl->m_vertexStreamStrides[i] = desc.vertexStreams[i].stride;
+    }
 
     returnComPtr(outLayout, impl);
     return SLANG_OK;
@@ -3260,6 +3283,8 @@ void D3D11Device::setVertexBuffers(
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
         // FIXME: vertexhate
+        auto inputLayout = (InputLayoutImpl*)m_currentPipelineState->inputLayout.Ptr();
+        vertexStrides[ii] = inputLayout->m_vertexStreamStrides[startSlot + ii];
         vertexOffsets[ii] = (UINT)offsetsIn[ii];
 		dxBuffers[ii] = buffers[ii]->m_buffer;
 	}
@@ -3397,6 +3422,36 @@ void D3D11Device::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t
 {
     _flushGraphicsState();
     m_immediateContext->DrawIndexed(indexCount, startIndex, baseVertex);
+}
+
+void D3D11Device::drawInstanced(
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startInstanceLocation)
+{
+    _flushGraphicsState();
+    m_immediateContext->DrawInstanced(
+        vertexCount,
+        instanceCount,
+        startVertex,
+        startInstanceLocation);
+}
+
+void D3D11Device::drawIndexedInstanced(
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startIndexLocation,
+    int32_t baseVertexLocation,
+    uint32_t startInstanceLocation)
+{
+    _flushGraphicsState();
+    m_immediateContext->DrawIndexedInstanced(
+        indexCount,
+        instanceCount,
+        startIndexLocation,
+        baseVertexLocation,
+        startInstanceLocation);
 }
 
 Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)

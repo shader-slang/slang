@@ -201,11 +201,8 @@ public:
             uint32_t startVertex,
             uint32_t startInstanceLocation) override
         {
-            SLANG_UNUSED(vertexCount);
-            SLANG_UNUSED(instanceCount);
-            SLANG_UNUSED(startVertex);
-            SLANG_UNUSED(startInstanceLocation);
-            SLANG_UNIMPLEMENTED_X("drawInstanced");
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
+            m_writer->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -514,6 +511,14 @@ public:
             case CommandName::DrawIndexed:
                 m_renderer->drawIndexed(
                     cmd.operands[0], cmd.operands[1], cmd.operands[2]);
+                break;
+            case CommandName::DrawInstanced:
+                m_renderer->drawInstanced(
+                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3]);
+                break;
+            case CommandName::DrawIndexedInstanced:
+                m_renderer->drawIndexedInstanced(
+                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3], cmd.operands[4]);
                 break;
             case CommandName::SetStencilReference:
                 m_renderer->setStencilReference(cmd.operands[0]);

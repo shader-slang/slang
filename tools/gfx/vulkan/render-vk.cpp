@@ -4075,7 +4075,7 @@ public:
                     m_vkCommandBuffer,
                     argBufferImpl->m_buffer.m_buffer,
                     argOffset,
-                    maxDrawCount, // Should be countBuffer + countOffset?
+                    maxDrawCount,
                     sizeof(VkDrawIndirectCommand));
             }
 
@@ -4096,7 +4096,7 @@ public:
                     m_vkCommandBuffer,
                     argBufferImpl->m_buffer.m_buffer,
                     argOffset,
-                    maxDrawCount, // Should be countBuffer + countOffset?
+                    maxDrawCount,
                     sizeof(VkDrawIndexedIndirectCommand));
             }
 
