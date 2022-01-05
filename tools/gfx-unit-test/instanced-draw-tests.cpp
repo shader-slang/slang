@@ -5,30 +5,10 @@
 #include "tools/gfx-util/shader-cursor.h"
 #include "source/core/slang-basic.h"
 
-#include <stdlib.h>
-#include <stdio.h>
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb/stb_image_write.h"
-
 using namespace gfx;
 
 namespace gfx_test
 {
-    // Testing only code used to dump images to visually confirm correctness.
-    // Will be removed once all draw tests are complete.
-    Slang::Result writeImage(
-        const char* filename,
-        ISlangBlob* pixels,
-        uint32_t width,
-        uint32_t height)
-    {
-        int stbResult =
-            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
-
-        return stbResult ? SLANG_OK : SLANG_FAIL;
-    }
-
     struct Vertex
     {
         float position[3];
@@ -237,9 +217,6 @@ namespace gfx_test
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 colorBuffer, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
             auto result = (float*)resultBlob->getBufferPointer();
-
-            // Dump image to disk so we can visually confirm the output
-            writeImage("C:/Users/lucchen/Documents/dump.hdr", resultBlob, kWidth, kHeight);
 
             int cursor = 0;
             for (int i = 0; i < pixelCount; ++i)

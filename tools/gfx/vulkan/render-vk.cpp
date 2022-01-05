@@ -6751,29 +6751,28 @@ SlangResult VKDevice::readTextureResource(
     SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
     size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     size_t rowPitch = width * pixelSize;
-    size_t bufferSize = height * rowPitch;
 
-//     List<TextureResource::Size> mipSizes;
-// 
-//     const int numMipMaps = desc->numMipLevels;
-//     auto arraySize = calcEffectiveArraySize(*desc);
-// 
-//     // Calculate how large the buffer has to be
-//     size_t bufferSize = 0;
-//     // Calculate how large an array entry is
-//     for (int j = 0; j < numMipMaps; ++j)
-//     {
-//         const TextureResource::Size mipSize = calcMipSize(desc->size, j);
-// 
-//         auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
-//         auto numRows = calcNumRows(desc->format, mipSize.height);
-// 
-//         mipSizes.add(mipSize);
-// 
-//         bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
-//     }
-//     // Calculate the total size taking into account the array
-//     bufferSize *= arraySize;
+    List<TextureResource::Size> mipSizes;
+
+    const int numMipMaps = desc->numMipLevels;
+    auto arraySize = calcEffectiveArraySize(*desc);
+
+    // Calculate how large the buffer has to be
+    size_t bufferSize = 0;
+    // Calculate how large an array entry is
+    for (int j = 0; j < numMipMaps; ++j)
+    {
+        const TextureResource::Size mipSize = calcMipSize(desc->size, j);
+
+        auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+        auto numRows = calcNumRows(desc->format, mipSize.height);
+
+        mipSizes.add(mipSize);
+
+        bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+    }
+    // Calculate the total size taking into account the array
+    bufferSize *= arraySize;
     blob->m_data.setCount(Index(bufferSize));
 
     Buffer staging;
@@ -6788,49 +6787,33 @@ SlangResult VKDevice::readTextureResource(
     VkImageLayout srcImageLayout = VulkanUtil::getImageLayoutFromState(state);
 
     size_t dstOffset = 0;
-    
-    VkBufferImageCopy region = {};
-    region.bufferOffset = dstOffset;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
+    for (int i = 0; i < arraySize; ++i)
+    {
+        for (Index j = 0; j < mipSizes.getCount(); ++j)
+        {
+            const auto& mipSize = mipSizes[j];
 
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = { (uint32_t)width, (uint32_t)height, 1 };
+            auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+            auto numRows = calcNumRows(desc->format, mipSize.height);
 
-    m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
+            VkBufferImageCopy region = {};
 
+            region.bufferOffset = dstOffset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
 
-//     for (int i = 0; i < arraySize; ++i)
-//     {
-//         for (Index j = 0; j < mipSizes.getCount(); ++j)
-//         {
-//             const auto& mipSize = mipSizes[j];
-// 
-//             auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
-//             auto numRows = calcNumRows(desc->format, mipSize.height);
-// 
-//             VkBufferImageCopy region = {};
-// 
-//             region.bufferOffset = dstOffset;
-//             region.bufferRowLength = 0;
-//             region.bufferImageHeight = 0;
-// 
-//             region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//             region.imageSubresource.mipLevel = uint32_t(j);
-//             region.imageSubresource.baseArrayLayer = i;
-//             region.imageSubresource.layerCount = 1;
-//             region.imageOffset = { 0, 0, 0 };
-//             region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
-// 
-//             m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
-// 
-//             dstOffset += rowSizeInBytes * numRows * mipSize.depth;
-//         }
-//     }
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = uint32_t(j);
+            region.imageSubresource.baseArrayLayer = i;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = { 0, 0, 0 };
+            region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
+
+            m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
+
+            dstOffset += rowSizeInBytes * numRows * mipSize.depth;
+        }
+    }
 
     m_deviceQueue.flushAndWait();
 

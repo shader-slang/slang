@@ -3273,6 +3273,7 @@ void D3D11Device::setVertexBuffers(
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
+    assert(m_currentPipelineState);
 
     UINT vertexStrides[kMaxVertexBuffers];
     UINT vertexOffsets[kMaxVertexBuffers];
@@ -3282,7 +3283,6 @@ void D3D11Device::setVertexBuffers(
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
-        // FIXME: vertexhate
         auto inputLayout = (InputLayoutImpl*)m_currentPipelineState->inputLayout.Ptr();
         vertexStrides[ii] = inputLayout->m_vertexStreamStrides[startSlot + ii];
         vertexOffsets[ii] = (UINT)offsetsIn[ii];
