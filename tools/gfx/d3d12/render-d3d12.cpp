@@ -530,7 +530,6 @@ public:
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
-        //int m_stride;
         int m_offset;
     };
 
@@ -3302,7 +3301,6 @@ public:
 
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
-                    //boundBuffer.m_stride = int(strides[i]);
                     boundBuffer.m_offset = int(offsets[i]);
                 }
             }

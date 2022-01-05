@@ -3860,9 +3860,6 @@ public:
         public:
             List<VkViewport> m_viewports;
             List<VkRect2D> m_scissorRects;
-//             List<BoundVertexBuffer> m_boundVertexBuffers;
-//             BoundVertexBuffer m_boundIndexBuffer;
-//             VkIndexType m_boundIndexFormat;
 
         public:
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)

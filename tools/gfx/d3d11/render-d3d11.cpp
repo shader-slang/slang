@@ -3273,7 +3273,7 @@ void D3D11Device::setVertexBuffers(
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
-    assert(m_currentPipelineState);
+    assert(m_currentPipelineState); // The pipeline state should be created before setting vertex buffers.
 
     UINT vertexStrides[kMaxVertexBuffers];
     UINT vertexOffsets[kMaxVertexBuffers];
