@@ -1459,7 +1459,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
-     
+
     if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
