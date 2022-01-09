@@ -126,10 +126,9 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
 
 DownstreamCompilerSet* TestContext::getCompilerSet()
 {
+    std::lock_guard<std::mutex> lock(mutex);
     if (!compilerSet)
     {
-        std::lock_guard<std::mutex> lock(mutex);
-
         compilerSet = new DownstreamCompilerSet;
 
         DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = { nullptr };
