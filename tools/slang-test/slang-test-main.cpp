@@ -541,14 +541,16 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
     if (options.shouldBeVerbose)
     {
         String commandLine = cmdLine.toString();
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
     Result res = ProcessUtil::execute(cmdLine, outRes);
     if (SLANG_FAILED(res))
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
     }
     return res;
 }
@@ -576,7 +578,8 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
         testCmdLine.addArg(exeName);
         testCmdLine.m_args.addRange(cmdLine.m_args);
 
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", testCmdLine.toString().getBuffer());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::Info, "%s\n", testCmdLine.toString().getBuffer());
     }
 
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
@@ -649,7 +652,8 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     if (options.shouldBeVerbose)
     {
         String commandLine = cmdLine.toString();
-        context->reporter->messageFormat(TestMessageType::Info, "%s\n", commandLine.begin());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::Info, "%s\n", commandLine.begin());
     }
 
     // Execute
@@ -657,7 +661,8 @@ Result spawnAndWaitProxy(TestContext* context, const String& testPath, const Com
     if (SLANG_FAILED(res))
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
-        context->reporter->messageFormat(TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::RunError, "failed to run test '%S'", testPath.toWString().begin());
     }
 
     return res;
@@ -1301,7 +1306,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
     // Otherwise we compare to the expected output
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
         result = TestResult::Fail;
     }
 
@@ -1313,7 +1318,7 @@ TestResult runDocTest(TestContext* context, TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -1386,7 +1391,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
     // Otherwise we compare to the expected output
     if (!_areResultsEqual(input.testOptions->type, expectedOutput, actualOutput))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
         result = TestResult::Fail;
     }
 
@@ -1398,7 +1403,7 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -1495,14 +1500,14 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
         }
         else
         {
-            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
         }
     }
     else
     {
         StringBuilder buf;
         buf << "Unable to find expected output for '" << outputStem << "'";
-        context->reporter->message(TestMessageType::TestFailure, buf);
+        context->getTestReporter()->message(TestMessageType::TestFailure, buf);
     }
 
     // If the test failed, then we write the actual output to a file
@@ -1550,7 +1555,7 @@ TestResult runCompile(TestContext* context, TestInput& input)
 
     if (exeRes.resultCode != 0)
     {
-        auto reporter = context->reporter;
+        auto reporter = context->getTestReporter();
         if (reporter)
         {
             auto output = getOutput(exeRes);
@@ -1666,7 +1671,7 @@ TestResult runReflectionTest(TestContext* context, TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -1825,7 +1830,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
             // Compare if they are the same 
             if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
             {
-                context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+                context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
                 return TestResult::Fail;
             }
         }
@@ -1964,7 +1969,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
         // Compare if they are the same 
         if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
         {
-            context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+            context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
             return TestResult::Fail;
         }
     }
@@ -2087,7 +2092,7 @@ TestResult runCrossCompilerTest(TestContext* context, TestInput& input)
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -2241,7 +2246,7 @@ static TestResult _runHLSLComparisonTest(
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
 
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
     }
 
     return result;
@@ -2358,7 +2363,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
     if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
 
         return TestResult::Fail;
     }
@@ -2429,7 +2434,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
         return TestResult::Fail;
     }
 
-    context->reporter->addExecutionTime(time);
+    context->getTestReporter()->addExecutionTime(time);
 
     return TestResult::Pass;
 }
@@ -2598,7 +2603,7 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
     
     if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
 
         String actualOutputPath = outputStem + ".actual";
         Slang::File::writeAllText(actualOutputPath, actualOutput);
@@ -2625,7 +2630,11 @@ TestResult runComputeComparisonImpl(TestContext* context, TestInput& input, cons
 
     if (SLANG_FAILED(_compareWithType(actualOutputContent.getUnownedSlice(), referenceOutputContent.getUnownedSlice())))
     {
-        context->reporter->messageFormat(TestMessageType::TestFailure, "output mismatch! actual output: {\n%s\n}, \n%s\n", actualOutputContent.getBuffer(), referenceOutputContent.getBuffer());
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "output mismatch! actual output: {\n%s\n}, \n%s\n",
+            actualOutputContent.getBuffer(),
+            referenceOutputContent.getBuffer());
         return TestResult::Fail;
     }
 
@@ -2774,7 +2783,7 @@ bool STBImage::isComparable(const ThisType& rhs) const
 
 TestResult doImageComparison(TestContext* context, String const& filePath)
 {
-    auto reporter = context->reporter;
+    auto reporter = context->getTestReporter();
 
     // Allow a difference in the low bits of the 8-bit result, just to play it safe
     static const int kAbsoluteDiffCutoff = 2;
@@ -2904,7 +2913,7 @@ TestResult runHLSLRenderComparisonTestImpl(
 
     if (!StringUtil::areLinesEqual(actualOutput.getUnownedSlice(), expectedOutput.getUnownedSlice()))
     {
-        context->reporter->dumpOutputDifference(expectedOutput, actualOutput);
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
 
         return TestResult::Fail;
     }
@@ -3207,8 +3216,7 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
 static SlangResult _runTestsOnFile(
     TestContext*    context,
-    String          filePath,
-    TestReporter*   reporter)
+    String          filePath)
 {
     // Gather a list of tests to run
     FileTestList testList;
@@ -3224,7 +3232,7 @@ static SlangResult _runTestsOnFile(
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.getCount() == 0 )
     {
-        reporter->addTest(filePath, TestResult::Ignored);
+        context->getTestReporter()->addTest(filePath, TestResult::Ignored);
         return SLANG_OK;
     }
 
@@ -3335,7 +3343,7 @@ static SlangResult _runTestsOnFile(
 
         // Report the test and run/ignore
         {
-            TestReporter::TestScope scope(reporter, testName);
+            TestReporter::TestScope scope(context->getTestReporter(), testName);
 
             TestResult testResult = TestResult::Fail;
 
@@ -3349,7 +3357,7 @@ static SlangResult _runTestsOnFile(
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
             }
 
-            reporter->addResult(testResult);
+            context->getTestReporter()->addResult(testResult);
 
             // Could determine if to continue or not here... based on result
         }        
@@ -3434,19 +3442,19 @@ void runTestsInDirectory(
 {
     List<String> files;
     getFilesInDirectory(directoryPath, files);
-    auto processFile = [&](TestReporter* reporter, String file)
+    auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
         {
             //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-            if (SLANG_FAILED(_runTestsOnFile(context, file, reporter)))
+            if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
-                    TestReporter::TestScope scope(reporter, file);
-                    reporter->message(
+                    TestReporter::TestScope scope(context->getTestReporter(), file);
+                    context->getTestReporter()->message(
                         TestMessageType::RunError, "slang-test: unable to parse test");
 
-                    reporter->addResult(TestResult::Fail);
+                    context->getTestReporter()->addResult(TestResult::Fail);
                 }
 
                 // Output there was some kind of error trying to run the tests on this file
@@ -3470,11 +3478,12 @@ void runTestsInDirectory(
     {
         for (auto file : files)
         {
-            processFile(context->reporter, file);
+            processFile(file);
         }
     }
     else
     {
+        auto originalReporter = context->getTestReporter();
         std::atomic<int> consumePtr;
         consumePtr = 0;
         auto threadFunc = [&](int threadId)
@@ -3483,17 +3492,19 @@ void runTestsInDirectory(
             reporter.init(context->options.outputMode, true);
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
             context->setThreadIndex(threadId);
+            context->setTestReporter(&reporter);
             do
             {
                 int index = consumePtr.fetch_add(1);
                 if (index >= (int)files.getCount())
                     break;
-                processFile(&reporter, files[index]);
+                processFile(files[index]);
             } while (true);
             {
                 std::lock_guard<std::mutex> lock(context->mutex);
-                context->reporter->consolidateWith(&reporter);
+                originalReporter->consolidateWith(&reporter);
             }
+            context->setTestReporter(nullptr);
         };
         List<std::thread> threads;
         for (int threadId = 0; threadId < context->options.serverCount; threadId++)
@@ -3502,6 +3513,7 @@ void runTestsInDirectory(
         }
         for (auto& t : threads)
             t.join();
+        context->setTestReporter(originalReporter);
     }
 }
 
@@ -3722,7 +3734,7 @@ SlangResult innerMain(int argc, char** argv)
 
     Options& options = context.options;
 
-    context.setMaxRPCConnectionCount(options.serverCount);
+    context.setMaxTestRunnerThreadCount(options.serverCount);
 
     // Set up the prelude/s
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], context.getSession());
@@ -3785,7 +3797,7 @@ SlangResult innerMain(int argc, char** argv)
         TestReporter reporter;
         SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode));
 
-        context.reporter = &reporter;
+        context.setTestReporter(&reporter);
 
         reporter.m_dumpOutputOnFailure = options.dumpOutputOnFailure;
         reporter.m_isVerbose = options.shouldBeVerbose;

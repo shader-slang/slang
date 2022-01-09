@@ -27,10 +27,15 @@ TestContext::TestContext()
 
 void TestContext::setThreadIndex(int index) { slangTestThreadIndex = index; }
 
-void TestContext::setMaxRPCConnectionCount(int count)
+void TestContext::setMaxTestRunnerThreadCount(int count)
 {
     m_jsonRpcConnections.setCount(count);
     m_testRequirements.setCount(count);
+    m_reporters.setCount(count);
+    for (auto& reporter : m_reporters)
+    {
+        reporter = nullptr;
+    }
 }
 
 void TestContext::setTestRequirements(TestRequirements* req)
@@ -41,6 +46,16 @@ void TestContext::setTestRequirements(TestRequirements* req)
 TestRequirements* TestContext::getTestRequirements() const
 {
     return m_testRequirements[slangTestThreadIndex];
+}
+
+void TestContext::setTestReporter(TestReporter* reporter)
+{
+    m_reporters[slangTestThreadIndex] = reporter;
+}
+
+TestReporter* TestContext::getTestReporter()
+{
+    return m_reporters[slangTestThreadIndex];
 }
 
 Result TestContext::init(const char* exePath)

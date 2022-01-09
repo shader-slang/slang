@@ -132,7 +132,6 @@ class TestContext
     ~TestContext();
 
     Options options;
-    TestReporter* reporter = nullptr;
     TestCategorySet categorySet;
 
         /// If set then tests are not run, but their requirements are set 
@@ -159,10 +158,12 @@ class TestContext
     Slang::Int connectionTimeOutInMs = 2 * 60 * 1000;
 
     void setThreadIndex(int index);
-    void setMaxRPCConnectionCount(int count);
+    void setMaxTestRunnerThreadCount(int count);
+
+    void setTestReporter(TestReporter* reporter);
+    TestReporter* getTestReporter();
 
     std::mutex mutex;
-    Slang::List<TestRequirements*> m_testRequirements = nullptr;
 
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
@@ -174,6 +175,8 @@ protected:
     };
 
     Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
+    Slang::List<TestReporter*> m_reporters;
+    Slang::List<TestRequirements*> m_testRequirements = nullptr;
     
     SlangSession* m_session;
 
