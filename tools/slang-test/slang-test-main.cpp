@@ -979,6 +979,8 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
 
 static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
     // Only evaluate if it hasn't already been evaluated (the actual evaluation is slow...)
     if (!context->isAvailableRenderApiFlagsValid)
     {
@@ -3048,7 +3050,7 @@ bool testCategoryMatches(
 
 bool testCategoryMatches(
     TestCategory*                           categoryToMatch,
-    Dictionary<TestCategory*, TestCategory*> categorySet)
+    const Dictionary<TestCategory*, TestCategory*>& categorySet)
 {
     for( auto item : categorySet )
     {
