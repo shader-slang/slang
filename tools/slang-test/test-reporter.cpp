@@ -193,6 +193,15 @@ TestResult TestReporter::addTest(const String& testName, bool isPass)
     return res;
 }
 
+void TestReporter::consolidateWith(TestReporter* other)
+{
+    m_testInfos.addRange(other->m_testInfos);
+    m_failedTestCount += other->m_failedTestCount;
+    m_ignoredTestCount += other->m_ignoredTestCount;
+    m_passedTestCount += other->m_passedTestCount;
+    m_totalTestCount += other->m_totalTestCount;
+}
+
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
 {
     StringBuilder builder;

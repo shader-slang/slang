@@ -3461,7 +3461,9 @@ void runTestsInDirectory(
         break;
     }
     if (context->options.serverCount == 1)
+    {
         useMultiThread = false;
+    }
     if (!useMultiThread)
     {
         for (auto file : files)
@@ -3471,7 +3473,8 @@ void runTestsInDirectory(
     }
     else
     {
-        std::atomic<int> consumePtr = 0;
+        std::atomic<int> consumePtr;
+        consumePtr = 0;
         auto threadFunc = [&](int threadId)
         {
             TestReporter reporter;
@@ -3487,18 +3490,13 @@ void runTestsInDirectory(
             } while (true);
             {
                 std::lock_guard<std::mutex> lock(context->mutex);
-                context->reporter->m_testInfos.addRange(reporter.m_testInfos);
-                context->reporter->m_failedTestCount += reporter.m_failedTestCount;
-                context->reporter->m_ignoredTestCount += reporter.m_ignoredTestCount;
-                context->reporter->m_passedTestCount += reporter.m_passedTestCount;
-                context->reporter->m_totalTestCount += reporter.m_totalTestCount;
+                context->reporter->consolidateWith(&reporter);
             }
         };
         List<std::thread> threads;
         for (int threadId = 0; threadId < context->options.serverCount; threadId++)
         {
-            std::thread t(threadFunc, threadId);
-            threads.add(_Move(t));
+            threads.add(std::thread(threadFunc, threadId));
         }
         for (auto& t : threads)
             t.join();

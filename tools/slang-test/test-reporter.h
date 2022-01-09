@@ -87,6 +87,8 @@ class TestReporter : public ITestReporter
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
 
+    void consolidateWith(TestReporter* other);
+
         /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
