@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <mutex>
+
 using namespace Slang;
 
 /* static */TestReporter* TestReporter::s_reporter = nullptr;
@@ -493,6 +495,8 @@ void TestReporter::addTest(const String& testName, TestResult testResult)
 
 void TestReporter::message(TestMessageType type, const String& message)
 {
+    static std::mutex mutex;
+    std::lock_guard<std::mutex> lock(mutex);
     if (type == TestMessageType::Info)
     {
         if (m_isVerbose && canWriteStdError())

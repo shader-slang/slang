@@ -43,6 +43,8 @@
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
 #include "../../prelude/slang-cpp-types.h"
 
+#include <atomic>
+#include <thread>
 
 using namespace Slang;
 
@@ -532,6 +534,8 @@ static SlangResult _gatherTestsForFile(
 
 Result spawnAndWaitExe(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
+    std::lock_guard<std::mutex> lock(context->mutex);
+
     const auto& options = context->options;
 
     if (options.shouldBeVerbose)
@@ -552,6 +556,8 @@ Result spawnAndWaitExe(TestContext* context, const String& testPath, const Comma
 
 Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, const CommandLine& cmdLine, ExecuteResult& outRes)
 {
+    std::lock_guard<std::mutex> lock(context->mutex);
+
     const auto& options = context->options;
     String exeName = Path::getFileNameWithoutExt(cmdLine.m_executableLocation.m_pathOrName);
 
@@ -621,6 +627,8 @@ Result spawnAndWaitSharedLibrary(TestContext* context, const String& testPath, c
 
 Result spawnAndWaitProxy(TestContext* context, const String& testPath, const CommandLine& inCmdLine, ExecuteResult& outRes)
 {
+    std::lock_guard<std::mutex> lock(context->mutex);
+
     // Get the name of the thing to execute
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
@@ -1046,8 +1054,9 @@ ToolReturnCode spawnAndWait(TestContext* context, const String& testPath, SpawnT
 {
     if (context->isCollectingRequirements())
     {
+        std::lock_guard<std::mutex> lock(context->mutex);
         // If we just want info... don't bother running anything
-        const SlangResult res = _extractTestRequirements(cmdLine, context->testRequirements);
+        const SlangResult res = _extractTestRequirements(cmdLine, context->getTestRequirements());
         // Keep compiler happy on release
         SLANG_UNUSED(res);
         SLANG_ASSERT(SLANG_SUCCEEDED(res));
@@ -1445,7 +1454,7 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
-
+     
     if (context->isCollectingRequirements())
     {
         return TestResult::Pass;
@@ -1756,7 +1765,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
-        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
+        context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
@@ -1869,7 +1878,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
-        context->testRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
+        context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
 
@@ -3150,9 +3159,9 @@ static void _calcSynthesizedTests(TestContext* context, RenderApiType synthRende
         }
 
         // Work out the info about this tests
-        context->testRequirements = &synthTestDetails.requirements;
+        context->setTestRequirements(& synthTestDetails.requirements);
         runTest(context, "", "", "", synthOptions);
-        context->testRequirements = nullptr;
+        context->setTestRequirements(nullptr);
 
         // It does set the explicit render target
         SLANG_ASSERT(synthTestDetails.requirements.explicitRenderApi == synthRenderApiType);
@@ -3196,7 +3205,8 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
 
 static SlangResult _runTestsOnFile(
     TestContext*    context,
-    String          filePath)
+    String          filePath,
+    TestReporter*   reporter)
 {
     // Gather a list of tests to run
     FileTestList testList;
@@ -3212,7 +3222,7 @@ static SlangResult _runTestsOnFile(
     // Note cases where a test file exists, but we found nothing to run
     if( testList.tests.getCount() == 0 )
     {
-        context->reporter->addTest(filePath, TestResult::Ignored);
+        reporter->addTest(filePath, TestResult::Ignored);
         return SLANG_OK;
     }
 
@@ -3226,14 +3236,14 @@ static SlangResult _runTestsOnFile(
             auto& requirements = testDetails.requirements;
 
             // Collect what the test needs (by setting restRequirements the test isn't actually run)
-            context->testRequirements = &requirements;
+            context->setTestRequirements(&requirements);
             runTest(context, filePath, filePath, filePath, testDetails.options);
 
             // 
             apiUsedFlags |= requirements.usedRenderApiFlags;
             explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown) ? (RenderApiFlags(1) << int(requirements.explicitRenderApi)) : 0;
         }
-        context->testRequirements = nullptr;
+        context->setTestRequirements(nullptr);
     }
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
@@ -3323,7 +3333,6 @@ static SlangResult _runTestsOnFile(
 
         // Report the test and run/ignore
         {
-            auto reporter = context->reporter;
             TestReporter::TestScope scope(reporter, testName);
 
             TestResult testResult = TestResult::Fail;
@@ -3400,43 +3409,99 @@ static bool shouldRunTest(
     return true;
 }
 
-void runTestsInDirectory(
-    TestContext*		context,
-    String				directoryPath)
+void getFilesInDirectory(String directoryPath, List<String>& files)
 {
     {
-        List<String> files;
-        DirectoryUtil::findFiles(directoryPath, files);
-        for (auto file : files)
-        {
-            if( shouldRunTest(context, file) )
-            {
-    //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
-                if (SLANG_FAILED(_runTestsOnFile(context, file)))
-                {
-                    auto reporter = context->reporter;
-
-                    {
-                        TestReporter::TestScope scope(reporter, file);
-                        reporter->message(TestMessageType::RunError, "slang-test: unable to parse test");
-
-                        reporter->addResult(TestResult::Fail);
-                    }
-
-                    // Output there was some kind of error trying to run the tests on this file
-                    // fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
-                }
-            }
-        }
+        List<String> localFiles;
+        DirectoryUtil::findFiles(directoryPath, localFiles);
+        files.addRange(localFiles);
     }
-
     {
         List<String> subDirs;
         DirectoryUtil::findDirectories(directoryPath, subDirs);
         for (auto subDir : subDirs)
         {
-            runTestsInDirectory(context, subDir);
+            getFilesInDirectory(subDir, files);
         }
+    }
+}
+
+void runTestsInDirectory(
+    TestContext*		context,
+    String				directoryPath)
+{
+    List<String> files;
+    getFilesInDirectory(directoryPath, files);
+    auto processFile = [&](TestReporter* reporter, String file)
+    {
+        if (shouldRunTest(context, file))
+        {
+            //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+            if (SLANG_FAILED(_runTestsOnFile(context, file, reporter)))
+            {
+                {
+                    TestReporter::TestScope scope(reporter, file);
+                    reporter->message(
+                        TestMessageType::RunError, "slang-test: unable to parse test");
+
+                    reporter->addResult(TestResult::Fail);
+                }
+
+                // Output there was some kind of error trying to run the tests on this file
+                // fprintf(stderr, "slang-test: unable to parse test '%s'\n", file.getBuffer());
+            }
+        }
+    };
+    bool useMultiThread = false;
+    switch (context->options.defaultSpawnType)
+    {
+    case SpawnType::UseFullyIsolatedTestServer:
+    case SpawnType::UseTestServer:
+        useMultiThread = true;
+        break;
+    }
+    if (context->options.serverCount == 1)
+        useMultiThread = false;
+    if (!useMultiThread)
+    {
+        for (auto file : files)
+        {
+            processFile(context->reporter, file);
+        }
+    }
+    else
+    {
+        std::atomic<int> consumePtr = 0;
+        auto threadFunc = [&](int threadId)
+        {
+            TestReporter reporter;
+            reporter.init(context->options.outputMode);
+            TestReporter::SuiteScope suiteScope(&reporter, "tests");
+            context->setThreadIndex(threadId);
+            do
+            {
+                int index = consumePtr.fetch_add(1);
+                if (index >= (int)files.getCount())
+                    break;
+                processFile(&reporter, files[index]);
+            } while (true);
+            {
+                std::lock_guard<std::mutex> lock(context->mutex);
+                context->reporter->m_testInfos.addRange(reporter.m_testInfos);
+                context->reporter->m_failedTestCount += reporter.m_failedTestCount;
+                context->reporter->m_ignoredTestCount += reporter.m_ignoredTestCount;
+                context->reporter->m_passedTestCount += reporter.m_passedTestCount;
+                context->reporter->m_totalTestCount += reporter.m_totalTestCount;
+            }
+        };
+        List<std::thread> threads;
+        for (int threadId = 0; threadId < context->options.serverCount; threadId++)
+        {
+            std::thread t(threadFunc, threadId);
+            threads.add(_Move(t));
+        }
+        for (auto& t : threads)
+            t.join();
     }
 }
 
@@ -3654,8 +3719,10 @@ SlangResult innerMain(int argc, char** argv)
     }
 
     SLANG_RETURN_ON_FAIL(Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
-    
+
     Options& options = context.options;
+
+    context.setMaxRPCConnectionCount(options.serverCount);
 
     // Set up the prelude/s
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], context.getSession());
