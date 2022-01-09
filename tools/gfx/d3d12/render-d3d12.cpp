@@ -4927,7 +4927,7 @@ Result D3D12Device::captureTextureToSurface(
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    auto resource = resourceImpl->m_resource;
+    auto& resource = resourceImpl->m_resource;
 
     const D3D12_RESOURCE_STATES initialState = D3DUtil::getResourceState(state);
 
@@ -5032,6 +5032,11 @@ Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    {
+        m_dxDebug->EnableDebugLayer();
+    }
+
     outDeviceInfo.clear();
 
     ComPtr<IDXGIFactory> dxgiFactory;
@@ -5060,8 +5065,6 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
 
     if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
     {
-        m_dxDebug->EnableDebugLayer();
-
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SLANG_SUCCEEDED(device->QueryInterface(infoQueue.writeRef())))
         {
@@ -5194,7 +5197,6 @@ Result D3D12Device::initialize(const Desc& desc)
                 debug1->SetEnableGPUBasedValidation(true);
             }
 #endif
-            m_dxDebug->EnableDebugLayer();
         }
     }
 #endif
