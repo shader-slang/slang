@@ -113,6 +113,8 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
 {
     if (!compilerSet)
     {
+        std::lock_guard<std::mutex> lock(mutex);
+
         compilerSet = new DownstreamCompilerSet;
 
         DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = { nullptr };

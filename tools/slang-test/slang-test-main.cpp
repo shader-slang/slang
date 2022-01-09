@@ -1759,6 +1759,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     DownstreamCompiler* compiler = context->getDefaultCompiler(SLANG_SOURCE_LANGUAGE_CPP);
     if (!compiler)
     {
+        std::lock_guard<std::mutex> lock(context->mutex);
         return TestResult::Ignored;
     }
 
@@ -1878,6 +1879,7 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     // If we are just collecting requirements, say it passed
     if (context->isCollectingRequirements())
     {
+        std::lock_guard<std::mutex> lock(context->mutex);
         context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_GENERIC_C_CPP);
         return TestResult::Pass;
     }
