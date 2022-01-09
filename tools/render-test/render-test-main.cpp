@@ -558,7 +558,7 @@ SlangResult RenderTestApp::initialize(
                 IBufferResource::Desc vertexBufferDesc;
                 vertexBufferDesc.type = IResource::Type::Buffer;
                 vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-                vertexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
+                vertexBufferDesc.memoryType = MemoryType::Upload;
                 vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
                 vertexBufferDesc.allowedStates = ResourceStateSet(ResourceState::VertexBuffer);
 
@@ -909,7 +909,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
             const size_t bufferSize = bufferDesc.sizeInBytes;
 
             ComPtr<ISlangBlob> blob;
-            if(bufferDesc.cpuAccessFlags & MemoryType::CpuRead)
+            if(bufferDesc.memoryType == MemoryType::ReadBack)
             {
                 // The buffer is already allocated for CPU access, so we can read it back directly.
                 //
@@ -920,7 +920,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 // The buffer is not CPU-readable, so we will copy it using a staging buffer.
 
                 auto stagingBufferDesc = bufferDesc;
-                stagingBufferDesc.cpuAccessFlags = MemoryType::CpuRead;
+                stagingBufferDesc.memoryType = MemoryType::ReadBack;
                 stagingBufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
                 stagingBufferDesc.defaultState = ResourceState::CopyDestination;

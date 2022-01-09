@@ -286,6 +286,24 @@ public:
             outHandle->api = InteropHandleAPI::Vulkan;
             return SLANG_OK;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            map(MemoryRange* rangeToRead, void** outPointer) override
+        {
+            SLANG_UNUSED(rangeToRead);
+            auto api = m_buffer.m_api;
+            SLANG_VK_RETURN_ON_FAIL(api->vkMapMemory(
+                api->m_device, m_buffer.m_memory, 0, VK_WHOLE_SIZE, 0, outPointer));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+        {
+            SLANG_UNUSED(writtenRange);
+            auto api = m_buffer.m_api;
+            api->vkUnmapMemory(api->m_device, m_buffer.m_memory);
+            return SLANG_OK;
+        }
     };
 
     class FenceImpl : public FenceBase
@@ -4856,13 +4874,13 @@ public:
         public:
             void init(CommandBufferImpl* commandBuffer) { m_commandBuffer = commandBuffer; }
 
-            inline VkAccessFlags translateAccelerationStructureAccessFlag(MemoryType::Enum access)
+            inline VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag access)
             {
                 VkAccessFlags result = 0;
-                if (access & MemoryType::CpuRead)
+                if ((uint32_t)access & (uint32_t)AccessFlag::Read)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
                               VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-                if (access & MemoryType::CpuWrite)
+                if ((uint32_t)access & (uint32_t)AccessFlag::Write)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
                 return result;
             }
@@ -4870,8 +4888,8 @@ public:
             inline void _memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                MemoryType::Enum srcAccess,
-                MemoryType::Enum destAccess)
+                AccessFlag srcAccess,
+                AccessFlag destAccess)
             {
                 ShortList<VkBufferMemoryBarrier> memBarriers;
                 memBarriers.setCount(count);
@@ -4998,7 +5016,7 @@ public:
 
                 if (propertyQueryCount)
                 {
-                    _memoryBarrier(1, &desc.dest, MemoryType::CpuWrite, MemoryType::CpuRead);
+                    _memoryBarrier(1, &desc.dest, AccessFlag::Write, AccessFlag::Read);
                     _queryAccelerationStructureProperties(
                         1, &desc.dest, propertyQueryCount, queryDescs);
                 }
@@ -5071,8 +5089,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                MemoryType::Enum srcAccess,
-                MemoryType::Enum destAccess) override
+                AccessFlag srcAccess,
+                AccessFlag destAccess) override
             {
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
@@ -6983,12 +7001,12 @@ static VkImageUsageFlagBits _calcImageUsageFlags(ResourceStateSet states)
 
 static VkImageUsageFlags _calcImageUsageFlags(
     ResourceStateSet states,
-    int cpuAccessFlags,
+    MemoryType memoryType,
     const void* initData)
 {
     VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
-    if ((cpuAccessFlags & MemoryType::CpuWrite) || initData)
+    if (memoryType == MemoryType::Upload || initData)
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
@@ -7200,7 +7218,7 @@ Result VKDevice::getTextureAllocationInfo(
     imageInfo.format = format;
 
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, nullptr);
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, nullptr);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -7279,7 +7297,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     imageInfo.format = format;
 
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.cpuAccessFlags, initData);
+    imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, initData);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -7519,7 +7537,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if ((desc.cpuAccessFlags & MemoryType::CpuWrite) || initData)
+    if (desc.memoryType == MemoryType::Upload || initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }

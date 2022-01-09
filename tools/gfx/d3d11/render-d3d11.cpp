@@ -219,6 +219,20 @@ protected:
         {
             return 0;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            map(MemoryRange* rangeToRead, void** outPointer) override
+        {
+            SLANG_UNUSED(rangeToRead);
+            SLANG_UNUSED(outPointer);
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+        {
+            SLANG_UNUSED(writtenRange);
+            return SLANG_FAIL;
+        }
     };
     class TextureResourceImpl : public TextureResource
     {
@@ -1514,7 +1528,7 @@ protected:
                 bufferDesc.defaultState = ResourceState::ConstantBuffer;
                 bufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-                bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
+                bufferDesc.memoryType = MemoryType::Upload;
                 SLANG_RETURN_ON_FAIL(
                     device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
                 m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
@@ -2549,16 +2563,19 @@ static int _calcResourceBindFlags(ResourceStateSet allowedStates)
     return dstFlags;
 }
 
-static int _calcResourceAccessFlags(int accessFlags)
+static int _calcResourceAccessFlags(MemoryType memType)
 {
-    switch (accessFlags)
+    switch (memType)
     {
-        case 0:         return 0;
-        case MemoryType::CpuRead:            return D3D11_CPU_ACCESS_READ;
-        case MemoryType::CpuWrite:           return D3D11_CPU_ACCESS_WRITE;
-        case MemoryType::CpuRead |
-             MemoryType::CpuWrite:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
-        default: assert(!"Invalid flags"); return 0;
+    case MemoryType::DeviceLocal:
+        return 0;
+    case MemoryType::ReadBack:
+        return D3D11_CPU_ACCESS_READ;
+    case MemoryType::Upload:
+        return D3D11_CPU_ACCESS_WRITE;
+    default:
+        assert(!"Invalid flags");
+        return 0;
     }
 }
 
@@ -2604,7 +2621,7 @@ Result D3D11Device::createTextureResource(const ITextureResource::Desc& descIn, 
         subResourcesPtr = subRes.getBuffer();
     }
 
-    const int accessFlags = _calcResourceAccessFlags(srcDesc.cpuAccessFlags);
+    const int accessFlags = _calcResourceAccessFlags(srcDesc.memoryType);
 
     RefPtr<TextureResourceImpl> texture(new TextureResourceImpl(srcDesc));
     
@@ -2710,15 +2727,20 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.ByteWidth = UINT(alignedSizeInBytes);
     bufferDesc.BindFlags = d3dBindFlags;
     // For read we'll need to do some staging
-    bufferDesc.CPUAccessFlags =
-        _calcResourceAccessFlags(descIn.cpuAccessFlags & MemoryType::CpuWrite);
+    bufferDesc.CPUAccessFlags = _calcResourceAccessFlags(descIn.memoryType);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
     // If written by CPU, make it dynamic
-    if ((descIn.cpuAccessFlags & MemoryType::CpuWrite) &&
+    if (descIn.memoryType == MemoryType::Upload &&
         !descIn.allowedStates.contains(ResourceState::UnorderedAccess))
     {
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    }
+
+    if (srcDesc.memoryType == MemoryType::ReadBack)
+    {
+        bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_READ;
+        bufferDesc.Usage = D3D11_USAGE_STAGING;
     }
 
     switch (descIn.defaultState)
@@ -2746,7 +2768,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
         }
     }
 
-    if (srcDesc.cpuAccessFlags & MemoryType::CpuWrite)
+    if (srcDesc.memoryType == MemoryType::Upload)
     {
         bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
     }
@@ -2759,7 +2781,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
     buffer->m_d3dUsage = bufferDesc.Usage;
 
-    if (srcDesc.cpuAccessFlags & MemoryType::CpuRead || bufferDesc.Usage != D3D11_USAGE_DYNAMIC)
+    if (srcDesc.memoryType == MemoryType::ReadBack || bufferDesc.Usage != D3D11_USAGE_DYNAMIC)
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;

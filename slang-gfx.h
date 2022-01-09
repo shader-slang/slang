@@ -107,6 +107,13 @@ enum class BindingStyle
     CountOf,
 };
 
+enum class AccessFlag
+{
+    None,
+    Read,
+    Write,
+};
+
 class ITransientResourceHeap;
 
 class IShaderProgram: public ISlangUnknown
@@ -185,6 +192,8 @@ public:
     x(R8_UNORM, 1, 1) \
     x(B8G8R8A8_UNORM, 4, 1) \
     x(B8G8R8A8_UNORM_SRGB, 4, 1) \
+    x(B8G8R8X8_UNORM, 4, 1) \
+    x(B8G8R8X8_UNORM_SRGB, 4, 1) \
     \
     x(R16G16B16A16_SNORM, 8, 1) \
     x(R16G16_SNORM, 4, 1) \
@@ -290,6 +299,8 @@ enum class Format
     R8_UNORM,
     B8G8R8A8_UNORM,
     B8G8R8A8_UNORM_SRGB,
+    B8G8R8X8_UNORM,
+    B8G8R8X8_UNORM_SRGB,
 
     R16G16B16A16_SNORM,
     R16G16_SNORM,
@@ -418,14 +429,11 @@ private:
 
 
 /// Describes how memory for the resource should be allocated for CPU access.
-struct MemoryType
+enum class MemoryType
 {
-    enum Enum
-    {
-        GpuOnly = 0x0,
-        CpuRead = 0x1,
-        CpuWrite = 0x2
-    };
+    DeviceLocal,
+    Upload,
+    ReadBack,
 };
 
 enum class InteropHandleAPI
@@ -463,12 +471,10 @@ public:
         /// Base class for Descs
     struct DescBase
     {
-        bool hasCpuAccessFlag(MemoryType::Enum accessFlag) const { return (cpuAccessFlags & accessFlag) != 0; }
-
         Type type = Type::Unknown;
         ResourceState defaultState = ResourceState::Undefined;
         ResourceStateSet allowedStates = ResourceStateSet();
-        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
+        MemoryType memoryType = MemoryType::DeviceLocal;
         InteropHandle existingHandle = {};
         bool isShared = false;
     };
@@ -486,6 +492,12 @@ public:
         0xa0e39f34, 0x8398, 0x4522, { 0x95, 0xc2, 0xeb, 0xc0, 0xf9, 0x84, 0xef, 0x3f } \
     }
 
+struct MemoryRange
+{
+    uint64_t offset;
+    uint64_t size;
+};
+
 class IBufferResource: public IResource
 {
 public:
@@ -498,6 +510,8 @@ public:
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL map(MemoryRange* rangeToRead, void** outPointer) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -1619,8 +1633,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        MemoryType::Enum sourceAccess,
-        MemoryType::Enum destAccess) = 0;
+        AccessFlag sourceAccess,
+        AccessFlag destAccess) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;

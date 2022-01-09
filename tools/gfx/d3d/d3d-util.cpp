@@ -166,7 +166,9 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         case Format::R8G8_UNORM:                return DXGI_FORMAT_R8G8_UNORM;
         case Format::R8_UNORM:                  return DXGI_FORMAT_R8_UNORM;
         case Format::B8G8R8A8_UNORM:            return DXGI_FORMAT_B8G8R8A8_UNORM;
+        case Format::B8G8R8X8_UNORM:            return DXGI_FORMAT_B8G8R8X8_UNORM;
         case Format::B8G8R8A8_UNORM_SRGB:       return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+        case Format::B8G8R8X8_UNORM_SRGB:       return DXGI_FORMAT_B8G8R8X8_UNORM_SRGB;
 
         case Format::R16G16B16A16_SNORM:        return DXGI_FORMAT_R16G16B16A16_SNORM;
         case Format::R16G16_SNORM:              return DXGI_FORMAT_R16G16_SNORM;
@@ -207,43 +209,6 @@ D3D12_DEPTH_STENCILOP_DESC D3DUtil::translateStencilOpDesc(DepthStencilOpDesc de
         default:                                return DXGI_FORMAT_UNKNOWN;
     }
 }
-
-D3D12_RESOURCE_STATES D3DUtil::translateResourceState(ResourceState state)
-{
-    switch (state)
-    {
-    case ResourceState::Undefined:
-        return D3D12_RESOURCE_STATE_COMMON;
-    case ResourceState::ShaderResource:
-        return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-               D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
-    case ResourceState::UnorderedAccess:
-        return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    case ResourceState::RenderTarget:
-        return D3D12_RESOURCE_STATE_RENDER_TARGET;
-    case ResourceState::DepthRead:
-        return D3D12_RESOURCE_STATE_DEPTH_READ;
-    case ResourceState::DepthWrite:
-        return D3D12_RESOURCE_STATE_DEPTH_WRITE;
-    case ResourceState::Present:
-        return D3D12_RESOURCE_STATE_PRESENT;
-    case ResourceState::CopySource:
-        return D3D12_RESOURCE_STATE_COPY_SOURCE;
-    case ResourceState::CopyDestination:
-        return D3D12_RESOURCE_STATE_COPY_DEST;
-    case ResourceState::ResolveSource:
-        return D3D12_RESOURCE_STATE_RESOLVE_SOURCE;
-    case ResourceState::ResolveDestination:
-        return D3D12_RESOURCE_STATE_RESOLVE_DEST;
-#if SLANG_GFX_HAS_DXR_SUPPORT
-    case ResourceState::AccelerationStructure:
-        return D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
-#endif
-    default:
-        return D3D12_RESOURCE_STATE_COMMON;
-    }
-}
-
 
 /* static */DXGI_FORMAT D3DUtil::calcResourceFormat(UsageType usage, Int usageFlags, DXGI_FORMAT format)
 {
