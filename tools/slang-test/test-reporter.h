@@ -98,7 +98,7 @@ class TestReporter : public ITestReporter
 
     void outputSummary();
 
-    SlangResult init(TestOutputMode outputMode);
+    SlangResult init(TestOutputMode outputMode, bool isSubReporter = false);
 
         /// Ctor
     TestReporter();
@@ -125,6 +125,7 @@ class TestReporter : public ITestReporter
     bool m_dumpOutputOnFailure;
     bool m_isVerbose = false;
     bool m_hideIgnored = false;
+    bool m_isSubReporter = false;
 
 protected:
     

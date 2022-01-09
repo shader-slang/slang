@@ -3478,7 +3478,7 @@ void runTestsInDirectory(
         auto threadFunc = [&](int threadId)
         {
             TestReporter reporter;
-            reporter.init(context->options.outputMode);
+            reporter.init(context->options.outputMode, true);
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
             context->setThreadIndex(threadId);
             do

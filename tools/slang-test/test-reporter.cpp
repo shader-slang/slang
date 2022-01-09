@@ -84,9 +84,10 @@ TestReporter::TestReporter() :
     m_isVerbose = false;
 }
 
-Result TestReporter::init(TestOutputMode outputMode)
+Result TestReporter::init(TestOutputMode outputMode, bool isSubReporter)
 {
     m_outputMode = outputMode;
+    m_isSubReporter = isSubReporter;
     return SLANG_OK;
 }
 
@@ -679,9 +680,12 @@ void TestReporter::startSuite(const String& name)
     {
         case TestOutputMode::TeamCity:
         {
-            StringBuilder escapedSuiteName;
-            _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
-            printf("##teamcity[testSuiteStarted name='%s']\n", escapedSuiteName.begin());
+            if (!m_isSubReporter)
+            {
+                StringBuilder escapedSuiteName;
+                _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
+                printf("##teamcity[testSuiteStarted name='%s']\n", escapedSuiteName.begin());
+            }
             break;
         }
         default: break;
@@ -696,10 +700,13 @@ void TestReporter::endSuite()
     {
         case TestOutputMode::TeamCity:
         {
-            const String& name = m_suiteStack.getLast();
-            StringBuilder escapedSuiteName;
-            _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
-            printf("##teamcity[testSuiteFinished name='%s']\n", escapedSuiteName.begin());
+            if (!m_isSubReporter)
+            {
+                const String& name = m_suiteStack.getLast();
+                StringBuilder escapedSuiteName;
+                _appendEncodedTeamCityString(name.getUnownedSlice(), escapedSuiteName);
+                printf("##teamcity[testSuiteFinished name='%s']\n", escapedSuiteName.begin());
+            }
             break;
         }
         default: break;
