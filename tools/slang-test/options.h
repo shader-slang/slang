@@ -112,6 +112,9 @@ struct Options
     // The adapter to use. If empty will match first found adapter.
     Slang::String adapter;
 
+    // Maximum number of test servers to run.
+    int serverCount = 4;
+
         /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(int argc, char** argv, TestCategorySet* categorySet, Slang::WriterHelper stdError, Options* optionsOut);
 };

@@ -71,6 +71,7 @@ ISlangUnknown* BaseWriter::getInterface(const Guid& guid)
 
 SLANG_NO_THROW char* SLANG_MCALL AppendBufferWriter::beginAppendBuffer(size_t maxNumChars)
 {
+    mutex.lock();
     m_appendBuffer.setCount(maxNumChars);
     return m_appendBuffer.getBuffer();
 }
@@ -82,6 +83,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL AppendBufferWriter::endAppendBuffer(char*
     SlangResult res = write(buffer, numChars);
     // Clear so that buffer can't be written from again without assert
     m_appendBuffer.clear();
+    mutex.unlock();
     return res;
 }
 

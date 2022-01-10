@@ -87,6 +87,8 @@ class TestReporter : public ITestReporter
 
     void dumpOutputDifference(const Slang::String& expectedOutput, const Slang::String& actualOutput);
 
+    void consolidateWith(TestReporter* other);
+
         /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
@@ -96,7 +98,7 @@ class TestReporter : public ITestReporter
 
     void outputSummary();
 
-    SlangResult init(TestOutputMode outputMode);
+    SlangResult init(TestOutputMode outputMode, bool isSubReporter = false);
 
         /// Ctor
     TestReporter();
@@ -123,6 +125,7 @@ class TestReporter : public ITestReporter
     bool m_dumpOutputOnFailure;
     bool m_isVerbose = false;
     bool m_hideIgnored = false;
+    bool m_isSubReporter = false;
 
 protected:
     
