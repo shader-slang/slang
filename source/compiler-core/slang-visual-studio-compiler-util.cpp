@@ -87,8 +87,7 @@ namespace Slang
     // https://docs.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-alphabetically?view=vs-2019
 
     cmdLine.addArg("/nologo");
-    // Generate complete debugging information
-    cmdLine.addArg("/Zi");
+
     // Display full path of source files in diagnostics
     cmdLine.addArg("/FC");
 
@@ -139,6 +138,8 @@ namespace Slang
     // /Fd - followed by name of the pdb file
     if (options.debugInfoType != DebugInfoType::None)
     {
+        // Generate complete debugging information
+        cmdLine.addArg("/Zi");
         cmdLine.addPrefixPathArg("/Fd", options.modulePath, ".pdb");
     }
 

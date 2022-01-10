@@ -17,6 +17,8 @@
 
 #include "options.h"
 
+#include <mutex>
+
 typedef uint32_t PassThroughFlags;
 struct PassThroughFlag
 {
@@ -93,10 +95,14 @@ class TestContext
         /// Set the function for the shared library
     void setInnerMainFunc(const Slang::String& name, InnerMainFunc func);
 
+    void setTestRequirements(TestRequirements* req);
+
+    TestRequirements* getTestRequirements() const;
+
         /// If true tests aren't being run just the information on testing is being accumulated
-    bool isCollectingRequirements() const { return testRequirements != nullptr; }
+    bool isCollectingRequirements() const { return getTestRequirements() != nullptr; }
         /// If set, then tests are executed
-    bool isExecuting() const { return testRequirements == nullptr; }
+    bool isExecuting() const { return getTestRequirements() == nullptr; }
 
         /// True if a render API filter is enabled
     bool isRenderApiFilterEnabled() const { return options.enabledApis != Slang::RenderApiFlag::AllOf && options.enabledApis != 0; }
@@ -126,11 +132,9 @@ class TestContext
     ~TestContext();
 
     Options options;
-    TestReporter* reporter = nullptr;
     TestCategorySet categorySet;
 
         /// If set then tests are not run, but their requirements are set 
-    TestRequirements* testRequirements = nullptr;
 
     PassThroughFlags availableBackendFlags = 0;
     Slang::RenderApiFlags availableRenderApiFlags = 0;
@@ -153,6 +157,14 @@ class TestContext
         /// Current default is 2 mins.
     Slang::Int connectionTimeOutInMs = 2 * 60 * 1000;
 
+    void setThreadIndex(int index);
+    void setMaxTestRunnerThreadCount(int count);
+
+    void setTestReporter(TestReporter* reporter);
+    TestReporter* getTestReporter();
+
+    std::mutex mutex;
+
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
 
@@ -162,7 +174,9 @@ protected:
         InnerMainFunc m_func;
     };
 
-    Slang::RefPtr<Slang::JSONRPCConnection> m_jsonRpcConnection;
+    Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
+    Slang::List<TestReporter*> m_reporters;
+    Slang::List<TestRequirements*> m_testRequirements = nullptr;
     
     SlangSession* m_session;
 
