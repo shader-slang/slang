@@ -227,6 +227,7 @@ Slang::Result initialize()
         { "COLOR",    0, Format::R32G32B32_FLOAT, offsetof(Vertex, color) },
     };
     auto inputLayout = gDevice->createInputLayout(
+        sizeof(Vertex),
         &inputElements[0],
         2);
     if(!inputLayout) return SLANG_FAIL;
@@ -373,7 +374,7 @@ virtual void renderFrame(int frameBufferIndex) override
     // We also need to set up a few pieces of fixed-function pipeline
     // state that are not bound by the pipeline state above.
     //
-    renderEncoder->setVertexBuffer(0, gVertexBuffer, sizeof(Vertex));
+    renderEncoder->setVertexBuffer(0, gVertexBuffer);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
     // Finally, we are ready to issue a draw call for a single triangle.

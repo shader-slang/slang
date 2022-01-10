@@ -119,10 +119,9 @@ public:
             uint32_t startSlot,
             uint32_t slotCount,
             IBufferResource* const* buffers,
-            const uint32_t* strides,
             const uint32_t* offsets) override
         {
-            m_writer->setVertexBuffers(startSlot, slotCount, buffers, strides, offsets);
+            m_writer->setVertexBuffers(startSlot, slotCount, buffers, offsets);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL
@@ -202,11 +201,8 @@ public:
             uint32_t startVertex,
             uint32_t startInstanceLocation) override
         {
-            SLANG_UNUSED(vertexCount);
-            SLANG_UNUSED(instanceCount);
-            SLANG_UNUSED(startVertex);
-            SLANG_UNUSED(startInstanceLocation);
-            SLANG_UNIMPLEMENTED_X("drawInstanced");
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
+            m_writer->drawInstanced(vertexCount, instanceCount, startVertex, startInstanceLocation);
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedInstanced(
@@ -216,12 +212,8 @@ public:
             int32_t baseVertexLocation,
             uint32_t startInstanceLocation) override
         {
-            SLANG_UNUSED(indexCount);
-            SLANG_UNUSED(instanceCount);
-            SLANG_UNUSED(startIndexLocation);
-            SLANG_UNUSED(baseVertexLocation);
-            SLANG_UNUSED(startInstanceLocation);
-            SLANG_UNIMPLEMENTED_X("drawIndexedInstanced");
+            m_writer->bindRootShaderObject(m_commandBuffer->m_rootShaderObject);
+            m_writer->drawIndexedInstanced(indexCount, instanceCount, startIndexLocation, baseVertexLocation, startInstanceLocation);
         }
     };
 
@@ -500,8 +492,7 @@ public:
                         cmd.operands[0],
                         cmd.operands[1],
                         bufferResources.getArrayView().getBuffer(),
-                        m_writer.getData<uint32_t>(cmd.operands[3]),
-                        m_writer.getData<uint32_t>(cmd.operands[4]));
+                        m_writer.getData<uint32_t>(cmd.operands[3]));
                 }
                 break;
             case CommandName::SetIndexBuffer:
@@ -516,6 +507,14 @@ public:
             case CommandName::DrawIndexed:
                 m_renderer->drawIndexed(
                     cmd.operands[0], cmd.operands[1], cmd.operands[2]);
+                break;
+            case CommandName::DrawInstanced:
+                m_renderer->drawInstanced(
+                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3]);
+                break;
+            case CommandName::DrawIndexedInstanced:
+                m_renderer->drawIndexedInstanced(
+                    cmd.operands[0], cmd.operands[1], cmd.operands[2], cmd.operands[3], cmd.operands[4]);
                 break;
             case CommandName::SetStencilReference:
                 m_renderer->setStencilReference(cmd.operands[0]);
