@@ -120,8 +120,7 @@ public:
         IRenderPassLayout** outRenderPassLayout) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
@@ -421,6 +420,7 @@ public:
 	{
     public:
         List<D3D12_INPUT_ELEMENT_DESC> m_elements;
+        List<UINT> m_vertexStreamStrides;
         List<char> m_text;                              ///< Holds all strings to keep in scope
     };
 
@@ -556,7 +556,6 @@ public:
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
-        int m_stride;
         int m_offset;
     };
 
@@ -3316,7 +3315,6 @@ public:
                 uint32_t startSlot,
                 uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const uint32_t* strides,
                 const uint32_t* offsets) override
             {
                 {
@@ -3333,7 +3331,6 @@ public:
 
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
-                    boundBuffer.m_stride = int(strides[i]);
                     boundBuffer.m_offset = int(offsets[i]);
                 }
             }
@@ -3369,6 +3366,7 @@ public:
 
                 // Set up vertex buffer views
                 {
+                    auto inputLayout = (InputLayoutImpl*)pipelineState->inputLayout.Ptr();
                     int numVertexViews = 0;
                     D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
                     for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
@@ -3383,7 +3381,7 @@ public:
                                 boundVertexBuffer.m_offset;
                             vertexView.SizeInBytes =
                                 UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
-                            vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
+                            vertexView.StrideInBytes = inputLayout->m_vertexStreamStrides[i];
                         }
                     }
                     m_d3dCmdList->IASetVertexBuffers(0, numVertexViews, vertexViews);
@@ -3479,7 +3477,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 
@@ -3500,7 +3498,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 
@@ -4616,6 +4614,8 @@ public:
 
     bool m_nvapi = false;
 
+    // Command signatures required for indirect draws. These indicate the format of the indirect
+    // as well as the command type to be used (DrawInstanced and DrawIndexedInstanced, in this case).
     ComPtr<ID3D12CommandSignature> drawIndirectCmdSignature;
     ComPtr<ID3D12CommandSignature> drawIndexedIndirectCmdSignature;
 };
@@ -5428,6 +5428,8 @@ Result D3D12Device::initialize(const Desc& desc)
         profileName,
         makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
+    // Allocate a D3D12 "command signature" object that matches the behavior
+    // of a D3D11-style `DrawInstancedIndirect` operation.
     {
         D3D12_INDIRECT_ARGUMENT_DESC args[1];
         args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
@@ -5441,6 +5443,8 @@ Result D3D12Device::initialize(const Desc& desc)
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
     }
 
+    // Allocate a D3D12 "command signature" object that matches the behavior
+    // of a D3D11-style `DrawIndexedInstancedIndirect` operation.
     {
         D3D12_INDIRECT_ARGUMENT_DESC args[1];
         args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
@@ -6325,12 +6329,16 @@ Result D3D12Device::createRenderPassLayout(
     return SLANG_OK;
 }
 
-Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout)
+Result D3D12Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
     // Work out a buffer size to hold all text
     size_t textSize = 0;
+    auto inputElementCount = desc.inputElementCount;
+    auto inputElements = desc.inputElements;
+    auto vertexStreamCount = desc.vertexStreamCount;
+    auto vertexStreams = desc.vertexStreams;
     for (int i = 0; i < Int(inputElementCount); ++i)
     {
         const char* text = inputElements[i].semanticName;
@@ -6339,7 +6347,6 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
     layout->m_text.setCount(textSize);
     char* textPos = layout->m_text.getBuffer();
 
-    //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
     elements.setCount(inputElementCount);
 
@@ -6347,6 +6354,7 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
     for (UInt i = 0; i < inputElementCount; ++i)
     {
         const InputElementDesc& srcEle = inputElements[i];
+        const auto& srcStream = vertexStreams[srcEle.bufferSlotIndex];
         D3D12_INPUT_ELEMENT_DESC& dstEle = elements[i];
 
         // Add text to the buffer
@@ -6364,8 +6372,15 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
         dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
         dstEle.InputSlot = (UINT)srcEle.bufferSlotIndex;
         dstEle.AlignedByteOffset = (UINT)srcEle.offset;
-        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcEle.slotClass);
-        dstEle.InstanceDataStepRate = (UINT)srcEle.instanceDataStepRate;
+        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcStream.slotClass);
+        dstEle.InstanceDataStepRate = (UINT)srcStream.instanceDataStepRate;
+    }
+
+    auto& vertexStreamStrides = layout->m_vertexStreamStrides;
+    vertexStreamStrides.setCount(vertexStreamCount);
+    for (UInt i = 0; i < vertexStreamCount; ++i)
+    {
+        vertexStreamStrides[i] = vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, layout);

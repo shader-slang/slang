@@ -106,8 +106,7 @@ public:
         WindowHandle window,
         ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
@@ -361,7 +360,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override;

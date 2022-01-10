@@ -2296,12 +2296,10 @@ public:
     }
     
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override
     {
-        SLANG_UNUSED(inputElements);
-        SLANG_UNUSED(inputElementCount);
+        SLANG_UNUSED(desc);
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }

@@ -284,6 +284,7 @@ Result initialize()
         { "POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position) },
     };
     auto inputLayout = gDevice->createInputLayout(
+        sizeof(FullScreenTriangle::Vertex),
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
     if(!inputLayout) return SLANG_FAIL;
@@ -367,7 +368,7 @@ virtual void renderFrame(int frameIndex) override
     auto constantBuffer = rootObject->getObject(ShaderOffset());
     constantBuffer->setData(ShaderOffset(), &uniforms, sizeof(uniforms));
 
-    encoder->setVertexBuffer(0, gVertexBuffer, sizeof(FullScreenTriangle::Vertex));
+    encoder->setVertexBuffer(0, gVertexBuffer);
     encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
     encoder->draw(3);
     encoder->endEncoding();
