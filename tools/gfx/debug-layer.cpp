@@ -584,15 +584,14 @@ Result DebugDevice::createSwapchain(
 }
 
 Result DebugDevice::createInputLayout(
-    const InputElementDesc* inputElements,
-    UInt inputElementCount,
+    IInputLayout::Desc const& desc,
     IInputLayout** outLayout)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugInputLayout> outObject = new DebugInputLayout();
     auto result = baseObject->createInputLayout(
-        inputElements, inputElementCount, outObject->baseObject.writeRef());
+        desc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outLayout, outObject);
@@ -1096,7 +1095,6 @@ void DebugRenderCommandEncoder::setVertexBuffers(
     uint32_t startSlot,
     uint32_t slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* strides,
     const uint32_t* offsets)
 {
     SLANG_GFX_API_FUNC;
@@ -1106,7 +1104,7 @@ void DebugRenderCommandEncoder::setVertexBuffers(
     {
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
-    baseObject->setVertexBuffers(startSlot, slotCount, innerBuffers.getBuffer(), strides, offsets);
+    baseObject->setVertexBuffers(startSlot, slotCount, innerBuffers.getBuffer(), offsets);
 }
 
 void DebugRenderCommandEncoder::setIndexBuffer(
