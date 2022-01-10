@@ -1567,7 +1567,7 @@ public:
             }
             case CU_AD_FORMAT_UNSIGNED_INT8:
             {
-                elementSize = sizeof(uint32_t) * numChannels;
+                elementSize = sizeof(uint8_t) * numChannels;
                 break;
             }
             default:

@@ -4881,7 +4881,7 @@ Result D3D12Device::captureTextureToSurface(
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    auto resource = resourceImpl->m_resource;
+    auto& resource = resourceImpl->m_resource;
 
     const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
@@ -4986,6 +4986,11 @@ Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    {
+        m_dxDebug->EnableDebugLayer();
+    }
+
     outDeviceInfo.clear();
 
     ComPtr<IDXGIFactory> dxgiFactory;
@@ -5014,8 +5019,6 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
 
     if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
     {
-        m_dxDebug->EnableDebugLayer();
-
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SLANG_SUCCEEDED(device->QueryInterface(infoQueue.writeRef())))
         {
@@ -5129,7 +5132,8 @@ Result D3D12Device::initialize(const Desc& desc)
     }
 
 #if ENABLE_DEBUG_LAYER
-    m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+    m_D3D12GetDebugInterface =
+        (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
     if (m_D3D12GetDebugInterface)
     {
         if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
@@ -5148,7 +5152,6 @@ Result D3D12Device::initialize(const Desc& desc)
                 debug1->SetEnableGPUBasedValidation(true);
             }
 #endif
-            m_dxDebug->EnableDebugLayer();
         }
     }
 #endif
