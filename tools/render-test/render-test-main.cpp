@@ -553,12 +553,12 @@ SlangResult RenderTestApp::initialize(
 
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
-                    inputElements, SLANG_COUNT_OF(inputElements), inputLayout.writeRef()));
+                    sizeof(Vertex), inputElements, SLANG_COUNT_OF(inputElements), inputLayout.writeRef()));
 
                 IBufferResource::Desc vertexBufferDesc;
                 vertexBufferDesc.type = IResource::Type::Buffer;
                 vertexBufferDesc.sizeInBytes = kVertexCount * sizeof(Vertex);
-                vertexBufferDesc.cpuAccessFlags = AccessFlag::Write;
+                vertexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
                 vertexBufferDesc.defaultState = ResourceState::VertexBuffer;
                 vertexBufferDesc.allowedStates = ResourceStateSet(ResourceState::VertexBuffer);
 
@@ -863,11 +863,10 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 void RenderTestApp::renderFrame(IRenderCommandEncoder* encoder)
 {
     auto pipelineType = PipelineType::Graphics;
+    applyBinding(pipelineType, encoder);
 
 	encoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-    encoder->setVertexBuffer(0, m_vertexBuffer, sizeof(Vertex));
-
-    applyBinding(pipelineType, encoder);
+    encoder->setVertexBuffer(0, m_vertexBuffer);
 
 	encoder->draw(3);
 }
@@ -909,7 +908,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
             const size_t bufferSize = bufferDesc.sizeInBytes;
 
             ComPtr<ISlangBlob> blob;
-            if(bufferDesc.cpuAccessFlags & AccessFlag::Read)
+            if(bufferDesc.cpuAccessFlags & MemoryType::CpuRead)
             {
                 // The buffer is already allocated for CPU access, so we can read it back directly.
                 //
@@ -920,7 +919,7 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
                 // The buffer is not CPU-readable, so we will copy it using a staging buffer.
 
                 auto stagingBufferDesc = bufferDesc;
-                stagingBufferDesc.cpuAccessFlags = AccessFlag::Read;
+                stagingBufferDesc.cpuAccessFlags = MemoryType::CpuRead;
                 stagingBufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
                 stagingBufferDesc.defaultState = ResourceState::CopyDestination;

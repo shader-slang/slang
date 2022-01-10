@@ -21,6 +21,8 @@ enum class CommandName
     SetIndexBuffer,
     Draw,
     DrawIndexed,
+    DrawInstanced,
+    DrawIndexedInstanced,
     SetStencilReference,
     DispatchCompute,
     UploadBufferData,
@@ -198,7 +200,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets)
     {
         uint32_t bufferOffset = 0;
@@ -208,14 +209,12 @@ public:
             if (i == 0)
                 bufferOffset = offset;
         }
-        uint32_t stridesOffset = encodeData(strides, sizeof(uint32_t) * slotCount);
         uint32_t offsetsOffset = encodeData(offsets, sizeof(uint32_t) * slotCount);
         m_commands.add(Command(
             CommandName::SetVertexBuffers,
             startSlot,
             slotCount,
             bufferOffset,
-            stridesOffset,
             offsetsOffset));
     }
 
@@ -238,6 +237,36 @@ public:
             (uint32_t)indexCount,
             (uint32_t)startIndex,
             (uint32_t)baseVertex));
+    }
+
+    void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation)
+    {
+        m_commands.add(Command(
+            CommandName::DrawInstanced,
+            (uint32_t)vertexCount,
+            (uint32_t)instanceCount,
+            (uint32_t)startVertex,
+            (uint32_t)startInstanceLocation));
+    }
+
+    void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation)
+    {
+        m_commands.add(Command(
+            CommandName::DrawIndexedInstanced,
+            (uint32_t)indexCount,
+            (uint32_t)instanceCount,
+            (uint32_t)startIndexLocation,
+            (int32_t)baseVertexLocation,
+            (uint32_t)startInstanceLocation));
     }
 
     void setStencilReference(uint32_t referenceValue)

@@ -504,7 +504,7 @@ Slang::Result initialize()
     InputElementDesc inputElements[] = {
         {"POSITION", 0, Format::R32G32_FLOAT, offsetof(FullScreenTriangle::Vertex, position)},
     };
-    auto inputLayout = gDevice->createInputLayout(&inputElements[0], SLANG_COUNT_OF(inputElements));
+    auto inputLayout = gDevice->createInputLayout(sizeof(FullScreenTriangle::Vertex), &inputElements[0], SLANG_COUNT_OF(inputElements));
     if (!inputLayout)
         return SLANG_FAIL;
 
@@ -643,7 +643,7 @@ virtual void renderFrame(int frameBufferIndex) override
         auto cursor = ShaderCursor(rootObject->getEntryPoint(1));
         cursor["t"].setResource(gResultTextureUAV);
         presentEncoder->setVertexBuffer(
-            0, gFullScreenVertexBuffer, sizeof(FullScreenTriangle::Vertex));
+            0, gFullScreenVertexBuffer);
         presentEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
         presentEncoder->draw(3);
         presentEncoder->endEncoding();

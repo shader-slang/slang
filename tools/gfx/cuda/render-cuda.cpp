@@ -1567,7 +1567,7 @@ public:
             }
             case CU_AD_FORMAT_UNSIGNED_INT8:
             {
-                elementSize = sizeof(uint32_t) * numChannels;
+                elementSize = sizeof(uint8_t) * numChannels;
                 break;
             }
             default:
@@ -2282,12 +2282,10 @@ public:
     }
     
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override
     {
-        SLANG_UNUSED(inputElements);
-        SLANG_UNUSED(inputElementCount);
+        SLANG_UNUSED(desc);
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }

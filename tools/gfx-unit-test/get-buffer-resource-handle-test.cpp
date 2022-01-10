@@ -27,7 +27,7 @@ namespace gfx_test
             ResourceState::CopyDestination,
             ResourceState::CopySource);
         bufferDesc.defaultState = ResourceState::UnorderedAccess;
-        bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
+        bufferDesc.cpuAccessFlags = MemoryType::GpuOnly;
 
         ComPtr<IBufferResource> buffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
