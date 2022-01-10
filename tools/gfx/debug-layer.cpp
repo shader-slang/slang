@@ -843,6 +843,17 @@ const char* DebugBufferResource::getDebugName()
     return baseObject->getDebugName();
 }
 
+Result DebugBufferResource::map(MemoryRange* rangeToRead, void** outPointer)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->map(rangeToRead, outPointer);
+}
+
+Result DebugBufferResource::unmap(MemoryRange* writtenRange)
+{
+    return baseObject->unmap(writtenRange);
+}
+
 IResource::Type DebugTextureResource::getType()
 {
     SLANG_GFX_API_FUNC;
@@ -1435,8 +1446,8 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
 void DebugRayTracingCommandEncoder::memoryBarrier(
     int count,
     IAccelerationStructure* const* structures,
-    MemoryType::Enum sourceAccess,
-    MemoryType::Enum destAccess)
+    AccessFlag sourceAccess,
+    AccessFlag destAccess)
 {
     SLANG_GFX_API_FUNC;
     List<IAccelerationStructure*> innerAS;

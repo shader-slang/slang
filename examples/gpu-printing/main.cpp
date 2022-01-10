@@ -108,7 +108,7 @@ Result execute()
     printBufferDesc.defaultState = ResourceState::UnorderedAccess;
     printBufferDesc.allowedStates = ResourceStateSet(
         ResourceState::CopySource, ResourceState::CopyDestination, ResourceState::UnorderedAccess);
-    printBufferDesc.cpuAccessFlags = MemoryType::CpuRead; // | Resource::AccessFlag::Write;
+    printBufferDesc.memoryType = MemoryType::ReadBack;
     auto printBuffer = gDevice->createBufferResource(printBufferDesc);
 
     IResourceView::Desc printBufferViewDesc;
