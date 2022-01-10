@@ -107,6 +107,7 @@ GUI::GUI(
         {"U", 2, Format::R8G8B8A8_UNORM,  offsetof(ImDrawVert, col) },
     };
     auto inputLayout = device->createInputLayout(
+        sizeof(ImDrawVert),
         &inputElements[0],
         SLANG_COUNT_OF(inputElements));
 
@@ -216,7 +217,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     vertexBufferDesc.allowedStates =
         ResourceStateSet(ResourceState::VertexBuffer, ResourceState::CopyDestination);
     vertexBufferDesc.sizeInBytes = vertexCount * sizeof(ImDrawVert);
-    vertexBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    vertexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto vertexBuffer = device->createBufferResource(vertexBufferDesc);
 
     gfx::IBufferResource::Desc indexBufferDesc;
@@ -225,7 +226,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
     indexBufferDesc.allowedStates =
         ResourceStateSet(ResourceState::IndexBuffer, ResourceState::CopyDestination);
     indexBufferDesc.defaultState = ResourceState::IndexBuffer;
-    indexBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    indexBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto indexBuffer = device->createBufferResource(indexBufferDesc);
     auto cmdBuf = transientHeap->createCommandBuffer();
     auto encoder = cmdBuf->encodeResourceCommands();
@@ -253,7 +254,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
         ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
     constantBufferDesc.defaultState = ResourceState::ConstantBuffer;
     constantBufferDesc.sizeInBytes = sizeof(glm::mat4x4);
-    constantBufferDesc.cpuAccessFlags = AccessFlag::Write;
+    constantBufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
     auto constantBuffer = device->createBufferResource(constantBufferDesc);
 
     {
@@ -287,13 +288,13 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
     renderEncoder->bindPipeline(pipelineState);
 
-    renderEncoder->setVertexBuffer(0, vertexBuffer, sizeof(ImDrawVert));
+    renderEncoder->setVertexBuffer(0, vertexBuffer);
     renderEncoder->setIndexBuffer(
         indexBuffer, sizeof(ImDrawIdx) == 2 ? Format::R16_UINT : Format::R32_UINT);
     renderEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
 
-    UInt vertexOffset = 0;
-    UInt indexOffset = 0;
+    uint32_t vertexOffset = 0;
+    uint32_t indexOffset = 0;
     ImVec2 pos = draw_data->DisplayPos;
     for(int ii = 0; ii < commandListCount; ++ii)
     {
@@ -319,7 +320,7 @@ void GUI::endFrame(ITransientResourceHeap* transientHeap, IFramebuffer* framebuf
 
                 // TODO: set parameter into root shader object.
                 
-                renderEncoder->drawIndexed(command->ElemCount, indexOffset, vertexOffset);
+                renderEncoder->drawIndexed(command->ElemCount, (uint32_t)indexOffset, (uint32_t)vertexOffset);
             }
             indexOffset += command->ElemCount;
         }

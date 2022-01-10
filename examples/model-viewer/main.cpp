@@ -748,6 +748,7 @@ Result initialize()
         {"UV",       0, Format::R32G32_FLOAT,  offsetof(Model::Vertex, uv) },
     };
     auto inputLayout = gDevice->createInputLayout(
+        sizeof(Model::Vertex),
         &inputElements[0],
         3);
     if(!inputLayout) return SLANG_FAIL;
@@ -868,7 +869,7 @@ void renderFrame(int frameIndex) override
     //
     for(auto& model : gModels)
     {
-        drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer, sizeof(Model::Vertex));
+        drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer);
         drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R32_UINT);
         // For each model we provide a parameter
         // block that holds the per-model transformation

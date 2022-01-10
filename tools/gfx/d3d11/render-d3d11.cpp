@@ -97,8 +97,7 @@ public:
         IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
@@ -138,7 +137,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override;
     virtual void setIndexBuffer(
         IBufferResource* buffer, Format indexFormat, uint32_t offset) override;
@@ -148,6 +146,17 @@ public:
     virtual void draw(uint32_t vertexCount, uint32_t startVertex) override;
     virtual void drawIndexed(
         uint32_t indexCount, uint32_t startIndex, uint32_t baseVertex) override;
+    virtual void drawInstanced(
+        uint32_t vertexCount,
+        uint32_t instanceCount,
+        uint32_t startVertex,
+        uint32_t startInstanceLocation) override;
+    virtual void drawIndexedInstanced(
+        uint32_t indexCount,
+        uint32_t instanceCount,
+        uint32_t startIndexLocation,
+        int32_t baseVertexLocation,
+        uint32_t startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
     virtual void waitForGpu() override
@@ -350,6 +359,7 @@ protected:
 	{
     public:
 		ComPtr<ID3D11InputLayout> m_layout;
+        List<UINT> m_vertexStreamStrides;
 	};
 
     class QueryPoolImpl : public QueryPoolBase
@@ -1514,7 +1524,7 @@ protected:
                 bufferDesc.defaultState = ResourceState::ConstantBuffer;
                 bufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-                bufferDesc.cpuAccessFlags |= AccessFlag::Write;
+                bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
                 SLANG_RETURN_ON_FAIL(
                     device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
                 m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());
@@ -2412,7 +2422,7 @@ Result D3D11Device::createFramebuffer(
         framebuffer->d3dRenderTargetViews[i] = framebuffer->renderTargetViews[i]->m_rtv;
     }
     framebuffer->depthStencilView = static_cast<DepthStencilViewImpl*>(desc.depthStencilView);
-    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView->m_dsv;
+    framebuffer->d3dDepthStencilView = framebuffer->depthStencilView ? framebuffer->depthStencilView->m_dsv : nullptr;
     returnComPtr(outFramebuffer, framebuffer);
     return SLANG_OK;
 }
@@ -2452,7 +2462,9 @@ SlangResult D3D11Device::readTextureResource(
         return E_INVALIDARG;
     }
 
-    size_t bytesPerPixel = sizeof(uint32_t);
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(texture->getDesc()->format, &sizeInfo);
+    size_t bytesPerPixel = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
     size_t rowPitch = int(texture->getDesc()->size.width) * bytesPerPixel;
     size_t bufferSize = rowPitch * int(texture->getDesc()->size.height);
     if (outRowPitch)
@@ -2554,10 +2566,10 @@ static int _calcResourceAccessFlags(int accessFlags)
     switch (accessFlags)
     {
         case 0:         return 0;
-        case AccessFlag::Read:            return D3D11_CPU_ACCESS_READ;
-        case AccessFlag::Write:           return D3D11_CPU_ACCESS_WRITE;
-        case AccessFlag::Read |
-             AccessFlag::Write:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+        case MemoryType::CpuRead:            return D3D11_CPU_ACCESS_READ;
+        case MemoryType::CpuWrite:           return D3D11_CPU_ACCESS_WRITE;
+        case MemoryType::CpuRead |
+             MemoryType::CpuWrite:           return D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         default: assert(!"Invalid flags"); return 0;
     }
 }
@@ -2711,11 +2723,11 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.BindFlags = d3dBindFlags;
     // For read we'll need to do some staging
     bufferDesc.CPUAccessFlags =
-        _calcResourceAccessFlags(descIn.cpuAccessFlags & AccessFlag::Write);
+        _calcResourceAccessFlags(descIn.cpuAccessFlags & MemoryType::CpuWrite);
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
 
     // If written by CPU, make it dynamic
-    if ((descIn.cpuAccessFlags & AccessFlag::Write) &&
+    if ((descIn.cpuAccessFlags & MemoryType::CpuWrite) &&
         !descIn.allowedStates.contains(ResourceState::UnorderedAccess))
     {
         bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -2746,7 +2758,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
         }
     }
 
-    if (srcDesc.cpuAccessFlags & AccessFlag::Write)
+    if (srcDesc.cpuAccessFlags & MemoryType::CpuWrite)
     {
         bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
     }
@@ -2759,8 +2771,7 @@ Result D3D11Device::createBufferResource(const IBufferResource::Desc& descIn, co
     SLANG_RETURN_ON_FAIL(m_device->CreateBuffer(&bufferDesc, initData ? &subResourceData : nullptr, buffer->m_buffer.writeRef()));
     buffer->m_d3dUsage = bufferDesc.Usage;
 
-    if ((srcDesc.cpuAccessFlags & AccessFlag::Read) ||
-        ((srcDesc.cpuAccessFlags & AccessFlag::Write) && bufferDesc.Usage != D3D11_USAGE_DYNAMIC))
+    if (srcDesc.cpuAccessFlags & MemoryType::CpuRead || bufferDesc.Usage != D3D11_USAGE_DYNAMIC)
     {
         D3D11_BUFFER_DESC bufDesc = {};
         bufDesc.BindFlags = 0;
@@ -3070,7 +3081,7 @@ Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Des
     }
 }
 
-Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, UInt inputElementCount, IInputLayout** outLayout)
+Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     D3D11_INPUT_ELEMENT_DESC inputElements[16] = {};
 
@@ -3079,15 +3090,21 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
 
     hlslCursor += sprintf(hlslCursor, "float4 main(\n");
 
+    auto inputElementCount = desc.inputElementCount;
+    auto inputElementsIn = desc.inputElements;
     for (UInt ii = 0; ii < inputElementCount; ++ii)
     {
+        auto vertexStreamIndex = inputElementsIn[ii].bufferSlotIndex;
+        auto& vertexStream = desc.vertexStreams[vertexStreamIndex];
+
         inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
         inputElements[ii].SemanticIndex = (UINT)inputElementsIn[ii].semanticIndex;
         inputElements[ii].Format = D3DUtil::getMapFormat(inputElementsIn[ii].format);
-        inputElements[ii].InputSlot = 0;
+        inputElements[ii].InputSlot = vertexStreamIndex;
         inputElements[ii].AlignedByteOffset = (UINT)inputElementsIn[ii].offset;
-        inputElements[ii].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-        inputElements[ii].InstanceDataStepRate = 0;
+        inputElements[ii].InputSlotClass =
+            (vertexStream.slotClass == InputSlotClass::PerInstance) ? D3D11_INPUT_PER_INSTANCE_DATA : D3D11_INPUT_PER_VERTEX_DATA;
+        inputElements[ii].InstanceDataStepRate = vertexStream.instanceDataStepRate;
 
         if (ii != 0)
         {
@@ -3132,6 +3149,13 @@ Result D3D11Device::createInputLayout(const InputElementDesc* inputElementsIn, U
 
     RefPtr<InputLayoutImpl> impl = new InputLayoutImpl;
     impl->m_layout.swap(inputLayout);
+
+    auto vertexStreamCount = desc.vertexStreamCount;
+    impl->m_vertexStreamStrides.setCount(vertexStreamCount);
+    for (Int i = 0; i < vertexStreamCount; ++i)
+    {
+        impl->m_vertexStreamStrides[i] = desc.vertexStreams[i].stride;
+    }
 
     returnComPtr(outLayout, impl);
     return SLANG_OK;
@@ -3247,11 +3271,11 @@ void D3D11Device::setVertexBuffers(
     uint32_t startSlot,
     uint32_t slotCount,
     IBufferResource* const* buffersIn,
-    const uint32_t* stridesIn,
     const uint32_t* offsetsIn)
 {
     static const int kMaxVertexBuffers = 16;
 	assert(slotCount <= kMaxVertexBuffers);
+    assert(m_currentPipelineState); // The pipeline state should be created before setting vertex buffers.
 
     UINT vertexStrides[kMaxVertexBuffers];
     UINT vertexOffsets[kMaxVertexBuffers];
@@ -3261,7 +3285,8 @@ void D3D11Device::setVertexBuffers(
 
     for (UInt ii = 0; ii < slotCount; ++ii)
     {
-        vertexStrides[ii] = (UINT)stridesIn[ii];
+        auto inputLayout = (InputLayoutImpl*)m_currentPipelineState->inputLayout.Ptr();
+        vertexStrides[ii] = inputLayout->m_vertexStreamStrides[startSlot + ii];
         vertexOffsets[ii] = (UINT)offsetsIn[ii];
 		dxBuffers[ii] = buffers[ii]->m_buffer;
 	}
@@ -3399,6 +3424,36 @@ void D3D11Device::drawIndexed(uint32_t indexCount, uint32_t startIndex, uint32_t
 {
     _flushGraphicsState();
     m_immediateContext->DrawIndexed(indexCount, startIndex, baseVertex);
+}
+
+void D3D11Device::drawInstanced(
+    uint32_t vertexCount,
+    uint32_t instanceCount,
+    uint32_t startVertex,
+    uint32_t startInstanceLocation)
+{
+    _flushGraphicsState();
+    m_immediateContext->DrawInstanced(
+        vertexCount,
+        instanceCount,
+        startVertex,
+        startInstanceLocation);
+}
+
+void D3D11Device::drawIndexedInstanced(
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t startIndexLocation,
+    int32_t baseVertexLocation,
+    uint32_t startInstanceLocation)
+{
+    _flushGraphicsState();
+    m_immediateContext->DrawIndexedInstanced(
+        indexCount,
+        instanceCount,
+        startIndexLocation,
+        baseVertexLocation,
+        startInstanceLocation);
 }
 
 Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)

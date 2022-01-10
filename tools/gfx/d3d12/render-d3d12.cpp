@@ -120,8 +120,7 @@ public:
         IRenderPassLayout** outRenderPassLayout) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
@@ -246,8 +245,7 @@ public:
             }
         }
 
-        D3D12Resource m_resource;           ///< The resource typically in gpu memory
-        D3D12Resource m_uploadResource;     ///< If the resource can be written to, and is in gpu memory (ie not Memory backed), will have upload resource
+        D3D12Resource m_resource;           ///< The resource in gpu memory, allocated on the correct heap relative to the cpu access flag
 
         D3D12_RESOURCE_STATES m_defaultState;
 
@@ -396,6 +394,7 @@ public:
 	{
     public:
         List<D3D12_INPUT_ELEMENT_DESC> m_elements;
+        List<UINT> m_vertexStreamStrides;
         List<char> m_text;                              ///< Holds all strings to keep in scope
     };
 
@@ -531,7 +530,6 @@ public:
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
-        int m_stride;
         int m_offset;
     };
 
@@ -623,41 +621,6 @@ public:
         out.Flags = D3D12_RESOURCE_FLAG_NONE;
     }
 
-    static Result _uploadBufferData(
-        ID3D12GraphicsCommandList* cmdList,
-        BufferResourceImpl* buffer,
-        size_t offset,
-        size_t size,
-        void* data)
-    {
-        D3D12_RANGE readRange = {};
-        readRange.Begin = offset;
-        readRange.End = offset + size;
-
-        void* uploadData;
-        SLANG_RETURN_ON_FAIL(buffer->m_uploadResource.getResource()->Map(
-            0, &readRange, reinterpret_cast<void**>(&uploadData)));
-        memcpy((uint8_t*)uploadData + offset, data, size);
-        buffer->m_uploadResource.getResource()->Unmap(0, &readRange);
-        {
-            D3D12BarrierSubmitter submitter(cmdList);
-            submitter.transition(
-                buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
-        }
-        cmdList->CopyBufferRegion(
-            buffer->m_resource.getResource(),
-            offset,
-            buffer->m_uploadResource.getResource(),
-            offset,
-            size);
-        {
-            D3D12BarrierSubmitter submitter(cmdList);
-            submitter.transition(
-                buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
-        }
-        return SLANG_OK;
-    }
-    
     class TransientResourceHeapImpl
         : public TransientResourceHeapBaseImpl<D3D12Device, BufferResourceImpl>
     {
@@ -721,7 +684,7 @@ public:
             auto d3dDevice = device->m_device;
             SLANG_RETURN_ON_FAIL(d3dDevice->CreateCommandAllocator(
                 D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_commandAllocator.writeRef())));
-            
+
             SLANG_RETURN_ON_FAIL(m_viewHeap.init(
                 d3dDevice,
                 viewHeapSize,
@@ -742,7 +705,7 @@ public:
                 bufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
                 bufferDesc.sizeInBytes = desc.constantBufferSize;
-                bufferDesc.cpuAccessFlags |= AccessFlag::Write;
+                bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
                 SLANG_RETURN_ON_FAIL(device->createBufferResource(
                     bufferDesc,
                     nullptr,
@@ -757,6 +720,58 @@ public:
 
         virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() override;
     };
+
+    static Result _uploadBufferData(
+        ID3D12Device* device,
+        ID3D12GraphicsCommandList* cmdList,
+        TransientResourceHeapImpl* transientHeap,
+        BufferResourceImpl* buffer,
+        size_t offset,
+        size_t size,
+        void* data)
+    {
+        D3D12_RANGE readRange = {};
+        readRange.Begin = offset;
+        readRange.End = offset + size;
+
+
+        IBufferResource* uploadResource;
+        if (!buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite))
+        {
+            transientHeap->allocateStagingBuffer(size, uploadResource, ResourceState::CopySource);
+        }
+
+        D3D12Resource& uploadResourceRef = (buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite)) ? buffer->m_resource : static_cast<BufferResourceImpl*>(uploadResource)->m_resource;
+
+        void* uploadData;
+        SLANG_RETURN_ON_FAIL(uploadResourceRef.getResource()->Map(
+            0, &readRange, reinterpret_cast<void**>(&uploadData)));
+        memcpy((uint8_t*)uploadData + offset, data, size);
+        uploadResourceRef.getResource()->Unmap(0, &readRange);
+
+        if (!buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite)) {
+            {
+                D3D12BarrierSubmitter submitter(cmdList);
+                submitter.transition(
+                    buffer->m_resource, buffer->m_defaultState, D3D12_RESOURCE_STATE_COPY_DEST);
+            }
+            cmdList->CopyBufferRegion(
+                buffer->m_resource.getResource(),
+                offset,
+                uploadResourceRef.getResource(),
+                offset,
+                size);
+
+            // Should already be in COPY_DEST if write flag was set.
+            {
+                D3D12BarrierSubmitter submitter(cmdList);
+                submitter.transition(
+                    buffer->m_resource, D3D12_RESOURCE_STATE_COPY_DEST, buffer->m_defaultState);
+            }
+        }
+
+        return SLANG_OK;
+    }
 
     class CommandBufferImpl;
 
@@ -2308,7 +2323,7 @@ public:
 
             SLANG_ASSERT(srcSize <= destSize);
 
-            _uploadBufferData(encoder->m_d3dCmdList, buffer, offset, srcSize, src);
+            _uploadBufferData(encoder->m_device, encoder->m_d3dCmdList, encoder->m_transientHeap, buffer, offset, srcSize, src);
 
             // In the case where this object has any sub-objects of
             // existential/interface type, we need to recurse on those objects
@@ -3270,7 +3285,6 @@ public:
                 uint32_t startSlot,
                 uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const uint32_t* strides,
                 const uint32_t* offsets) override
             {
                 {
@@ -3287,7 +3301,6 @@ public:
 
                     BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
                     boundBuffer.m_buffer = buffer;
-                    boundBuffer.m_stride = int(strides[i]);
                     boundBuffer.m_offset = int(offsets[i]);
                 }
             }
@@ -3323,6 +3336,7 @@ public:
 
                 // Set up vertex buffer views
                 {
+                    auto inputLayout = (InputLayoutImpl*)pipelineState->inputLayout.Ptr();
                     int numVertexViews = 0;
                     D3D12_VERTEX_BUFFER_VIEW vertexViews[16];
                     for (Index i = 0; i < m_boundVertexBuffers.getCount(); i++)
@@ -3337,7 +3351,7 @@ public:
                                 boundVertexBuffer.m_offset;
                             vertexView.SizeInBytes =
                                 UINT(buffer->getDesc()->sizeInBytes - boundVertexBuffer.m_offset);
-                            vertexView.StrideInBytes = UINT(boundVertexBuffer.m_stride);
+                            vertexView.StrideInBytes = inputLayout->m_vertexStreamStrides[i];
                         }
                     }
                     m_d3dCmdList->IASetVertexBuffers(0, numVertexViews, vertexViews);
@@ -3433,7 +3447,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 
@@ -3454,7 +3468,7 @@ public:
                     maxDrawCount,
                     argBufferImpl->m_resource,
                     argOffset,
-                    countBufferImpl->m_resource,
+                    countBufferImpl ? countBufferImpl->m_resource.getResource() : nullptr,
                     countOffset);
             }
 
@@ -3601,7 +3615,9 @@ public:
                 void* data) override
             {
                 _uploadBufferData(
+                    m_commandBuffer->m_renderer->m_device,
                     m_commandBuffer->m_cmdList,
+                    m_commandBuffer->m_transientHeap,
                     static_cast<BufferResourceImpl*>(dst),
                     offset,
                     size,
@@ -3663,6 +3679,33 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
+
+                List<D3D12_RESOURCE_BARRIER> barriers;
+                barriers.reserve(count);
+
+                for (size_t i = 0; i < count; i++)
+                {
+                    auto bufferImpl = static_cast<BufferResourceImpl*>(buffers[i]);
+
+                    D3D12_RESOURCE_BARRIER barrier = {};
+                    // If the src == dst, it must be a UAV barrier.
+                    barrier.Type = (src == dst) ? D3D12_RESOURCE_BARRIER_TYPE_UAV : D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+
+                    if (barrier.Type == D3D12_RESOURCE_BARRIER_TYPE_UAV) {
+                        barrier.UAV.pResource = bufferImpl->m_resource;
+                    }
+                    else {
+                        barrier.Transition.pResource = bufferImpl->m_resource;
+                        barrier.Transition.StateBefore = D3DUtil::translateResourceState(src);
+                        barrier.Transition.StateAfter = D3DUtil::translateResourceState(dst);
+                        barrier.Transition.Subresource = 0;
+                    }
+
+                    barriers.add(barrier);
+                }
+
+                m_commandBuffer->m_cmdList4->ResourceBarrier((UINT)count, barriers.getArrayView().getBuffer());
             }
             virtual SLANG_NO_THROW void SLANG_MCALL endEncoding() {}
             virtual SLANG_NO_THROW void SLANG_MCALL writeTimestamp(IQueryPool* pool, SlangInt index) override
@@ -4149,8 +4192,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                AccessFlag::Enum sourceAccess,
-                AccessFlag::Enum destAccess) override;
+                MemoryType::Enum sourceAccess,
+                MemoryType::Enum destAccess) override;
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
@@ -4455,10 +4498,10 @@ public:
         const D3D12_RESOURCE_DESC& resourceDesc,
         const void* srcData,
         size_t srcDataSize,
-        D3D12Resource& uploadResource,
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
-        bool isShared = false);
+        bool isShared,
+        MemoryType::Enum access = MemoryType::GpuOnly);
 
     Result captureTextureToSurface(
         TextureResourceImpl* resource,
@@ -4528,6 +4571,8 @@ public:
 
     bool m_nvapi = false;
 
+    // Command signatures required for indirect draws. These indicate the format of the indirect
+    // as well as the command type to be used (DrawInstanced and DrawIndexedInstanced, in this case).
     ComPtr<ID3D12CommandSignature> drawIndirectCmdSignature;
     ComPtr<ID3D12CommandSignature> drawIndexedIndirectCmdSignature;
 };
@@ -4748,57 +4793,83 @@ static void _initSrvDesc(
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12Resource& uploadResource, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, MemoryType::Enum access)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
+   D3D12_HEAP_PROPERTIES heapProps;
+   heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+   heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+   heapProps.CreationNodeMask = 1;
+   heapProps.VisibleNodeMask = 1;
 
-        D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
-        if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
+   D3D12_HEAP_FLAGS flags = D3D12_HEAP_FLAG_NONE;
+   if (isShared) flags |= D3D12_HEAP_FLAG_SHARED;
 
-        const D3D12_RESOURCE_STATES initialState = srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState;
+   D3D12_RESOURCE_DESC desc = resourceDesc;
 
-        SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, resourceDesc, initialState, nullptr));
-    }
+   D3D12_RESOURCE_STATES initialState = finalState;
 
-    {
-        D3D12_HEAP_PROPERTIES heapProps;
-        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
-        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-        heapProps.CreationNodeMask = 1;
-        heapProps.VisibleNodeMask = 1;
+   switch (access) {
+   case MemoryType::CpuRead:
+       assert(!srcData);
 
-        D3D12_RESOURCE_DESC uploadResourceDesc(resourceDesc);
-        uploadResourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+       desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       initialState |= D3D12_RESOURCE_STATE_COPY_DEST;
 
-        SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
-    }
+       break;
+   case MemoryType::CpuWrite:
 
-    if (srcData)
-    {
-        // Copy data to the intermediate upload heap and then schedule a copy
-        // from the upload heap to the vertex buffer.
-        UINT8* dstData;
-        D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
+       heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+       desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+       initialState |= D3D12_RESOURCE_STATE_GENERIC_READ;
 
-        ID3D12Resource* dxUploadResource = uploadResource.getResource();
+       break;
+   case MemoryType::GpuOnly:
+       heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+       initialState = (srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState);
+       break;
+   default:
+       return SLANG_FAIL;
+   }
 
-        SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
-        ::memcpy(dstData, srcData, srcDataSize);
-        dxUploadResource->Unmap(0, nullptr);
+   // Create the resource.
+   SLANG_RETURN_ON_FAIL(resourceOut.initCommitted(m_device, heapProps, flags, desc, initialState, nullptr));
 
-        auto encodeInfo = encodeResourceCommands();
-        encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResource, 0, bufferSize);
-        submitResourceCommandsAndWait(encodeInfo);
-    }
+   if (srcData)
+   {
+       D3D12Resource uploadResource;
+
+       if (access == MemoryType::GpuOnly) {
+           // If the buffer is on the default heap, create upload buffer.
+           D3D12_RESOURCE_DESC uploadDesc(resourceDesc);
+           uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+           heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+           SLANG_RETURN_ON_FAIL(uploadResource.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, uploadDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr));
+       }
+
+       // Be careful not to actually copy a resource here.
+       D3D12Resource& uploadResourceRef = (access == MemoryType::GpuOnly) ? uploadResource : resourceOut;
+
+       // Copy data to the intermediate upload heap and then schedule a copy
+       // from the upload heap to the vertex buffer.
+       UINT8* dstData;
+       D3D12_RANGE readRange = {};         // We do not intend to read from this resource on the CPU.
+
+       ID3D12Resource* dxUploadResource = uploadResourceRef.getResource();
+
+       SLANG_RETURN_ON_FAIL(dxUploadResource->Map(0, &readRange, reinterpret_cast<void**>(&dstData)));
+       ::memcpy(dstData, srcData, srcDataSize);
+       dxUploadResource->Unmap(0, nullptr);
+
+       if (access == MemoryType::GpuOnly) {
+           auto encodeInfo = encodeResourceCommands();
+           encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
+           submitResourceCommandsAndWait(encodeInfo);
+       }
+   }
 
     return SLANG_OK;
 }
@@ -4810,7 +4881,7 @@ Result D3D12Device::captureTextureToSurface(
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    auto resource = resourceImpl->m_resource;
+    auto& resource = resourceImpl->m_resource;
 
     const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
 
@@ -4915,6 +4986,11 @@ Result D3D12Device::getNativeDeviceHandles(InteropHandles* outHandles)
 
 Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const UnownedStringSlice& nameMatch, D3D_FEATURE_LEVEL featureLevel, DeviceInfo& outDeviceInfo)
 {
+    if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
+    {
+        m_dxDebug->EnableDebugLayer();
+    }
+
     outDeviceInfo.clear();
 
     ComPtr<IDXGIFactory> dxgiFactory;
@@ -4943,8 +5019,6 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
 
     if (m_dxDebug && (deviceCheckFlags & DeviceCheckFlag::UseDebug))
     {
-        m_dxDebug->EnableDebugLayer();
-
         ComPtr<ID3D12InfoQueue> infoQueue;
         if (SLANG_SUCCEEDED(device->QueryInterface(infoQueue.writeRef())))
         {
@@ -5058,7 +5132,8 @@ Result D3D12Device::initialize(const Desc& desc)
     }
 
 #if ENABLE_DEBUG_LAYER
-    m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+    m_D3D12GetDebugInterface =
+        (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
     if (m_D3D12GetDebugInterface)
     {
         if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
@@ -5077,7 +5152,6 @@ Result D3D12Device::initialize(const Desc& desc)
                 debug1->SetEnableGPUBasedValidation(true);
             }
 #endif
-            m_dxDebug->EnableDebugLayer();
         }
     }
 #endif
@@ -5309,6 +5383,8 @@ Result D3D12Device::initialize(const Desc& desc)
         profileName,
         makeArray(slang::PreprocessorMacroDesc{"__D3D12__", "1"}).getView()));
 
+    // Allocate a D3D12 "command signature" object that matches the behavior
+    // of a D3D11-style `DrawInstancedIndirect` operation.
     {
         D3D12_INDIRECT_ARGUMENT_DESC args[1];
         args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
@@ -5322,6 +5398,8 @@ Result D3D12Device::initialize(const Desc& desc)
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
     }
 
+    // Allocate a D3D12 "command signature" object that matches the behavior
+    // of a D3D11-style `DrawIndexedInstancedIndirect` operation.
     {
         D3D12_INDIRECT_ARGUMENT_DESC args[1];
         args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
@@ -5711,7 +5789,8 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, buffer->m_uploadResource, initialState, buffer->m_resource, descIn.isShared));
+    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, initialState, buffer->m_resource, descIn.isShared,
+        (MemoryType::Enum)descIn.cpuAccessFlags));
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
@@ -6199,12 +6278,16 @@ Result D3D12Device::createRenderPassLayout(
     return SLANG_OK;
 }
 
-Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout)
+Result D3D12Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
     // Work out a buffer size to hold all text
     size_t textSize = 0;
+    auto inputElementCount = desc.inputElementCount;
+    auto inputElements = desc.inputElements;
+    auto vertexStreamCount = desc.vertexStreamCount;
+    auto vertexStreams = desc.vertexStreams;
     for (int i = 0; i < Int(inputElementCount); ++i)
     {
         const char* text = inputElements[i].semanticName;
@@ -6213,7 +6296,6 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
     layout->m_text.setCount(textSize);
     char* textPos = layout->m_text.getBuffer();
 
-    //
     List<D3D12_INPUT_ELEMENT_DESC>& elements = layout->m_elements;
     elements.setCount(inputElementCount);
 
@@ -6221,6 +6303,7 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
     for (UInt i = 0; i < inputElementCount; ++i)
     {
         const InputElementDesc& srcEle = inputElements[i];
+        const auto& srcStream = vertexStreams[srcEle.bufferSlotIndex];
         D3D12_INPUT_ELEMENT_DESC& dstEle = elements[i];
 
         // Add text to the buffer
@@ -6238,8 +6321,15 @@ Result D3D12Device::createInputLayout(const InputElementDesc* inputElements, UIn
         dstEle.Format = D3DUtil::getMapFormat(srcEle.format);
         dstEle.InputSlot = (UINT)srcEle.bufferSlotIndex;
         dstEle.AlignedByteOffset = (UINT)srcEle.offset;
-        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcEle.slotClass);
-        dstEle.InstanceDataStepRate = (UINT)srcEle.instanceDataStepRate;
+        dstEle.InputSlotClass = D3DUtil::getInputSlotClass(srcStream.slotClass);
+        dstEle.InstanceDataStepRate = (UINT)srcStream.instanceDataStepRate;
+    }
+
+    auto& vertexStreamStrides = layout->m_vertexStreamStrides;
+    vertexStreamStrides.setCount(vertexStreamCount);
+    for (UInt i = 0; i < vertexStreamCount; ++i)
+    {
+        vertexStreamStrides[i] = vertexStreams[i].stride;
     }
 
     returnComPtr(outLayout, layout);
@@ -6252,7 +6342,6 @@ Result D3D12Device::readBufferResource(
     size_t size,
     ISlangBlob** outBlob)
 {
-    auto encodeInfo = encodeResourceCommands();
 
     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(bufferIn);
 
@@ -6261,26 +6350,34 @@ Result D3D12Device::readBufferResource(
     // This will be slow!!! - it blocks CPU on GPU completion
     D3D12Resource& resource = buffer->m_resource;
 
-    // Readback heap
-    D3D12_HEAP_PROPERTIES heapProps;
-    heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-    heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-    heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-    heapProps.CreationNodeMask = 1;
-    heapProps.VisibleNodeMask = 1;
-
-    // Resource to readback to
-    D3D12_RESOURCE_DESC stagingDesc;
-    _initBufferResourceDesc(size, stagingDesc);
-
     D3D12Resource stageBuf;
-    SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+    if (buffer->getDesc()->cpuAccessFlags != (int)MemoryType::CpuRead) {
 
-    // Do the copy
-    encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
+        auto encodeInfo = encodeResourceCommands();
 
-    // Wait until complete
-    submitResourceCommandsAndWait(encodeInfo);
+
+        // Readback heap
+        D3D12_HEAP_PROPERTIES heapProps;
+        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
+        heapProps.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+        heapProps.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+        heapProps.CreationNodeMask = 1;
+        heapProps.VisibleNodeMask = 1;
+
+        // Resource to readback to
+        D3D12_RESOURCE_DESC stagingDesc;
+        _initBufferResourceDesc(size, stagingDesc);
+
+        SLANG_RETURN_ON_FAIL(stageBuf.initCommitted(m_device, heapProps, D3D12_HEAP_FLAG_NONE, stagingDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr));
+
+        // Do the copy
+        encodeInfo.d3dCommandList->CopyBufferRegion(stageBuf, 0, resource, offset, size);
+
+        // Wait until complete
+        submitResourceCommandsAndWait(encodeInfo);
+    }
+
+    D3D12Resource& stageBufRef = (buffer->getDesc()->cpuAccessFlags != (int)MemoryType::CpuRead) ? stageBuf : resource;
 
     // Map and copy
     RefPtr<ListBlob> blob = new ListBlob();
@@ -6288,13 +6385,13 @@ Result D3D12Device::readBufferResource(
         UINT8* data;
         D3D12_RANGE readRange = { 0, size };
 
-        SLANG_RETURN_ON_FAIL(stageBuf.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
+        SLANG_RETURN_ON_FAIL(stageBufRef.getResource()->Map(0, &readRange, reinterpret_cast<void**>(&data)));
 
         // Copy to memory buffer
         blob->m_data.setCount(size);
         ::memcpy(blob->m_data.getBuffer(), data, size);
 
-        stageBuf.getResource()->Unmap(0, nullptr);
+        stageBufRef.getResource()->Unmap(0, nullptr);
     }
     returnComPtr(outBlob, blob);
     return SLANG_OK;
@@ -6962,8 +7059,8 @@ void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::deserializeAc
 void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::memoryBarrier(
     int count,
     IAccelerationStructure* const* structures,
-    AccessFlag::Enum sourceAccess,
-    AccessFlag::Enum destAccess)
+    MemoryType::Enum sourceAccess,
+    MemoryType::Enum destAccess)
 {
     ShortList<D3D12_RESOURCE_BARRIER> barriers;
     barriers.setCount(count);

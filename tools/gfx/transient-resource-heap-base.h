@@ -31,7 +31,7 @@ public:
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
             bufferDesc.sizeInBytes = desc.constantBufferSize;
-            bufferDesc.cpuAccessFlags = AccessFlag::Write;
+            bufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
             SLANG_RETURN_ON_FAIL(
                 m_device->createBufferResource(bufferDesc, nullptr, bufferPtr.writeRef()));
             m_constantBuffers.add(static_cast<TBufferResource*>(bufferPtr.get()));
@@ -56,9 +56,9 @@ public:
         bufferDesc.allowedStates =
             ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
         if (state == ResourceState::CopySource)
-            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
         else
-            bufferDesc.cpuAccessFlags |= AccessFlag::Read;
+            bufferDesc.cpuAccessFlags |= MemoryType::CpuRead;
         bufferDesc.sizeInBytes = size;
         SLANG_RETURN_ON_FAIL(
             m_device->createBufferResource(bufferDesc, nullptr, bufferPtr.writeRef()));
@@ -96,7 +96,7 @@ public:
             bufferDesc.defaultState = ResourceState::ConstantBuffer;
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= AccessFlag::Write;
+            bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
             size_t lastConstantBufferSize = 0;
             if (m_constantBuffers.getCount())
             {

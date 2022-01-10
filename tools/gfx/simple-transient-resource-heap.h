@@ -24,7 +24,7 @@ public:
         bufferDesc.allowedStates = ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
         bufferDesc.defaultState = ResourceState::ConstantBuffer;
         bufferDesc.sizeInBytes = desc.constantBufferSize;
-        bufferDesc.cpuAccessFlags = AccessFlag::Write;
+        bufferDesc.cpuAccessFlags = MemoryType::CpuWrite;
         SLANG_RETURN_ON_FAIL(
             device->createBufferResource(bufferDesc, nullptr, m_constantBuffer.writeRef()));
         return SLANG_OK;

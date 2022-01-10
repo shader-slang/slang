@@ -95,8 +95,7 @@ public:
         IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
 
     virtual Result createShaderObjectLayout(
@@ -208,8 +207,8 @@ public:
     class InputLayoutImpl : public InputLayoutBase
     {
     public:
-        List<VkVertexInputAttributeDescription> m_vertexDescs;
-        int m_vertexSize;
+        List<VkVertexInputAttributeDescription> m_attributeDescs;
+        List<VkVertexInputBindingDescription> m_streamDescs;
     };
 
     class BufferResourceImpl: public BufferResource
@@ -835,7 +834,6 @@ public:
     struct BoundVertexBuffer
     {
         RefPtr<BufferResourceImpl> m_buffer;
-        int m_stride;
         int m_offset;
     };
 
@@ -3862,9 +3860,6 @@ public:
         public:
             List<VkViewport> m_viewports;
             List<VkRect2D> m_scissorRects;
-            List<BoundVertexBuffer> m_boundVertexBuffers;
-            BoundVertexBuffer m_boundIndexBuffer;
-            VkIndexType m_boundIndexFormat;
 
         public:
             void beginPass(IRenderPassLayout* renderPass, IFramebuffer* framebuffer)
@@ -3919,9 +3914,9 @@ public:
                     auto& vkViewport = m_viewports[ii];
 
                     vkViewport.x = inViewport.originX;
-                    vkViewport.y = inViewport.originY;
+                    vkViewport.y = inViewport.originY + inViewport.extentY;
                     vkViewport.width = inViewport.extentX;
-                    vkViewport.height = inViewport.extentY;
+                    vkViewport.height = -inViewport.extentY;
                     vkViewport.minDepth = inViewport.minZ;
                     vkViewport.maxDepth = inViewport.maxZ;
                 }
@@ -3985,44 +3980,45 @@ public:
                 uint32_t startSlot,
                 uint32_t slotCount,
                 IBufferResource* const* buffers,
-                const uint32_t* strides,
                 const uint32_t* offsets) override
             {
-                {
-                    const Index num = Index(startSlot + slotCount);
-                    if (num > m_boundVertexBuffers.getCount())
-                    {
-                        m_boundVertexBuffers.setCount(num);
-                    }
-                }
-
                 for (Index i = 0; i < Index(slotCount); i++)
                 {
+                    Index slotIndex = startSlot + i;
                     BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[i]);
-                    BoundVertexBuffer& boundBuffer = m_boundVertexBuffers[startSlot + i];
-                    boundBuffer.m_buffer = buffer;
-                    boundBuffer.m_stride = int(strides[i]);
-                    boundBuffer.m_offset = int(offsets[i]);
+                    if (buffer)
+                    {
+                        VkBuffer vertexBuffers[] = { buffer->m_buffer.m_buffer };
+                        VkDeviceSize offset = VkDeviceSize(offsets[i]);
+
+                        m_api->vkCmdBindVertexBuffers(m_vkCommandBuffer, (uint32_t)slotIndex, 1, vertexBuffers, &offset);
+                    }
                 }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setIndexBuffer(
                 IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override
             {
+                VkIndexType indexType = VK_INDEX_TYPE_UINT16;
                 switch (indexFormat)
                 {
                 case Format::R16_UINT:
-                    m_boundIndexFormat = VK_INDEX_TYPE_UINT16;
+                    indexType = VK_INDEX_TYPE_UINT16;
                     break;
                 case Format::R32_UINT:
-                    m_boundIndexFormat = VK_INDEX_TYPE_UINT32;
+                    indexType = VK_INDEX_TYPE_UINT32;
                     break;
                 default:
                     assert(!"unsupported index format");
                 }
-                m_boundIndexBuffer.m_buffer = static_cast<BufferResourceImpl*>(buffer);
-                m_boundIndexBuffer.m_stride = 0;
-                m_boundIndexBuffer.m_offset = int(offset);
+
+                BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(buffer);
+
+                m_api->vkCmdBindIndexBuffer(
+                    m_vkCommandBuffer,
+                    bufferImpl->m_buffer.m_buffer,
+                    (VkDeviceSize)offset,
+                    indexType);
             }
 
             void prepareDraw()
@@ -4041,16 +4037,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
-                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 api.vkCmdDraw(m_vkCommandBuffer, vertexCount, 1, 0, 0);
             }
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexed(
@@ -4058,22 +4044,7 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
-                    m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = {boundVertexBuffer.m_buffer->m_buffer.m_buffer};
-                    VkDeviceSize offsets[] = {VkDeviceSize(boundVertexBuffer.m_offset)};
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
-                api.vkCmdDraw(m_vkCommandBuffer, indexCount, 1, 0, 0);
+                api.vkCmdDrawIndexed(m_vkCommandBuffer, indexCount, 1, startIndex, baseVertex, 0);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL
@@ -4091,19 +4062,18 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
+                // Vulkan does not support sourcing the count from a buffer.
+                assert(!countBuffer);
+
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
-                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndirectCommand));
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                api.vkCmdDrawIndirect(
+                    m_vkCommandBuffer,
+                    argBufferImpl->m_buffer.m_buffer,
+                    argOffset,
+                    maxDrawCount,
+                    sizeof(VkDrawIndirectCommand));
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
@@ -4113,24 +4083,18 @@ public:
                 IBufferResource* countBuffer,
                 uint64_t countOffset) override
             {
+                // Vulkan does not support sourcing the count from a buffer.
+                assert(!countBuffer);
+
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
+                auto argBufferImpl = static_cast<BufferResourceImpl*>(argBuffer);
+                api.vkCmdDrawIndexedIndirect(
                     m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
-                api.vkCmdDrawIndirect(m_vkCommandBuffer, (VkBuffer)argBuffer, argOffset, maxDrawCount, sizeof(VkDrawIndexedIndirectCommand));
+                    argBufferImpl->m_buffer.m_buffer,
+                    argOffset,
+                    maxDrawCount,
+                    sizeof(VkDrawIndexedIndirectCommand));
             }
 
             virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
@@ -4158,16 +4122,6 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
                 api.vkCmdDraw(
                     m_vkCommandBuffer,
                     vertexCount,
@@ -4185,25 +4139,11 @@ public:
             {
                 prepareDraw();
                 auto& api = *m_api;
-                api.vkCmdBindIndexBuffer(
-                    m_vkCommandBuffer,
-                    m_boundIndexBuffer.m_buffer->m_buffer.m_buffer,
-                    m_boundIndexBuffer.m_offset,
-                    m_boundIndexFormat);
-                // Bind the vertex buffer
-                if (m_boundVertexBuffers.getCount() > 0 && m_boundVertexBuffers[0].m_buffer)
-                {
-                    const BoundVertexBuffer& boundVertexBuffer = m_boundVertexBuffers[0];
-
-                    VkBuffer vertexBuffers[] = { boundVertexBuffer.m_buffer->m_buffer.m_buffer };
-                    VkDeviceSize offsets[] = { VkDeviceSize(boundVertexBuffer.m_offset) };
-
-                    api.vkCmdBindVertexBuffers(m_vkCommandBuffer, 0, 1, vertexBuffers, offsets);
-                }
-                api.vkCmdDraw(
+                api.vkCmdDrawIndexed(
                     m_vkCommandBuffer,
                     indexCount,
                     instanceCount,
+                    startIndexLocation,
                     baseVertexLocation,
                     startInstanceLocation);
             }
@@ -4856,13 +4796,13 @@ public:
         public:
             void init(CommandBufferImpl* commandBuffer) { m_commandBuffer = commandBuffer; }
 
-            inline VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag::Enum access)
+            inline VkAccessFlags translateAccelerationStructureAccessFlag(MemoryType::Enum access)
             {
                 VkAccessFlags result = 0;
-                if (access & AccessFlag::Read)
+                if (access & MemoryType::CpuRead)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR |
                               VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-                if (access & AccessFlag::Write)
+                if (access & MemoryType::CpuWrite)
                     result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
                 return result;
             }
@@ -4870,8 +4810,8 @@ public:
             inline void _memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                AccessFlag::Enum srcAccess,
-                AccessFlag::Enum destAccess)
+                MemoryType::Enum srcAccess,
+                MemoryType::Enum destAccess)
             {
                 ShortList<VkBufferMemoryBarrier> memBarriers;
                 memBarriers.setCount(count);
@@ -4998,7 +4938,7 @@ public:
 
                 if (propertyQueryCount)
                 {
-                    _memoryBarrier(1, &desc.dest, AccessFlag::Write, AccessFlag::Read);
+                    _memoryBarrier(1, &desc.dest, MemoryType::CpuWrite, MemoryType::CpuRead);
                     _queryAccelerationStructureProperties(
                         1, &desc.dest, propertyQueryCount, queryDescs);
                 }
@@ -5071,8 +5011,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                AccessFlag::Enum srcAccess,
-                AccessFlag::Enum destAccess) override
+                MemoryType::Enum srcAccess,
+                MemoryType::Enum destAccess) override
             {
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
@@ -6606,7 +6546,7 @@ SlangResult VKDevice::initialize(const Desc& desc)
         m_info.bindingStyle = BindingStyle::Vulkan;
         m_info.projectionStyle = ProjectionStyle::Vulkan;
         m_info.deviceType = DeviceType::Vulkan;
-        static const float kIdentity[] = {1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
         ::memcpy(m_info.identityProjectionMatrix, kIdentity, sizeof(kIdentity));
     }
 
@@ -6777,6 +6717,20 @@ Result VKDevice::createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer*
     return SLANG_OK;
 }
 
+size_t calcRowSize(Format format, int width)
+{
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
+}
+
+size_t calcNumRows(Format format, int height)
+{
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(format, &sizeInfo);
+    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+}
+
 SlangResult VKDevice::readTextureResource(
     ITextureResource* texture,
     ResourceState state,
@@ -6784,11 +6738,94 @@ SlangResult VKDevice::readTextureResource(
     size_t* outRowPitch,
     size_t* outPixelSize)
 {
-    SLANG_UNUSED(texture);
-    SLANG_UNUSED(outBlob);
-    SLANG_UNUSED(outRowPitch);
-    SLANG_UNUSED(outPixelSize);
-    return SLANG_FAIL;
+    auto textureImpl = static_cast<TextureResourceImpl*>(texture);
+    RefPtr<ListBlob> blob = new ListBlob();
+
+    auto desc = textureImpl->getDesc();
+    auto width = desc->size.width;
+    auto height = desc->size.height;
+    FormatInfo sizeInfo;
+    SLANG_RETURN_ON_FAIL(gfxGetFormatInfo(desc->format, &sizeInfo));
+    size_t pixelSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
+    size_t rowPitch = width * pixelSize;
+
+    List<TextureResource::Size> mipSizes;
+
+    const int numMipMaps = desc->numMipLevels;
+    auto arraySize = calcEffectiveArraySize(*desc);
+
+    // Calculate how large the buffer has to be
+    size_t bufferSize = 0;
+    // Calculate how large an array entry is
+    for (int j = 0; j < numMipMaps; ++j)
+    {
+        const TextureResource::Size mipSize = calcMipSize(desc->size, j);
+
+        auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+        auto numRows = calcNumRows(desc->format, mipSize.height);
+
+        mipSizes.add(mipSize);
+
+        bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+    }
+    // Calculate the total size taking into account the array
+    bufferSize *= arraySize;
+    blob->m_data.setCount(Index(bufferSize));
+
+    Buffer staging;
+    SLANG_RETURN_ON_FAIL(staging.init(
+        m_api,
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+
+    VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
+    VkImage srcImage = textureImpl->m_image;
+    VkImageLayout srcImageLayout = VulkanUtil::getImageLayoutFromState(state);
+
+    size_t dstOffset = 0;
+    for (int i = 0; i < arraySize; ++i)
+    {
+        for (Index j = 0; j < mipSizes.getCount(); ++j)
+        {
+            const auto& mipSize = mipSizes[j];
+
+            auto rowSizeInBytes = calcRowSize(desc->format, mipSize.width);
+            auto numRows = calcNumRows(desc->format, mipSize.height);
+
+            VkBufferImageCopy region = {};
+
+            region.bufferOffset = dstOffset;
+            region.bufferRowLength = 0;
+            region.bufferImageHeight = 0;
+
+            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            region.imageSubresource.mipLevel = uint32_t(j);
+            region.imageSubresource.baseArrayLayer = i;
+            region.imageSubresource.layerCount = 1;
+            region.imageOffset = { 0, 0, 0 };
+            region.imageExtent = { uint32_t(mipSize.width), uint32_t(mipSize.height), uint32_t(mipSize.depth) };
+
+            m_api.vkCmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, staging.m_buffer, 1, &region);
+
+            dstOffset += rowSizeInBytes * numRows * mipSize.depth;
+        }
+    }
+
+    m_deviceQueue.flushAndWait();
+
+    // Write out the data from the buffer
+    void* mappedData = nullptr;
+    SLANG_RETURN_ON_FAIL(
+        m_api.vkMapMemory(m_device, staging.m_memory, 0, bufferSize, 0, &mappedData));
+
+    ::memcpy(blob->m_data.getBuffer(), mappedData, bufferSize);
+    m_api.vkUnmapMemory(m_device, staging.m_memory);
+
+    *outPixelSize = pixelSize;
+    *outRowPitch = rowPitch;
+    returnComPtr(outBlob, blob);
+    return SLANG_OK;
 }
 
 SlangResult VKDevice::readBufferResource(
@@ -6988,7 +7025,7 @@ static VkImageUsageFlags _calcImageUsageFlags(
 {
     VkImageUsageFlags usage = _calcImageUsageFlags(states);
 
-    if ((cpuAccessFlags & AccessFlag::Write) || initData)
+    if ((cpuAccessFlags & MemoryType::CpuWrite) || initData)
     {
         usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
@@ -7122,20 +7159,6 @@ void VKDevice::_transitionImageLayout(
 {
     VkCommandBuffer commandBuffer = m_deviceQueue.getCommandBuffer();
     _transitionImageLayout(commandBuffer, image, format, desc, oldLayout, newLayout);
-}
-
-size_t calcRowSize(Format format, int width)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return size_t((width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth * sizeInfo.blockSizeInBytes);
-}
-
-size_t calcNumRows(Format format, int height)
-{
-    FormatInfo sizeInfo;
-    gfxGetFormatInfo(format, &sizeInfo);
-    return (size_t)(height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
 }
 
 Result VKDevice::getTextureAllocationInfo(
@@ -7519,7 +7542,7 @@ Result VKDevice::createBufferResource(const IBufferResource::Desc& descIn, const
         SLANG_RETURN_ON_FAIL(buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
 
-    if ((desc.cpuAccessFlags & AccessFlag::Write) || initData)
+    if ((desc.cpuAccessFlags & MemoryType::CpuWrite) || initData)
     {
         SLANG_RETURN_ON_FAIL(buffer->m_uploadBuffer.init(m_api, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
     }
@@ -7890,22 +7913,40 @@ Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc c
     }
 }
 
-Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numElements, IInputLayout** outLayout)
+Result VKDevice::createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout)
 {
     RefPtr<InputLayoutImpl> layout(new InputLayoutImpl);
 
-    List<VkVertexInputAttributeDescription>& dstVertexDescs = layout->m_vertexDescs;
+    List<VkVertexInputAttributeDescription>& dstAttributes = layout->m_attributeDescs;
+    List<VkVertexInputBindingDescription>& dstStreams = layout->m_streamDescs;
 
-    size_t vertexSize = 0;
-    dstVertexDescs.setCount(numElements);
+    auto elements = desc.inputElements;
+    Int numElements = desc.inputElementCount;
 
-    for (UInt i = 0; i <  numElements; ++i)
+    auto srcVertexStreams = desc.vertexStreams;
+    Int vertexStreamCount = desc.vertexStreamCount;
+
+    dstAttributes.setCount(numElements);
+    dstStreams.setCount(vertexStreamCount);
+
+    for (Int i = 0; i < vertexStreamCount; i++)
+    {
+        auto& dstStream = dstStreams[i];
+        auto& srcStream = srcVertexStreams[i];
+        dstStream.stride = srcStream.stride;
+        dstStream.binding = (uint32_t)i;
+        dstStream.inputRate = (srcStream.slotClass == InputSlotClass::PerInstance) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+
+    for (Int i = 0; i < numElements; ++i)
     {
         const InputElementDesc& srcDesc = elements[i];
-        VkVertexInputAttributeDescription& dstDesc = dstVertexDescs[i];
+        auto streamIndex = srcDesc.bufferSlotIndex;
+
+        VkVertexInputAttributeDescription& dstDesc = dstAttributes[i];
 
         dstDesc.location = uint32_t(i);
-        dstDesc.binding = 0;
+        dstDesc.binding = (uint32_t)streamIndex;
         dstDesc.format = VulkanUtil::getVkFormat(srcDesc.format);
         if (dstDesc.format == VK_FORMAT_UNDEFINED)
         {
@@ -7913,18 +7954,9 @@ Result VKDevice::createInputLayout(const InputElementDesc* elements, UInt numEle
         }
 
         dstDesc.offset = uint32_t(srcDesc.offset);
-
-        FormatInfo sizeInfo;
-        gfxGetFormatInfo(srcDesc.format, &sizeInfo);
-        const size_t elementSize = sizeInfo.blockSizeInBytes / sizeInfo.pixelsPerBlock;
-        assert(elementSize > 0);
-        const size_t endElement = srcDesc.offset + elementSize;
-
-        vertexSize = (vertexSize < endElement) ? endElement : vertexSize;
     }
 
     // Work out the overall size
-    layout->m_vertexSize = int(vertexSize);
     returnComPtr(outLayout, layout);
     return SLANG_OK;
 }
@@ -8078,20 +8110,15 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     vertexInputInfo.vertexBindingDescriptionCount = 0;
     vertexInputInfo.vertexAttributeDescriptionCount = 0;
 
-    VkVertexInputBindingDescription vertexInputBindingDescription;
-
     if (inputLayoutImpl)
     {
-        vertexInputBindingDescription.binding = 0;
-        vertexInputBindingDescription.stride = inputLayoutImpl->m_vertexSize;
-        vertexInputBindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        const auto& srcAttributeDescs = inputLayoutImpl->m_attributeDescs;
+        const auto& srcStreamDescs = inputLayoutImpl->m_streamDescs;
 
-        const auto& srcAttributeDescs = inputLayoutImpl->m_vertexDescs;
+        vertexInputInfo.vertexBindingDescriptionCount = (uint32_t)srcStreamDescs.getCount();
+        vertexInputInfo.pVertexBindingDescriptions = srcStreamDescs.getBuffer();
 
-        vertexInputInfo.vertexBindingDescriptionCount = 1;
-        vertexInputInfo.pVertexBindingDescriptions = &vertexInputBindingDescription;
-
-        vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(srcAttributeDescs.getCount());
+        vertexInputInfo.vertexAttributeDescriptionCount = (uint32_t)srcAttributeDescs.getCount();
         vertexInputInfo.pVertexAttributeDescriptions = srcAttributeDescs.getBuffer();
     }
 
