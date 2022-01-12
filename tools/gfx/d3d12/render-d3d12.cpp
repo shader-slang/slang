@@ -3999,6 +3999,7 @@ public:
                 size_t dstOffset,
                 size_t dstSize,
                 ITextureResource* src,
+                ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override

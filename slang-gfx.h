@@ -1544,9 +1544,11 @@ public:
     /// the entire resource is being copied and dstOffset, srcOffset and extent arguments are ignored.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
+        ResourceState dstState,
         SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
+        ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
@@ -1557,6 +1559,7 @@ public:
         size_t dstOffset,
         size_t dstSize,
         ITextureResource* src,
+        ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
