@@ -4781,30 +4781,26 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
+                assert(srcSubresource.mipLevelCount == 1);
+
                 auto image = static_cast<TextureResourceImpl*>(src);
                 auto desc = image->getDesc();
                 auto buffer = static_cast<BufferResourceImpl*>(dst);
                 auto srcImageLayout = VulkanUtil::getImageLayoutFromState(srcState);
 
-                for (Int layer = 0; layer < srcSubresource.layerCount; ++layer)
-                {
-                    for (Int mipId = 0; mipId < srcSubresource.mipLevelCount; ++mipId)
-                    {
-                        VkBufferImageCopy region = {};
-                        region.bufferOffset = dstOffset;
-                        region.bufferRowLength = 0;
-                        region.bufferImageHeight = 0;
-                        region.imageSubresource.aspectMask = getAspectMask(image->m_vkformat);
-                        region.imageSubresource.mipLevel = mipId + srcSubresource.mipLevel;
-                        region.imageSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
-                        region.imageSubresource.layerCount = 1;
-                        region.imageOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
-                        region.imageExtent = { uint32_t(extent.width), uint32_t(extent.height), uint32_t(extent.depth) };
+                VkBufferImageCopy region = {};
+                region.bufferOffset = dstOffset;
+                region.bufferRowLength = 0;
+                region.bufferImageHeight = 0;
+                region.imageSubresource.aspectMask = getAspectMask(image->m_vkformat);
+                region.imageSubresource.mipLevel = srcSubresource.mipLevel;
+                region.imageSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
+                region.imageSubresource.layerCount = srcSubresource.layerCount;
+                region.imageOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
+                region.imageExtent = { uint32_t(extent.width), uint32_t(extent.height), uint32_t(extent.depth) };
 
-                        auto& vkApi = m_commandBuffer->m_renderer->m_api;
-                        vkApi.vkCmdCopyImageToBuffer(m_commandBuffer->m_commandBuffer, image->m_image, srcImageLayout, buffer->m_buffer.m_buffer, 1, &region);
-                    }
-                }
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdCopyImageToBuffer(m_commandBuffer->m_commandBuffer, image->m_image, srcImageLayout, buffer->m_buffer.m_buffer, 1, &region);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
