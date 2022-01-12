@@ -4518,13 +4518,13 @@ public:
                         region.srcSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
                         region.srcSubresource.mipLevel = mipId + srcSubresource.mipLevel;
                         region.srcSubresource.layerCount = 1;
-                        region.srcOffset = { srcOffset.x, srcOffset.y, srcOffset.z };
+                        region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
                         region.dstSubresource.aspectMask = getAspectMask(dstImage->m_vkformat);
                         region.dstSubresource.baseArrayLayer = layer + dstSubresource.baseArrayLayer;
                         region.dstSubresource.mipLevel = mipId + dstSubresource.mipLevel;
                         region.dstSubresource.layerCount = 1;
-                        region.dstOffset = { dstOffset.x, dstOffset.y, dstOffset.z };
-                        region.extent = { extent.width, extent.height, extent.depth };
+                        region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
+                        region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
 
                         auto& vkApi = m_commandBuffer->m_renderer->m_api;
                         vkApi.vkCmdCopyImage(m_commandBuffer->m_commandBuffer, srcImage->m_image, srcImageLayout, dstImage->m_image, dstImageLayout, 1, &region);
@@ -4798,7 +4798,7 @@ public:
                         region.imageSubresource.mipLevel = mipId + srcSubresource.mipLevel;
                         region.imageSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
                         region.imageSubresource.layerCount = 1;
-                        region.imageOffset = { srcOffset.x, srcOffset.y, srcOffset.z };
+                        region.imageOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
                         region.imageExtent = { uint32_t(extent.width), uint32_t(extent.height), uint32_t(extent.depth) };
 
                         auto& vkApi = m_commandBuffer->m_renderer->m_api;
@@ -4844,7 +4844,7 @@ public:
                     nullptr,
                     0,
                     nullptr,
-                    barriers.getCount(),
+                    (uint32_t)barriers.getCount(),
                     barriers.getArrayView().getBuffer());
             }
         };

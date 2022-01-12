@@ -38,7 +38,7 @@ namespace gfx_test
         gfx::IDevice* device,
         gfx::ITextureResource* texture,
         gfx::ResourceState state,
-        float* expectedResult,
+        void* expectedResult,
         size_t expectedResultRowPitch,
         size_t rowCount);
 
