@@ -233,7 +233,7 @@ public:
 
         BufferResourceImpl(const Desc& desc)
             : Parent(desc)
-            , m_defaultState(D3DUtil::translateResourceState(desc.defaultState))
+            , m_defaultState(D3DUtil::getResourceState(desc.defaultState))
         {
         }
 
@@ -279,6 +279,31 @@ public:
             sharedHandle = *outHandle;
             return SLANG_OK;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            map(MemoryRange* rangeToRead, void** outPointer) override
+        {
+            D3D12_RANGE range = {};
+            if (rangeToRead)
+            {
+                range.Begin = (SIZE_T)rangeToRead->offset;
+                range.End = (SIZE_T)(rangeToRead->offset + rangeToRead->size);
+            }
+            SLANG_RETURN_ON_FAIL(m_resource.getResource()->Map(0, rangeToRead ? &range : nullptr, outPointer));
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+        {
+            D3D12_RANGE range = {};
+            if (writtenRange)
+            {
+                range.Begin = (SIZE_T)writtenRange->offset;
+                range.End = (SIZE_T)(writtenRange->offset + writtenRange->size);
+            }
+            m_resource.getResource()->Unmap(0, writtenRange ? &range : nullptr);
+            return SLANG_OK;
+        }
     };
 
     class TextureResourceImpl: public TextureResource
@@ -288,7 +313,7 @@ public:
 
         TextureResourceImpl(const Desc& desc)
             : Parent(desc)
-            , m_defaultState(D3DUtil::translateResourceState(desc.defaultState))
+            , m_defaultState(D3DUtil::getResourceState(desc.defaultState))
         {
         }
 
@@ -387,6 +412,7 @@ public:
         {
             SimpleRenderPassLayout::init(desc);
             m_framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+            m_hasDepthStencil = m_framebufferLayout->m_hasDepthStencil;
         }
     };
 
@@ -705,7 +731,7 @@ public:
                 bufferDesc.allowedStates =
                     ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
                 bufferDesc.sizeInBytes = desc.constantBufferSize;
-                bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
+                bufferDesc.memoryType = MemoryType::Upload;
                 SLANG_RETURN_ON_FAIL(device->createBufferResource(
                     bufferDesc,
                     nullptr,
@@ -736,12 +762,15 @@ public:
 
 
         IBufferResource* uploadResource;
-        if (!buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite))
+        if (buffer->getDesc()->memoryType != MemoryType::Upload)
         {
             transientHeap->allocateStagingBuffer(size, uploadResource, ResourceState::CopySource);
         }
 
-        D3D12Resource& uploadResourceRef = (buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite)) ? buffer->m_resource : static_cast<BufferResourceImpl*>(uploadResource)->m_resource;
+        D3D12Resource& uploadResourceRef =
+            (buffer->getDesc()->memoryType == MemoryType::Upload)
+                ? buffer->m_resource
+                : static_cast<BufferResourceImpl*>(uploadResource)->m_resource;
 
         void* uploadData;
         SLANG_RETURN_ON_FAIL(uploadResourceRef.getResource()->Map(
@@ -749,7 +778,8 @@ public:
         memcpy((uint8_t*)uploadData + offset, data, size);
         uploadResourceRef.getResource()->Unmap(0, &readRange);
 
-        if (!buffer->getDesc()->hasCpuAccessFlag(MemoryType::CpuWrite)) {
+        if (buffer->getDesc()->memoryType != MemoryType::Upload)
+        {
             {
                 D3D12BarrierSubmitter submitter(cmdList);
                 submitter.transition(
@@ -3148,7 +3178,7 @@ public:
                         }
                         else
                         {
-                            initialState = D3DUtil::translateResourceState(access.initialState);
+                            initialState = D3DUtil::getResourceState(access.initialState);
                         }
                         textureResource->m_resource.transition(
                             initialState,
@@ -3182,7 +3212,7 @@ public:
                         }
                         else
                         {
-                            initialState = D3DUtil::translateResourceState(
+                            initialState = D3DUtil::getResourceState(
                                 renderPass->m_depthStencilAccess.initialState);
                         }
                         textureResource->m_resource.transition(
@@ -3398,7 +3428,7 @@ public:
                             static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                         textureResource->m_resource.transition(
                             D3D12_RESOURCE_STATE_RENDER_TARGET,
-                            D3DUtil::translateResourceState(access.finalState),
+                            D3DUtil::getResourceState(access.finalState),
                             submitter);
                     }
                 }
@@ -3412,7 +3442,7 @@ public:
                         static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
                     textureResource->m_resource.transition(
                         D3D12_RESOURCE_STATE_DEPTH_WRITE,
-                        D3DUtil::translateResourceState(
+                        D3DUtil::getResourceState(
                             m_renderPass->m_depthStencilAccess.finalState),
                         submitter);
                 }
@@ -3651,9 +3681,12 @@ public:
                         barrier.Transition.pResource = textureImpl->m_resource.getResource();
                         auto planeCount = D3DUtil::getPlaneSliceCount(
                             D3DUtil::getMapFormat(textureImpl->getDesc()->format));
+                        auto arraySize = textureDesc->arraySize;
+                        if (arraySize == 0)
+                            arraySize = 1;
                         for (uint32_t planeIndex = 0; planeIndex < planeCount; planeIndex++)
                         {
-                            for (int layer = 0; layer < textureDesc->arraySize; layer++)
+                            for (int layer = 0; layer < arraySize; layer++)
                             {
                                 for (int mip = 0; mip < textureDesc->numMipLevels; mip++)
                                 {
@@ -3662,7 +3695,7 @@ public:
                                         layer,
                                         planeIndex,
                                         textureImpl->getDesc()->numMipLevels,
-                                        textureImpl->getDesc()->arraySize);
+                                        arraySize);
                                     barriers.add(barrier);
                                 }
                             }
@@ -3697,8 +3730,8 @@ public:
                     }
                     else {
                         barrier.Transition.pResource = bufferImpl->m_resource;
-                        barrier.Transition.StateBefore = D3DUtil::translateResourceState(src);
-                        barrier.Transition.StateAfter = D3DUtil::translateResourceState(dst);
+                        barrier.Transition.StateBefore = D3DUtil::getResourceState(src);
+                        barrier.Transition.StateAfter = D3DUtil::getResourceState(dst);
                         barrier.Transition.Subresource = 0;
                     }
 
@@ -3886,11 +3919,9 @@ public:
                     bufferImpl->m_resource.getResource()->Unmap(0, nullptr);
 
                     srcRegion.pResource = bufferImpl->m_resource.getResource();
-                    D3D12_BOX srcBox = {};
-                    srcBox.right = (UINT)bufferSize;
-                    srcBox.bottom = srcBox.back = 1;
+
                     m_commandBuffer->m_cmdList->CopyTextureRegion(
-                        &dstRegion, offset.x, offset.y, offset.z, &srcRegion, &srcBox);
+                        &dstRegion, offset.x, offset.y, offset.z, &srcRegion, nullptr);
                 }
             }
 
@@ -4195,8 +4226,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
                 int count,
                 IAccelerationStructure* const* structures,
-                MemoryType::Enum sourceAccess,
-                MemoryType::Enum destAccess) override;
+                AccessFlag sourceAccess,
+                AccessFlag destAccess) override;
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
@@ -4351,8 +4382,6 @@ public:
         virtual SLANG_NO_THROW void SLANG_MCALL
             executeCommandBuffers(uint32_t count, ICommandBuffer* const* commandBuffers, IFence* fence, uint64_t valueToSignal) override
         {
-            // TODO: implement fence signal.
-            assert(fence == nullptr);
             ShortList<ID3D12CommandList*> commandLists;
             for (uint32_t i = 0; i < count; i++)
             {
@@ -4375,6 +4404,12 @@ public:
             }
             m_d3dQueue->Signal(m_fence, m_fenceValue);
             ResetEvent(globalWaitHandle);
+
+            if (fence)
+            {
+                auto fenceImpl = static_cast<FenceImpl*>(fence);
+                m_d3dQueue->Signal(fenceImpl->m_fence.get(), valueToSignal);
+            }
         }
 
         virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() override
@@ -4436,6 +4471,14 @@ public:
                     CREATE_EVENT_INITIAL_SET | CREATE_EVENT_MANUAL_RESET,
                     EVENT_ALL_ACCESS));
             }
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL resize(uint32_t width, uint32_t height) override
+        {
+            for (auto evt : m_frameEvents)
+                SetEvent(evt);
+            SLANG_RETURN_ON_FAIL(D3DSwapchainBase::resize(width, height));
             return SLANG_OK;
         }
 
@@ -4504,7 +4547,7 @@ public:
         D3D12_RESOURCE_STATES finalState,
         D3D12Resource& resourceOut,
         bool isShared,
-        MemoryType::Enum access = MemoryType::GpuOnly);
+        MemoryType access = MemoryType::DeviceLocal);
 
     Result captureTextureToSurface(
         TextureResourceImpl* resource,
@@ -4796,7 +4839,7 @@ static void _initSrvDesc(
     }
 }
 
-Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, MemoryType::Enum access)
+Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const void* srcData, size_t srcDataSize, D3D12_RESOURCE_STATES finalState, D3D12Resource& resourceOut, bool isShared, MemoryType memoryType)
 {
    const  size_t bufferSize = size_t(resourceDesc.Width);
 
@@ -4813,8 +4856,9 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
 
    D3D12_RESOURCE_STATES initialState = finalState;
 
-   switch (access) {
-   case MemoryType::CpuRead:
+   switch (memoryType)
+   {
+   case MemoryType::ReadBack:
        assert(!srcData);
 
        heapProps.Type = D3D12_HEAP_TYPE_READBACK;
@@ -4822,14 +4866,14 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        initialState |= D3D12_RESOURCE_STATE_COPY_DEST;
 
        break;
-   case MemoryType::CpuWrite:
+   case MemoryType::Upload:
 
        heapProps.Type = D3D12_HEAP_TYPE_UPLOAD;
        desc.Flags = D3D12_RESOURCE_FLAG_NONE;
        initialState |= D3D12_RESOURCE_STATE_GENERIC_READ;
 
        break;
-   case MemoryType::GpuOnly:
+   case MemoryType::DeviceLocal:
        heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
        initialState = (srcData ? D3D12_RESOURCE_STATE_COPY_DEST : finalState);
        break;
@@ -4844,7 +4888,8 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
    {
        D3D12Resource uploadResource;
 
-       if (access == MemoryType::GpuOnly) {
+       if (memoryType == MemoryType::DeviceLocal)
+       {
            // If the buffer is on the default heap, create upload buffer.
            D3D12_RESOURCE_DESC uploadDesc(resourceDesc);
            uploadDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -4854,7 +4899,7 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        }
 
        // Be careful not to actually copy a resource here.
-       D3D12Resource& uploadResourceRef = (access == MemoryType::GpuOnly) ? uploadResource : resourceOut;
+       D3D12Resource& uploadResourceRef = (memoryType == MemoryType::DeviceLocal) ? uploadResource : resourceOut;
 
        // Copy data to the intermediate upload heap and then schedule a copy
        // from the upload heap to the vertex buffer.
@@ -4867,7 +4912,8 @@ Result D3D12Device::createBuffer(const D3D12_RESOURCE_DESC& resourceDesc, const 
        ::memcpy(dstData, srcData, srcDataSize);
        dxUploadResource->Unmap(0, nullptr);
 
-       if (access == MemoryType::GpuOnly) {
+       if (memoryType == MemoryType::DeviceLocal)
+       {
            auto encodeInfo = encodeResourceCommands();
            encodeInfo.d3dCommandList->CopyBufferRegion(resourceOut, 0, uploadResourceRef, 0, bufferSize);
            submitResourceCommandsAndWait(encodeInfo);
@@ -4886,7 +4932,7 @@ Result D3D12Device::captureTextureToSurface(
 {
     auto& resource = resourceImpl->m_resource;
 
-    const D3D12_RESOURCE_STATES initialState = D3DUtil::translateResourceState(state);
+    const D3D12_RESOURCE_STATES initialState = D3DUtil::getResourceState(state);
 
     const ITextureResource::Desc& gfxDesc = *resourceImpl->getDesc();
     const D3D12_RESOURCE_DESC desc = resource.getResource()->GetDesc();
@@ -4926,7 +4972,7 @@ Result D3D12Device::captureTextureToSurface(
     }
 
     auto encodeInfo = encodeResourceCommands();
-    auto currentState = D3DUtil::translateResourceState(state);
+    auto currentState = D3DUtil::getResourceState(state);
 
     {
         D3D12BarrierSubmitter submitter(encodeInfo.d3dCommandList);
@@ -5135,8 +5181,7 @@ Result D3D12Device::initialize(const Desc& desc)
     }
 
 #if ENABLE_DEBUG_LAYER
-    m_D3D12GetDebugInterface =
-        (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
+    m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)loadProc(d3dModule, "D3D12GetDebugInterface");
     if (m_D3D12GetDebugInterface)
     {
         if (SLANG_SUCCEEDED(m_D3D12GetDebugInterface(IID_PPV_ARGS(m_dxDebug.writeRef()))))
@@ -5792,8 +5837,14 @@ Result D3D12Device::createBufferResource(const IBufferResource::Desc& descIn, co
     bufferDesc.Flags |= _calcResourceFlags(srcDesc.allowedStates);
 
     const D3D12_RESOURCE_STATES initialState = buffer->m_defaultState;
-    SLANG_RETURN_ON_FAIL(createBuffer(bufferDesc, initData, srcDesc.sizeInBytes, initialState, buffer->m_resource, descIn.isShared,
-        (MemoryType::Enum)descIn.cpuAccessFlags));
+    SLANG_RETURN_ON_FAIL(createBuffer(
+        bufferDesc,
+        initData,
+        srcDesc.sizeInBytes,
+        initialState,
+        buffer->m_resource,
+        descIn.isShared,
+        descIn.memoryType));
 
     returnComPtr(outResource, buffer);
     return SLANG_OK;
@@ -6354,10 +6405,9 @@ Result D3D12Device::readBufferResource(
     D3D12Resource& resource = buffer->m_resource;
 
     D3D12Resource stageBuf;
-    if (buffer->getDesc()->cpuAccessFlags != (int)MemoryType::CpuRead) {
-
+    if (buffer->getDesc()->memoryType != MemoryType::ReadBack)
+    {
         auto encodeInfo = encodeResourceCommands();
-
 
         // Readback heap
         D3D12_HEAP_PROPERTIES heapProps;
@@ -6380,7 +6430,8 @@ Result D3D12Device::readBufferResource(
         submitResourceCommandsAndWait(encodeInfo);
     }
 
-    D3D12Resource& stageBufRef = (buffer->getDesc()->cpuAccessFlags != (int)MemoryType::CpuRead) ? stageBuf : resource;
+    D3D12Resource& stageBufRef =
+        buffer->getDesc()->memoryType != MemoryType::ReadBack ? stageBuf : resource;
 
     // Map and copy
     RefPtr<ListBlob> blob = new ListBlob();
@@ -7062,8 +7113,8 @@ void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::deserializeAc
 void D3D12Device::CommandBufferImpl::RayTracingCommandEncoderImpl::memoryBarrier(
     int count,
     IAccelerationStructure* const* structures,
-    MemoryType::Enum sourceAccess,
-    MemoryType::Enum destAccess)
+    AccessFlag sourceAccess,
+    AccessFlag destAccess)
 {
     ShortList<D3D12_RESOURCE_BARRIER> barriers;
     barriers.setCount(count);

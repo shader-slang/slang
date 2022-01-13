@@ -8,6 +8,8 @@
 
 #include "slang-list.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -81,6 +83,7 @@ public:
 
 protected:
     List<char> m_appendBuffer;
+    std::mutex mutex;
 };
 
 class CallbackWriter : public AppendBufferWriter

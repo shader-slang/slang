@@ -170,7 +170,7 @@ int main()
         ResourceState::CopyDestination,
         ResourceState::CopySource);
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
-    bufferDesc.cpuAccessFlags = MemoryType::GpuOnly;
+    bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<gfx::IBufferResource> numbersBuffer;
     SLANG_RETURN_ON_FAIL(device->createBufferResource(

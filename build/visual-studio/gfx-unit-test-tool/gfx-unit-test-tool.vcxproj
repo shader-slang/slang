@@ -276,7 +276,6 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\existing-device-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\format-unit-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
@@ -284,10 +283,11 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp" />
   </ItemGroup>
   <ItemGroup>

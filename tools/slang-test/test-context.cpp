@@ -12,6 +12,8 @@
 
 using namespace Slang;
 
+thread_local int slangTestThreadIndex = 0;
+
 TestContext::TestContext() 
 {
     m_session = nullptr;
@@ -21,6 +23,39 @@ TestContext::TestContext()
     // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on debug
     connectionTimeOutInMs = 1000 * 60 * 10;
 #endif
+}
+
+void TestContext::setThreadIndex(int index) { slangTestThreadIndex = index; }
+
+void TestContext::setMaxTestRunnerThreadCount(int count)
+{
+    m_jsonRpcConnections.setCount(count);
+    m_testRequirements.setCount(count);
+    m_reporters.setCount(count);
+    for (auto& reporter : m_reporters)
+    {
+        reporter = nullptr;
+    }
+}
+
+void TestContext::setTestRequirements(TestRequirements* req)
+{
+    m_testRequirements[slangTestThreadIndex] = req;
+}
+
+TestRequirements* TestContext::getTestRequirements() const
+{
+    return m_testRequirements[slangTestThreadIndex];
+}
+
+void TestContext::setTestReporter(TestReporter* reporter)
+{
+    m_reporters[slangTestThreadIndex] = reporter;
+}
+
+TestReporter* TestContext::getTestReporter()
+{
+    return m_reporters[slangTestThreadIndex];
 }
 
 Result TestContext::init(const char* exePath)
@@ -91,6 +126,7 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
 
 DownstreamCompilerSet* TestContext::getCompilerSet()
 {
+    std::lock_guard<std::mutex> lock(mutex);
     if (!compilerSet)
     {
         compilerSet = new DownstreamCompilerSet;
@@ -138,24 +174,24 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
 
 void TestContext::destroyRPCConnection()
 {
-    if (m_jsonRpcConnection)
+    if (m_jsonRpcConnections[slangTestThreadIndex])
     {
-        m_jsonRpcConnection->disconnect();
-        m_jsonRpcConnection.setNull();
+        m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
+        m_jsonRpcConnections[slangTestThreadIndex].setNull();
     }
 }
 
 Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
 {
-    if (!m_jsonRpcConnection)
+    if (!m_jsonRpcConnections[slangTestThreadIndex])
     {
-        if (SLANG_FAILED(_createJSONRPCConnection(m_jsonRpcConnection)))
+        if (SLANG_FAILED(_createJSONRPCConnection(m_jsonRpcConnections[slangTestThreadIndex])))
         {
             return nullptr;
         }
     }
 
-    return m_jsonRpcConnection;
+    return m_jsonRpcConnections[slangTestThreadIndex];
 }
 
 

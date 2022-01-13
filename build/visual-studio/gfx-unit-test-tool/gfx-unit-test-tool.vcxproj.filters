@@ -23,6 +23,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\compute-smoke.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\create-buffer-from-handle.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -47,7 +50,13 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp">
@@ -56,16 +65,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\copy-texture-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -82,13 +82,13 @@
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
+      <Filter>Source Files</Filter>
+    </None>
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

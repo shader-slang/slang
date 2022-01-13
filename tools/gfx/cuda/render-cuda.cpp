@@ -202,6 +202,20 @@ public:
         outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        map(MemoryRange* rangeToRead, void** outPointer) override
+    {
+        SLANG_UNUSED(rangeToRead);
+        SLANG_UNUSED(outPointer);
+        return SLANG_FAIL;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+    {
+        SLANG_UNUSED(writtenRange);
+        return SLANG_FAIL;
+    }
 };
 
 class TextureCUDAResource : public TextureResource

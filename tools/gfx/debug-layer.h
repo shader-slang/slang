@@ -184,6 +184,10 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        map(MemoryRange* rangeToRead, void** outPointer) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>
@@ -500,8 +504,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        MemoryType::Enum sourceAccess,
-        MemoryType::Enum destAccess) override;
+        AccessFlag sourceAccess,
+        AccessFlag destAccess) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(

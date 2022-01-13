@@ -271,6 +271,20 @@ public:
         {
             return 0;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL
+            map(MemoryRange* rangeToRead, void** outPointer) override
+        {
+            SLANG_UNUSED(rangeToRead);
+            SLANG_UNUSED(outPointer);
+            return SLANG_FAIL;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+        {
+            SLANG_UNUSED(writtenRange);
+            return SLANG_FAIL;
+        }
 	};
 
     class TextureResourceImpl: public TextureResource
@@ -1272,7 +1286,7 @@ public:
             bufferDesc.defaultState = ResourceState::ConstantBuffer;
             bufferDesc.allowedStates =
                 ResourceStateSet(ResourceState::ConstantBuffer, ResourceState::CopyDestination);
-            bufferDesc.cpuAccessFlags |= MemoryType::CpuWrite;
+            bufferDesc.memoryType = MemoryType::Upload;
             SLANG_RETURN_ON_FAIL(
                 device->createBufferResource(bufferDesc, nullptr, bufferResourcePtr.writeRef()));
             m_ordinaryDataBuffer = static_cast<BufferResourceImpl*>(bufferResourcePtr.get());

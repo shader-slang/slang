@@ -85,7 +85,7 @@ namespace gfx_test
             ResourceState::CopyDestination,
             ResourceState::CopySource);
         bufferDesc.defaultState = ResourceState::ShaderResource;
-        bufferDesc.cpuAccessFlags = MemoryType::GpuOnly;
+        bufferDesc.memoryType = MemoryType::DeviceLocal;
 
         ComPtr<IBufferResource> resultsBuffer;
         GFX_CHECK_CALL_ABORT(device->createBufferResource(
