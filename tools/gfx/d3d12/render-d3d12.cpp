@@ -1803,8 +1803,6 @@ public:
                 BindingRegisterOffsetPair const&    containerOffset,
                 BindingRegisterOffsetPair const&    elementOffset)
             {
-                auto debug__typeName_ = typeLayout->getName();
-
                 // Our first task is to add the binding ranges for stuff that is
                 // directly contained in `typeLayout` rather than via sub-objects.
                 //
