@@ -666,12 +666,13 @@ Result DebugDevice::createMutableRootShaderObject(
     return result;
 }
 
-Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result DebugDevice::createProgram(
+    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram(desc);
-    auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef());
+    auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef(), outDiagnostics);
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outProgram, outObject);
