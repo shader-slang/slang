@@ -1693,7 +1693,8 @@ public:
             Result addDescriptorRange(
                 slang::TypeLayoutReflection*    typeLayout,
                 Index                           physicalDescriptorSetIndex,
-                BindingRegisterOffset const&    offset,
+                BindingRegisterOffset const&    containerOffset,
+                BindingRegisterOffset const&    elementOffset,
                 Index                           logicalDescriptorSetIndex,
                 Index                           descriptorRangeIndex)
             {
@@ -1708,8 +1709,8 @@ public:
                 return addDescriptorRange(
                     physicalDescriptorSetIndex,
                     rangeType,
-                    (UINT)index + offset[rangeType],
-                    (UINT)space,
+                    (UINT)index + elementOffset[rangeType],
+                    (UINT)space + containerOffset.spaceOffset,
                     (UINT)count);
             }
 
@@ -1729,7 +1730,8 @@ public:
             void addBindingRange(
                 slang::TypeLayoutReflection*    typeLayout,
                 Index                           physicalDescriptorSetIndex,
-                BindingRegisterOffset const&    offset,
+                BindingRegisterOffset const&    containerOffset,
+                BindingRegisterOffset const&    elementOffset,
                 Index                           bindingRangeIndex)
             {
                 auto logicalDescriptorSetIndex  = typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
@@ -1743,7 +1745,13 @@ public:
                     // want to silently skip any ranges that represent kinds of bindings that
                     // don't actually exist in D3D12.
                     //
-                    addDescriptorRange(typeLayout, physicalDescriptorSetIndex, offset, logicalDescriptorSetIndex, descriptorRangeIndex);
+                    addDescriptorRange(
+                        typeLayout,
+                        physicalDescriptorSetIndex,
+                        containerOffset,
+                        elementOffset,
+                        logicalDescriptorSetIndex,
+                        descriptorRangeIndex);
                 }
             }
 
@@ -1752,7 +1760,7 @@ public:
                 Index                               physicalDescriptorSetIndex)
             {
                 BindingRegisterOffsetPair offset(varLayout);
-                addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset);
+                addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset, offset);
             }
 
 
@@ -1786,13 +1794,14 @@ public:
                         1);
                 }
 
-                addAsValue(typeLayout, physicalDescriptorSetIndex, elementOffset);
+                addAsValue(typeLayout, physicalDescriptorSetIndex, containerOffset, elementOffset);
             }
 
             void addAsValue(
                 slang::TypeLayoutReflection*        typeLayout,
                 Index                               physicalDescriptorSetIndex,
-                BindingRegisterOffsetPair const&    offset)
+                BindingRegisterOffsetPair const&    containerOffset,
+                BindingRegisterOffsetPair const&    elementOffset)
             {
                 auto debug__typeName_ = typeLayout->getName();
 
@@ -1824,7 +1833,12 @@ public:
                     // For binding ranges that don't represent sub-objects, we will add
                     // all of the descriptor ranges they encompass to the root signature.
                     //
-                    addBindingRange(typeLayout, physicalDescriptorSetIndex, offset.primary, bindingRangeIndex);
+                    addBindingRange(
+                        typeLayout,
+                        physicalDescriptorSetIndex,
+                        containerOffset.primary,
+                        elementOffset.primary,
+                        bindingRangeIndex);
                 }
 
                 // Next we need to recursively include everything bound via sub-objects
@@ -1836,8 +1850,12 @@ public:
 
                     auto subObjectTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
 
-                    BindingRegisterOffsetPair subObjectRangeOffset = offset;
-                    subObjectRangeOffset += BindingRegisterOffsetPair(typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
+                    BindingRegisterOffsetPair subObjectRangeContainerOffset = containerOffset;
+                    subObjectRangeContainerOffset += BindingRegisterOffsetPair(
+                        typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
+                    BindingRegisterOffsetPair subObjectRangeElementOffset = elementOffset;
+                    subObjectRangeElementOffset += BindingRegisterOffsetPair(
+                        typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
 
                     switch(bindingType)
                     {
@@ -1852,10 +1870,10 @@ public:
                             auto elementTypeLayout = elementVarLayout->getTypeLayout();
                             SLANG_ASSERT(elementTypeLayout);
 
-                            BindingRegisterOffsetPair containerOffset = subObjectRangeOffset;
+                            BindingRegisterOffsetPair containerOffset = subObjectRangeContainerOffset;
                             containerOffset += BindingRegisterOffsetPair(containerVarLayout);
 
-                            BindingRegisterOffsetPair elementOffset = subObjectRangeOffset;
+                            BindingRegisterOffsetPair elementOffset = subObjectRangeElementOffset;
                             elementOffset += BindingRegisterOffsetPair(elementVarLayout);
 
                             addAsConstantBuffer(elementTypeLayout, physicalDescriptorSetIndex, containerOffset, elementOffset);
@@ -1874,8 +1892,10 @@ public:
                             SLANG_ASSERT(elementTypeLayout);
 
                             BindingRegisterOffsetPair subDescriptorSetOffset;
-                            subDescriptorSetOffset.primary.spaceOffset = subObjectRangeOffset.primary.spaceOffset;
-                            subDescriptorSetOffset.pending.spaceOffset = subObjectRangeOffset.pending.spaceOffset;
+                            subDescriptorSetOffset.primary.spaceOffset =
+                                subObjectRangeElementOffset.primary.spaceOffset;
+                            subDescriptorSetOffset.pending.spaceOffset =
+                                subObjectRangeElementOffset.pending.spaceOffset;
 
                             auto subPhysicalDescriptorSetIndex = addDescriptorSet();
 
@@ -1898,9 +1918,13 @@ public:
                             if(specializedTypeLayout)
                             {
                                 BindingRegisterOffsetPair pendingOffset;
-                                pendingOffset.primary = subObjectRangeOffset.pending;
+                                pendingOffset.primary = subObjectRangeElementOffset.pending;
 
-                                addAsValue(specializedTypeLayout, physicalDescriptorSetIndex, pendingOffset);
+                                addAsValue(
+                                    specializedTypeLayout,
+                                    physicalDescriptorSetIndex,
+                                    pendingOffset,
+                                    pendingOffset);
                             }
                         }
                         break;
@@ -2313,7 +2337,6 @@ public:
             {
                 m_descriptorSet.samplerTable.allocate(samplerHeap, samplerCount);
             }
-
 
             // If the layout specifies that we have any sub-objects, then
             // we need to size the array to account for them.
@@ -3033,7 +3056,7 @@ public:
                 specializedComponentType.writeRef(),
                 diagnosticBlob.writeRef());
 
-            if (diagnosticBlob->getBufferSize())
+            if (diagnosticBlob && diagnosticBlob->getBufferSize())
             {
                 getDebugCallback()->handleMessage(
                     SLANG_FAILED(result) ? DebugMessageType::Error : DebugMessageType::Info,
