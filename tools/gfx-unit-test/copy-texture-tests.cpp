@@ -84,9 +84,10 @@ namespace gfx_test
         FormatInfo formatInfo;
         gfxGetFormatInfo(srcTexDesc.format, &formatInfo);
         UInt alignment = 256; // D3D requires rows to be aligned to a multiple of 256 bytes.
-        uint8_t initialData[] = { 0 };
+        auto alignedRowPitch = (extent.width * formatInfo.blockSizeInBytes + alignment - 1) & ~(alignment - 1);
+        uint8_t initialData[512] = { 0 }; // Buffer will contain 512 bytes due to alignment rules.
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.sizeInBytes = extent.height * ((formatInfo.blockSizeInBytes + alignment - 1) & ~(alignment - 1));
+        bufferDesc.sizeInBytes = extent.height * alignedRowPitch;
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(uint8_t);
         bufferDesc.allowedStates = ResourceStateSet(
@@ -124,11 +125,31 @@ namespace gfx_test
         queue->executeCommandBuffer(commandBuffer);
         queue->waitOnHost();
 
-        compareComputeResult(
-            device,
-            resultsBuffer,
-            srcTexData,
-            16);
+        if (device->getDeviceInfo().deviceType == DeviceType::DirectX12)
+        {
+            // D3D12 has to pad out the rows in order to adhere to alignment, so when comparing results
+            // we need to make sure not to include the padding.
+            size_t testOffset = 0;
+            for (Int i = 0; i < extent.height; ++i)
+            {
+                compareComputeResult(
+                    device,
+                    resultsBuffer,
+                    testOffset,
+                    srcTexData + 8 * i,
+                    8);
+                testOffset += alignedRowPitch;
+            }
+        }
+        else if (device->getDeviceInfo().deviceType == DeviceType::Vulkan)
+        {
+            compareComputeResult(
+                device,
+                resultsBuffer,
+                0,
+                srcTexData,
+                16);
+        }
     }
 
     // D3D12 test currently fails due to an exception inside copyTextureToResource.
