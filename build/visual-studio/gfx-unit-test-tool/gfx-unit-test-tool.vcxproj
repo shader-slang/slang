@@ -284,6 +284,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
@@ -296,6 +297,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\format-test-shaders.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
   <ItemGroup>
