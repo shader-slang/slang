@@ -109,8 +109,10 @@ public:
         createMutableRootShaderObject(
         IShaderProgram* program, IShaderObject** outObject) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc,
         IPipelineState** outState) override;
@@ -8074,7 +8076,8 @@ static VkImageViewType _calcImageViewType(ITextureResource::Type type, const ITe
     return VK_IMAGE_VIEW_TYPE_MAX_ENUM;
 }
 
-Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result VKDevice::createProgram(
+    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
     shaderProgram->slangProgram = desc.slangProgram;
@@ -8108,6 +8111,8 @@ Result VKDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram*
                 compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
                 DebugMessageSource::Slang,
                 (char*)diagnostics->getBufferPointer());
+            if (outDiagnosticBlob)
+                returnComPtr(outDiagnosticBlob, diagnostics);
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         shaderProgram->m_codeBlobs.add(kernelCode);
