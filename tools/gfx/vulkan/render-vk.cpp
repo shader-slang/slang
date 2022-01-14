@@ -4500,11 +4500,11 @@ public:
                 m_commandBuffer = commandBuffer;
             }
 
-            VkImageAspectFlags getAspectMask(VkFormat format)
+            VkImageAspectFlags getAspectMask(TextureAspect aspect)
             {
-                if (VulkanUtil::isDepthFormat(format))
+                if (aspect == TextureAspect::Depth)
                     return VK_IMAGE_ASPECT_DEPTH_BIT;
-                if (VulkanUtil::isStencilFormat(format))
+                if (aspect == TextureAspect::Stencil)
                     return VK_IMAGE_ASPECT_STENCIL_BIT;
                 return VK_IMAGE_ASPECT_COLOR_BIT;
             }
@@ -4532,12 +4532,12 @@ public:
                     for (Int mipId = 0; mipId < srcSubresource.mipLevelCount; ++mipId)
                     {
                         VkImageCopy region = {};
-                        region.srcSubresource.aspectMask = getAspectMask(srcImage->m_vkformat);
+                        region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
                         region.srcSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
                         region.srcSubresource.mipLevel = mipId + srcSubresource.mipLevel;
                         region.srcSubresource.layerCount = 1;
                         region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
-                        region.dstSubresource.aspectMask = getAspectMask(dstImage->m_vkformat);
+                        region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
                         region.dstSubresource.baseArrayLayer = layer + dstSubresource.baseArrayLayer;
                         region.dstSubresource.mipLevel = mipId + dstSubresource.mipLevel;
                         region.dstSubresource.layerCount = 1;
@@ -4810,7 +4810,7 @@ public:
                 region.bufferOffset = dstOffset;
                 region.bufferRowLength = 0;
                 region.bufferImageHeight = 0;
-                region.imageSubresource.aspectMask = getAspectMask(image->m_vkformat);
+                region.imageSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
                 region.imageSubresource.mipLevel = srcSubresource.mipLevel;
                 region.imageSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
                 region.imageSubresource.layerCount = srcSubresource.layerCount;
@@ -4836,7 +4836,7 @@ public:
                 barrier.image = image->m_image;
                 barrier.oldLayout = translateImageLayout(src);
                 barrier.newLayout = translateImageLayout(dst);
-                barrier.subresourceRange.aspectMask = getAspectMask(image->m_vkformat);
+                barrier.subresourceRange.aspectMask = getAspectMask(subresourceRange.aspectMask);
                 barrier.subresourceRange.baseArrayLayer = subresourceRange.baseArrayLayer;
                 barrier.subresourceRange.baseMipLevel = subresourceRange.mipLevel;
                 barrier.subresourceRange.layerCount = subresourceRange.layerCount;
@@ -7131,6 +7131,9 @@ void VKDevice::_transitionImageLayout(
     VkImageLayout oldLayout,
     VkImageLayout newLayout)
 {
+    if (oldLayout == newLayout)
+        return;
+
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
