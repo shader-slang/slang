@@ -4163,7 +4163,7 @@ public:
                         auto aspect = Math::getLowestBit((int32_t)aspectMask);
                         aspectMask &= ~aspect;
                         auto planeIndex = D3DUtil::getPlaneSlice(d3dFormat, (TextureAspect)aspect);
-                        for (uint32_t layer = 0; layer < subresourceRange.baseArrayLayer; layer++)
+                        for (uint32_t layer = 0; layer < subresourceRange.layerCount; layer++)
                         {
                             for (uint32_t mip = 0; mip < subresourceRange.mipLevelCount; mip++)
                             {

@@ -30,6 +30,10 @@ namespace gfx_test
         srcTexDesc.arraySize = 1;
         srcTexDesc.size = extent;
         srcTexDesc.defaultState = ResourceState::UnorderedAccess;
+        srcTexDesc.allowedStates = ResourceStateSet(
+            ResourceState::UnorderedAccess,
+            ResourceState::ShaderResource,
+            ResourceState::CopySource);
         srcTexDesc.format = Format::R8G8B8A8_UINT;
 
         ComPtr<ITextureResource> srcTexture;
@@ -55,7 +59,11 @@ namespace gfx_test
         dstTexDesc.numMipLevels = 1;
         dstTexDesc.arraySize = 1;
         dstTexDesc.size = extent;
-        dstTexDesc.defaultState = ResourceState::ShaderResource;
+        dstTexDesc.defaultState = ResourceState::CopyDestination;
+        dstTexDesc.allowedStates = ResourceStateSet(
+            ResourceState::ShaderResource,
+            ResourceState::CopyDestination,
+            ResourceState::CopySource);
         dstTexDesc.format = Format::R8G8B8A8_UINT;
 
         ComPtr<ITextureResource> dstTexture;
@@ -73,10 +81,12 @@ namespace gfx_test
 
         ITextureResource::Offset3D dstOffset;
 
-        const int numberCount = 16;
+        FormatInfo formatInfo;
+        gfxGetFormatInfo(srcTexDesc.format, &formatInfo);
+        UInt alignment = 256; // D3D requires rows to be aligned to a multiple of 256 bytes.
         uint8_t initialData[] = { 0 };
         IBufferResource::Desc bufferDesc = {};
-        bufferDesc.sizeInBytes = numberCount * sizeof(uint8_t);
+        bufferDesc.sizeInBytes = extent.height * ((formatInfo.blockSizeInBytes + alignment - 1) & ~(alignment - 1));
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(uint8_t);
         bufferDesc.allowedStates = ResourceStateSet(
@@ -84,7 +94,7 @@ namespace gfx_test
             ResourceState::UnorderedAccess,
             ResourceState::CopyDestination,
             ResourceState::CopySource);
-        bufferDesc.defaultState = ResourceState::ShaderResource;
+        bufferDesc.defaultState = ResourceState::CopyDestination;
         bufferDesc.memoryType = MemoryType::DeviceLocal;
 
         ComPtr<IBufferResource> resultsBuffer;
@@ -105,9 +115,10 @@ namespace gfx_test
         auto commandBuffer = transientHeap->createCommandBuffer();
         auto encoder = commandBuffer->encodeResourceCommands();
 
-        encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::UnorderedAccess, ResourceState::ShaderResource);
-        encoder->copyTexture(dstTexture, ResourceState::ShaderResource, dstSubresource, dstOffset, srcTexture, ResourceState::ShaderResource, srcSubresource, srcOffset, extent);
-        encoder->copyTextureToBuffer(resultsBuffer, 0, 16, dstTexture, ResourceState::ShaderResource, srcSubresource, srcOffset, extent);
+        encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::UnorderedAccess, ResourceState::CopySource);
+        encoder->copyTexture(dstTexture, ResourceState::CopyDestination, dstSubresource, dstOffset, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, extent);
+        encoder->textureSubresourceBarrier(dstTexture, dstSubresource, ResourceState::CopyDestination, ResourceState::CopySource);
+        encoder->copyTextureToBuffer(resultsBuffer, 0, 16, dstTexture, ResourceState::CopySource, dstSubresource, dstOffset, extent);
         encoder->endEncoding();
         commandBuffer->close();
         queue->executeCommandBuffer(commandBuffer);
@@ -121,10 +132,10 @@ namespace gfx_test
     }
 
     // D3D12 test currently fails due to an exception inside copyTextureToResource.
-//     SLANG_UNIT_TEST(copyTextureD3D12)
-//     {
-//         runTestImpl(copyTextureTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
-//     }
+    SLANG_UNIT_TEST(copyTextureD3D12)
+    {
+        runTestImpl(copyTextureTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    }
 
     SLANG_UNIT_TEST(copyTextureVulkan)
     {
