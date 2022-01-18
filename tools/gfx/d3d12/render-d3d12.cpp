@@ -981,6 +981,9 @@ public:
                 /// The type of binding in this range.
             slang::BindingType bindingType;
 
+                /// The shape of the resource
+            SlangResourceShape resourceShape;
+
                 /// The number of distinct bindings in this range.
             uint32_t count;
 
@@ -1118,6 +1121,7 @@ public:
                         typeLayout->getBindingRangeLeafTypeLayout(r);
                     BindingRangeInfo bindingRangeInfo = {};
                     bindingRangeInfo.bindingType = slangBindingType;
+                    bindingRangeInfo.resourceShape = slangLeafTypeLayout->getResourceShape();
                     bindingRangeInfo.count = count;
 
                     switch (slangBindingType)
@@ -3343,19 +3347,8 @@ public:
             virtual SLANG_NO_THROW void SLANG_MCALL
                 setPrimitiveTopology(PrimitiveTopology topology) override
             {
-                switch (topology)
-                {
-                case PrimitiveTopology::TriangleList:
-                    {
-                        m_primitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-                        m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
-                        break;
-                    }
-                default:
-                    {
-                        assert(!"Unhandled type");
-                    }
-                }
+                m_primitiveTopologyType = D3DUtil::getPrimitiveType(topology);
+                m_primitiveTopology = D3DUtil::getPrimitiveTopology(topology);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL setVertexBuffers(
@@ -4726,8 +4719,8 @@ Result D3D12Device::PipelineCommandEncoder::_bindRenderState(Submitter* submitte
     auto commandList = m_d3dCmdList;
     auto pipelineTypeIndex = (int)newPipelineImpl->desc.type;
     auto programImpl = static_cast<ShaderProgramImpl*>(newPipelineImpl->m_program.Ptr());
-    submitter->setPipelineState(newPipelineImpl);
     submitter->setRootSignature(programImpl->m_rootObjectLayout->m_rootSignature);
+    submitter->setPipelineState(newPipelineImpl);
     RefPtr<ShaderObjectLayoutImpl> specializedRootLayout;
     SLANG_RETURN_ON_FAIL(rootObjectImpl->getSpecializedLayout(specializedRootLayout.writeRef()));
     RootShaderObjectLayoutImpl* rootLayoutImpl =
@@ -5481,13 +5474,13 @@ Result D3D12Device::initialize(const Desc& desc)
     // Allocate a D3D12 "command signature" object that matches the behavior
     // of a D3D11-style `DrawInstancedIndirect` operation.
     {
-        D3D12_INDIRECT_ARGUMENT_DESC args[1];
-        args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+        D3D12_INDIRECT_ARGUMENT_DESC args;
+        args.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
 
         D3D12_COMMAND_SIGNATURE_DESC desc;
-        desc.ByteStride = 36;
+        desc.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS);
         desc.NumArgumentDescs = 1;
-        desc.pArgumentDescs = args;
+        desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndirectCmdSignature.writeRef())));
@@ -5496,13 +5489,13 @@ Result D3D12Device::initialize(const Desc& desc)
     // Allocate a D3D12 "command signature" object that matches the behavior
     // of a D3D11-style `DrawIndexedInstancedIndirect` operation.
     {
-        D3D12_INDIRECT_ARGUMENT_DESC args[1];
-        args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+        D3D12_INDIRECT_ARGUMENT_DESC args;
+        args.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
         D3D12_COMMAND_SIGNATURE_DESC desc;
-        desc.ByteStride = 36;
+        desc.ByteStride = sizeof(D3D12_DRAW_INDEXED_ARGUMENTS);
         desc.NumArgumentDescs = 1;
-        desc.pArgumentDescs = args;
+        desc.pArgumentDescs = &args;
         desc.NodeMask = 0;
 
         SLANG_RETURN_ON_FAIL(m_device->CreateCommandSignature(&desc, nullptr, IID_PPV_ARGS(drawIndexedIndirectCmdSignature.writeRef())));
@@ -6059,6 +6052,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             viewImpl->m_allocator = m_rtvAllocator;
             D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
             rtvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            isArray = desc.renderTarget.arraySize > 1;
             switch (desc.renderTarget.shape)
             {
             case IResource::Type::Texture1D:
@@ -6078,8 +6072,8 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 {
                     rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DARRAY
                                                     : D3D12_RTV_DIMENSION_TEXTURE2D;
-                    rtvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
-                    rtvDesc.Texture2D.PlaneSlice = desc.renderTarget.planeIndex;
+                    rtvDesc.Texture2DArray.MipSlice = desc.renderTarget.mipSlice;
+                    rtvDesc.Texture2DArray.PlaneSlice = desc.renderTarget.planeIndex;
                     rtvDesc.Texture2DArray.ArraySize = desc.renderTarget.arraySize;
                     rtvDesc.Texture2DArray.FirstArraySlice = desc.renderTarget.arrayIndex;
                 }
@@ -6104,6 +6098,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             viewImpl->m_allocator = m_dsvAllocator;
             D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
             dsvDesc.Format = D3DUtil::getMapFormat(desc.format);
+            isArray = desc.renderTarget.arraySize > 1;
             switch (desc.renderTarget.shape)
             {
             case IResource::Type::Texture1D:
@@ -6111,8 +6106,21 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 dsvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
                 break;
             case IResource::Type::Texture2D:
-                dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-                dsvDesc.Texture2D.MipSlice = desc.renderTarget.mipSlice;
+                if (resourceImpl->getDesc()->sampleDesc.numSamples > 1)
+                {
+                    dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY
+                                                    : D3D12_DSV_DIMENSION_TEXTURE2DMS;
+                    dsvDesc.Texture2DMSArray.ArraySize = desc.renderTarget.arraySize;
+                    dsvDesc.Texture2DMSArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
+                else
+                {
+                    dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DARRAY
+                                                    : D3D12_DSV_DIMENSION_TEXTURE2D;
+                    dsvDesc.Texture2DArray.MipSlice = desc.renderTarget.mipSlice;
+                    dsvDesc.Texture2DArray.ArraySize = desc.renderTarget.arraySize;
+                    dsvDesc.Texture2DArray.FirstArraySlice = desc.renderTarget.arrayIndex;
+                }
                 break;
             default:
                 return SLANG_FAIL;
@@ -6183,8 +6191,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
             // Need to construct the D3D12_SHADER_RESOURCE_VIEW_DESC because otherwise TextureCube is not accessed
             // appropriately (rather than just passing nullptr to CreateShaderResourceView)
             const D3D12_RESOURCE_DESC resourceDesc = resourceImpl->m_resource.getResource()->GetDesc();
-            const DXGI_FORMAT pixelFormat =
-                gfxIsTypelessFormat(texture->getDesc()->format) ? D3DUtil::getMapFormat(desc.format) : resourceDesc.Format;
+            const DXGI_FORMAT pixelFormat = desc.format == Format::Unknown ? resourceDesc.Format : D3DUtil::getMapFormat(desc.format);
 
             D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
             _initSrvDesc(
@@ -7517,6 +7524,103 @@ Result D3D12Device::RayTracingPipelineStateImpl::createShaderTables(
 
 #endif // SLANG_GFX_HAS_DXR_SUPPORT
 
+Result createNullDescriptor(
+    ID3D12Device* d3dDevice,
+    D3D12_CPU_DESCRIPTOR_HANDLE destDescriptor,
+    const D3D12Device::ShaderObjectLayoutImpl::BindingRangeInfo& bindingRange)
+{
+    switch (bindingRange.bindingType)
+    {
+    case slang::BindingType::ConstantBuffer:
+        {
+            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+            cbvDesc.BufferLocation = 0;
+            cbvDesc.SizeInBytes = 0;
+            d3dDevice->CreateConstantBufferView(&cbvDesc, destDescriptor);
+        }
+        break;
+    case slang::BindingType::MutableRawBuffer:
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+            uavDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            d3dDevice->CreateUnorderedAccessView(nullptr, nullptr, &uavDesc, destDescriptor);
+        }
+        break;
+    case slang::BindingType::MutableTypedBuffer:
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+            uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uavDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            d3dDevice->CreateUnorderedAccessView(nullptr, nullptr, &uavDesc, destDescriptor);
+        }
+        break;
+    case slang::BindingType::RawBuffer:
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+            srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            d3dDevice->CreateShaderResourceView(nullptr, &srvDesc, destDescriptor);
+        }
+        break;
+    case slang::BindingType::TypedBuffer:
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            d3dDevice->CreateShaderResourceView(nullptr, &srvDesc, destDescriptor);
+        }
+        break;
+    case slang::BindingType::Texture:
+        {
+            D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            switch (bindingRange.resourceShape)
+            {
+            case SLANG_TEXTURE_1D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
+                break;
+            case SLANG_TEXTURE_1D_ARRAY:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
+                break;
+            case SLANG_TEXTURE_2D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                break;
+            case SLANG_TEXTURE_2D_ARRAY:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+                break;
+            case SLANG_TEXTURE_3D:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
+                break;
+            case SLANG_TEXTURE_CUBE:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+                break;
+            case SLANG_TEXTURE_CUBE_ARRAY:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+                break;
+            case SLANG_TEXTURE_2D_MULTISAMPLE:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+                break;
+            case SLANG_TEXTURE_2D_MULTISAMPLE_ARRAY:
+                srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMSARRAY;
+                break;
+            default:
+                return SLANG_OK;
+            }
+            d3dDevice->CreateShaderResourceView(nullptr, &srvDesc, destDescriptor);
+        }
+        break;
+    default:
+        break;
+    }
+    return SLANG_OK;
+}
+
 Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourceView)
 {
     if (offset.bindingRangeIndex < 0)
@@ -7525,7 +7629,17 @@ Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IR
     if (offset.bindingRangeIndex >= layout->getBindingRangeCount())
         return SLANG_E_INVALID_ARG;
 
+    ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
+
     auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
+
+    if (resourceView == nullptr)
+    {
+        // Create null descriptor for the binding.
+        auto destDescriptor = m_descriptorSet.resourceTable.getCpuHandle(
+            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex);
+        return createNullDescriptor(d3dDevice, destDescriptor, bindingRange);
+    }
 
     ResourceViewInternalImpl* internalResourceView = nullptr;
     switch (resourceView->getViewDesc()->type)
@@ -7552,7 +7666,6 @@ Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IR
     }
 
     auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-    ID3D12Device* d3dDevice = static_cast<D3D12Device*>(getDevice())->m_device;
     d3dDevice->CopyDescriptorsSimple(
         1,
         m_descriptorSet.resourceTable.getCpuHandle(

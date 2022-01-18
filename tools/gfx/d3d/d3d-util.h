@@ -50,6 +50,8 @@ class D3DUtil
 
     static D3D12_PRIMITIVE_TOPOLOGY_TYPE getPrimitiveType(PrimitiveType type);
 
+    static D3D12_PRIMITIVE_TOPOLOGY_TYPE getPrimitiveType(PrimitiveTopology topology);
+
     static D3D12_COMPARISON_FUNC getComparisonFunc(ComparisonFunc func);
 
     static D3D12_DEPTH_STENCILOP_DESC translateStencilOpDesc(DepthStencilOpDesc desc);
