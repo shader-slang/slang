@@ -202,6 +202,20 @@ public:
         outHandle->api = InteropHandleAPI::CUDA;
         return SLANG_OK;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        map(MemoryRange* rangeToRead, void** outPointer) override
+    {
+        SLANG_UNUSED(rangeToRead);
+        SLANG_UNUSED(outPointer);
+        return SLANG_FAIL;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+    {
+        SLANG_UNUSED(writtenRange);
+        return SLANG_FAIL;
+    }
 };
 
 class TextureCUDAResource : public TextureResource
@@ -1567,7 +1581,7 @@ public:
             }
             case CU_AD_FORMAT_UNSIGNED_INT8:
             {
-                elementSize = sizeof(uint32_t) * numChannels;
+                elementSize = sizeof(uint8_t) * numChannels;
                 break;
             }
             default:
@@ -2146,8 +2160,10 @@ public:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob) override
     {
         // If this is a specializable program, we just keep a reference to the slang program and
         // don't actually create any kernels. This program will be specialized later when we know
@@ -2172,6 +2188,8 @@ public:
                 compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
                 DebugMessageSource::Slang,
                 (char*)diagnostics->getBufferPointer());
+            if (outDiagnosticBlob)
+                returnComPtr(outDiagnosticBlob, diagnostics);
         }
         SLANG_RETURN_ON_FAIL(compileResult);
         
@@ -2282,12 +2300,10 @@ public:
     }
     
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override
     {
-        SLANG_UNUSED(inputElements);
-        SLANG_UNUSED(inputElementCount);
+        SLANG_UNUSED(desc);
         SLANG_UNUSED(outLayout);
         return SLANG_E_NOT_AVAILABLE;
     }

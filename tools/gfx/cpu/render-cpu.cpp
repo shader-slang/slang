@@ -54,6 +54,21 @@ public:
     {
         return (DeviceAddress)m_data;
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        map(MemoryRange* rangeToRead, void** outPointer) override
+    {
+        SLANG_UNUSED(rangeToRead);
+        if (outPointer)
+            *outPointer = m_data;
+        return SLANG_OK;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override
+    {
+        SLANG_UNUSED(writtenRange);
+        return SLANG_OK;
+    }
 };
 
 struct CPUTextureBaseShapeInfo
@@ -1245,8 +1260,10 @@ public:
         return SLANG_OK;
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob) override
     {
         RefPtr<CPUShaderProgram> cpuProgram = new CPUShaderProgram();
 

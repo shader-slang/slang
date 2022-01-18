@@ -23,12 +23,11 @@ TestCategory* TestCategorySet::add(String const& name, TestCategory* parent)
 
 TestCategory* TestCategorySet::find(String const& name)
 {
-    RefPtr<TestCategory> category;
-    if (!m_categoryMap.TryGetValue(name, category))
+    if (auto category = m_categoryMap.TryGetValue(name))
     {
-        return nullptr;
+        return category->Ptr();
     }
-    return category;
+    return nullptr;
 }
 
 TestCategory* TestCategorySet::findOrError(String const& name)
@@ -190,6 +189,19 @@ static bool _isSubCommand(const char* arg)
                 return SLANG_FAIL;
             }
             optionsOut->adapter = *argCursor++;
+        }
+        else if (strcmp(arg, "-server-count") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                return SLANG_FAIL;
+            }
+            optionsOut->serverCount = StringToInt(* argCursor++);
+            if (optionsOut->serverCount <= 0)
+            {
+                optionsOut->serverCount = 1;
+            }
         }
         else if (strcmp(arg, "-appveyor") == 0)
         {

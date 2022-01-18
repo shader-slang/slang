@@ -44,15 +44,6 @@ typedef uint64_t DeviceAddress;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
-// Declare opaque type
-class IInputLayout: public ISlangUnknown
-{
-};
-#define SLANG_UUID_IInputLayout                                                         \
-    {                                                                                  \
-        0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
-    }
-
 enum class StageType
 {
     Unknown,
@@ -105,6 +96,13 @@ enum class BindingStyle
     CPU,
     CUDA,
     CountOf,
+};
+
+enum class AccessFlag
+{
+    None,
+    Read,
+    Write,
 };
 
 class ITransientResourceHeap;
@@ -185,6 +183,8 @@ public:
     x(R8_UNORM, 1, 1) \
     x(B8G8R8A8_UNORM, 4, 1) \
     x(B8G8R8A8_UNORM_SRGB, 4, 1) \
+    x(B8G8R8X8_UNORM, 4, 1) \
+    x(B8G8R8X8_UNORM_SRGB, 4, 1) \
     \
     x(R16G16B16A16_SNORM, 8, 1) \
     x(R16G16_SNORM, 4, 1) \
@@ -290,6 +290,8 @@ enum class Format
     R8_UNORM,
     B8G8R8A8_UNORM,
     B8G8R8A8_UNORM_SRGB,
+    B8G8R8X8_UNORM,
+    B8G8R8X8_UNORM_SRGB,
 
     R16G16B16A16_SNORM,
     R16G16_SNORM,
@@ -352,8 +354,13 @@ struct InputElementDesc
     UInt semanticIndex;
     Format format;
     UInt offset;
-    InputSlotClass slotClass;
     UInt bufferSlotIndex;
+};
+
+struct VertexStreamDesc
+{
+    uint32_t stride;
+    InputSlotClass slotClass;
     UInt instanceDataStepRate;
 };
 
@@ -417,14 +424,12 @@ private:
 };
 
 
-/// Combinations describe how a resource can be accessed (typically by the host/cpu)
-struct AccessFlag
+/// Describes how memory for the resource should be allocated for CPU access.
+enum class MemoryType
 {
-    enum Enum
-    {
-        Read = 0x1,
-        Write = 0x2
-    };
+    DeviceLocal,
+    Upload,
+    ReadBack,
 };
 
 enum class InteropHandleAPI
@@ -442,6 +447,23 @@ struct InteropHandle
     InteropHandleAPI api = InteropHandleAPI::Unknown;
     uint64_t handleValue = 0;
 };
+
+// Declare opaque type
+class IInputLayout : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        InputElementDesc const* inputElements = nullptr;
+        Int inputElementCount = 0;
+        VertexStreamDesc const* vertexStreams = nullptr;
+        Int vertexStreamCount = 0;
+    };
+};
+#define SLANG_UUID_IInputLayout                                                         \
+    {                                                                                  \
+        0x45223711, 0xa84b, 0x455c, { 0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e } \
+    }
 
 class IResource: public ISlangUnknown
 {
@@ -462,12 +484,10 @@ public:
         /// Base class for Descs
     struct DescBase
     {
-        bool hasCpuAccessFlag(AccessFlag::Enum accessFlag) { return (cpuAccessFlags & accessFlag) != 0; }
-
         Type type = Type::Unknown;
         ResourceState defaultState = ResourceState::Undefined;
         ResourceStateSet allowedStates = ResourceStateSet();
-        int cpuAccessFlags = 0;     ///< Combination of Resource::AccessFlag
+        MemoryType memoryType = MemoryType::DeviceLocal;
         InteropHandle existingHandle = {};
         bool isShared = false;
     };
@@ -485,6 +505,12 @@ public:
         0xa0e39f34, 0x8398, 0x4522, { 0x95, 0xc2, 0xeb, 0xc0, 0xf9, 0x84, 0xef, 0x3f } \
     }
 
+struct MemoryRange
+{
+    uint64_t offset;
+    uint64_t size;
+};
+
 class IBufferResource: public IResource
 {
 public:
@@ -497,6 +523,8 @@ public:
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL map(MemoryRange* rangeToRead, void** outPointer) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) = 0;
 };
 #define SLANG_UUID_IBufferResource                                                     \
     {                                                                                  \
@@ -731,6 +759,7 @@ public:
         RenderTargetDesc renderTarget;
         SubresourceRange subresourceRange;
         BufferRange bufferRange;
+        uint32_t bufferElementSize; // 0 means raw buffer.
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
@@ -1454,12 +1483,11 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) = 0;
     inline void setVertexBuffer(
-        uint32_t slot, IBufferResource* buffer, uint32_t stride, uint32_t offset = 0)
+        uint32_t slot, IBufferResource* buffer, uint32_t offset = 0)
     {
-        setVertexBuffers(slot, 1, &buffer, &stride, &offset);
+        setVertexBuffers(slot, 1, &buffer, &offset);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -1472,14 +1500,14 @@ public:
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
         uint64_t argOffset,
-        IBufferResource* countBuffer,
-        uint64_t countOffset) = 0;
+        IBufferResource* countBuffer = nullptr,
+        uint64_t countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL drawIndexedIndirect(
         uint32_t maxDrawCount,
         IBufferResource* argBuffer,
         uint64_t argOffset,
-        IBufferResource* countBuffer,
-        uint64_t countOffset) = 0;
+        IBufferResource* countBuffer = nullptr,
+        uint64_t countOffset = 0) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL setStencilReference(uint32_t referenceValue) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL setSamplePositions(
         uint32_t samplesPerPixel, uint32_t pixelCount, const SamplePosition* samplePositions) = 0;
@@ -1618,8 +1646,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        AccessFlag::Enum sourceAccess,
-        AccessFlag::Enum destAccess) = 0;
+        AccessFlag sourceAccess,
+        AccessFlag destAccess) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
@@ -2049,12 +2077,31 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements, UInt inputElementCount, IInputLayout** outLayout) = 0;
+        IInputLayout::Desc const& desc, IInputLayout** outLayout) = 0;
 
-    inline ComPtr<IInputLayout> createInputLayout(const InputElementDesc* inputElements, UInt inputElementCount)
+    inline ComPtr<IInputLayout> createInputLayout(IInputLayout::Desc const& desc)
     {
         ComPtr<IInputLayout> layout;
-        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(inputElements, inputElementCount, layout.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(desc, layout.writeRef()));
+        return layout;
+    }
+
+    inline Result createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount, IInputLayout** outLayout)
+    {
+        VertexStreamDesc streamDesc = { (uint32_t)vertexSize, InputSlotClass::PerVertex, 0 };
+
+        IInputLayout::Desc inputLayoutDesc = {};
+        inputLayoutDesc.inputElementCount = inputElementCount;
+        inputLayoutDesc.inputElements = inputElements;
+        inputLayoutDesc.vertexStreamCount = 1;
+        inputLayoutDesc.vertexStreams = &streamDesc;
+        return createInputLayout(inputLayoutDesc, outLayout);
+    }
+
+    inline ComPtr<IInputLayout> createInputLayout(size_t vertexSize, InputElementDesc const* inputElements, Int inputElementCount)
+    {
+        ComPtr<IInputLayout> layout;
+        SLANG_RETURN_NULL_ON_FAIL(createInputLayout(vertexSize, inputElements, inputElementCount, layout.writeRef()));
         return layout;
     }
 
@@ -2088,7 +2135,10 @@ public:
         IShaderProgram* program,
         IShaderObject** outObject) = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob = nullptr) = 0;
 
     inline ComPtr<IShaderProgram> createProgram(const IShaderProgram::Desc& desc)
     {

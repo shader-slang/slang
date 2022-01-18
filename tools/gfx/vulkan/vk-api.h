@@ -85,6 +85,7 @@ namespace gfx {
     x(vkCmdBindDescriptorSets) \
     x(vkCmdDispatch) \
     x(vkCmdDraw) \
+    x(vkCmdDrawIndexed) \
     x(vkCmdDrawIndirect) \
     x(vkCmdDrawIndexedIndirect) \
     x(vkCmdSetScissor) \
@@ -95,6 +96,7 @@ namespace gfx {
     x(vkCmdEndRenderPass) \
     x(vkCmdPipelineBarrier) \
     x(vkCmdCopyBufferToImage)\
+    x(vkCmdCopyImageToBuffer) \
     x(vkCmdPushConstants) \
     x(vkCmdSetStencilReference) \
     x(vkCmdWriteTimestamp) \

@@ -32,7 +32,7 @@ namespace gfx_test
         bufferDesc.format = gfx::Format::Unknown;
         bufferDesc.elementSize = sizeof(float);
         bufferDesc.defaultState = unorderedAccess ? ResourceState::UnorderedAccess : ResourceState::ShaderResource;
-        bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
+        bufferDesc.memoryType = MemoryType::DeviceLocal;
         bufferDesc.allowedStates = ResourceStateSet(
             ResourceState::ShaderResource,
             ResourceState::CopyDestination,
@@ -47,6 +47,7 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = unorderedAccess ? IResourceView::Type::UnorderedAccess : IResourceView::Type::ShaderResource;
         viewDesc.format = Format::Unknown;
+        viewDesc.bufferElementSize = sizeof(float);
         GFX_CHECK_CALL_ABORT(device->createBufferView(outBuffer.buffer, viewDesc, outBuffer.view.writeRef()));
     }
 

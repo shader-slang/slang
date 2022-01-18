@@ -63,8 +63,6 @@ class D3DUtil
         /// Given a slang pixel format returns the equivalent DXGI_ pixel format. If the format is not known, will return DXGI_FORMAT_UNKNOWN
     static DXGI_FORMAT getMapFormat(Format format);
 
-    static D3D12_RESOURCE_STATES translateResourceState(ResourceState state);
-
         /// Given the usage, flags, and format will return the most suitable format. Will return DXGI_UNKNOWN if combination is not possible
     static DXGI_FORMAT calcFormat(UsageType usage, DXGI_FORMAT format);
         /// Calculate appropriate format for creating a buffer for usage and flags

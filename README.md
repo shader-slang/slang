@@ -1,7 +1,7 @@
 Slang
 =====
-
-[![AppVeyor build status](https://ci.appveyor.com/api/projects/status/3jptgsry13k6wdwp/branch/master?svg=true)](https://ci.appveyor.com/project/shader-slang/slang/branch/master) [![Travis build status](https://travis-ci.org/shader-slang/slang.svg?branch=master)](https://travis-ci.org/shader-slang/slang)
+![Linux Build Status](https://github.com/shader-slang/slang/actions/workflows/c-cpp.yml/badge.svg)
+![Windows Build Status](https://github.com/shader-slang/slang/actions/workflows/windows.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
 Slang is based on years of collaboration between researchers at NVIDIA, Carnegie Mellon University, and Stanford.

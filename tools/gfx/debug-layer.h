@@ -106,8 +106,7 @@ public:
         WindowHandle window,
         ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        const InputElementDesc* inputElements,
-        UInt inputElementCount,
+        IInputLayout::Desc const& desc,
         IInputLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createCommandQueue(const ICommandQueue::Desc& desc, ICommandQueue** outQueue) override;
@@ -122,7 +121,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
+        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc,
         IPipelineState** outState) override;
@@ -185,6 +184,10 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) override;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        map(MemoryRange* rangeToRead, void** outPointer) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) override;
 };
 
 class DebugTextureResource : public DebugObject<ITextureResource>
@@ -293,9 +296,18 @@ public:
         setConstantBufferOverride(IBufferResource* constantBuffer) override;
 
 public:
+    // Type name of an ordinary shader object.
     Slang::String m_typeName;
+
+    // The slang Type of an ordinary shader object. This is null for root objects.
     slang::TypeReflection* m_slangType = nullptr;
+
+    // The slang program from which a root shader object is created, this is null for ordinary
+    // objects.
+    Slang::ComPtr<slang::IComponentType> m_rootComponentType;
+
     DebugDevice* m_device;
+
     Slang::List<Slang::RefPtr<DebugShaderObject>> m_entryPoints;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugShaderObject>> m_objects;
     Slang::Dictionary<ShaderOffsetKey, Slang::RefPtr<DebugResourceView>> m_resources;
@@ -348,7 +360,6 @@ public:
         uint32_t startSlot,
         uint32_t slotCount,
         IBufferResource* const* buffers,
-        const uint32_t* strides,
         const uint32_t* offsets) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         setIndexBuffer(IBufferResource* buffer, Format indexFormat, uint32_t offset = 0) override;
@@ -490,8 +501,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL memoryBarrier(
         int count,
         IAccelerationStructure* const* structures,
-        AccessFlag::Enum sourceAccess,
-        AccessFlag::Enum destAccess) override;
+        AccessFlag sourceAccess,
+        AccessFlag destAccess) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
@@ -626,6 +637,10 @@ public:
 public:
     IShaderProgram* getInterface(const Slang::Guid& guid);
 
+    DebugShaderProgram(const IShaderProgram::Desc& desc);
+
+public:
+    Slang::ComPtr<slang::IComponentType> m_slangProgram;
 };
 
 class DebugTransientResourceHeap : public DebugObject<ITransientResourceHeap>

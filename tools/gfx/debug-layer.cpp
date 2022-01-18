@@ -584,15 +584,14 @@ Result DebugDevice::createSwapchain(
 }
 
 Result DebugDevice::createInputLayout(
-    const InputElementDesc* inputElements,
-    UInt inputElementCount,
+    IInputLayout::Desc const& desc,
     IInputLayout** outLayout)
 {
     SLANG_GFX_API_FUNC;
 
     RefPtr<DebugInputLayout> outObject = new DebugInputLayout();
     auto result = baseObject->createInputLayout(
-        inputElements, inputElementCount, outObject->baseObject.writeRef());
+        desc, outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outLayout, outObject);
@@ -652,18 +651,28 @@ Result DebugDevice::createMutableShaderObject(
 }
 
 Result DebugDevice::createMutableRootShaderObject(
-    IShaderProgram* program, IShaderObject** outObject)
+    IShaderProgram* program, IShaderObject** outRootObject)
 {
     SLANG_GFX_API_FUNC;
-    return baseObject->createMutableRootShaderObject(program, outObject);
+    RefPtr<DebugShaderObject> outObject = new DebugShaderObject();
+    auto result = baseObject->createMutableRootShaderObject(
+        getInnerObj(program), outObject->baseObject.writeRef());
+    if (SLANG_FAILED(result))
+        return result;
+    outObject->m_device = this;
+    outObject->m_slangType = nullptr;
+    outObject->m_rootComponentType = getDebugObj(program)->m_slangProgram;
+    returnComPtr(outRootObject, outObject);
+    return result;
 }
 
-Result DebugDevice::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result DebugDevice::createProgram(
+    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics)
 {
     SLANG_GFX_API_FUNC;
 
-    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram();
-    auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef());
+    RefPtr<DebugShaderProgram> outObject = new DebugShaderProgram(desc);
+    auto result = baseObject->createProgram(desc, outObject->baseObject.writeRef(), outDiagnostics);
     if (SLANG_FAILED(result))
         return result;
     returnComPtr(outProgram, outObject);
@@ -833,6 +842,17 @@ const char* DebugBufferResource::getDebugName()
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getDebugName();
+}
+
+Result DebugBufferResource::map(MemoryRange* rangeToRead, void** outPointer)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->map(rangeToRead, outPointer);
+}
+
+Result DebugBufferResource::unmap(MemoryRange* writtenRange)
+{
+    return baseObject->unmap(writtenRange);
 }
 
 IResource::Type DebugTextureResource::getType()
@@ -1087,7 +1107,6 @@ void DebugRenderCommandEncoder::setVertexBuffers(
     uint32_t startSlot,
     uint32_t slotCount,
     IBufferResource* const* buffers,
-    const uint32_t* strides,
     const uint32_t* offsets)
 {
     SLANG_GFX_API_FUNC;
@@ -1097,7 +1116,7 @@ void DebugRenderCommandEncoder::setVertexBuffers(
     {
         innerBuffers.add(static_cast<DebugBufferResource*>(buffers[i])->baseObject.get());
     }
-    baseObject->setVertexBuffers(startSlot, slotCount, innerBuffers.getBuffer(), strides, offsets);
+    baseObject->setVertexBuffers(startSlot, slotCount, innerBuffers.getBuffer(), offsets);
 }
 
 void DebugRenderCommandEncoder::setIndexBuffer(
@@ -1428,8 +1447,8 @@ void DebugRayTracingCommandEncoder::deserializeAccelerationStructure(
 void DebugRayTracingCommandEncoder::memoryBarrier(
     int count,
     IAccelerationStructure* const* structures,
-    AccessFlag::Enum sourceAccess,
-    AccessFlag::Enum destAccess)
+    AccessFlag sourceAccess,
+    AccessFlag destAccess)
 {
     SLANG_GFX_API_FUNC;
     List<IAccelerationStructure*> innerAS;
@@ -1834,6 +1853,11 @@ Result DebugFence::setCurrentValue(uint64_t value)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->setCurrentValue(value);
+}
+
+DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
+{
+    m_slangProgram = desc.slangProgram;
 }
 
 } // namespace gfx
