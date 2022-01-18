@@ -2734,7 +2734,7 @@ void CLikeSourceEmitter::emitParamTypeImpl(IRType* type, String const& name)
         // Note: There is no HLSL/GLSL equivalent for by-reference parameters,
         // so we don't actually expect to encounter these in user code.
         m_writer->emit("inout ");
-        type = inOutType->getValueType();
+        type = refType->getValueType();
     }
 
     emitType(type, name);
