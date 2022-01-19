@@ -4084,6 +4084,8 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
+                assert(srcSubresource.mipLevelCount <= 1);
+
                 auto srcTexture = static_cast<TextureResourceImpl*>(src);
                 auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
                 auto baseSubresourceIndex = D3DUtil::getSubresourceIndex(
@@ -4102,74 +4104,71 @@ public:
 
                 for (uint32_t layer = 0; layer < srcSubresource.layerCount; layer++)
                 {
-                    for (uint32_t mipId = 0; mipId < srcSubresource.mipLevelCount; mipId++)
+                    // Get the footprint
+                    D3D12_RESOURCE_DESC texDesc =
+                        srcTexture->m_resource.getResource()->GetDesc();
+
+                    D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
+                    dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+                    dstRegion.pResource = dstBuffer->m_resource.getResource();
+                    D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = dstRegion.PlacedFootprint;
+
+                    D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
+                    srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+                    srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
+                        srcSubresource.mipLevel,
+                        layer + srcSubresource.baseArrayLayer,
+                        0,
+                        srcTexture->getDesc()->numMipLevels,
+                        srcTexture->getDesc()->arraySize);
+                    srcRegion.pResource = srcTexture->m_resource.getResource();
+
+                    footprint.Offset = dstOffset;
+                    footprint.Footprint.Format = texDesc.Format;
+                    uint32_t mipLevel = srcSubresource.mipLevel;
+                    if (extent.width != 0xFFFFFFFF)
                     {
-                        // Get the footprint
-                        D3D12_RESOURCE_DESC texDesc =
-                            srcTexture->m_resource.getResource()->GetDesc();
-
-                        D3D12_TEXTURE_COPY_LOCATION dstRegion = {};
-                        dstRegion.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-                        dstRegion.pResource = dstBuffer->m_resource.getResource();
-                        D3D12_PLACED_SUBRESOURCE_FOOTPRINT& footprint = dstRegion.PlacedFootprint;
-
-                        D3D12_TEXTURE_COPY_LOCATION srcRegion = {};
-                        srcRegion.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-                        srcRegion.SubresourceIndex = D3DUtil::getSubresourceIndex(
-                            mipId + srcSubresource.mipLevel,
-                            layer + srcSubresource.baseArrayLayer,
-                            0,
-                            srcTexture->getDesc()->numMipLevels,
-                            srcTexture->getDesc()->arraySize);
-                        srcRegion.pResource = srcTexture->m_resource.getResource();
-
-                        footprint.Offset = 0;
-                        footprint.Footprint.Format = texDesc.Format;
-                        uint32_t mipLevel = mipId + srcSubresource.mipLevel;
-                        if (extent.width != 0xFFFFFFFF)
-                        {
-                            footprint.Footprint.Width = extent.width;
-                        }
-                        else
-                        {
-                            footprint.Footprint.Width =
-                                Math::Max(1, (textureSize.width >> mipLevel)) - srcOffset.x;
-                        }
-                        if (extent.height != 0xFFFFFFFF)
-                        {
-                            footprint.Footprint.Height = extent.height;
-                        }
-                        else
-                        {
-                            footprint.Footprint.Height =
-                                Math::Max(1, (textureSize.height >> mipLevel)) - srcOffset.y;
-                        }
-                        if (extent.depth != 0xFFFFFFFF)
-                        {
-                            footprint.Footprint.Depth = extent.depth;
-                        }
-                        else
-                        {
-                            footprint.Footprint.Depth =
-                                Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
-                        }
-                        footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
-                            footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
-                            (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-
-                        auto bufferSize = footprint.Footprint.RowPitch *
-                                          footprint.Footprint.Height * footprint.Footprint.Depth;
-
-                        D3D12_BOX srcBox = {};
-                        srcBox.left = srcOffset.x;
-                        srcBox.top = srcOffset.y;
-                        srcBox.front = srcOffset.z;
-                        srcBox.right = srcOffset.x + extent.width;
-                        srcBox.bottom = srcOffset.y + extent.height;
-                        srcBox.back = srcOffset.z + extent.depth;
-                        m_commandBuffer->m_cmdList->CopyTextureRegion(
-                            &dstRegion, (UINT)dstOffset, 0, 0, &srcRegion, &srcBox);
+                        footprint.Footprint.Width = extent.width;
                     }
+                    else
+                    {
+                        footprint.Footprint.Width =
+                            Math::Max(1, (textureSize.width >> mipLevel)) - srcOffset.x;
+                    }
+                    if (extent.height != 0xFFFFFFFF)
+                    {
+                        footprint.Footprint.Height = extent.height;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Height =
+                            Math::Max(1, (textureSize.height >> mipLevel)) - srcOffset.y;
+                    }
+                    if (extent.depth != 0xFFFFFFFF)
+                    {
+                        footprint.Footprint.Depth = extent.depth;
+                    }
+                    else
+                    {
+                        footprint.Footprint.Depth =
+                            Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
+                    }
+                    footprint.Footprint.RowPitch = (UINT)D3DUtil::calcAligned(
+                        footprint.Footprint.Width * (UInt)formatInfo.blockSizeInBytes,
+                        (uint32_t)D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+                    auto bufferSize = footprint.Footprint.RowPitch *
+                                        footprint.Footprint.Height * footprint.Footprint.Depth;
+
+                    D3D12_BOX srcBox = {};
+                    srcBox.left = srcOffset.x;
+                    srcBox.top = srcOffset.y;
+                    srcBox.front = srcOffset.z;
+                    srcBox.right = srcOffset.x + extent.width;
+                    srcBox.bottom = srcOffset.y + extent.height;
+                    srcBox.back = srcOffset.z + extent.depth;
+                    m_commandBuffer->m_cmdList->CopyTextureRegion(
+                        &dstRegion, 0, 0, 0, &srcRegion, &srcBox);
                 }
             }
 
@@ -5766,7 +5765,7 @@ Result D3D12Device::createTextureResource(const ITextureResource::Desc& descIn, 
 
             for (int j = 0; j < numMipMaps; ++j)
             {
-                auto srcSubresource = initData[j];
+                auto srcSubresource = initData[subResourceIndex + j];
 
                 const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout = layouts[j];
                 const D3D12_SUBRESOURCE_FOOTPRINT& footprint = layout.Footprint;

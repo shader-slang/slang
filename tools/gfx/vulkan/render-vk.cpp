@@ -4801,7 +4801,7 @@ public:
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                assert(srcSubresource.mipLevelCount == 1);
+                assert(srcSubresource.mipLevelCount <= 1);
 
                 auto image = static_cast<TextureResourceImpl*>(src);
                 auto desc = image->getDesc();

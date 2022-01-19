@@ -117,9 +117,9 @@ namespace gfx_test
             auto encoder = commandBuffer->encodeResourceCommands();
 
             encoder->textureSubresourceBarrier(srcTexture, srcSubresource, ResourceState::UnorderedAccess, ResourceState::CopySource);
-            //encoder->copyTexture(dstTexture, ResourceState::CopyDestination, dstSubresource, dstOffset, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, extent);
+            encoder->copyTexture(dstTexture, ResourceState::CopyDestination, dstSubresource, dstOffset, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, extent);
             encoder->textureSubresourceBarrier(dstTexture, dstSubresource, ResourceState::CopyDestination, ResourceState::CopySource);
-            encoder->copyTextureToBuffer(resultsBuffer, 0, textureSize, srcTexture, ResourceState::CopySource, srcSubresource, srcOffset, extent);
+            encoder->copyTextureToBuffer(resultsBuffer, 0, textureSize, dstTexture, ResourceState::CopySource, dstSubresource, dstOffset, extent);
             encoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
@@ -278,27 +278,25 @@ namespace gfx_test
 
             submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, extent, 4 * 256);
 
+            ITextureResource::SubresourceData expectedData = srcSubData[2];
             if (device->getDeviceInfo().deviceType == DeviceType::DirectX12)
             {
                 // D3D12 has to pad out the rows in order to adhere to alignment, so when comparing results
                 // we need to make sure not to include the padding.
                 size_t testOffset = 0;
                 size_t dataOffset = 0;
-                for (Int index = 0; index < 4; ++index)
+                auto rowStride = expectedData.strideY / 4;
+                for (Int i = 0; i < extent.height; ++i)
                 {
-                    auto rowStride = srcSubData[index].strideY;
-                    for (Int i = 0; i < extent.height; ++i)
-                    {
-                        compareComputeResult(
-                            device,
-                            resultsBuffer,
-                            testOffset,
-                            srcTexData + dataOffset + rowStride * i,
-                            rowStride);
-                        testOffset += alignedRowPitch;
-                    }
-                    dataOffset += srcSubData[index].strideZ;
+                    compareComputeResult(
+                        device,
+                        resultsBuffer,
+                        testOffset,
+                        (float*) expectedData.data + rowStride * i,
+                        rowStride * 4);
+                    testOffset += alignedRowPitch;
                 }
+                dataOffset += srcSubData[0].strideZ / 4;
             }
             else if (device->getDeviceInfo().deviceType == DeviceType::Vulkan)
             {
@@ -306,8 +304,8 @@ namespace gfx_test
                     device,
                     resultsBuffer,
                     0,
-                    srcTexData,
-                    160);
+                    expectedData.data,
+                    64);
             }
         }
     };

@@ -139,7 +139,7 @@ namespace gfx_test
         }
     }
 
-    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, size_t offset, void* expectedResult, size_t expectedBufferSize)
+    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, size_t offset, const void* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
