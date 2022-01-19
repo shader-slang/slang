@@ -5786,7 +5786,8 @@ namespace
                 desc.srvDescriptorCount,
                 desc.uavDescriptorCount,
                 desc.accelerationStructureDescriptorCount),
-            desc.constantBufferDescriptorCount);
+            desc.constantBufferDescriptorCount,
+            2048u);
     }
 }
 
@@ -5799,7 +5800,7 @@ Result D3D12Device::createTransientResourceHeap(
         desc.flags,
         desc.constantBufferSize,
         getViewDescriptorCount(desc),
-        desc.samplerDescriptorCount,
+        Math::Max(1024u, desc.samplerDescriptorCount),
         heap.writeRef()));
     returnComPtr(outHeap, heap);
     return SLANG_OK;
