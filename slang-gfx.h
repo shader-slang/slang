@@ -1393,6 +1393,7 @@ public:
     };
 public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL reset() = 0;
 };
 #define SLANG_UUID_IQueryPool                                                         \
     { 0xc2cc3784, 0x12da, 0x480a, { 0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 } }
@@ -1769,9 +1770,23 @@ public:
 class ITransientResourceHeap : public ISlangUnknown
 {
 public:
+    struct Flags
+    {
+        enum Enum
+        {
+            None = 0,
+            AllowResizing = 0x1,
+        };
+    };
     struct Desc
     {
+        Flags::Enum flags;
         size_t constantBufferSize;
+        uint32_t samplerDescriptorCount;
+        uint32_t uavDescriptorCount;
+        uint32_t srvDescriptorCount;
+        uint32_t constantBufferDescriptorCount;
+        uint32_t accelerationStructureDescriptorCount;
     };
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() = 0;
 

@@ -166,7 +166,9 @@ public:
     IQueryPool::Desc desc;
 public:
     IQueryPool* getInterface(const Slang::Guid& guid);
-    virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt index, SlangInt count, uint64_t* data) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getResult(SlangInt index, SlangInt count, uint64_t* data) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL reset() override;
 };
 
 class DebugBufferResource : public DebugObject<IBufferResource>

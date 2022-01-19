@@ -1810,6 +1810,12 @@ Result DebugQueryPool::getResult(SlangInt index, SlangInt count, uint64_t* data)
     return baseObject->getResult(index, count, data);
 }
 
+Result DebugQueryPool::reset()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->reset();
+}
+
 DeviceAddress DebugAccelerationStructure::getDeviceAddress()
 {
     SLANG_GFX_API_FUNC;
