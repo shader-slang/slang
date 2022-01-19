@@ -9,6 +9,7 @@
 #include <d3d12.h>
 #endif
 
+using namespace Slang;
 using namespace gfx;
 
 namespace gfx_test
@@ -198,36 +199,72 @@ namespace gfx_test
         }
     };
 
+    struct Texel
+    {
+        float channels[4];
+    };
+
+    struct SubresourceStuff : RefObject
+    {
+        List<Texel> texels;
+    };
+
+    struct TextureStuff : RefObject
+    {
+        List<RefPtr<SubresourceStuff>> subresourceObjects;
+        List<ITextureResource::SubresourceData> subresourceDatas;
+    };
+
     struct CopyTextureSection : BaseCopyTextureTest
     {
         Format format = Format::R32G32B32A32_FLOAT;
 
-        void generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers, float* texData)
+        RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers)
         {
-            int layerOffset = 0;
+            RefPtr<TextureStuff> texture = new TextureStuff();
             for (int layer = 0; layer < arrayLayers; ++layer)
             {
                 for (int mip = 0; mip < mipLevels; ++mip)
                 {
-                    int mipWidth = width / pow(2, mip);
-                    int mipHeight = height / pow(2, mip);
+                    RefPtr<SubresourceStuff> subresource = new SubresourceStuff();
+                    texture->subresourceObjects.add(subresource);
 
-                    int mipSize = mipWidth * mipHeight;
+                    int mipWidth = Math::Max(width >> mip, 1);
+                    int mipHeight = Math::Max(height >> mip, 1);
+
+                    int mipTexelCount = mipWidth * mipHeight;
+                    subresource->texels.setCount(mipTexelCount);
                     for (int h = 0; h < mipHeight; ++h)
                     {
                         for (int w = 0; w < mipWidth; ++w)
                         {
                             // 4 channels per pixel
-                            texData[(layerOffset + h * mipWidth + w) * 4] = w;
-                            texData[(layerOffset + h * mipWidth + w) * 4 + 1] = h;
-                            texData[(layerOffset + h * mipWidth + w) * 4 + 2] = mip;
-                            texData[(layerOffset + h * mipWidth + w) * 4 + 3] = layer;
+                            subresource->texels[h * mipWidth + w].channels[0] = w;
+                            subresource->texels[h * mipWidth + w].channels[1] = h;
+                            subresource->texels[h * mipWidth + w].channels[2] = mip;
+                            subresource->texels[h * mipWidth + w].channels[3] = layer;
                         }
                     }
-                    layerOffset += mipSize;
+
+                    ITextureResource::SubresourceData subData = {};
+                    subData.data = subresource->texels.getBuffer();
+                    subData.strideY = mipWidth * sizeof(Texel);
+                    subData.strideZ = mipHeight * subData.strideY;
+                    texture->subresourceDatas.add(subData);
                 }
             }
+            return texture;
         }
+
+        // TODO: Things to test in the future
+        // 1. Size of src texture(W, H, mips, layers)
+        // 2. Size of dst texture(...)
+        // 3. src subresource(mip, layer)
+        // 4. dst subresource(mip, layer)
+        // 5. copy extents(x, y)
+        // 6. copy src coords(x, y)
+        // 7. copy dst coords(x, y)
+        // 8. Final buffer offset
 
         void run()
         {
@@ -236,25 +273,13 @@ namespace gfx_test
             extent.height = 4;
             extent.depth = 1;
 
-            float srcTexData[160] = { 0.0 };
-            generateTextureData(4, 4, 2, 2, srcTexData);
-            ITextureResource::SubresourceData srcSubData[] = {
-                ITextureResource::SubresourceData { (void*)srcTexData, 64, 256 },
-                ITextureResource::SubresourceData { (void*)(srcTexData + 64), 32, 64 },
-                ITextureResource::SubresourceData { (void*)(srcTexData + 80), 64, 256 },
-                ITextureResource::SubresourceData { (void*)(srcTexData + 144), 32, 64 },
-            };
+            auto mipLevelCount = 2;
+            auto arrayLayerCount = 2;
 
-            float dstTexData[160] = { 0u };
-            ITextureResource::SubresourceData dstSubData[] = {
-                ITextureResource::SubresourceData { (void*)dstTexData, 64, 256 },
-                ITextureResource::SubresourceData { (void*)(dstTexData + 64), 32, 64 },
-                ITextureResource::SubresourceData { (void*)(dstTexData + 80), 64, 256 },
-                ITextureResource::SubresourceData { (void*)(dstTexData + 144), 32, 64 },
-            };
-
-            TextureInfo srcTextureInfo = { extent, 2, 2, srcSubData };
-            TextureInfo dstTextureInfo = { extent, 2, 2, dstSubData };
+            auto srcTextureStuff = generateTextureData(extent.width, extent.height, mipLevelCount, arrayLayerCount);
+            
+            TextureInfo srcTextureInfo = { extent, mipLevelCount, arrayLayerCount, srcTextureStuff->subresourceDatas.getBuffer() };
+            TextureInfo dstTextureInfo = { extent, mipLevelCount, arrayLayerCount, nullptr };
 
             createRequiredResources(srcTextureInfo, dstTextureInfo, format);
 
@@ -276,9 +301,9 @@ namespace gfx_test
 
             ITextureResource::Offset3D dstOffset;
 
-            submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, extent, 4 * 256);
+            submitGPUWork(srcSubresource, dstSubresource, srcOffset, dstOffset, extent, extent.height * 256);
 
-            ITextureResource::SubresourceData expectedData = srcSubData[2];
+            ITextureResource::SubresourceData expectedData = srcTextureStuff->subresourceDatas[2];
             if (device->getDeviceInfo().deviceType == DeviceType::DirectX12)
             {
                 // D3D12 has to pad out the rows in order to adhere to alignment, so when comparing results
@@ -296,7 +321,7 @@ namespace gfx_test
                         rowStride * 4);
                     testOffset += alignedRowPitch;
                 }
-                dataOffset += srcSubData[0].strideZ / 4;
+                dataOffset += srcTextureStuff->subresourceDatas[0].strideZ / 4;
             }
             else if (device->getDeviceInfo().deviceType == DeviceType::Vulkan)
             {
