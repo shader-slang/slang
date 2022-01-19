@@ -371,7 +371,7 @@ enum class PrimitiveType
 
 enum class PrimitiveTopology
 {
-    TriangleList,
+    TriangleList, TriangleStrip, PointList, LineList, LineStrip
 };
 
 enum class ResourceState
@@ -668,14 +668,14 @@ public:
 
 enum class ComparisonFunc : uint8_t
 {
-    Never           = 0,
-    Less            = 0x01,
-    Equal           = 0x02,
-    LessEqual       = 0x03,
-    Greater         = 0x04,
-    NotEqual        = 0x05,
-    GreaterEqual    = 0x06,
-    Always          = 0x07,
+    Never           = 0x0,
+    Less            = 0x1,
+    Equal           = 0x2,
+    LessEqual       = 0x3,
+    Greater         = 0x4,
+    NotEqual        = 0x5,
+    GreaterEqual    = 0x6,
+    Always          = 0x7,
 };
 
 enum class TextureFilteringMode
