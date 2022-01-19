@@ -139,7 +139,7 @@ namespace gfx_test
         }
     }
 
-    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, size_t offset, uint8_t* expectedResult, size_t expectedBufferSize)
+    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, size_t offset, void* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
@@ -148,7 +148,7 @@ namespace gfx_test
         SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
         auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
-        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
+        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), (uint8_t*)expectedResult, expectedBufferSize) == 0);
     }
 
     void compareComputeResultFuzzy(const float* result, float* expectedResult, size_t expectedBufferSize)
