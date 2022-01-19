@@ -121,7 +121,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
         createMutableRootShaderObject(IShaderProgram* program, IShaderObject** outObject) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
+        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnostics) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc,
         IPipelineState** outState) override;

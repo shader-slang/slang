@@ -113,8 +113,10 @@ public:
         override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-        createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
         const GraphicsPipelineStateDesc& desc, IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
@@ -3114,7 +3116,7 @@ Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
 
     auto inputElementCount = desc.inputElementCount;
     auto inputElementsIn = desc.inputElements;
-    for (UInt ii = 0; ii < inputElementCount; ++ii)
+    for (Int ii = 0; ii < inputElementCount; ++ii)
     {
         auto vertexStreamIndex = inputElementsIn[ii].bufferSlotIndex;
         auto& vertexStream = desc.vertexStreams[vertexStreamIndex];
@@ -3122,11 +3124,11 @@ Result D3D11Device::createInputLayout(IInputLayout::Desc const& desc, IInputLayo
         inputElements[ii].SemanticName = inputElementsIn[ii].semanticName;
         inputElements[ii].SemanticIndex = (UINT)inputElementsIn[ii].semanticIndex;
         inputElements[ii].Format = D3DUtil::getMapFormat(inputElementsIn[ii].format);
-        inputElements[ii].InputSlot = vertexStreamIndex;
+        inputElements[ii].InputSlot = (UINT)vertexStreamIndex;
         inputElements[ii].AlignedByteOffset = (UINT)inputElementsIn[ii].offset;
         inputElements[ii].InputSlotClass =
             (vertexStream.slotClass == InputSlotClass::PerInstance) ? D3D11_INPUT_PER_INSTANCE_DATA : D3D11_INPUT_PER_VERTEX_DATA;
-        inputElements[ii].InstanceDataStepRate = vertexStream.instanceDataStepRate;
+        inputElements[ii].InstanceDataStepRate = (UINT)vertexStream.instanceDataStepRate;
 
         if (ii != 0)
         {
@@ -3478,7 +3480,8 @@ void D3D11Device::drawIndexedInstanced(
         startInstanceLocation);
 }
 
-Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram)
+Result D3D11Device::createProgram(
+    const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
     SLANG_ASSERT(desc.slangProgram);
 
@@ -3520,6 +3523,8 @@ Result D3D11Device::createProgram(const IShaderProgram::Desc& desc, IShaderProgr
                 compileResult == SLANG_OK ? DebugMessageType::Warning : DebugMessageType::Error,
                 DebugMessageSource::Slang,
                 (char*)diagnostics->getBufferPointer());
+            if (outDiagnosticBlob)
+                returnComPtr(outDiagnosticBlob, diagnostics);
         }
 
         SLANG_RETURN_ON_FAIL(compileResult);

@@ -317,6 +317,7 @@ Slang::Result initialize()
     IResourceView::Desc primitiveSRVDesc = {};
     primitiveSRVDesc.format = Format::Unknown;
     primitiveSRVDesc.type = IResourceView::Type::ShaderResource;
+    primitiveSRVDesc.bufferElementSize = sizeof(Primitive);
     gPrimitiveBufferSRV = gDevice->createBufferView(gPrimitiveBuffer, primitiveSRVDesc);
 
     IBufferResource::Desc transformBufferDesc;

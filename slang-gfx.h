@@ -759,6 +759,7 @@ public:
         RenderTargetDesc renderTarget;
         SubresourceRange subresourceRange;
         BufferRange bufferRange;
+        uint32_t bufferElementSize; // 0 means raw buffer.
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
 };
@@ -2137,7 +2138,10 @@ public:
         IShaderProgram* program,
         IShaderObject** outObject) = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(const IShaderProgram::Desc& desc, IShaderProgram** outProgram) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
+        const IShaderProgram::Desc& desc,
+        IShaderProgram** outProgram,
+        ISlangBlob** outDiagnosticBlob = nullptr) = 0;
 
     inline ComPtr<IShaderProgram> createProgram(const IShaderProgram::Desc& desc)
     {
