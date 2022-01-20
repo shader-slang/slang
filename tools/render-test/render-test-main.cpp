@@ -746,6 +746,8 @@ void RenderTestApp::_initializeAccelerationStructure()
         draftCreateDesc.size = accelerationStructurePrebuildInfo.resultDataMaxSize;
         m_device->createAccelerationStructure(draftCreateDesc, draftAS.writeRef());
 
+        compactedSizeQuery->reset();
+
         auto commandBuffer = m_transientHeap->createCommandBuffer();
         auto encoder = commandBuffer->encodeRayTracingCommands();
         IAccelerationStructure::BuildDesc buildDesc = {};

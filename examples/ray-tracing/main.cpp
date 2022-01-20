@@ -382,6 +382,8 @@ Slang::Result initialize()
         SLANG_RETURN_ON_FAIL(
             gDevice->createAccelerationStructure(draftCreateDesc, draftAS.writeRef()));
 
+        compactedSizeQuery->reset();
+
         auto commandBuffer = gTransientHeaps[0]->createCommandBuffer();
         auto encoder = commandBuffer->encodeRayTracingCommands();
         IAccelerationStructure::BuildDesc buildDesc = {};

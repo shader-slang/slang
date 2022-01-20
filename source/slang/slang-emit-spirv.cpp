@@ -2510,6 +2510,8 @@ struct SPIRVEmitContext
         auto base = inst->getBase();
         SpvWord baseId = 0;
         IRArrayType* baseArrayType = nullptr;
+        // Only used in debug build, but we don't want a warning/error for an unused initialized variable
+        SLANG_UNUSED(baseArrayType);
 
         if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
         {
@@ -2541,6 +2543,8 @@ struct SPIRVEmitContext
         auto base = inst->getBase();
         SpvWord baseId = 0;
         IRArrayType* baseArrayType = nullptr;
+        // Only used in debug build, but we don't want a warning/error for an unused initialized variable
+        SLANG_UNUSED(baseArrayType);
 
         if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
         {
