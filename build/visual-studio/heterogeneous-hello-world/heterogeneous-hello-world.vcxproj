@@ -175,7 +175,7 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-x86/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -194,7 +194,7 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-x64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug aarch64|ARM'">
@@ -213,7 +213,7 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-aarch64/debug/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -236,7 +236,7 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-x86/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -259,7 +259,7 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-x64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release aarch64|ARM'">
@@ -282,11 +282,12 @@
     </Link>
     <PreBuildEvent>
       <Command>"../../../bin/windows-aarch64/release/slangc"  "../../../examples/heterogeneous-hello-world/shader.slang" -o "../../../examples/heterogeneous-hello-world/shader.cpp" -heterogeneous -target cpp -target hlsl</Command>
-      <Message>Generating shader.cpp from shader.slang</Message>
+      <Message>Generating shader.cpp in ../../../examples/heterogeneous-hello-world/</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\main.cpp" />
+    <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\examples\heterogeneous-hello-world\shader.slang" />
