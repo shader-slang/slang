@@ -117,7 +117,7 @@ namespace gfx_test
         gfx::IDevice* device,
         gfx::ITextureResource* texture,
         gfx::ResourceState state,
-        float* expectedResult,
+        void* expectedResult,
         size_t expectedResultRowPitch,
         size_t rowCount)
     {
@@ -139,15 +139,16 @@ namespace gfx_test
         }
     }
 
-    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, uint8_t* expectedResult, size_t expectedBufferSize)
+    void compareComputeResult(gfx::IDevice* device, gfx::IBufferResource* buffer, size_t offset, const void* expectedResult, size_t expectedBufferSize)
     {
         // Read back the results.
         ComPtr<ISlangBlob> resultBlob;
         GFX_CHECK_CALL_ABORT(device->readBufferResource(
-            buffer, 0, expectedBufferSize, resultBlob.writeRef()));
+            buffer, offset, expectedBufferSize, resultBlob.writeRef()));
         SLANG_CHECK(resultBlob->getBufferSize() == expectedBufferSize);
+        auto result = (float*)resultBlob->getBufferPointer();
         // Compare results.
-        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), expectedResult, expectedBufferSize) == 0);
+        SLANG_CHECK(memcmp(resultBlob->getBufferPointer(), (uint8_t*)expectedResult, expectedBufferSize) == 0);
     }
 
     void compareComputeResultFuzzy(const float* result, float* expectedResult, size_t expectedBufferSize)

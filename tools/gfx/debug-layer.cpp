@@ -1277,9 +1277,11 @@ void DebugResourceCommandEncoder::bufferBarrier(
 
 void DebugResourceCommandEncoder::copyTexture(
     ITextureResource* dst,
+    ResourceState dstState,
     SubresourceRange dstSubresource,
     ITextureResource::Offset3D dstOffset,
     ITextureResource* src,
+    ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Size extent)
@@ -1287,9 +1289,11 @@ void DebugResourceCommandEncoder::copyTexture(
     SLANG_GFX_API_FUNC;
     baseObject->copyTexture(
         getInnerObj(dst),
+        dstState,
         dstSubresource,
         dstOffset,
         getInnerObj(src),
+        srcState,
         srcSubresource,
         srcOffset,
         extent);
@@ -1342,13 +1346,14 @@ void DebugResourceCommandEncoder::copyTextureToBuffer(
     size_t dstOffset,
     size_t dstSize,
     ITextureResource* src,
+    ResourceState srcState,
     SubresourceRange srcSubresource,
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Size extent)
 {
     SLANG_GFX_API_FUNC;
     baseObject->copyTextureToBuffer(
-        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcSubresource, srcOffset, extent);
+        getInnerObj(dst), dstOffset, dstSize, getInnerObj(src), srcState, srcSubresource, srcOffset, extent);
 }
 
 void DebugResourceCommandEncoder::textureSubresourceBarrier(
