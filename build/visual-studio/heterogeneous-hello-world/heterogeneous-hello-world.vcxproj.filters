@@ -9,9 +9,6 @@
     <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\shader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\examples\heterogeneous-hello-world\shader.slang">

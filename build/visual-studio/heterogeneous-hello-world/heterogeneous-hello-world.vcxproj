@@ -287,7 +287,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\main.cpp" />
-    <ClCompile Include="..\..\..\examples\heterogeneous-hello-world\shader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\examples\heterogeneous-hello-world\shader.slang" />

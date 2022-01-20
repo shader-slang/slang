@@ -151,14 +151,6 @@ newoption {
      default     = "true",
      allowed     = { { "true", "True"}, { "false", "False" } }
   }
- 
-newoption {
-    trigger     = "enable-experimental-projects",
-    description = "(Optional) If true include experimental projects in build.",
-    value       = "bool",
-    default     = "false",
-    allowed     = { { "true", "True"}, { "false", "False" } }
- }
 
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
@@ -170,7 +162,6 @@ newoption {
  enableProfile = (_OPTIONS["enable-profile"] == "true")
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
- enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
  -- Determine the target info
 
  targetInfo = slangUtil.getTargetInfo()
@@ -680,20 +671,15 @@ newoption {
  example "cpu-hello-world"
      kind "ConsoleApp"
  
-if enableExperimental then
-    -- TODO: Currently this project doesn't build on linux CI.
-    -- Need to fix so that we don't check in shader.cpp, which changes
-    -- everytime when it is generated on a different machine (contains absolute path)
-    example "heterogeneous-hello-world"
-        kind "ConsoleApp"
-        -- Additionally add slangc for compiling shader.cpp
-        links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
-        -- Generate shader.cpp from shader.slang
-        prebuildmessage ("Generating shader.cpp from shader.slang")
-        prebuildcommands {
-            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
-        }
-end
+example "heterogeneous-hello-world"
+    kind "ConsoleApp"
+    -- Additionally add slangc for compiling shader.cpp
+    links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core" }
+    -- Generate shader.cpp from shader.slang
+    prebuildmessage ("Generating shader.cpp from shader.slang")
+    prebuildcommands {
+        "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+    }
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
  --
