@@ -680,6 +680,9 @@ example "heterogeneous-hello-world"
     prebuildcommands {
         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
     }
+    files {
+        "examples/heterogeneous-hello-world/shader.cpp"
+    }
 
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
