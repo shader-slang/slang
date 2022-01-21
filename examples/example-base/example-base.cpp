@@ -71,7 +71,7 @@ Slang::Result WindowedAppBase::initializeBase(
 
     for (uint32_t i = 0; i < kSwapchainImageCount; i++)
     {
-        gfx::ITransientResourceHeap::Desc transientHeapDesc;
+        gfx::ITransientResourceHeap::Desc transientHeapDesc = {};
         transientHeapDesc.constantBufferSize = 4096 * 1024;
         auto transientHeap = gDevice->createTransientResourceHeap(transientHeapDesc);
         gTransientHeaps.add(transientHeap);

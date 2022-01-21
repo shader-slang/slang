@@ -76,15 +76,10 @@ void D3D12ResourceBase::transition(
 
 /* static */void D3D12Resource::setDebugName(ID3D12Resource* resource, const char* name)
 {
-	if (resource)
-	{
-		size_t len = ::strlen(name);
-		List<wchar_t> buf;
-		buf.setCount(len + 1);
-
-		D3DUtil::appendWideChars(name, buf);
-		resource->SetName(buf.begin());
-	}
+    if (resource)
+    {
+        resource->SetName(String(name).toWString().begin());
+    }
 }
 
 void D3D12Resource::setDebugName(const char* name)

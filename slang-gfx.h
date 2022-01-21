@@ -371,7 +371,7 @@ enum class PrimitiveType
 
 enum class PrimitiveTopology
 {
-    TriangleList,
+    TriangleList, TriangleStrip, PointList, LineList, LineStrip
 };
 
 enum class ResourceState
@@ -668,14 +668,14 @@ public:
 
 enum class ComparisonFunc : uint8_t
 {
-    Never           = 0,
-    Less            = 0x01,
-    Equal           = 0x02,
-    LessEqual       = 0x03,
-    Greater         = 0x04,
-    NotEqual        = 0x05,
-    GreaterEqual    = 0x06,
-    Always          = 0x07,
+    Never           = 0x0,
+    Less            = 0x1,
+    Equal           = 0x2,
+    LessEqual       = 0x3,
+    Greater         = 0x4,
+    NotEqual        = 0x5,
+    GreaterEqual    = 0x6,
+    Always          = 0x7,
 };
 
 enum class TextureFilteringMode
@@ -1393,6 +1393,7 @@ public:
     };
 public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL reset() = 0;
 };
 #define SLANG_UUID_IQueryPool                                                         \
     { 0xc2cc3784, 0x12da, 0x480a, { 0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 } }
@@ -1559,9 +1560,11 @@ public:
     /// the entire resource is being copied and dstOffset, srcOffset and extent arguments are ignored.
     virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
         ITextureResource* dst,
+        ResourceState dstState,
         SubresourceRange dstSubresource,
         ITextureResource::Offset3D dstOffset,
         ITextureResource* src,
+        ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
@@ -1572,6 +1575,7 @@ public:
         size_t dstOffset,
         size_t dstSize,
         ITextureResource* src,
+        ResourceState srcState,
         SubresourceRange srcSubresource,
         ITextureResource::Offset3D srcOffset,
         ITextureResource::Size extent) = 0;
@@ -1769,9 +1773,23 @@ public:
 class ITransientResourceHeap : public ISlangUnknown
 {
 public:
+    struct Flags
+    {
+        enum Enum
+        {
+            None = 0,
+            AllowResizing = 0x1,
+        };
+    };
     struct Desc
     {
+        Flags::Enum flags;
         size_t constantBufferSize;
+        uint32_t samplerDescriptorCount;
+        uint32_t uavDescriptorCount;
+        uint32_t srvDescriptorCount;
+        uint32_t constantBufferDescriptorCount;
+        uint32_t accelerationStructureDescriptorCount;
     };
     virtual SLANG_NO_THROW Result SLANG_MCALL synchronizeAndReset() = 0;
 

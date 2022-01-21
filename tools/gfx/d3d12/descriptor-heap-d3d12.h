@@ -15,7 +15,7 @@ namespace gfx {
 individual allocations, but all allocations can be deallocated with 'deallocateAll'. */
 class D3D12DescriptorHeap
 {
-    public:
+public:
     typedef D3D12DescriptorHeap ThisType;
 
         /// Initialize
@@ -64,6 +64,7 @@ protected:
     int m_totalSize;                                ///< Total amount of allocations available on the heap
     int m_currentIndex;                        ///< The current descriptor
     int m_descriptorSize;                    ///< The size of each descriptor
+    D3D12_DESCRIPTOR_HEAP_FLAGS m_heapFlags; ///< The flags of the heap
 };
 
 /// A d3d12 descriptor, used as "backing storage" for a view.
@@ -237,6 +238,11 @@ int D3D12DescriptorHeap::allocate(int numDescriptors)
         const int index = m_currentIndex;
         m_currentIndex += numDescriptors;
         return index;
+    }
+    if (m_heapFlags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+    {
+        // No automatic resizing for GPU visible heaps.
+        return -1;
     }
     // We don't have enough heap size, resize the heap.
     auto oldHeap = m_heap;

@@ -96,6 +96,7 @@ namespace gfx {
     x(vkCmdEndRenderPass) \
     x(vkCmdPipelineBarrier) \
     x(vkCmdCopyBufferToImage)\
+    x(vkCmdCopyImage) \
     x(vkCmdCopyImageToBuffer) \
     x(vkCmdPushConstants) \
     x(vkCmdSetStencilReference) \

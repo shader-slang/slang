@@ -18,12 +18,36 @@ using namespace Slang;
     switch (topology)
     {
         case PrimitiveTopology::TriangleList:
-        {
-            return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-        }
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        case PrimitiveTopology::TriangleStrip:
+            return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+        case PrimitiveTopology::LineList:
+            return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+        case PrimitiveTopology::LineStrip:
+            return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+        case PrimitiveTopology::PointList:
+            return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
         default: break;
     }
-    return D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+    return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+}
+
+D3D12_PRIMITIVE_TOPOLOGY_TYPE D3DUtil::getPrimitiveType(PrimitiveTopology topology)
+{
+    switch (topology)
+    {
+    case PrimitiveTopology::TriangleList:
+    case PrimitiveTopology::TriangleStrip:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    case PrimitiveTopology::LineList:
+    case PrimitiveTopology::LineStrip:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    case PrimitiveTopology::PointList:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    default:
+        break;
+    }
+    return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 }
 
 D3D12_PRIMITIVE_TOPOLOGY_TYPE D3DUtil::getPrimitiveType(PrimitiveType type)

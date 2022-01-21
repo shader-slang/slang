@@ -4502,23 +4502,54 @@ public:
                 m_commandBuffer = commandBuffer;
             }
 
+            VkImageAspectFlags getAspectMask(TextureAspect aspect)
+            {
+                if (aspect == TextureAspect::Depth)
+                    return VK_IMAGE_ASPECT_DEPTH_BIT;
+                if (aspect == TextureAspect::Stencil)
+                    return VK_IMAGE_ASPECT_STENCIL_BIT;
+                return VK_IMAGE_ASPECT_COLOR_BIT;
+            }
+
             virtual SLANG_NO_THROW void SLANG_MCALL copyTexture(
                 ITextureResource* dst,
+                ResourceState dstState,
                 SubresourceRange dstSubresource,
                 ITextureResource::Offset3D dstOffset,
                 ITextureResource* src,
+                ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstSubresource);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTexture");
+                auto srcImage = static_cast<TextureResourceImpl*>(src);
+                auto srcDesc = srcImage->getDesc();
+                auto srcImageLayout = VulkanUtil::getImageLayoutFromState(srcState);
+                auto dstImage = static_cast<TextureResourceImpl*>(dst);
+                auto dstDesc = dstImage->getDesc();
+                auto dstImageLayout = VulkanUtil::getImageLayoutFromState(dstState);
+
+                for (Int layer = 0; layer < srcSubresource.layerCount; ++layer)
+                {
+                    for (Int mipId = 0; mipId < srcSubresource.mipLevelCount; ++mipId)
+                    {
+                        VkImageCopy region = {};
+                        region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+                        region.srcSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
+                        region.srcSubresource.mipLevel = mipId + srcSubresource.mipLevel;
+                        region.srcSubresource.layerCount = 1;
+                        region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
+                        region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
+                        region.dstSubresource.baseArrayLayer = layer + dstSubresource.baseArrayLayer;
+                        region.dstSubresource.mipLevel = mipId + dstSubresource.mipLevel;
+                        region.dstSubresource.layerCount = 1;
+                        region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
+                        region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
+
+                        auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                        vkApi.vkCmdCopyImage(m_commandBuffer->m_commandBuffer, srcImage->m_image, srcImageLayout, dstImage->m_image, dstImageLayout, 1, &region);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL uploadTextureData(
@@ -4765,18 +4796,31 @@ public:
                 size_t dstOffset,
                 size_t dstSize,
                 ITextureResource* src,
+                ResourceState srcState,
                 SubresourceRange srcSubresource,
                 ITextureResource::Offset3D srcOffset,
                 ITextureResource::Size extent) override
             {
-                SLANG_UNUSED(dst);
-                SLANG_UNUSED(dstOffset);
-                SLANG_UNUSED(dstSize);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(srcSubresource);
-                SLANG_UNUSED(srcOffset);
-                SLANG_UNUSED(extent);
-                SLANG_UNIMPLEMENTED_X("copyTextureToBuffer");
+                assert(srcSubresource.mipLevelCount <= 1);
+
+                auto image = static_cast<TextureResourceImpl*>(src);
+                auto desc = image->getDesc();
+                auto buffer = static_cast<BufferResourceImpl*>(dst);
+                auto srcImageLayout = VulkanUtil::getImageLayoutFromState(srcState);
+
+                VkBufferImageCopy region = {};
+                region.bufferOffset = dstOffset;
+                region.bufferRowLength = 0;
+                region.bufferImageHeight = 0;
+                region.imageSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
+                region.imageSubresource.mipLevel = srcSubresource.mipLevel;
+                region.imageSubresource.baseArrayLayer = srcSubresource.baseArrayLayer;
+                region.imageSubresource.layerCount = srcSubresource.layerCount;
+                region.imageOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
+                region.imageExtent = { uint32_t(extent.width), uint32_t(extent.height), uint32_t(extent.depth) };
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdCopyImageToBuffer(m_commandBuffer->m_commandBuffer, image->m_image, srcImageLayout, buffer->m_buffer.m_buffer, 1, &region);
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
@@ -4785,11 +4829,39 @@ public:
                 ResourceState src,
                 ResourceState dst) override
             {
-                SLANG_UNUSED(texture);
-                SLANG_UNUSED(subresourceRange);
-                SLANG_UNUSED(src);
-                SLANG_UNUSED(dst);
-                SLANG_UNIMPLEMENTED_X("textureSubresourceBarrier");
+                ShortList<VkImageMemoryBarrier> barriers;
+                auto image = static_cast<TextureResourceImpl*>(texture);
+                auto desc = image->getDesc();
+
+                VkImageMemoryBarrier barrier = {};
+                barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+                barrier.image = image->m_image;
+                barrier.oldLayout = translateImageLayout(src);
+                barrier.newLayout = translateImageLayout(dst);
+                barrier.subresourceRange.aspectMask = getAspectMask(subresourceRange.aspectMask);
+                barrier.subresourceRange.baseArrayLayer = subresourceRange.baseArrayLayer;
+                barrier.subresourceRange.baseMipLevel = subresourceRange.mipLevel;
+                barrier.subresourceRange.layerCount = subresourceRange.layerCount;
+                barrier.subresourceRange.levelCount = subresourceRange.mipLevelCount;
+                barrier.srcAccessMask = calcAccessFlags(src);
+                barrier.dstAccessMask = calcAccessFlags(dst);
+                barriers.add(barrier);
+
+                VkPipelineStageFlagBits srcStage = calcPipelineStageFlags(src, true);
+                VkPipelineStageFlagBits dstStage = calcPipelineStageFlags(dst, false);
+
+                auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                vkApi.vkCmdPipelineBarrier(
+                    m_commandBuffer->m_commandBuffer,
+                    srcStage,
+                    dstStage,
+                    0,
+                    0,
+                    nullptr,
+                    0,
+                    nullptr,
+                    (uint32_t)barriers.getCount(),
+                    barriers.getArrayView().getBuffer());
             }
         };
 
@@ -7061,6 +7133,9 @@ void VKDevice::_transitionImageLayout(
     VkImageLayout oldLayout,
     VkImageLayout newLayout)
 {
+    if (oldLayout == newLayout)
+        return;
+
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
