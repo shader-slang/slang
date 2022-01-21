@@ -55,7 +55,7 @@ public:
         bufferDesc.defaultState = state;
         bufferDesc.allowedStates =
             ResourceStateSet(ResourceState::CopyDestination, ResourceState::CopySource);
-        if (state == ResourceState::CopySource)
+        if (state == ResourceState::General)
             bufferDesc.memoryType = MemoryType::Upload;
         else
             bufferDesc.memoryType = MemoryType::ReadBack;

@@ -39,6 +39,7 @@ struct GfxGUID
     static const Slang::Guid IID_IQueryPool;
     static const Slang::Guid IID_IAccelerationStructure;
     static const Slang::Guid IID_IFence;
+    static const Slang::Guid IID_IShaderTable;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -1186,12 +1187,54 @@ public:
     }
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
-        ITransientResourceHeap* getInterface(const Slang::Guid& guid)
+    ITransientResourceHeap* getInterface(const Slang::Guid& guid)
     {
         if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ITransientResourceHeap)
             return static_cast<ITransientResourceHeap*>(this);
         return nullptr;
     }
+};
+
+class ShaderTableBase
+    : public IShaderTable
+    , public Slang::ComObject
+{
+public:
+    Slang::List<Slang::String> m_entryPointNames;
+    uint32_t m_rayGenShaderCount;
+    uint32_t m_missShaderCount;
+    uint32_t m_hitGroupCount;
+
+    Slang::Dictionary<PipelineStateBase*, Slang::RefPtr<BufferResource>> m_deviceBuffers;
+
+    SLANG_COM_OBJECT_IUNKNOWN_ALL
+    IShaderTable* getInterface(const Slang::Guid& guid)
+    {
+        if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IShaderTable)
+            return static_cast<IShaderTable*>(this);
+        return nullptr;
+    }
+
+    virtual Slang::RefPtr<BufferResource> createDeviceBuffer(
+        PipelineStateBase* pipeline,
+        TransientResourceHeapBase* transientHeap,
+        IResourceCommandEncoder* encoder) = 0;
+
+    BufferResource* getOrCreateBuffer(
+        PipelineStateBase* pipeline,
+        TransientResourceHeapBase* transientHeap,
+        IResourceCommandEncoder* encoder)
+    {
+        if (auto ptr = m_deviceBuffers.TryGetValue(pipeline))
+        {
+            return ptr->Ptr();
+        }
+        auto result = createDeviceBuffer(pipeline, transientHeap, encoder);
+        m_deviceBuffers[pipeline] = result;
+        return result;
+    }
+
+    Result init(const IShaderTable::Desc& desc);
 };
 
 // Renderer implementation shared by all platforms.
@@ -1253,6 +1296,11 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createAccelerationStructure(
         const IAccelerationStructure::CreateDesc& desc,
         IAccelerationStructure** outView) override;
+
+    // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
+    // without ray tracing support.
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE for platforms
     // without ray tracing support.

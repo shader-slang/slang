@@ -5117,12 +5117,14 @@ public:
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-                const char* rayGenShaderName,
+                uint32_t raygenShaderIndex,
+                IShaderTable* shaderTable,
                 int32_t width,
                 int32_t height,
                 int32_t depth) override
             {
-                SLANG_UNUSED(rayGenShaderName);
+                SLANG_UNUSED(raygenShaderIndex);
+                SLANG_UNUSED(shaderTable);
                 SLANG_UNUSED(width);
                 SLANG_UNUSED(height);
                 SLANG_UNUSED(depth);

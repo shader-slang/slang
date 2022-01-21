@@ -32,6 +32,7 @@ const Slang::Guid GfxGUID::IID_ICommandQueue = SLANG_UUID_ICommandQueue;
 const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
 const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAccelerationStructure;
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
+const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
 
 
 StageType translateStage(SlangStage slangStage)
@@ -435,6 +436,13 @@ Result RendererBase::createAccelerationStructure(
 {
     SLANG_UNUSED(desc);
     SLANG_UNUSED(outView);
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable)
+{
+    SLANG_UNUSED(desc);
+    SLANG_UNUSED(outTable);
     return SLANG_E_NOT_AVAILABLE;
 }
 
@@ -847,4 +855,26 @@ Result ShaderObjectBase::copyFrom(IShaderObject* object, ITransientResourceHeap*
     return SLANG_FAIL;
 }
 
+Result ShaderTableBase::init(const IShaderTable::Desc& desc)
+{
+    m_rayGenShaderCount = desc.rayGenShaderCount;
+    m_missShaderCount = desc.missShaderCount;
+    m_hitGroupCount = desc.hitGroupCount;
+    m_entryPointNames.reserve(desc.hitGroupCount + desc.missShaderCount + desc.rayGenShaderCount);
+    for (uint32_t i = 0; i < desc.rayGenShaderCount; i++)
+    {
+        m_entryPointNames.add(desc.rayGenShaderEntryPointNames[i]);
+    }
+    for (uint32_t i = 0; i < desc.missShaderCount; i++)
+    {
+        m_entryPointNames.add(desc.missShaderEntryPointNames[i]);
+    }
+    for (uint32_t i = 0; i < desc.hitGroupCount; i++)
+    {
+        m_entryPointNames.add(desc.hitGroupNames[i]);
+    }
+    return SLANG_OK;
+}
+
 } // namespace gfx
+
