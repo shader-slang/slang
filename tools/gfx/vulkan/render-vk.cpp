@@ -4780,15 +4780,43 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
                 ITextureResource* source,
+                ResourceState sourceState,
                 SubresourceRange sourceRange,
                 ITextureResource* dest,
+                ResourceState destState,
                 SubresourceRange destRange) override
             {
-                SLANG_UNUSED(source);
-                SLANG_UNUSED(sourceRange);
-                SLANG_UNUSED(dest);
-                SLANG_UNUSED(destRange);
-                SLANG_UNIMPLEMENTED_X("resolveResource");
+                auto srcTexture = static_cast<TextureResourceImpl*>(source);
+                auto srcExtent = srcTexture->getDesc()->size;
+                auto dstTexture = static_cast<TextureResourceImpl*>(dest);
+
+                auto srcImage = srcTexture->m_image;
+                auto dstImage = dstTexture->m_image;
+
+                auto srcImageLayout = VulkanUtil::getImageLayoutFromState(sourceState);
+                auto dstImageLayout = VulkanUtil::getImageLayoutFromState(destState);
+
+                for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+                {
+                    for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+                    {
+                        VkImageResolve region = {};
+                        region.srcSubresource.aspectMask = getAspectMask(sourceRange.aspectMask);
+                        region.srcSubresource.baseArrayLayer = layer + sourceRange.baseArrayLayer;
+                        region.srcSubresource.layerCount = 1;
+                        region.srcSubresource.mipLevel = mip + sourceRange.mipLevel;
+                        region.srcOffset = { 0, 0, 0 };
+                        region.dstSubresource.aspectMask = getAspectMask(destRange.aspectMask);
+                        region.dstSubresource.baseArrayLayer = layer + destRange.baseArrayLayer;
+                        region.dstSubresource.layerCount = 1;
+                        region.dstSubresource.mipLevel = mip + destRange.mipLevel;
+                        region.dstOffset = { 0, 0, 0 };
+                        region.extent = { (uint32_t)srcExtent.width, (uint32_t)srcExtent.height, (uint32_t)srcExtent.depth };
+
+                        auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                        vkApi.vkCmdResolveImage(m_commandBuffer->m_commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, 1, &region);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
