@@ -222,6 +222,7 @@ ComPtr<gfx::IBufferResource> gTLASBuffer;
 ComPtr<gfx::IAccelerationStructure> gTLAS;
 ComPtr<gfx::ITextureResource> gResultTexture;
 ComPtr<gfx::IResourceView> gResultTextureUAV;
+ComPtr<gfx::IShaderTable> gShaderTable;
 
 uint64_t lastTime = 0;
 
@@ -521,6 +522,8 @@ Slang::Result initialize()
     if (!gPresentPipelineState)
         return SLANG_FAIL;
 
+    const char* hitgroupNames[] = {"hitgroup0", "hitgroup1"};
+
     ComPtr<IShaderProgram> rayTracingProgram;
     SLANG_RETURN_ON_FAIL(
         loadShaderProgram(gDevice, true, rayTracingProgram.writeRef()));
@@ -529,17 +532,28 @@ Slang::Result initialize()
     rtpDesc.hitGroupCount = 2;
     HitGroupDesc hitGroups[2];
     hitGroups[0].closestHitEntryPoint = "closestHitShader";
+    hitGroups[0].hitGroupName = hitgroupNames[0];
     hitGroups[1].closestHitEntryPoint = "shadowRayHitShader";
+    hitGroups[1].hitGroupName = hitgroupNames[1];
     rtpDesc.hitGroups = hitGroups;
     rtpDesc.maxRayPayloadSize = 64;
     rtpDesc.maxRecursion = 2;
-    rtpDesc.shaderTableHitGroupCount = 2;
-    int32_t shaderTable[] = {0, 1};
-    rtpDesc.shaderTableHitGroupIndices = shaderTable;
     SLANG_RETURN_ON_FAIL(
         gDevice->createRayTracingPipelineState(rtpDesc, gRenderPipelineState.writeRef()));
     if (!gRenderPipelineState)
         return SLANG_FAIL;
+
+    IShaderTable::Desc shaderTableDesc = {};
+    const char* raygenName = "rayGenShader";
+    const char* missName = "missShader";
+    shaderTableDesc.program = rayTracingProgram;
+    shaderTableDesc.hitGroupCount = 2;
+    shaderTableDesc.hitGroupNames = hitgroupNames;
+    shaderTableDesc.rayGenShaderCount = 1;
+    shaderTableDesc.rayGenShaderEntryPointNames = &raygenName;
+    shaderTableDesc.missShaderCount = 1;
+    shaderTableDesc.missShaderEntryPointNames = &missName;
+    SLANG_RETURN_ON_FAIL(gDevice->createShaderTable(shaderTableDesc, gShaderTable.writeRef()));
 
     createResultTexture();
     return SLANG_OK;
@@ -626,7 +640,7 @@ virtual void renderFrame(int frameBufferIndex) override
         cursor["uniforms"].setData(&gUniforms, sizeof(Uniforms));
         cursor["sceneBVH"].setResource(gTLAS);
         cursor["primitiveBuffer"].setResource(gPrimitiveBufferSRV);
-        renderEncoder->dispatchRays(nullptr, windowWidth, windowHeight, 1);
+        renderEncoder->dispatchRays(0, gShaderTable, windowWidth, windowHeight, 1);
         renderEncoder->endEncoding();
         renderCommandBuffer->close();
         gQueue->executeCommandBuffer(renderCommandBuffer);

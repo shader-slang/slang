@@ -140,7 +140,7 @@ SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(TransientResourceHeap)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(QueryPool)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT(AccelerationStructure, ResourceView)
 SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(Fence)
-
+SLANG_GFX_DEBUG_GET_INTERFACE_IMPL(ShaderTable)
 
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL
 #undef SLANG_GFX_DEBUG_GET_INTERFACE_IMPL_PARENT
@@ -179,6 +179,7 @@ SLANG_GFX_DEBUG_GET_OBJ_IMPL(TransientResourceHeap)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(QueryPool)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(AccelerationStructure)
 SLANG_GFX_DEBUG_GET_OBJ_IMPL(Fence)
+SLANG_GFX_DEBUG_GET_OBJ_IMPL(ShaderTable)
 
 #undef SLANG_GFX_DEBUG_GET_OBJ_IMPL
 
@@ -800,6 +801,15 @@ Result DebugDevice::getTextureAllocationInfo(
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getTextureAllocationInfo(desc, outSize, outAlignment);
+}
+
+Result DebugDevice::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable)
+{
+    SLANG_GFX_API_FUNC;
+    RefPtr<DebugShaderTable> result = new DebugShaderTable();
+    SLANG_RETURN_ON_FAIL(baseObject->createShaderTable(desc, result->baseObject.writeRef()));
+    returnComPtr(outTable, result);
+    return SLANG_OK;
 }
 
 IResource::Type DebugBufferResource::getType()
@@ -1477,13 +1487,14 @@ void DebugRayTracingCommandEncoder::bindPipeline(
 }
 
 void DebugRayTracingCommandEncoder::dispatchRays(
-    const char* rayGenShaderName,
+    uint32_t rayGenShaderIndex,
+    IShaderTable* shaderTable,
     int32_t width,
     int32_t height,
     int32_t depth)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->dispatchRays(rayGenShaderName, width, height, depth);
+    baseObject->dispatchRays(rayGenShaderIndex, getInnerObj(shaderTable), width, height, depth);
 }
 
 const ICommandQueue::Desc& DebugCommandQueue::getDesc()
