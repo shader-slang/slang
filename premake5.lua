@@ -152,6 +152,14 @@ newoption {
      allowed     = { { "true", "True"}, { "false", "False" } }
   }
 
+  newoption {
+    trigger     = "enable-experimental-projects",
+    description = "(Optional) If true include experimental projects in build.",
+    value       = "bool",
+    default     = "false",
+    allowed     = { { "true", "True"}, { "false", "False" } }
+  }
+
  buildLocation = _OPTIONS["build-location"]
  executeBinary = (_OPTIONS["execute-binary"] == "true")
  buildGlslang = (_OPTIONS["build-glslang"] == "true")
@@ -162,6 +170,7 @@ newoption {
  enableProfile = (_OPTIONS["enable-profile"] == "true")
  enableEmbedStdLib = (_OPTIONS["enable-embed-stdlib"] == "true")
  enableXlib = (_OPTIONS["enable-xlib"] == "true")
+ enableExperimental = (_OPTIONS["enable-experimental-projects"] == "true")
  -- Determine the target info
 
  targetInfo = slangUtil.getTargetInfo()
@@ -671,25 +680,28 @@ newoption {
  example "cpu-hello-world"
      kind "ConsoleApp"
 
- project "heterogeneous-first-gen"
-     kind "Utility"
-     links "slangc"
-     prebuildcommands {
-        "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
-     }
- 
- example "heterogeneous-hello-world"
-     kind "ConsoleApp"
-     -- Additionally add slangc for compiling shader.cpp
-     links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core", "heterogeneous-first-gen" }
-     -- Generate shader.cpp from shader.slang
-     prebuildmessage "Generating shader.cpp in %{wks.location:lower()}/examples/heterogeneous-hello-world/"
-     prebuildcommands {
-         "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
-     }
-     files {
-         "examples/heterogeneous-hello-world/shader.cpp"
-     }
+ if enableExperimental then
+    project "heterogeneous-first-gen"
+        kind "Utility"
+        links "slangc"
+        location("build/" .. slangUtil.getBuildLocationName(targetInfo) .. "/heterogeneous-hello-world")
+        prebuildcommands {
+            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+        }
+    
+    example "heterogeneous-hello-world"
+        kind "ConsoleApp"
+        -- Additionally add slangc for compiling shader.cpp
+        links { "example-base", "slang", "gfx", "gfx-util", "slangc", "platform", "core", "heterogeneous-first-gen" }
+        -- Generate shader.cpp from shader.slang
+        prebuildmessage "Generating shader.cpp in %{wks.location:lower()}/examples/heterogeneous-hello-world/"
+        prebuildcommands {
+            "\"%{wks.location:lower()}/bin/" .. targetName .. "/%{cfg.buildcfg:lower()}/slangc\"  \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.slang\" -o \"%{wks.location:lower()}/examples/heterogeneous-hello-world/shader.cpp\" -heterogeneous -target cpp -target hlsl"
+        }
+        files {
+            "examples/heterogeneous-hello-world/shader.cpp"
+        }
+ end
 
  -- Most of the other projects have more interesting configuration going
  -- on, so let's walk through them in order of increasing complexity.
