@@ -119,6 +119,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
+    // TODO: Add implementation for createRayTracingPipelineState() - calls VkCreateRayTracingPipelinesKHR
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
@@ -5142,6 +5143,7 @@ public:
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
 
+            // TODO: Bind ray tracing pipeline state
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override
             {
@@ -5149,6 +5151,7 @@ public:
                 SLANG_UNUSED(outRootObject);
             }
 
+            // TODO: Implement after implementing createRayTracingPipelineState
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
                 uint32_t raygenShaderIndex,
                 IShaderTable* shaderTable,
@@ -8282,7 +8285,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
         assert(!"unknown topology type.");
         break;
     }
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+    inputAssembly.primitiveRestartEnable = VK_FALSE; // TODO: True by default?
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -8305,6 +8308,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     viewportState.scissorCount = 1;
     viewportState.pScissors = &scissor;
 
+    // TODO: Should be pulled from the desc?
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.depthClampEnable = VK_FALSE;
@@ -8317,15 +8321,18 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
 
     auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
 
+    // TODO: Should be pulled from the desc?
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = framebufferLayoutImpl->sampleCount;
+    multisampling.rasterizationSamples = framebufferLayoutImpl->sampleCount; // TODO: account for forced sample count
 
+    // TODO: Values from elsewhere?
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     colorBlendAttachment.blendEnable = VK_FALSE;
 
+    // TODO: Values from elsewhere?
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE;
@@ -8353,7 +8360,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     depthStencilStateInfo.back.writeMask = inDesc.depthStencil.stencilWriteMask;
     depthStencilStateInfo.front.compareMask = inDesc.depthStencil.stencilReadMask;
     depthStencilStateInfo.front.writeMask = inDesc.depthStencil.stencilWriteMask;
-    depthStencilStateInfo.depthBoundsTestEnable = 0;
+    depthStencilStateInfo.depthBoundsTestEnable = 0; // TODO: Value from elsewhere?
     depthStencilStateInfo.depthCompareOp = translateComparisonFunc(inDesc.depthStencil.depthFunc);
     depthStencilStateInfo.depthWriteEnable = inDesc.depthStencil.depthWriteEnable ? 1 : 0;
     depthStencilStateInfo.stencilTestEnable = inDesc.depthStencil.stencilEnable ? 1 : 0;
