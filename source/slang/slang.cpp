@@ -3325,6 +3325,7 @@ CompositeComponentType::CompositeComponentType(
         {
             m_entryPoints.add(child->getEntryPoint(cc));
             m_entryPointMangledNames.add(child->getEntryPointMangledName(cc));
+            m_entryPointNameOverrides.add(child->getEntryPointNameOverride(cc));
         }
 
         auto childShaderParamCount = child->getShaderParamCount();
@@ -3374,6 +3375,11 @@ RefPtr<EntryPoint> CompositeComponentType::getEntryPoint(Index index)
 String CompositeComponentType::getEntryPointMangledName(Index index)
 {
     return m_entryPointMangledNames[index];
+}
+
+String CompositeComponentType::getEntryPointNameOverride(Index index)
+{
+    return m_entryPointNameOverrides[index];
 }
 
 Index CompositeComponentType::getShaderParamCount()
@@ -3783,6 +3789,7 @@ SpecializedComponentType::SpecializedComponentType(
     struct EntryPointMangledNameCollector : ComponentTypeVisitor
     {
         List<String>* mangledEntryPointNames;
+        List<String>* entryPointNameOverrides;
 
         void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo)  SLANG_OVERRIDE
         {
@@ -3791,6 +3798,7 @@ SpecializedComponentType::SpecializedComponentType(
                 funcDeclRef = specializationInfo->specializedFuncDeclRef;
 
             (*mangledEntryPointNames).add(getMangledName(m_astBuilder, funcDeclRef));
+            (*entryPointNameOverrides).add(entryPoint->getEntryPointNameOverride(0));
         }
 
         void visitModule(Module*, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
@@ -3815,6 +3823,7 @@ SpecializedComponentType::SpecializedComponentType(
     //
     EntryPointMangledNameCollector collector(getLinkage()->getASTBuilder());
     collector.mangledEntryPointNames = &m_entryPointMangledNames;
+    collector.entryPointNameOverrides = &m_entryPointNameOverrides;
     collector.visitSpecialized(this);
 }
 
@@ -3838,6 +3847,11 @@ RefPtr<ComponentType> SpecializedComponentType::getRequirement(Index index)
 String SpecializedComponentType::getEntryPointMangledName(Index index)
 {
     return m_entryPointMangledNames[index];
+}
+
+String SpecializedComponentType::getEntryPointNameOverride(Index index)
+{
+    return m_entryPointNameOverrides[index];
 }
 
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)
