@@ -9,11 +9,13 @@
 #include <d3d12.h>
 #endif
 
+#if 0
 #include <stdlib.h>
 #include <stdio.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "external/stb/stb_image_write.h"
+#endif
 
 using namespace Slang;
 using namespace gfx;
@@ -22,6 +24,7 @@ namespace
 {
     using namespace gfx_test;
 
+#if 0
     Slang::Result writeImage(
         const char* filename,
         ISlangBlob* pixels,
@@ -33,6 +36,7 @@ namespace
 
         return stbResult ? SLANG_OK : SLANG_FAIL;
     }
+#endif
 
     struct Vertex
     {
@@ -87,7 +91,6 @@ namespace
 
         ComPtr<ITextureResource> msaaTexture;
         ComPtr<ITextureResource> dstTexture;
-        //ComPtr<IBufferResource> resultsBuffer;
 
         ComPtr<ITransientResourceHeap> transientHeap;
         ComPtr<IPipelineState> pipelineState;
@@ -110,7 +113,6 @@ namespace
             this->context = context;
         }
 
-        // EDIT AS NECESSARY
         void createRequiredResources(TextureInfo msaaTextureInfo, TextureInfo dstTextureInfo, Format format)
         {
             VertexStreamDesc vertexStreams[] = {
@@ -218,23 +220,6 @@ namespace
             framebufferDesc.renderTargetViews = rtv.readRef();
             framebufferDesc.layout = framebufferLayout;
             GFX_CHECK_CALL_ABORT(device->createFramebuffer(framebufferDesc, framebuffer.writeRef()));
-
-//             IBufferResource::Desc bufferDesc = {};
-//             bufferDesc.sizeInBytes = dstTextureInfo.extent.height * 256;
-//             bufferDesc.format = gfx::Format::Unknown;
-//             bufferDesc.elementSize = 0;
-//             bufferDesc.allowedStates = ResourceStateSet(
-//                 ResourceState::ShaderResource,
-//                 ResourceState::UnorderedAccess,
-//                 ResourceState::CopyDestination,
-//                 ResourceState::CopySource);
-//             bufferDesc.defaultState = ResourceState::CopyDestination;
-//             bufferDesc.memoryType = MemoryType::DeviceLocal;
-// 
-//             GFX_CHECK_CALL_ABORT(device->createBufferResource(
-//                 bufferDesc,
-//                 nullptr,
-//                 resultsBuffer.writeRef()));
         }
 
         void submitGPUWork(SubresourceRange msaaSubresource, SubresourceRange dstSubresource, ITextureResource::Size extent)
@@ -265,10 +250,8 @@ namespace
 
             auto resourceEncoder = commandBuffer->encodeResourceCommands();
 
-            ITextureResource::Offset3D offset;
             resourceEncoder->resolveResource(msaaTexture, ResourceState::ResolveSource, msaaSubresource, dstTexture, ResourceState::ResolveDestination, dstSubresource);
             resourceEncoder->textureSubresourceBarrier(dstTexture, dstSubresource, ResourceState::ResolveDestination, ResourceState::CopySource);
-            // Read back into a buffer?
             resourceEncoder->endEncoding();
             commandBuffer->close();
             queue->executeCommandBuffer(commandBuffer);
@@ -307,6 +290,8 @@ namespace
         }
     };
 
+    // TODO: Add more tests?
+
     struct ResolveResourceSimple : BaseResolveResourceTest
     {
         void run()
@@ -344,32 +329,6 @@ namespace
             uint8_t testResults[kPixelCount * kChannelCount];
 
             checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
-
-//             if (device->getDeviceInfo().deviceType == DeviceType::DirectX12)
-//             {
-//                 // D3D12 has to pad out the rows in order to adhere to alignment, so when comparing results
-//                 // we need to make sure not to include the padding.
-//                 size_t testOffset = 0;
-//                 for (Int i = 0; i < extent.height; ++i)
-//                 {
-//                     compareComputeResult(
-//                         device,
-//                         resultsBuffer,
-//                         testOffset,
-//                         srcTexData + 8 * i,
-//                         8);
-//                     testOffset += alignedRowPitch;
-//                 }
-//             }
-//             else if (device->getDeviceInfo().deviceType == DeviceType::Vulkan)
-//             {
-//                 compareComputeResult(
-//                     device,
-//                     resultsBuffer,
-//                     0,
-//                     srcTexData,
-//                     16);
-//             }
         }
     };
 
@@ -389,18 +348,8 @@ namespace gfx_test
         runTestImpl(resolveResourceTestImpl<ResolveResourceSimple>, unitTestContext, Slang::RenderApiFlag::D3D12);
     }
 
-//     SLANG_UNIT_TEST(D3D12)
-//     {
-//         runTestImpl(resolveResourceTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::D3D12);
-//     }
-
     SLANG_UNIT_TEST(resolveResourceSimpleVulkan)
     {
         runTestImpl(resolveResourceTestImpl<ResolveResourceSimple>, unitTestContext, Slang::RenderApiFlag::Vulkan);
     }
-
-//     SLANG_UNIT_TEST(copyTextureSectionVulkan)
-//     {
-//         runTestImpl(resolveResourceTestImpl<CopyTextureSection>, unitTestContext, Slang::RenderApiFlag::Vulkan);
-//     }
 }

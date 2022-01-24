@@ -561,6 +561,7 @@ public:
         VkAttachmentReference m_depthReference;
         bool m_hasDepthStencilAttachment;
         uint32_t m_renderTargetCount;
+        VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
 
     public:
         ~FramebufferLayoutImpl()
@@ -601,6 +602,8 @@ public:
                 dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
                 dst.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+                sampleCount = Math::Max(dst.samples, sampleCount);
             }
 
             if (desc.depthStencil)
@@ -615,6 +618,8 @@ public:
                 dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                 dst.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+                sampleCount = Math::Max(dst.samples, sampleCount);
             }
 
             Array<VkAttachmentReference, kMaxRenderTargets>& colorReferences = m_colorReferences;
@@ -7120,6 +7125,10 @@ static VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
         return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::ResolveSource:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::ResolveDestination:
+        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     default:
         {
             assert(!"Unsupported");
@@ -7351,7 +7360,7 @@ Result VKDevice::getTextureAllocationInfo(
     imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, nullptr);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = (VkSampleCountFlagBits)desc.sampleDesc.numSamples;
 
     VkImage image;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &image));
@@ -7430,7 +7439,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, initData);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = (VkSampleCountFlagBits)desc.sampleDesc.numSamples;
 
     VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO };
 #if SLANG_WINDOWS_FAMILY
@@ -8306,10 +8315,12 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
+    auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = framebufferLayoutImpl->sampleCount;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -8360,7 +8371,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDepthStencilState = &depthStencilStateInfo;
     pipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
-    pipelineInfo.renderPass = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout)->m_renderPass;
+    pipelineInfo.renderPass = framebufferLayoutImpl->m_renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDynamicState = &dynamicStateInfo;
