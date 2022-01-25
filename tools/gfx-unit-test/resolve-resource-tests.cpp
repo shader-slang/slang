@@ -32,7 +32,7 @@ namespace
         uint32_t height)
     {
         int stbResult =
-            stbi_write_png(filename, width, height, 4, (char*)pixels->getBufferPointer(), width * 4);
+            stbi_write_hdr(filename, width, height, 4, (float*)pixels->getBufferPointer());
 
         return stbResult ? SLANG_OK : SLANG_FAIL;
     }
@@ -70,7 +70,7 @@ namespace
 
     const int kWidth = 256;
     const int kHeight = 256;
-    Format format = Format::R8G8B8A8_UNORM;
+    Format format = Format::R32G32B32A32_FLOAT;
 
     ComPtr<IBufferResource> createVertexBuffer(IDevice* device)
     {
@@ -258,7 +258,7 @@ namespace
             queue->waitOnHost();
         }
 
-        void checkTestResults(int pixelCount, int channelCount, const int* testXCoords, const int* testYCoords, uint8_t* testResults)
+        void checkTestResults(int pixelCount, int channelCount, const int* testXCoords, const int* testYCoords, float* testResults)
         {
             // Read texture values back from four specific pixels located within the triangles
             // and compare against expected values (because testing every single pixel will be too long and tedious
@@ -268,14 +268,14 @@ namespace
             size_t pixelSize = 0;
             GFX_CHECK_CALL_ABORT(device->readTextureResource(
                 dstTexture, ResourceState::CopySource, resultBlob.writeRef(), &rowPitch, &pixelSize));
-            auto result = (uint8_t*)resultBlob->getBufferPointer();
+            auto result = (float*)resultBlob->getBufferPointer();
 
             int cursor = 0;
             for (int i = 0; i < pixelCount; ++i)
             {
                 auto x = testXCoords[i];
                 auto y = testYCoords[i];
-                auto pixelPtr = result + x * channelCount + y * rowPitch / sizeof(uint8_t);
+                auto pixelPtr = result + x * channelCount + y * rowPitch / sizeof(float);
                 for (int j = 0; j < channelCount; ++j)
                 {
                     testResults[cursor] = pixelPtr[j];
@@ -283,10 +283,10 @@ namespace
                 }
             }
 
-            uint8_t expectedResult[] = { 127u, 127u, 0u, 255u, 255u, 0u, 0u, 255u, 127u, 0u, 0u, 255u,
-                                         0u, 255u, 0u, 255u, 0u, 0u, 0u, 255u,
-                                         0u, 127u, 127u, 255u, 0u, 0u, 255u, 255u, 0u, 0u, 127u, 255u };
-            SLANG_CHECK(memcmp(testResults, expectedResult, 32) == 0);
+            float expectedResult[] = { 0.5f, 0.5f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.5f, 0.0f, 0.0f, 1.0f,
+                                         0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+                                         0.0f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.5f, 1.0f };
+            SLANG_CHECK(memcmp(testResults, expectedResult, 128) == 0);
         }
     };
 
@@ -326,7 +326,7 @@ namespace
             const int kChannelCount = 4;
             int testXCoords[kPixelCount] = { 64, 127, 191, 64, 191, 64, 127, 191 };
             int testYCoords[kPixelCount] = { 64, 64, 64, 127, 127, 191, 191, 191 };
-            uint8_t testResults[kPixelCount * kChannelCount];
+            float testResults[kPixelCount * kChannelCount];
 
             checkTestResults(kPixelCount, kChannelCount, testXCoords, testYCoords, testResults);
         }
