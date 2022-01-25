@@ -157,6 +157,14 @@ public:
 
     Type* getAndType(Type* left, Type* right);
 
+    Type* getModifiedType(Type* base, Count modifierCount, Val* const* modifiers);
+    Type* getModifiedType(Type* base, List<Val*> const& modifiers)
+    {
+        return getModifiedType(base, modifiers.getCount(), modifiers.getBuffer());
+    }
+    Val* getUNormModifierVal();
+    Val* getSNormModifierVal();
+
     TypeType* getTypeType(Type* type);
 
         /// Helpers to get type info from the SharedASTBuilder
@@ -208,6 +216,63 @@ protected:
     SharedASTBuilder* m_sharedASTBuilder;
 
     MemoryArena m_arena;
+
+    struct NodeDesc
+    {
+        ASTNodeType         type;
+        Count               operandCount = 0;
+        NodeBase* const*    operands = nullptr;
+
+        bool operator==(NodeDesc const& that) const;
+        HashCode getHashCode() const;
+    };
+
+        /// A cache for AST nodes that are entirely defined by their node type, with
+        /// no need for additional state.
+    Dictionary<NodeDesc, NodeBase*> m_cachedNodes;
+
+
+    typedef NodeBase* (*NodeCreateFunc)(ASTBuilder* astBuilder, NodeDesc const& desc, void* userData);
+
+    NodeBase* _getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc, void* createFuncUserData);
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* _getOrCreate(Count operandCount, NodeBase* const* operands)
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+
+        struct Helper
+        {
+            static NodeBase* create(ASTBuilder* astBuilder, NodeDesc const& desc, void* /*userData*/)
+            {
+                return astBuilder->create<T>(desc.operandCount, desc.operands);
+            }
+        };
+
+        NodeDesc desc;
+        desc.type = T::kType;
+        desc.operandCount = operandCount;
+        desc.operands = operands;
+        return (T*) _getOrCreateImpl(desc, &Helper::create, nullptr);
+    }
+
+    template<typename T>
+    SLANG_FORCE_INLINE T* _getOrCreate()
+    {
+        SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
+
+        struct Helper
+        {
+            static NodeBase* create(ASTBuilder* astBuilder, NodeDesc const& /*desc*/, void* /*userData*/)
+            {
+                return astBuilder->create<T>();
+            }
+        };
+
+        NodeDesc desc;
+        desc.type = T::kType;
+        return (T*) _getOrCreateImpl(desc, &Helper::create, nullptr);
+    }
 };
 
 } // namespace Slang

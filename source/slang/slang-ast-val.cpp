@@ -528,6 +528,52 @@ Val* TaggedUnionSubtypeWitness::_substituteImplOverride(ASTBuilder* astBuilder, 
     return substWitness;
 }
 
+// ModifierVal
 
+bool ModifierVal::_equalsValOverride(Val* val)
+{
+    // TODO: This is assuming we can fully deduplicate the values that represent
+    // modifiers, which may not actually be the case if there are multiple modules
+    // being combined that use different `ASTBuilder`s.
+    //
+    return this == val;
+}
+
+HashCode ModifierVal::_getHashCodeOverride()
+{
+    Hasher hasher;
+    hasher.hashValue((void*) this);
+    return hasher.getResult();
+}
+
+// UNormModifierVal
+
+void UNormModifierVal::_toTextOverride(StringBuilder& out)
+{
+    out.append("unorm");
+}
+
+Val* UNormModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    SLANG_UNUSED(astBuilder);
+    SLANG_UNUSED(subst);
+    SLANG_UNUSED(ioDiff);
+    return this;
+}
+
+// SNormModifierVal
+
+void SNormModifierVal::_toTextOverride(StringBuilder& out)
+{
+    out.append("snorm");
+}
+
+Val* SNormModifierVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    SLANG_UNUSED(astBuilder);
+    SLANG_UNUSED(subst);
+    SLANG_UNUSED(ioDiff);
+    return this;
+}
 
 } // namespace Slang

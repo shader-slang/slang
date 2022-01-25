@@ -983,4 +983,44 @@ class PayloadAttribute : public Attribute
     SLANG_AST_CLASS(PayloadAttribute)
 };
 
+    /// A modifier that applies to types rather than declarations.
+    ///
+    /// In most cases, the Slang compiler assumes that a modifier should
+    /// inhere to a declaration. Given input like:
+    ///
+    /// mod1 mod2 int myVar = ...;
+    ///
+    /// The default assumption is that `mod1` and `mod2` apply to `myVar`
+    /// and *not* to the `int` type.
+    ///
+    /// In order to allow modifiers to inhere to the type instead, we introduce
+    /// a base class for modifiers that really don't want to belong to the declaration,
+    /// and instead want to belong to the type (or rather the type *specifier*
+    /// from a parsing standpoint).
+    ///
+class TypeModifier : public Modifier
+{
+    SLANG_AST_CLASS(TypeModifier)
+};
+
+    /// A modifier that applies to a type and implies information about the
+    /// underlying format of a resource that uses that type as its element type.
+    ///
+class ResourceElementFormatModifier : public TypeModifier
+{
+    SLANG_AST_CLASS(ResourceElementFormatModifier)
+};
+
+    /// HLSL `unorm` modifier
+class UNormModifier : public ResourceElementFormatModifier
+{
+    SLANG_AST_CLASS(UNormModifier)
+};
+
+    /// HLSL `snorm` modifier
+class SNormModifier : public ResourceElementFormatModifier
+{
+    SLANG_AST_CLASS(SNormModifier)
+};
+
 } // namespace Slang

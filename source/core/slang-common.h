@@ -36,6 +36,8 @@ namespace Slang
     // Type used for indexing, in arrays/views etc. Signed.
     typedef Int Index;
     typedef UInt UIndex;
+    typedef Int Count;
+    typedef UInt UCount;
 
     static const Index kMaxIndex = kMaxInt;
 
