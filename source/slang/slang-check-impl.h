@@ -1154,6 +1154,10 @@ namespace Slang
             Expr*    fromExpr,
             Val*     witness);
 
+        Expr* createModifierCastExpr(
+            Type*    toType,
+            Expr*    fromExpr);
+
         /// Does there exist an implicit conversion from `fromType` to `toType`?
         bool canConvertImplicitly(
             Type* toType,
@@ -1573,6 +1577,7 @@ namespace Slang
         CASE(OverloadedExpr2)
         CASE(AggTypeCtorExpr)
         CASE(CastToSuperTypeExpr)
+        CASE(ModifierCastExpr)
         CASE(LetExpr)
         CASE(ExtractExistentialValueExpr)
 
@@ -1587,6 +1592,10 @@ namespace Slang
         Expr* visitThisExpr(ThisExpr* expr);
         Expr* visitThisTypeExpr(ThisTypeExpr* expr);
         Expr* visitAndTypeExpr(AndTypeExpr* expr);
+        Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
+
+            /// Perform semantic checking on a `modifier` that is being applied to the given `type`
+        Val* checkTypeModifier(Modifier* modifier, Type* type);
     };
 
     struct SemanticsStmtVisitor

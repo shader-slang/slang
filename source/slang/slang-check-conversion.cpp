@@ -539,6 +539,68 @@ namespace Slang
         return false;
     }
 
+        /// Do the `left` and `right` modifiers represent the same thing?
+    static bool _doModifiersMatch(Val* left, Val* right)
+    {
+        if( left == right )
+            return true;
+
+        if( left->equalsVal(right) )
+            return true;
+
+        return false;
+    }
+
+        /// Does `type` have a modifier that matches `modifier`?
+    static bool _hasMatchingModifier(ModifiedType* type, Val* modifier)
+    {
+        if(!type) return false;
+
+        for( auto m : type->modifiers )
+        {
+            if(_doModifiersMatch(m, modifier))
+                return true;
+        }
+
+        return false;
+    }
+
+        /// Can `modifier` be added to a type as part of a coercion?
+        ///
+        /// For example, it is generally safe to convert from a value
+        /// of type `T` to a value of type `const T` in C/C++.
+        ///
+    static bool _canModifierBeAddedDuringCoercion(Val* modifier)
+    {
+        switch( modifier->astNodeType )
+        {
+        default:
+            return false;
+
+        case ASTNodeType::UNormModifierVal:
+        case ASTNodeType::SNormModifierVal:
+            return true;
+        }
+    }
+
+        /// Can `modifier` be dropped from a type as part of a coercion?
+        ///
+        /// For example, it is generally safe to convert from a value
+        /// of type `const T` to a value of type `T` in C/C++.
+        ///
+    static bool _canModifierBeDroppedDuringCoercion(Val* modifier)
+    {
+        switch( modifier->astNodeType )
+        {
+        default:
+            return false;
+
+        case ASTNodeType::UNormModifierVal:
+        case ASTNodeType::SNormModifierVal:
+            return true;
+        }
+    }
+
     bool SemanticsVisitor::_coerce(
         Type*    toType,
         Expr**   outToExpr,
@@ -590,6 +652,77 @@ namespace Slang
             if(outCost)
                 *outCost = kConversionCost_None;
             return true;
+        }
+
+        {
+            // It is possible that one or more of the types involved might have modifiers
+            // on it, but the underlying types are otherwise the same.
+            //
+            auto toModified = as<ModifiedType>(toType);
+            auto toBase = toModified ? toModified->base : toType;
+            //
+            auto fromModified = as<ModifiedType>(fromType);
+            auto fromBase = fromModified ? fromModified->base : fromType;
+
+
+            if((toModified || fromModified) && toBase->equals(fromBase))
+            {
+                // We need to check each modifier present on either `toType`
+                // or `fromType`. For each modifier, it will either be:
+                //
+                // * Present on both types; these are a non-issue
+                // * Present only on `toType`
+                // * Present only on `fromType`
+                //
+                if( toModified )
+                {
+                    for( auto modifier : toModified->modifiers )
+                    {
+                        if(_hasMatchingModifier(fromModified, modifier))
+                            continue;
+
+                        // If `modifier` is present on `toType`, but not `fromType`,
+                        // then we need to know whether this modifier can be added
+                        // to the type of an expression as part of coercion.
+                        //
+                        if( !_canModifierBeAddedDuringCoercion(modifier) )
+                        {
+                            return _failedCoercion(toType, outToExpr, fromExpr);
+                        }
+                    }
+                }
+                if( fromModified )
+                {
+                    for( auto modifier : fromModified->modifiers )
+                    {
+                        if(_hasMatchingModifier(toModified, modifier))
+                            continue;
+
+                        // If `modifier` is present on `fromType`, but not `toType`,
+                        // then we need to know whether this modifier can be dropped
+                        // to the type of an expression as part of coercion.
+                        //
+                        if( !_canModifierBeDroppedDuringCoercion(modifier) )
+                        {
+                            return _failedCoercion(toType, outToExpr, fromExpr);
+                        }
+                    }
+                }
+
+                // If all the modifiers were okay, we can convert.
+
+                // TODO: we may need a cost to allow disambiguation of overloads based on modifiers?
+                if(outCost)
+                {
+                    *outCost = kConversionCost_None;
+                }
+                if( outToExpr )
+                {
+                    *outToExpr = createModifierCastExpr(toType, fromExpr);
+                }
+
+                return true;
+            }
         }
 
         // Coercion from an initializer list is allowed for many types,
@@ -930,6 +1063,18 @@ namespace Slang
         expr->witnessArg = witness;
         return expr;
     }
+
+    Expr* SemanticsVisitor::createModifierCastExpr(
+        Type*    toType,
+        Expr*    fromExpr)
+    {
+        ModifierCastExpr* expr = m_astBuilder->create<ModifierCastExpr>();
+        expr->loc = fromExpr->loc;
+        expr->type = QualType(toType);
+        expr->valueArg = fromExpr;
+        return expr;
+    }
+
 
     Expr* SemanticsVisitor::coerce(
         Type*    toType,

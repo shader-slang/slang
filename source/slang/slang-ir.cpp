@@ -200,7 +200,7 @@ namespace Slang
         return nullptr;
     }
 
-    IROperandListBase IRInst::getAllAttrs()
+    IROperandList<IRAttr> IRInst::getAllAttrs()
     {
         // We assume as an invariant that all attributes appear at the end of the operand
         // list, after all the non-attribute operands.
@@ -215,7 +215,7 @@ namespace Slang
         while(cursor != end && !as<IRAttr>(cursor->get()))
             cursor++;
 
-        return IROperandListBase(cursor, end);
+        return IROperandList<IRAttr>(cursor, end);
     }
 
     // IRConstant
@@ -2766,6 +2766,17 @@ namespace Slang
         return getType(kIROp_ConjunctionType, typeCount, (IRInst* const*)types);
     }
 
+    IRType* IRBuilder::getAttributedType(
+        IRType*         baseType,
+        UInt            attributeCount,
+        IRAttr* const*  attributes)
+    {
+        List<IRInst*> operands;
+        operands.add(baseType);
+        for(UInt i = 0; i < attributeCount; ++i)
+            operands.add(attributes[i]);
+        return getType(kIROp_AttributedType, operands.getCount(), operands.getBuffer());
+    }
 
 
     void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
@@ -4257,6 +4268,16 @@ namespace Slang
             SLANG_COUNT_OF(operands),
             operands));
     }
+
+    IRAttr* IRBuilder::getAttr(IROp op, UInt operandCount, IRInst* const* operands)
+    {
+        return cast<IRAttr>(findOrEmitHoistableInst(
+            getVoidType(),
+            op,
+            operandCount,
+            operands));
+    }
+
 
 
     IRTypeLayout* IRBuilder::getTypeLayout(IROp op, List<IRInst*> const& operands)

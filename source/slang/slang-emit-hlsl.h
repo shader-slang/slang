@@ -55,6 +55,7 @@ protected:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) SLANG_OVERRIDE;
 
+    void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
 
         // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout info
         // Keyword to use in the uniform case (`register` for globals, `packoffset` inside a `cbuffer`)

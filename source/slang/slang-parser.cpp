@@ -213,10 +213,10 @@ namespace Slang
 
     static Decl* parseEnumDecl(Parser* parser);
 
-    static Modifier* ParseOptSemantics(
+    static Modifiers _parseOptSemantics(
         Parser* parser);
 
-    static void ParseOptSemantics(
+    static void _parseOptSemantics(
         Parser* parser,
         Decl*	decl);
 
@@ -233,6 +233,8 @@ namespace Slang
         CallableDecl*   decl);
 
     static TokenType peekTokenType(Parser* parser);
+
+    static Expr* _parseGenericArg(Parser* parser);
 
     //
 
@@ -1228,7 +1230,7 @@ namespace Slang
     {
         Expr*	    typeSpec = nullptr;
         NameLoc             nameAndLoc;
-        Modifier*	semantics = nullptr;
+        Modifiers   semantics;
         Expr*	    initializer = nullptr;
     };
 
@@ -1483,7 +1485,7 @@ namespace Slang
             parser->PushScope(decl);
 
             parseParameterList(parser, decl);
-            ParseOptSemantics(parser, decl);
+            _parseOptSemantics(parser, decl);
             decl->body = parseOptBody(parser);
 
             parser->PopScope();
@@ -1511,9 +1513,9 @@ namespace Slang
     }
 
     // Add modifiers to the end of the modifier list for a declaration
-    void AddModifiers(Decl* decl, Modifier* modifiers)
+    static void _addModifiers(Decl* decl, Modifiers const& modifiers)
     {
-        if (!modifiers)
+        if (!modifiers.first)
             return;
 
         Modifier** link = &decl->modifiers.first;
@@ -1521,7 +1523,7 @@ namespace Slang
         {
             link = &(*link)->next;
         }
-        *link = modifiers;
+        *link = modifiers.first;
     }
 
     static Name* generateName(Parser* parser, String const& base)
@@ -1556,7 +1558,7 @@ namespace Slang
         }
         decl->type = TypeExp(declaratorInfo.typeSpec);
 
-        AddModifiers(decl, declaratorInfo.semantics);
+        _addModifiers(decl, declaratorInfo.semantics);
 
         decl->initExpr = declaratorInfo.initializer;
     }
@@ -1695,7 +1697,7 @@ namespace Slang
     struct InitDeclarator
     {
         RefPtr<Declarator>  declarator;
-        Modifier*    semantics = nullptr;
+        Modifiers    semantics;
         Expr*        initializer = nullptr;
     };
 
@@ -1706,7 +1708,7 @@ namespace Slang
     {
         InitDeclarator result;
         result.declarator = parseDeclarator(parser, options);
-        result.semantics = ParseOptSemantics(parser);
+        result.semantics = _parseOptSemantics(parser);
         return result;
     }
 
@@ -1822,12 +1824,6 @@ namespace Slang
         }
     };
 
-    // Pares an argument to an application of a generic
-    Expr* ParseGenericArg(Parser* parser)
-    {
-        return parser->ParseArgExpr();
-    }
-
     // Create a type expression that will refer to the given declaration
     static Expr*
     createDeclRefType(Parser* parser, Decl* decl)
@@ -1866,10 +1862,10 @@ namespace Slang
         parser->ReadToken(TokenType::OpLess);
         parser->genericDepth++;
         // For now assume all generics have at least one argument
-        genericApp->arguments.add(ParseGenericArg(parser));
+        genericApp->arguments.add(_parseGenericArg(parser));
         while (AdvanceIf(parser, TokenType::Comma))
         {
-            genericApp->arguments.add(ParseGenericArg(parser));
+            genericApp->arguments.add(_parseGenericArg(parser));
         }
         parser->genericDepth--;
 
@@ -2016,7 +2012,143 @@ namespace Slang
         return parseThisTypeExpr(parser);
     }
 
-    static TypeSpec parseTypeSpec(Parser* parser)
+        /// Apply the given `modifiers` (if any) to the given `typeExpr`
+    static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers const& modifiers)
+    {
+        if(modifiers.first)
+        {
+            // Currently, we represent a type with modifiers applied to it as
+            // an AST node of the `ModifiedTypeExpr` class. We will create
+            // one here and make it be the home for our `typeModifiers`.
+            //
+            ModifiedTypeExpr* modifiedTypeExpr = parser->astBuilder->create<ModifiedTypeExpr>();
+            modifiedTypeExpr->base.exp = typeExpr;
+            modifiedTypeExpr->modifiers = modifiers;
+            return modifiedTypeExpr;
+        }
+        else
+        {
+            // If none of the modifiers were type modifiers, we can leave
+            // the existing type expression alone.
+            return typeExpr;
+        }
+    }
+
+        /// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
+        ///
+        /// If any type modifiers were present, `ioBaseModifiers` will be updated
+        /// to only include those modifiers that were not type modifiers (if any).
+        /// 
+        /// If no type modifiers were present, `ioBaseModifiers` will remain unchanged.
+        ///
+    static Expr* _applyTypeModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers& ioBaseModifiers)
+    {
+        // The `Modifiers` that were passed in as `ioBaseModifiers` comprise
+        // a singly-linked list of `Modifier` nodes.
+        //
+        // It is possible that some of these modifiers represent type modifiers and,
+        // if so, we want to transfer those modifiers to apply to the type given
+        // by `typeExpr`. Any remaining modifiers that are not type modifiers will
+        // be left in the `ioBaseModifiers` list.
+        //
+        // The type modifiers will be collected into their own `Modifiers` list,
+        // and we will retain a poiner to the final pointer in the linked list
+        // (the one that is null), so that we can append to the end.
+        //
+        Modifiers typeModifiers;
+        Modifier** typeModifierLink = &typeModifiers.first;
+
+        // While iterating over the base modifiers, we need to be able to remove
+        // a linked-list node while inspecting it, so we will similarly keep a "link"
+        // variable that points at whatever location points to the current node
+        // (either the head of the list, or the `next` pointer in the previous modifier)
+        //
+        Modifier** baseModifierLink = &ioBaseModifiers.first;
+        while(auto baseModifier = *baseModifierLink)
+        {
+            // We want to detect whether we have a type modifier or not.
+            //
+            auto typeModifier = as<TypeModifier>(baseModifier);
+
+            // The easy case is when we *don't* have a type modifier.
+            //
+            if(!typeModifier)
+            {
+                // We want to leave the modifier where it is (in the list
+                // of "base" modifiers), and advance to the next one in order.
+                //
+                baseModifierLink = &baseModifier->next;
+            }
+            else
+            {
+                // If we have a type modifier, we need to graft it onto
+                // the list of type modifiers. This is done by writing
+                // a pointer to the type modifier into the "link" for
+                // the type modifier list, and updating the link to point
+                // to the `next` field of the current modifier (since that
+                // fill be the location any further type modifiers need
+                // to be linked).
+                //
+                *typeModifierLink = typeModifier;
+                typeModifierLink = &typeModifier->next;
+
+                // The above logic puts `typeModifier` into the type modifer
+                // list, but it doesn't remove it from the base modifier list.
+                // In order to do that we must replace the pointer to `typeModifer`
+                // with a pointer to whatever is next in the base list, and also
+                // null out the `next` field of `typeModifier` so that it no
+                // longer points to the base modifiers that come after it.
+                //
+                *baseModifierLink = typeModifier->next;
+                typeModifier->next = nullptr;
+
+                // Note: We do *not* need to update `baseModifierLink` before
+                // the next loop iteration, because `*baseModifierLink` has
+                // already been updated so that it points to the next node
+                // we want to visit.
+            }
+        }
+
+        // If we ended up finding any type modifiers, we want to apply them
+        // to the type expression.
+        //
+        return _applyModifiersToTypeExpr(parser, typeExpr, typeModifiers);
+    }
+
+    static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Modifiers const& inModifiers)
+    {
+        // It is possible that the form of the type specifier will have
+        // included a declaration directly (e.g., using `struct { ... }`
+        // as a type specifier to declare both a type and value(s) of that
+        // type in one go).
+        //
+        if(auto decl = typeSpec.decl)
+        {
+            // In the case where there *is* a declaration, we want to apply
+            // any modifiers that logically belong to the type to the type,
+            // and any modifiers that logically belong to the declaration to
+            // the declaration.
+            //
+            Modifiers modifiers = inModifiers;
+            typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
+
+            // Any remaining modifiers should instead be applied to the declaration.
+            _addModifiers(decl, modifiers);
+        }
+        else
+        {
+            // If there are modifiers, then we apply *all* of them to the type expression.
+            // This may result in modifiers being applied that do not belong on a type;
+            // in that case we rely on downstream semantic checking to diagnose any error.
+            //
+            typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, inModifiers);
+        }
+
+        return typeSpec;
+    }
+
+        /// Parse a type specifier, without dealing with modifiers.
+    static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     {
         TypeSpec typeSpec;
 
@@ -2110,13 +2242,56 @@ namespace Slang
         return typeSpec;
     }
 
+        /// Parse a type specifier, following the given list of modifiers.
+        ///
+        /// If there are any modifiers in `ioModifiers`, this function may modify it
+        /// by stripping out any type modifiers and attaching them to the `TypeSpec`.
+        /// Any modifiers that are not type modifiers will be left where they were.
+        ///
+    static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
+    {
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
+
+        // We don't know whether `ioModifiers` has any modifiers in it,
+        // or which of them might be type modifiers, so we will delegate
+        // figuring that out to a subroutine.
+        //
+        typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
+
+        return typeSpec;
+    }
+
+        /// Parse a type specifier, including any leading modifiers.
+        ///
+        /// Note that all the modifiers that precede the type specifier
+        /// will end up as modifiers for the type specifier even if they
+        /// should *not* be allowed as modifiers on a type.
+        ///
+        /// This function should not be used in contexts where a type specifier
+        /// is being parsed as part of a declaration, such that a subset of
+        /// the modifiers might inhere to the declaration rather than the
+        /// type specifier.
+        ///
+    static TypeSpec _parseTypeSpec(Parser* parser)
+    {
+        Modifiers modifiers = ParseModifiers(parser);
+        TypeSpec typeSpec = _parseSimpleTypeSpec(parser);
+
+        typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
+
+        return typeSpec;
+    }
+
+
     static DeclBase* ParseDeclaratorDecl(
-        Parser*         parser,
-        ContainerDecl*  containerDecl)
+        Parser*             parser,
+        ContainerDecl*      containerDecl,
+        Modifiers const&    inModifiers)
     {
         SourceLoc startPosition = parser->tokenReader.peekLoc();
 
-        auto typeSpec = parseTypeSpec(parser);
+        Modifiers modifiers = inModifiers;
+        auto typeSpec = _parseTypeSpec(parser, modifiers);
 
         // We may need to build up multiple declarations in a group,
         // but the common case will be when we have just a single
@@ -2206,7 +2381,7 @@ namespace Slang
             // Only parse as a function if we didn't already see mutually-exclusive
             // constructs when parsing the declarator.
             && !initDeclarator.initializer
-            && !initDeclarator.semantics)
+            && !initDeclarator.semantics.first)
         {
             // Looks like a function, so parse it like one.
             UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
@@ -2433,14 +2608,15 @@ namespace Slang
     //
     // opt-semantics ::= (':' semantic)*
     //
-    static Modifier* ParseOptSemantics(
+    static Modifiers _parseOptSemantics(
         Parser* parser)
     {
-        if (!AdvanceIf(parser, TokenType::Colon))
-            return nullptr;
+        Modifiers modifiers;
 
-        Modifier* result = nullptr;
-        Modifier** link = &result;
+        if (!AdvanceIf(parser, TokenType::Colon))
+            return modifiers;
+
+        Modifier** link = &modifiers.first;
         SLANG_ASSERT(!*link);
 
         for (;;)
@@ -2470,18 +2646,18 @@ namespace Slang
             // avoiding an infinite loop here.
             if (!AdvanceIf(parser, TokenType::Colon))
             {
-                return result;
+                return modifiers;
             }
         }
 
     }
 
 
-    static void ParseOptSemantics(
+    static void _parseOptSemantics(
         Parser* parser,
         Decl*	decl)
     {
-        AddModifiers(decl, ParseOptSemantics(parser));
+        _addModifiers(decl, _parseOptSemantics(parser));
     }
 
     static Decl* ParseHLSLBufferDecl(
@@ -2559,7 +2735,7 @@ namespace Slang
 
         // Any semantics applied to the buffer declaration are taken as applying
         // to the variable instead.
-        ParseOptSemantics(parser, bufferVarDecl);
+        _parseOptSemantics(parser, bufferVarDecl);
 
         // The declarations in the body belong to the data type.
         parseDeclBody(parser, bufferDataTypeDecl);
@@ -2917,7 +3093,7 @@ namespace Slang
         }
         decl->loc = loc;
 
-        AddModifiers(decl, modifiers.first);
+        _addModifiers(decl, modifiers);
 
         parser->PushScope(decl);
 
@@ -3423,7 +3599,7 @@ namespace Slang
         Decl* declToModify = decl;
         if(auto genericDecl = as<GenericDecl>(decl))
             declToModify = genericDecl->inner;
-        AddModifiers(declToModify, modifiers.first);
+        _addModifiers(declToModify, modifiers);
 
         // Make sure the decl is properly nested inside its lexical parent
         if (containerDecl)
@@ -3435,7 +3611,7 @@ namespace Slang
     static DeclBase* ParseDeclWithModifiers(
         Parser*             parser,
         ContainerDecl*      containerDecl,
-        Modifiers			modifiers )
+        Modifiers           modifiers )
     {
         DeclBase* decl = nullptr;
 
@@ -3462,7 +3638,7 @@ namespace Slang
 
                 // Our final fallback case is to assume that the user is
                 // probably writing a C-style declarator-based declaration.
-                decl = ParseDeclaratorDecl(parser, containerDecl);
+                decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
                 break;
             }
             break;
@@ -3483,7 +3659,7 @@ namespace Slang
 
         // If nothing else matched, we try to parse an "ordinary" declarator-based declaration
         default:
-            decl = ParseDeclaratorDecl(parser, containerDecl);
+            decl = ParseDeclaratorDecl(parser, containerDecl, modifiers);
             break;
         }
 
@@ -4299,7 +4475,7 @@ namespace Slang
         ///
     static Expr* _parseAtomicTypeExpr(Parser* parser)
     {
-        auto typeSpec = parseTypeSpec(parser);
+        auto typeSpec = _parseTypeSpec(parser);
         if( typeSpec.decl )
         {
             AddMember(parser->currentScope, typeSpec.decl);
@@ -4318,15 +4494,8 @@ namespace Slang
         return parsePostfixTypeSuffix(parser, typeExpr);
     }
 
-        /// Parse an infix type expression.
-        ///
-        /// Currently, the only infix type expression we support is the `&`
-        /// operator for forming interface conjunctions.
-        ///
-    static Expr* _parseInfixTypeExpr(Parser* parser)
+    static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
     {
-        auto leftExpr = _parsePostfixTypeExpr(parser);
-
         for(;;)
         {
             // As long as the next token is an `&`, we will try
@@ -4347,6 +4516,17 @@ namespace Slang
         }
 
         return leftExpr;
+    }
+
+        /// Parse an infix type expression.
+        ///
+        /// Currently, the only infix type expression we support is the `&`
+        /// operator for forming interface conjunctions.
+        ///
+    static Expr* _parseInfixTypeExpr(Parser* parser)
+    {
+        auto leftExpr = _parsePostfixTypeExpr(parser);
+        return _parseInfixTypeExprSuffix(parser, leftExpr);
     }
 
     Expr* Parser::ParseType()
@@ -5506,6 +5686,46 @@ namespace Slang
     Expr* Parser::ParseLeafExpression()
     {
         return parsePrefixExpr(this);
+    }
+
+        /// Parse an argument to an application of a generic
+    static Expr* _parseGenericArg(Parser* parser)
+    {
+        // The grammar for generic arguments needs to be a super-set of the
+        // grammar for types and for expressions, because we do not know
+        // which to expect at each argument position during parsing.
+        //
+        // For the most part the expression grammar is more permissive than
+        // the type grammar, but types support modifiers that are not
+        // (currently) allowed in pure expression contexts.
+        //
+        // We could in theory allow modifiers to appear in expression contexts
+        // and deal with the cases where this should not be allowed downstream,
+        // but doing so runs a high risk of changing the meaning of existing code
+        // (notably in cases where a user might have used a variable name that
+        // overlaps with a language modifier keyword).
+        //
+        // Instead, we will simply detect the case where modifiers appear on
+        // a generic argument here, as a special case.
+        //
+        Modifiers modifiers = ParseModifiers(parser);
+        if(modifiers.first)
+        {
+            // If there are any modifiers, then we know that we are actually
+            // in the type case.
+            //
+            auto typeSpec = _parseSimpleTypeSpec(parser);
+            typeSpec = _applyModifiersToTypeSpec(parser, typeSpec, modifiers);
+
+            auto typeExpr = typeSpec.expr;
+
+            typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
+            typeExpr = _parseInfixTypeExprSuffix(parser, typeExpr);
+
+            return typeExpr;
+        }
+
+        return parser->ParseArgExpr();
     }
 
     Expr* parseTermFromSourceFile(

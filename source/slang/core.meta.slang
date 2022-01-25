@@ -27,6 +27,42 @@ syntax globallycoherent : GloballyCoherentModifier;
 ///
 syntax pervertex : PerVertexModifier;
 
+/// Modifier to indicate a buffer or texture element type is
+/// backed by data in an unsigned normalized format.
+///
+/// The `unorm` modifier is only valid on `float` and `vector`s
+/// with `float` elements.
+///
+/// This modifier does not affect the semantics of any variable,
+/// parameter, or field that uses it. The semantics of a `float`
+/// or vector are the same with or without `unorm`.
+///
+/// The `unorm` modifier can be used for the element type of a
+/// buffer or texture, to indicate that the data that is bound
+/// to that buffer or texture is in a matching normalized format.
+/// Some platforms may require a `unorm` qualifier for such buffers
+/// and textures, and others may operate correctly without it.
+///
+syntax unorm : UNormModifier;
+
+/// Modifier to indicate a buffer or texture element type is
+/// backed by data in an signed normalized format.
+///
+/// The `snorm` modifier is only valid on `float` and `vector`s
+/// with `float` elements.
+///
+/// This modifier does not affect the semantics of any variable,
+/// parameter, or field that uses it. The semantics of a `float`
+/// or vector are the same with or without `snorm`.
+///
+/// The `snorm` modifier can be used for the element type of a
+/// buffer or texture, to indicate that the data that is bound
+/// to that buffer or texture is in a matching normalized format.
+/// Some platforms may require a `unorm` qualifier for such buffers
+/// and textures, and others may operate correctly without it.
+///
+syntax snorm : SNormModifier;
+
 /// A type that can be used as an operand for builtins
 [sealed]
 [builtin]
