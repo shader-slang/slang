@@ -3294,8 +3294,15 @@ public:
 
             auto copyShaderIdInto = [&](void* dest, String& name)
             {
-                void* shaderId = stateObjectProperties->GetShaderIdentifier(name.toWString().begin());
-                memcpy(dest, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                if (name.getLength())
+                {
+                    void* shaderId = stateObjectProperties->GetShaderIdentifier(name.toWString().begin());
+                    memcpy(dest, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                }
+                else
+                {
+                    memset(dest, 0, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                }
             };
 
             uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
