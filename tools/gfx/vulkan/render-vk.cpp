@@ -8429,28 +8429,41 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
 
     auto targetCount = blendDesc.targetCount;
     List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
-    colorBlendAttachments.setCount(targetCount);
 
-    for (UInt i = 0; i < targetCount; ++i)
+    // Regardless of whether blending is enabled, Vulkan always applies the color write mask operation,
+    // so if there is no blending then we need to add an attachment that defines the color write mask
+    // to ensure colors are actually written.
+    if (targetCount == 0)
     {
-        auto& gfxBlendDesc = blendDesc.targets[i];
-        auto& vkBlendDesc = colorBlendAttachments[i];
-
-        vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
-        vkBlendDesc.srcColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.srcFactor);
-        vkBlendDesc.dstColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.dstFactor);
-        vkBlendDesc.colorBlendOp = translateBlendOp(gfxBlendDesc.color.op);
-        vkBlendDesc.srcAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.srcFactor);
-        vkBlendDesc.dstAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.dstFactor);
-        vkBlendDesc.alphaBlendOp = translateBlendOp(gfxBlendDesc.alpha.op);
-        vkBlendDesc.colorWriteMask = (VkColorComponentFlags)gfxBlendDesc.writeMask;
+        colorBlendAttachments.setCount(1);
+        auto& vkBlendDesc = colorBlendAttachments[0];
+        vkBlendDesc.blendEnable = VK_FALSE;
+        vkBlendDesc.colorWriteMask = (VkColorComponentFlags)RenderTargetWriteMask::EnableAll;
     }
+    else
+    {
+        colorBlendAttachments.setCount(targetCount);
+        for (UInt i = 0; i < targetCount; ++i)
+        {
+            auto& gfxBlendDesc = blendDesc.targets[i];
+            auto& vkBlendDesc = colorBlendAttachments[i];
 
+            vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
+            vkBlendDesc.srcColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.srcFactor);
+            vkBlendDesc.dstColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.dstFactor);
+            vkBlendDesc.colorBlendOp = translateBlendOp(gfxBlendDesc.color.op);
+            vkBlendDesc.srcAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.srcFactor);
+            vkBlendDesc.dstAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.dstFactor);
+            vkBlendDesc.alphaBlendOp = translateBlendOp(gfxBlendDesc.alpha.op);
+            vkBlendDesc.colorWriteMask = (VkColorComponentFlags)gfxBlendDesc.writeMask;
+        }
+    }
+    
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = targetCount;
+    colorBlending.attachmentCount = (targetCount == 0) ? 1 : targetCount;
     colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
