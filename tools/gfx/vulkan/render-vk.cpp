@@ -562,7 +562,7 @@ public:
         VkAttachmentReference m_depthReference;
         bool m_hasDepthStencilAttachment;
         uint32_t m_renderTargetCount;
-        VkSampleCountFlagBits sampleCount = VK_SAMPLE_COUNT_1_BIT;
+        VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
 
     public:
         ~FramebufferLayoutImpl()
@@ -604,7 +604,7 @@ public:
                 dst.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-                sampleCount = Math::Max(dst.samples, sampleCount);
+                m_sampleCount = Math::Max(dst.samples, m_sampleCount);
             }
 
             if (desc.depthStencil)
@@ -620,7 +620,7 @@ public:
                 dst.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-                sampleCount = Math::Max(dst.samples, sampleCount);
+                m_sampleCount = Math::Max(dst.samples, m_sampleCount);
             }
 
             Array<VkAttachmentReference, kMaxRenderTargets>& colorReferences = m_colorReferences;
@@ -8223,6 +8223,118 @@ Result VKDevice::createMutableRootShaderObject(
     return SLANG_OK;
 }
 
+VkSampleCountFlagBits translateSampleCount(uint32_t sampleCount)
+{
+    switch (sampleCount)
+    {
+    case 1:        return VK_SAMPLE_COUNT_1_BIT;
+    case 2:        return VK_SAMPLE_COUNT_2_BIT;
+    case 4:        return VK_SAMPLE_COUNT_4_BIT;
+    case 8:        return VK_SAMPLE_COUNT_8_BIT;
+    case 16:       return VK_SAMPLE_COUNT_16_BIT;
+    case 32:       return VK_SAMPLE_COUNT_32_BIT;
+    case 64:       return VK_SAMPLE_COUNT_64_BIT;
+    default:
+        assert(!"Unsupported sample count");
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+}
+
+VkCullModeFlags translateCullMode(CullMode cullMode)
+{
+    switch (cullMode)
+    {
+    case CullMode::None:        return VK_CULL_MODE_NONE;
+    case CullMode::Front:       return VK_CULL_MODE_FRONT_BIT;
+    case CullMode::Back:        return VK_CULL_MODE_BACK_BIT;
+    default:
+        assert(!"Unsupported cull mode");
+        return VK_CULL_MODE_NONE;
+    }
+}
+
+VkFrontFace translateFrontFaceMode(FrontFaceMode frontFaceMode)
+{
+    // TODO: May need to be reversed due to the viewport flip
+    switch (frontFaceMode)
+    {
+    case FrontFaceMode::CounterClockwise:       return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    case FrontFaceMode::Clockwise:              return VK_FRONT_FACE_CLOCKWISE;
+    default:
+        assert(!"Unsupported front face mode");
+        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    }
+}
+
+VkPolygonMode translateFillMode(FillMode fillMode)
+{
+    switch (fillMode)
+    {
+    case FillMode::Solid:        return VK_POLYGON_MODE_FILL;
+    case FillMode::Wireframe:    return VK_POLYGON_MODE_LINE;
+    default:
+        assert(!"Unsupported fill mode");
+        return VK_POLYGON_MODE_FILL;
+    }
+}
+
+VkBlendFactor translateBlendFactor(BlendFactor blendFactor)
+{
+    switch (blendFactor)
+    {
+    case BlendFactor::Zero:                     return VK_BLEND_FACTOR_ZERO;
+    case BlendFactor::One:                      return VK_BLEND_FACTOR_ONE;
+    case BlendFactor::SrcColor:                 return VK_BLEND_FACTOR_SRC_COLOR;
+    case BlendFactor::InvSrcColor:              return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+    case BlendFactor::SrcAlpha:                 return VK_BLEND_FACTOR_SRC_ALPHA;
+    case BlendFactor::InvSrcAlpha:              return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    case BlendFactor::DestAlpha:                return VK_BLEND_FACTOR_DST_ALPHA;
+    case BlendFactor::InvDestAlpha:             return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::DestColor:                return VK_BLEND_FACTOR_DST_COLOR;
+    case BlendFactor::InvDestColor:             return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::SrcAlphaSaturate:         return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+    case BlendFactor::BlendColor:               return VK_BLEND_FACTOR_CONSTANT_COLOR;
+    case BlendFactor::InvBlendColor:            return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+    case BlendFactor::SecondarySrcColor:        return VK_BLEND_FACTOR_SRC1_COLOR;
+    case BlendFactor::InvSecondarySrcColor:     return VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+    case BlendFactor::SecondarySrcAlpha:        return VK_BLEND_FACTOR_SRC1_ALPHA;
+    case BlendFactor::InvSecondarySrcAlpha:     return VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+
+    default:
+        assert(!"Unsupported blend factor");
+        return VK_BLEND_FACTOR_ONE;
+    }
+}
+
+VkBlendOp translateBlendOp(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:              return VK_BLEND_OP_ADD;
+    case BlendOp::Subtract:         return VK_BLEND_OP_SUBTRACT;
+    case BlendOp::ReverseSubtract:  return VK_BLEND_OP_REVERSE_SUBTRACT;
+    case BlendOp::Min:              return VK_BLEND_OP_MIN;
+    case BlendOp::Max:              return VK_BLEND_OP_MAX;
+    default:
+        assert(!"Unsupported blend op");
+        return VK_BLEND_OP_ADD;
+    }
+}
+
+VkPrimitiveTopology translatePrimitiveTypeToListTopology(PrimitiveType primitiveType)
+{
+    switch (primitiveType)
+    {
+    case PrimitiveType::Point:        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    case PrimitiveType::Line:         return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case PrimitiveType::Triangle:     return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveType::Patch:        return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    default:
+        assert(!"unknown topology type.");
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+}
+
 Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
@@ -8243,8 +8355,6 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
 
     // VertexBuffer/s
-    // Currently only handles one
-
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 0;
@@ -8264,28 +8374,9 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-
-    // Use PRITIMVE_LIST topology for each primitive type here.
     // All other forms of primitive toplogies are specified via dynamic state.
-    switch (inDesc.primitiveType)
-    {
-    case PrimitiveType::Point:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        break;
-    case PrimitiveType::Line:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-        break;
-    case PrimitiveType::Triangle:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        break;
-    case PrimitiveType::Patch:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
-        break;
-    default:
-        assert(!"unknown topology type.");
-        break;
-    }
-    inputAssembly.primitiveRestartEnable = VK_FALSE; // TODO: True by default?
+    inputAssembly.topology = translatePrimitiveTypeToListTopology(inDesc.primitiveType);
+    inputAssembly.primitiveRestartEnable = VK_FALSE; // TODO: Currently unsupported
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -8308,47 +8399,74 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     viewportState.scissorCount = 1;
     viewportState.pScissors = &scissor;
 
-    // TODO: Should be pulled from the desc?
+    auto rasterizerDesc = desc.rasterizer;
+
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthClampEnable = VK_TRUE; // TODO: Depth clipping and clamping are different between Vk and D3D12
+    rasterizer.rasterizerDiscardEnable = VK_FALSE; // TODO: Currently unsupported
+    rasterizer.polygonMode = translateFillMode(rasterizerDesc.fillMode);
+    rasterizer.cullMode = translateCullMode(rasterizerDesc.cullMode);
+    rasterizer.frontFace = translateFrontFaceMode(rasterizerDesc.frontFace);
+    rasterizer.depthBiasEnable = (rasterizerDesc.depthBias == 0) ? VK_FALSE : VK_TRUE;
+    rasterizer.depthBiasConstantFactor = (float)rasterizerDesc.depthBias;
+    rasterizer.depthBiasClamp = rasterizerDesc.depthBiasClamp;
+    rasterizer.depthBiasSlopeFactor = rasterizerDesc.slopeScaledDepthBias;
+    rasterizer.lineWidth = 1.0f; // TODO: Currently unsupported
 
     auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+    auto forcedSampleCount = rasterizerDesc.forcedSampleCount;
+    auto blendDesc = desc.blend;
 
-    // TODO: Should be pulled from the desc?
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = framebufferLayoutImpl->sampleCount; // TODO: account for forced sample count
+    multisampling.rasterizationSamples =
+        (forcedSampleCount == 0) ? framebufferLayoutImpl->m_sampleCount : translateSampleCount(forcedSampleCount);
+    multisampling.sampleShadingEnable = VK_FALSE; // TODO: Should check if fragment shader needs this
+    // TODO: Sample mask is dynamic in D3D12 but PSO state in Vulkan
+    multisampling.alphaToCoverageEnable = blendDesc.alphaToCoverageEnable;
+    multisampling.alphaToOneEnable = VK_FALSE;
 
-    // TODO: Values from elsewhere?
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    auto targetCount = blendDesc.targetCount;
+    List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
+    colorBlendAttachments.setCount(targetCount);
 
-    // TODO: Values from elsewhere?
+    for (UInt i = 0; i < targetCount; ++i)
+    {
+        auto& gfxBlendDesc = blendDesc.targets[i];
+        auto& vkBlendDesc = colorBlendAttachments[i];
+
+        vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
+        vkBlendDesc.srcColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.srcFactor);
+        vkBlendDesc.dstColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.dstFactor);
+        vkBlendDesc.colorBlendOp = translateBlendOp(gfxBlendDesc.color.op);
+        vkBlendDesc.srcAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.srcFactor);
+        vkBlendDesc.dstAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.dstFactor);
+        vkBlendDesc.alphaBlendOp = translateBlendOp(gfxBlendDesc.alpha.op);
+        vkBlendDesc.colorWriteMask = (VkColorComponentFlags)gfxBlendDesc.writeMask;
+    }
+
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = targetCount;
+    colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+        VK_DYNAMIC_STATE_BLEND_CONSTANTS,
+        // TODO: Add VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT if supported
+    };
     VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
     dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicStateInfo.dynamicStateCount = 3;
-    VkDynamicState dynamicStates[] = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_STENCIL_REFERENCE};
+    dynamicStateInfo.dynamicStateCount = SLANG_COUNT_OF(dynamicStates);
     dynamicStateInfo.pDynamicStates = dynamicStates;
 
     VkPipelineDepthStencilStateCreateInfo depthStencilStateInfo = {};
@@ -8360,7 +8478,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     depthStencilStateInfo.back.writeMask = inDesc.depthStencil.stencilWriteMask;
     depthStencilStateInfo.front.compareMask = inDesc.depthStencil.stencilReadMask;
     depthStencilStateInfo.front.writeMask = inDesc.depthStencil.stencilWriteMask;
-    depthStencilStateInfo.depthBoundsTestEnable = 0; // TODO: Value from elsewhere?
+    depthStencilStateInfo.depthBoundsTestEnable = 0; // TODO: Currently unsupported
     depthStencilStateInfo.depthCompareOp = translateComparisonFunc(inDesc.depthStencil.depthFunc);
     depthStencilStateInfo.depthWriteEnable = inDesc.depthStencil.depthWriteEnable ? 1 : 0;
     depthStencilStateInfo.stencilTestEnable = inDesc.depthStencil.stencilEnable ? 1 : 0;
