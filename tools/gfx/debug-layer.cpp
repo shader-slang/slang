@@ -1343,12 +1343,14 @@ void DebugResourceCommandEncoder::clearResourceView(
 
 void DebugResourceCommandEncoder::resolveResource(
     ITextureResource* source,
+    ResourceState sourceState,
     SubresourceRange sourceRange,
     ITextureResource* dest,
+    ResourceState destState,
     SubresourceRange destRange)
 {
     SLANG_GFX_API_FUNC;
-    baseObject->resolveResource(getInnerObj(source), sourceRange, getInnerObj(dest), destRange);
+    baseObject->resolveResource(getInnerObj(source), sourceState, sourceRange, getInnerObj(dest), destState, destRange);
 }
 
 void DebugResourceCommandEncoder::copyTextureToBuffer(

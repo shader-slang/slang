@@ -1629,8 +1629,10 @@ public:
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
         ITextureResource* source,
+        ResourceState sourceState,
         SubresourceRange sourceRange,
         ITextureResource* dest,
+        ResourceState destState,
         SubresourceRange destRange) = 0;
 };
 

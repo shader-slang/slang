@@ -3294,8 +3294,15 @@ public:
 
             auto copyShaderIdInto = [&](void* dest, String& name)
             {
-                void* shaderId = stateObjectProperties->GetShaderIdentifier(name.toWString().begin());
-                memcpy(dest, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                if (name.getLength())
+                {
+                    void* shaderId = stateObjectProperties->GetShaderIdentifier(name.toWString().begin());
+                    memcpy(dest, shaderId, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                }
+                else
+                {
+                    memset(dest, 0, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
+                }
             };
 
             uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
@@ -4314,15 +4321,44 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
                 ITextureResource* source,
+                ResourceState sourceState,
                 SubresourceRange sourceRange,
                 ITextureResource* dest,
+                ResourceState destState,
                 SubresourceRange destRange) override
             {
-                SLANG_UNUSED(source);
-                SLANG_UNUSED(sourceRange);
-                SLANG_UNUSED(dest);
-                SLANG_UNUSED(destRange);
-                SLANG_UNIMPLEMENTED_X("resolveResource");
+                auto srcTexture = static_cast<TextureResourceImpl*>(source);
+                auto srcDesc = srcTexture->getDesc();
+                auto dstTexture = static_cast<TextureResourceImpl*>(dest);
+                auto dstDesc = dstTexture->getDesc();
+
+                for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+                {
+                    for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+                    {
+                        auto srcSubresourceIndex = D3DUtil::getSubresourceIndex(
+                            mip + sourceRange.mipLevel,
+                            layer + sourceRange.baseArrayLayer,
+                            0,
+                            srcDesc->numMipLevels,
+                            srcDesc->arraySize);
+                        auto dstSubresourceIndex = D3DUtil::getSubresourceIndex(
+                            mip + destRange.mipLevel,
+                            layer + destRange.baseArrayLayer,
+                            0,
+                            dstDesc->numMipLevels,
+                            dstDesc->arraySize);
+
+                        DXGI_FORMAT format = D3DUtil::getMapFormat(srcDesc->format);
+
+                        m_commandBuffer->m_cmdList->ResolveSubresource(
+                            dstTexture->m_resource.getResource(),
+                            dstSubresourceIndex,
+                            srcTexture->m_resource.getResource(),
+                            srcSubresourceIndex,
+                            format);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(

@@ -34,7 +34,7 @@ namespace gfx_test
         const void* expectedResult,
         size_t expectedBufferSize);
 
-    /// Reads back the content of `buffer` and compares it against `expectedResult`.
+    /// Reads back the content of `texture` and compares it against `expectedResult`.
     void compareComputeResult(
         gfx::IDevice* device,
         gfx::ITextureResource* texture,

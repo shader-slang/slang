@@ -463,8 +463,10 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
         ITextureResource* source,
+        ResourceState sourceState,
         SubresourceRange sourceRange,
         ITextureResource* dest,
+        ResourceState destState,
         SubresourceRange destRange) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
