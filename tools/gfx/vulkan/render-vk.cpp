@@ -8258,11 +8258,11 @@ VkFrontFace translateFrontFaceMode(FrontFaceMode frontFaceMode)
     // TODO: May need to be reversed due to the viewport flip
     switch (frontFaceMode)
     {
-    case FrontFaceMode::CounterClockwise:       return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    case FrontFaceMode::Clockwise:              return VK_FRONT_FACE_CLOCKWISE;
+    case FrontFaceMode::CounterClockwise:       return VK_FRONT_FACE_CLOCKWISE;
+    case FrontFaceMode::Clockwise:              return VK_FRONT_FACE_COUNTER_CLOCKWISE;
     default:
         assert(!"Unsupported front face mode");
-        return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        return VK_FRONT_FACE_CLOCKWISE;
     }
 }
 
