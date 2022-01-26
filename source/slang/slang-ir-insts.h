@@ -2113,6 +2113,18 @@ public:
         return getConjunctionType(2, types);
     }
 
+    IRType* getAttributedType(
+        IRType*         baseType,
+        UInt            attributeCount,
+        IRAttr* const*  attributes);
+
+    IRType* getAttributedType(
+        IRType*         baseType,
+        List<IRAttr*>   attributes)
+    {
+        return getAttributedType(baseType, attributes.getCount(), attributes.getBuffer());
+    }
+
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
@@ -2642,6 +2654,18 @@ public:
     }
 
     IRStageAttr* getStageAttr(Stage stage);
+
+    IRAttr* getAttr(IROp op, UInt operandCount, IRInst* const* operands);
+
+    IRAttr* getAttr(IROp op, List<IRInst*> const& operands)
+    {
+        return getAttr(op, operands.getCount(), operands.getBuffer());
+    }
+
+    IRAttr* getAttr(IROp op)
+    {
+        return getAttr(op, 0, nullptr);
+    }
 
     IRTypeLayout* getTypeLayout(IROp op, List<IRInst*> const& operands);
     IRVarLayout* getVarLayout(List<IRInst*> const& operands);

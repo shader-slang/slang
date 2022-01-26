@@ -241,4 +241,39 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     int indexInConjunction;
 };
 
+    /// A value that represents a modifier attached to some other value
+class ModifierVal : public Val
+{
+    SLANG_AST_CLASS(ModifierVal)
+
+    bool _equalsValOverride(Val* val);
+    HashCode _getHashCodeOverride();
+};
+
+class TypeModifierVal : public ModifierVal
+{
+    SLANG_AST_CLASS(TypeModifierVal)
+};
+
+class ResourceFormatModifierVal : public TypeModifierVal
+{
+    SLANG_AST_CLASS(ResourceFormatModifierVal)
+};
+
+class UNormModifierVal : public ResourceFormatModifierVal
+{
+    SLANG_AST_CLASS(UNormModifierVal)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+class SNormModifierVal : public ResourceFormatModifierVal
+{
+    SLANG_AST_CLASS(SNormModifierVal)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 } // namespace Slang

@@ -2142,4 +2142,53 @@ namespace Slang
         return expr;
     }
 
+    Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
+    {
+        // The base type should be a proper type (not an expression, generic, etc.)
+        //
+        expr->base = CheckProperType(expr->base);
+        auto baseType = expr->base.type;
+
+        // We will check the modifiers that were applied to the type expression
+        // one by one, and collect a list of the ones that should modify the
+        // resulting `Type`.
+        //
+        List<Val*> modifierVals;
+        for( auto modifier : expr->modifiers )
+        {
+            auto modifierVal = checkTypeModifier(modifier, baseType);
+            if(!modifierVal)
+                continue;
+            modifierVals.add(modifierVal);
+        }
+
+        auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
+        expr->type = m_astBuilder->getTypeType(modifiedType);
+
+        return expr;
+    }
+
+    Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
+    {
+        SLANG_UNUSED(type);
+
+        if( auto unormModifier = as<UNormModifier>(modifier) )
+        {
+            // TODO: validate that `type` is either `float` or a vector of `float`s
+            return m_astBuilder->getUNormModifierVal();
+
+        }
+        else if( auto snormModifier = as<SNormModifier>(modifier) )
+        {
+            // TODO: validate that `type` is either `float` or a vector of `float`s
+            return m_astBuilder->getSNormModifierVal();
+        }
+        else
+        {
+            // TODO: more complete error message here
+            getSink()->diagnose(modifier, Diagnostics::unexpected, "unknown type modifier in semantic checking");
+            return nullptr;
+        }
+    }
+
 }

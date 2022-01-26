@@ -80,6 +80,7 @@ public:
             SizedArray,
             UnsizedArray,
             LiteralSizedArray,
+            Attributed,
         };
         Flavor flavor;
 
@@ -143,6 +144,16 @@ public:
             : ChainedDeclaratorInfo(Flavor::LiteralSizedArray, next)
             , elementCount(elementCount)
         {}
+    };
+
+    struct AttributedDeclaratorInfo : ChainedDeclaratorInfo
+    {
+        AttributedDeclaratorInfo(DeclaratorInfo* next, IRInst* instWithAttributes)
+            : ChainedDeclaratorInfo(Flavor::Attributed, next)
+            , instWithAttributes(instWithAttributes)
+        {}
+
+        IRInst* instWithAttributes;
     };
 
     struct ComputeEmitActionsContext;
@@ -449,10 +460,11 @@ public:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) { SLANG_UNUSED(inst); }
 
-    void _emitArrayType(IRArrayType* arrayType, DeclaratorInfo* declarator);
-    void _emitUnsizedArrayType(IRUnsizedArrayType* arrayType, DeclaratorInfo* declarator);
     void _emitType(IRType* type, DeclaratorInfo* declarator);
     void _emitInst(IRInst* inst);
+
+    virtual void _emitPrefixTypeAttr(IRAttr* attr);
+    virtual void _emitPostfixTypeAttr(IRAttr* attr);
 
         // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call);

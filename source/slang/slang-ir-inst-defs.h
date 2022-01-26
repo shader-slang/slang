@@ -52,6 +52,7 @@ INST(Nop, nop, 0, 0)
     INST(TaggedUnionType, TaggedUnion, 0, 0)
 
     INST(ConjunctionType, Conjunction, 0, 0)
+    INST(AttributedType, Attributed, 0, 0)
 
     /* BindExistentialsTypeBase */
 
@@ -695,6 +696,8 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(StageAttr, stage, 1, 0)
     INST(StructFieldLayoutAttr, fieldLayout, 2, 0)
     INST(CaseTypeLayoutAttr, caseLayout, 1, 0)
+    INST(UNormAttr, unorm, 0, 0)
+    INST(SNormAttr, snorm, 0, 0)
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, 0)
         INST(SystemValueSemanticAttr, systemValueSemantic, 2, 0)

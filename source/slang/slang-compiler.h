@@ -319,6 +319,9 @@ namespace Slang
             /// Get the mangled name of one of the entry points linked into this component type.
         virtual String getEntryPointMangledName(Index index) = 0;
 
+            /// Get the name override of one of the entry points linked into this component type.
+        virtual String getEntryPointNameOverride(Index index) = 0;
+
             /// Get the number of global shader parameters linked into this component type.
         virtual Index getShaderParamCount() = 0;
 
@@ -511,6 +514,7 @@ namespace Slang
         Index getEntryPointCount() SLANG_OVERRIDE;
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE;
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
+        String getEntryPointNameOverride(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE;
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE;
@@ -560,6 +564,7 @@ namespace Slang
         //
         List<EntryPoint*> m_entryPoints;
         List<String> m_entryPointMangledNames;
+        List<String> m_entryPointNameOverrides;
         List<ShaderParamInfo> m_shaderParams;
         List<SpecializationParam> m_specializationParams;
         List<ComponentType*> m_requirements;
@@ -598,6 +603,7 @@ namespace Slang
         Index getEntryPointCount() SLANG_OVERRIDE { return m_base->getEntryPointCount(); }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { return m_base->getEntryPoint(index); }
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
+        String getEntryPointNameOverride(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_base->getShaderParamCount(); }
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_base->getShaderParam(index); }
@@ -638,6 +644,7 @@ namespace Slang
         RefPtr<IRModule> m_irModule;
 
         List<String> m_entryPointMangledNames;
+        List<String> m_entryPointNameOverrides;
 
         // Any tagged union types that were referenced by the specialization arguments.
         List<TaggedUnionType*> m_taggedUnionTypes;
@@ -721,6 +728,15 @@ namespace Slang
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL getRenamedEntryPoint(const char* newName, IEntryPoint** outEntryPoint)
+            SLANG_OVERRIDE
+        {
+            RefPtr<EntryPoint> newEntryPoint = create(getLinkage(), m_funcDeclRef, m_profile);
+            newEntryPoint->m_nameOverride = newName;
+            *outEntryPoint = newEntryPoint.detach();
+            return SLANG_OK;
+        }
+
             /// Create an entry point that refers to the given function.
         static RefPtr<EntryPoint> create(
             Linkage*            linkage,
@@ -791,6 +807,7 @@ namespace Slang
         Index getEntryPointCount() SLANG_OVERRIDE { return 1; };
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return this; }
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE;
+        String getEntryPointNameOverride(Index index) SLANG_OVERRIDE;
 
         Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return ShaderParamInfo(); }
@@ -830,6 +847,9 @@ namespace Slang
 
             /// The mangled name of the entry point function
         String m_mangledName;
+
+            /// The name of this entry point in the compiled code.
+        String m_nameOverride;
 
         SpecializationParams m_genericSpecializationParams;
         SpecializationParams m_existentialSpecializationParams;
@@ -940,6 +960,7 @@ namespace Slang
             return nullptr;
         }
         String getEntryPointMangledName(Index /*index*/) SLANG_OVERRIDE { return ""; }
+        String getEntryPointNameOverride(Index /*index*/) SLANG_OVERRIDE { return ""; }
 
         Index getShaderParamCount() SLANG_OVERRIDE { return 0; }
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE
@@ -1107,6 +1128,7 @@ namespace Slang
         Index getEntryPointCount() SLANG_OVERRIDE { return 0; }
         RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return nullptr; }
         String getEntryPointMangledName(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
+        String getEntryPointNameOverride(Index index) SLANG_OVERRIDE { SLANG_UNUSED(index); return String(); }
 
         Index getShaderParamCount() SLANG_OVERRIDE { return m_shaderParams.getCount(); }
         ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE { return m_shaderParams[index]; }

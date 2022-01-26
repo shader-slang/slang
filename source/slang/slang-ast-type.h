@@ -729,4 +729,19 @@ class AndType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+class ModifiedType : public Type
+{
+    SLANG_AST_CLASS(ModifiedType)
+
+    Type* base;
+    List<Val*> modifiers;
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    bool _equalsImplOverride(Type* type);
+    HashCode _getHashCodeOverride();
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
 } // namespace Slang
