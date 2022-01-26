@@ -59,6 +59,9 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -69,9 +72,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\tools\unit-test\slang-unit-test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -97,10 +97,10 @@
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
+    <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang">
+    <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>

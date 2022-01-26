@@ -252,8 +252,9 @@ newoption {
      cppdialect "C++11"
      -- Statically link to the C/C++ runtime rather than create a DLL dependency.
      staticruntime "On"
- 
-     -- Statically link to the C/C++ runtime rather than create a DLL dependency.
+     -- Turn off edit and continue for all projects. This is needed to avoid
+     -- linking warnings.
+     editandcontinue "Off"
  
      -- Once we've set up the common settings, we will make some tweaks
      -- that only apply in a subset of cases. Each call to `filter()`
@@ -269,7 +270,6 @@ newoption {
          architecture "x86"
      filter { "platforms:aarch64"}
          architecture "ARM"
-         editandcontinue "Off"
  
  
      filter { "toolset:clang or gcc*" }
@@ -432,7 +432,7 @@ newoption {
      -- one, so that subsequent commands affect this project.
      --
      project(name)
- 
+
      -- We need every project to have a stable UUID for
      -- output formats (like Visual Studio and XCode projects)
      -- that use UUIDs rather than names to uniquely identify
@@ -462,7 +462,7 @@ newoption {
      -- All of our projects are written in C++.
      --
      language "C++"
- 
+
      -- By default, Premake generates VS project files that
      -- reflect the directory structure of the source code.
      -- While this is nice in principle, it creates messy
