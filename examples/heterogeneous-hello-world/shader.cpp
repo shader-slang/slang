@@ -1,1 +1,0 @@
-// This is a placeholder. The contents will be generated during build.
