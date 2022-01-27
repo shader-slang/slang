@@ -56,6 +56,7 @@ namespace gfx {
     x(vkDestroyPipelineLayout) \
     x(vkCreateComputePipelines) \
     x(vkCreateGraphicsPipelines) \
+    x(vkCreateRayTracingPipelinesKHR) \
     x(vkDestroyPipeline) \
     x(vkCreateShaderModule) \
     x(vkDestroyShaderModule) \

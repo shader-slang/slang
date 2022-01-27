@@ -119,7 +119,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
-    // TODO: Add implementation for createRayTracingPipelineState() - calls VkCreateRayTracingPipelinesKHR
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
@@ -903,6 +905,13 @@ public:
             PipelineStateDesc pipelineDesc;
             pipelineDesc.type = PipelineType::Compute;
             pipelineDesc.compute = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        void init(const RayTracingPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::RayTracing;
+            pipelineDesc.rayTracing = inDesc;
             initializeBase(pipelineDesc);
         }
 
@@ -8556,6 +8565,36 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     pipelineStateImpl->init(desc);
     m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     pipelineStateImpl->establishStrongDeviceReference();
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+Result VKDevice::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
+{
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+
+    VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+    raytracingPipelineInfo.pNext = nullptr;
+    raytracingPipelineInfo.stageCount = ;
+    raytracingPipelineInfo.pStages = ;
+    raytracingPipelineInfo.groupCount = ;
+    raytracingPipelineInfo.pGroups = ;
+    raytracingPipelineInfo.maxPipelineRayRecursionDepth = ;
+    raytracingPipelineInfo.pLibraryInfo = ;
+    raytracingPipelineInfo.pLibraryInterface = ;
+    raytracingPipelineInfo.pDynamicState = ;
+    raytracingPipelineInfo.layout = ;
+    raytracingPipelineInfo.basePipelineHandle = ;
+    raytracingPipelineInfo.basePipelineIndex = ;
+
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    SLANG_VK_CHECK(m_api.vkCreateRayTracingPipelinesKHR(m_device, , pipelineCache, , &raytracingPipelineInfo, nullptr, &pipeline));
+
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+    pipelineStateImpl->m_pipeline = pipeline;
+    pipelineStateImpl->init(desc);
+    pipelineStateImpl->establishStrongDeviceReference();
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }
