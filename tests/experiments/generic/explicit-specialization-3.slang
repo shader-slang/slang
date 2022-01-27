@@ -39,7 +39,7 @@ extension Combination<float, 20> : IDoThing
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
     let v = Combination<float, 20>::doThing(tid) + 
         Combination<int, 10>::doThing(tid);
@@ -51,6 +51,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //
     //let y = Combination<int, 20>::doThing(tid);
     
-	outputBuffer[tid] = v;
+    outputBuffer[tid] = v;
 }
 

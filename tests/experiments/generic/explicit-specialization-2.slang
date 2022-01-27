@@ -26,10 +26,10 @@ T rotateLeft<T : IRotatable>(T a) { return a.rotateLeft(); }
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-	uint tid = dispatchThreadID.x;
+    uint tid = dispatchThreadID.x;
 
     let v = rotateLeft(tid) + rotateLeft((int)tid);
    
-	outputBuffer[tid] = v;
+    outputBuffer[tid] = v;
 }
 
