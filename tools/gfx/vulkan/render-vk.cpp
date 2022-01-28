@@ -60,6 +60,8 @@ public:
     // Renderer    implementation
     Result initVulkanInstanceAndDevice(const InteropHandle* handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getFormatSupportedResourceStates(
+        Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
         ITransientResourceHeap** outHeap) override;
@@ -7956,6 +7958,32 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     return SLANG_OK;
 }
 
+Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
+{
+    VkFormatProperties supportedProperties;
+    m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, VulkanUtil::getVkFormat(format), &supportedProperties);
+
+    ResourceStateSet allowedStates;
+    auto linearTilingFeatures = supportedProperties.linearTilingFeatures;
+    if (linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    {
+        allowedStates.add(ResourceState::DepthRead);
+        allowedStates.add(ResourceState::DepthWrite);
+    }
+    if (linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)
+        allowedStates.add(ResourceState::CopySource);
+    if (linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT)
+        allowedStates.add(ResourceState::CopyDestination);
+    if (linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+        allowedStates.add(ResourceState::CopySource);
+    if (linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+        allowedStates.add(ResourceState::CopyDestination);
+    
+
+    *outStates = allowedStates;
+    return SLANG_OK;
+}
+
 Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
@@ -8463,7 +8491,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (targetCount == 0) ? 1 : targetCount;
+    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.getCount();
     colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
