@@ -7958,27 +7958,73 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     return SLANG_OK;
 }
 
+// TODO: Buffer vs texture specific?
 Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
 {
     VkFormatProperties supportedProperties;
     m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, VulkanUtil::getVkFormat(format), &supportedProperties);
 
     ResourceStateSet allowedStates;
-    auto linearTilingFeatures = supportedProperties.linearTilingFeatures;
-    if (linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    // TODO: Currently only supports VK_IMAGE_TILING_OPTIMAL
+    auto imageFeatures = supportedProperties.optimalTilingFeatures;
+    auto bufferFeatures = supportedProperties.bufferFeatures;
+    // PreInitialized - Only supported for VK_IMAGE_TILING_LINEAR
+    // VertexBuffer
+    if (bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
+        allowedStates.add(ResourceState::VertexBuffer);
+    // IndexBuffer - Without extensions, Vulkan only supports two formats for index buffers.
+    switch (format)
+    {
+    case Format::R32_UINT:
+    case Format::R16_UINT:
+        allowedStates.add(ResourceState::IndexBuffer);
+        break;
+    default:
+        break;
+    }
+    // ConstantBuffer
+    allowedStates.add(ResourceState::ConstantBuffer);
+    // StreamOutput - TODO: Requires VK_EXT_transform_feedback
+    // ShaderResource
+    if (imageFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    if (bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    // UnorderedAccess
+    if (imageFeatures & (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    if (bufferFeatures & (VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT | VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    // RenderTarget
+    if (imageFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)
+        allowedStates.add(ResourceState::RenderTarget);
+    // DepthRead, DepthWrite
+    if (imageFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
     {
         allowedStates.add(ResourceState::DepthRead);
         allowedStates.add(ResourceState::DepthWrite);
     }
-    if (linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_SRC_BIT)
+    // Present - TODO: Requires VK_GOOGLE_surfaceless_query and calling vkGetPhysicalDeviceSurfaceFormatsKHR
+    // IndirectArgument
+    allowedStates.add(ResourceState::IndirectArgument);
+    // CopySource, ResolveSource
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+    {
         allowedStates.add(ResourceState::CopySource);
-    if (linearTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT)
+        allowedStates.add(ResourceState::ResolveSource);
+    }
+    // CopyDestination, ResolveDestination
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+    {
         allowedStates.add(ResourceState::CopyDestination);
-    if (linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
-        allowedStates.add(ResourceState::CopySource);
-    if (linearTilingFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
-        allowedStates.add(ResourceState::CopyDestination);
-    
+        allowedStates.add(ResourceState::ResolveDestination);
+    }
+    // AccelerationStructure
+    if (bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)
+        allowedStates.add(ResourceState::AccelerationStructure);
+    // General - VK_IMAGE_LAYOUT_GENERAL supports all types of device access. Should only be set if everything else
+    // is included?
+    allowedStates.add(ResourceState::General);
 
     *outStates = allowedStates;
     return SLANG_OK;
