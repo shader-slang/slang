@@ -3,6 +3,9 @@
 /* Test here is to try and associate a value with a type
 
 This does work. 
+
+Note that it *requires* the getType<T> function as if we try to call say int.getType(), we get an error around
+swizzling.
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
