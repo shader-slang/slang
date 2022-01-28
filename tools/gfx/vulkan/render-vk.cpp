@@ -8569,20 +8569,42 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     return SLANG_OK;
 }
 
+VkPipelineCreateFlags translateFlags(RayTracingPipelineFlags::Enum flags)
+{
+    VkPipelineCreateFlags vkFlags;
+    if (flags & RayTracingPipelineFlags::Enum::SkipTriangles)
+        vkFlags |= VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR;
+    if (flags & RayTracingPipelineFlags::Enum::SkipProcedurals)
+        vkFlags |= ;
+
+    return vkFlags;
+}
+
 Result VKDevice::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
 {
     VkPipelineCache pipelineCache = VK_NULL_HANDLE;
 
     VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
     raytracingPipelineInfo.pNext = nullptr;
+    raytracingPipelineInfo.flags = translateFlags(desc.flags);
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
     raytracingPipelineInfo.stageCount = ;
     raytracingPipelineInfo.pStages = ;
+
+    VkRayTracingShaderGroupCreateInfoKHR shaderGroupInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
     raytracingPipelineInfo.groupCount = ;
     raytracingPipelineInfo.pGroups = ;
-    raytracingPipelineInfo.maxPipelineRayRecursionDepth = ;
+
+    raytracingPipelineInfo.maxPipelineRayRecursionDepth = (uint32_t)desc.maxRecursion;
+
+    VkPipelineLibraryCreateInfoKHR libraryInfo = { VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR };
     raytracingPipelineInfo.pLibraryInfo = ;
     raytracingPipelineInfo.pLibraryInterface = ;
+
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo = { VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
     raytracingPipelineInfo.pDynamicState = ;
+
     raytracingPipelineInfo.layout = ;
     raytracingPipelineInfo.basePipelineHandle = ;
     raytracingPipelineInfo.basePipelineIndex = ;
