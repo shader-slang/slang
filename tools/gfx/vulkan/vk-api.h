@@ -56,7 +56,6 @@ namespace gfx {
     x(vkDestroyPipelineLayout) \
     x(vkCreateComputePipelines) \
     x(vkCreateGraphicsPipelines) \
-    x(vkCreateRayTracingPipelinesKHR) \
     x(vkDestroyPipeline) \
     x(vkCreateShaderModule) \
     x(vkDestroyShaderModule) \
@@ -163,6 +162,7 @@ namespace gfx {
     x(vkGetSwapchainImagesKHR) \
     x(vkDestroySwapchainKHR) \
     x(vkAcquireNextImageKHR) \
+    x(vkCreateRayTracingPipelinesKHR) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
