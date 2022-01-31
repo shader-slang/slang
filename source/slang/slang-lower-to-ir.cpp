@@ -1017,10 +1017,10 @@ static IRGeneric* getOuterGeneric(IRInst* gv)
 }
 
 static void addLinkageDecoration(
-    IRGenContext*               context,
-    IRInst*                     inInst,
-    Decl*                       decl,
-    UnownedStringSlice const&   mangledName)
+    IRGenContext* context,
+    IRInst* inInst,
+    Decl* decl,
+    UnownedStringSlice const& mangledName)
 {
     // If the instruction is nested inside one or more generics,
     // then the mangled name should really apply to the outer-most
@@ -1034,7 +1034,7 @@ static void addLinkageDecoration(
         inst = outerGeneric;
     }
 
-    if(isImportedDecl(context, decl))
+    if (isImportedDecl(context, decl))
     {
         builder->addImportDecoration(inst, mangledName);
     }
@@ -1046,6 +1046,14 @@ static void addLinkageDecoration(
     {
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
+    }
+    if (decl->findModifier<__exportDirectly>())
+    {
+        builder->addExportDirectlyDecoration(inst);
+    }
+    if (decl->findModifier<__externLib>())
+    {
+        builder->addExternLibDecoration(inst);
     }
 }
 
@@ -1891,7 +1899,6 @@ void addVarDecorations(
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-
         // TODO: what are other modifiers we need to propagate through?
     }
 }
@@ -1986,7 +1993,12 @@ static String getNameForNameHint(
 
     StringBuilder sb;
     sb.append(parentName);
-    sb.append(".");
+    if (decl->hasModifier<__exportDirectly>()) {
+        sb.append("::");
+    }
+    else {
+        sb.append(".");
+    }
     sb.append(leafName->text);
 
     return sb.ProduceString();

@@ -2709,26 +2709,43 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
                                 }
                             }
                         }
+                        // Hardcode in (for now) an include for slang-gfx.h so that we can make use
+                        // of the gfx namespace
+                        // 
+                        // TODO: Aside from making sure this approach is viable, it would also be
+                        // much better to allow this to be done by the programmer in the Slang file.
+                        m_writer->emit("#include \"slang-gfx.h\"\n\n");
+
+                        // Emit boilerplate that requires gfx.
+                        // This is required by the wrapper, so that will be the next place to look 
+                        // as far as removing boilerplate goes.
+                        m_writer->emit("gfx::IShaderProgram* loadShaderProgram(gfx::IDevice* _0, char* _1, char* _2);\n");
+                        m_writer->emit("gfx::ITransientResourceHeap* buildTransientHeap(gfx::IDevice* _0);\n");
+                        m_writer->emit("gfx::IPipelineState* buildPipelineState(gfx::IDevice* _0, gfx::IShaderProgram* _1);\n");
+                        m_writer->emit("void dispatchComputation(gfx::IDevice* _0, gfx::ITransientResourceHeap* _1, gfx::IPipelineState* _2, gfx::IResourceView* _3, uint32_t gridDimsX, uint32_t gridDimsY, uint32_t gridDimsZ);\n");
+                        m_writer->emit("gfx::IResourceView* createBufferView(gfx::IDevice* _0, gfx::IBufferResource* _1);\n");
+                        m_writer->emit("gfx::IBufferResource* unconvertBuffer(RWStructuredBuffer<float> _0);\n\n");
+
                         // Emit a wrapper function for calling the shader blob
                         m_writer->emit("void ");
                         m_writer->emit(entryPointName);
-                        m_writer->emit("_wrapper(gfx_Device_0* device, Vector<uint32_t, 3> gridDims, \n");
+                        m_writer->emit("_wrapper(gfx::IDevice* device, Vector<uint32_t, 3> gridDims, \n");
                         m_writer->emit("\tRWStructuredBuffer<float> buffer)\n{");
                        /* m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, __");
                         m_writer->emit(entryPointName);
                         m_writer->emit(", __");
                         m_writer->emit(entryPointName);
                         m_writer->emit("Size);");*/
-                        m_writer->emit("\n\tgfx_ShaderProgram_0* shaderProgram = loadShaderProgram_0(device, \"");
+                        m_writer->emit("\n\tgfx::IShaderProgram* shaderProgram = loadShaderProgram(device, \"");
                         m_writer->emit(entryPointName);
                         m_writer->emit("\", \"");
                         m_writer->emit(moduleName);
                         m_writer->emit("\");");
-                        m_writer->emit("\n\tgfx_TransientResourceHeap_0* transientHeap = buildTransientHeap_0(device);");
-                        m_writer->emit("\n\tgfx_PipelineState_0* pipelineState = ");
-                        m_writer->emit("buildPipelineState_0(device, shaderProgram);");
-                        m_writer->emit("\n\tgfx_ResourceView_0* bufferView = createBufferView_0(device, unconvertBuffer_0(buffer));");
-                        m_writer->emit("\n\tdispatchComputation_0(device, transientHeap, pipelineState, ");
+                        m_writer->emit("\n\tgfx::ITransientResourceHeap* transientHeap = buildTransientHeap(device);");
+                        m_writer->emit("\n\tgfx::IPipelineState* pipelineState = ");
+                        m_writer->emit("buildPipelineState(device, shaderProgram);");
+                        m_writer->emit("\n\tgfx::IResourceView* bufferView = createBufferView(device, unconvertBuffer(buffer));");
+                        m_writer->emit("\n\tdispatchComputation(device, transientHeap, pipelineState, ");
                         m_writer->emit("bufferView, gridDims.x, gridDims.y, gridDims.z);");
                         m_writer->emit("\n}\n");
                     }

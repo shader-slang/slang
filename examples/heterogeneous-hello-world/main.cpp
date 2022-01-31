@@ -27,13 +27,7 @@ ComPtr<gfx::ICommandQueue> gQueue;
 
 // Boilerplate types to help the slang-generated file
 //
-struct gfx_Device_0;
-struct gfx_BufferResource_0;
-struct gfx_ShaderProgram_0;
-struct gfx_ResourceView_0;
-struct gfx_TransientResourceHeap_0;
-struct gfx_PipelineState_0;
-bool executeComputation_0();
+bool executeComputation();
 
 // Many Slang API functions return detailed diagnostic information
 // (error messages, warnings, etc.) as a "blob" of data, or return
@@ -50,7 +44,7 @@ void diagnoseIfNeeded(slang::IBlob *diagnosticsBlob)
     }
 }
 
-gfx::IDevice* createDevice()
+gfx::IDevice *createDevice()
 {
     ComPtr<gfx::IDevice> device;
     IDevice::Desc deviceDesc = {};
@@ -62,7 +56,7 @@ gfx::IDevice* createDevice()
 
 // Loads the shader code defined in `shader.slang` for use by the `gfx` layer.
 //
-gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint, String moduleName)
+gfx::IShaderProgram *loadShaderProgram(gfx::IDevice *device, char* entryPoint, char* moduleName)
 {
     // We need to obtain a compilation session (`slang::ISession`) that will provide
     // a scope to all the compilation and loading of code we do.
@@ -83,17 +77,17 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint, 
     // already been loaded previously, that would be used directly.
     //
     ComPtr<slang::IBlob> diagnosticsBlob;
-    slang::IModule *module = slangSession->loadModule(moduleName.getBuffer(), diagnosticsBlob.writeRef());
+    slang::IModule *module = slangSession->loadModule(moduleName, diagnosticsBlob.writeRef());
     diagnoseIfNeeded(diagnosticsBlob);
     if (!module)
         return NULL;
 
     // Look up entry point
     //
-    char const *computeEntryPointName = entryPoint.getBuffer();
+    // char const *computeEntryPointName = entryPoint.getBuffer();
     ComPtr<slang::IEntryPoint> computeEntryPoint;
     SLANG_RETURN_NULL_ON_FAIL(
-        module->findEntryPointByName(computeEntryPointName, computeEntryPoint.writeRef()));
+        module->findEntryPointByName(entryPoint, computeEntryPoint.writeRef()));
 
     // At this point we have a few different Slang API objects that represent
     // pieces of our code: `module`, `vertexEntryPoint`, and `fragmentEntryPoint`.
@@ -139,9 +133,7 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint, 
     return gProgram;
 }
 
-gfx::IBufferResource* createStructuredBuffer(
-    gfx::IDevice *device,
-    float *initialData)
+gfx::IBufferResource* createStructuredBuffer(gfx::IDevice* device, FixedArray<float, 4> initialData)
 {
     // Create a structured buffer for storing computation data
     //
@@ -160,15 +152,15 @@ gfx::IBufferResource* createStructuredBuffer(
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     SlangResult result = device->createBufferResource(bufferDesc,
-                                                      (void *)initialData,
+                                                      (void *)&initialData,
                                                       gBufferResource.writeRef());
     SLANG_RETURN_NULL_ON_FAIL(result);
     return gBufferResource;
 }
 
-gfx::IResourceView* createBufferView(
-    gfx::IDevice* device,
-    gfx::IBufferResource* buffer)
+gfx::IResourceView *createBufferView(
+    gfx::IDevice *device,
+    gfx::IBufferResource *buffer)
 {
     // Create a resource view for the structured buffer
     //
@@ -179,7 +171,7 @@ gfx::IResourceView* createBufferView(
     return gResourceView;
 }
 
-gfx::ITransientResourceHeap* buildTransientHeap(gfx::IDevice *device)
+gfx::ITransientResourceHeap *buildTransientHeap(gfx::IDevice *device)
 {
     ITransientResourceHeap::Desc transientHeapDesc = {};
     transientHeapDesc.constantBufferSize = 4096;
@@ -188,9 +180,9 @@ gfx::ITransientResourceHeap* buildTransientHeap(gfx::IDevice *device)
     return gTransientHeap;
 }
 
-gfx::IPipelineState* buildPipelineState(
+gfx::IPipelineState *buildPipelineState(
     gfx::IDevice *device,
-    gfx::IShaderProgram* shaderProgram)
+    gfx::IShaderProgram *shaderProgram)
 {
     gfx::ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram;
@@ -199,7 +191,7 @@ gfx::IPipelineState* buildPipelineState(
     return gPipelineState;
 }
 
-void printInitialValues(float *initialArray, int length)
+void printInitialValues(FixedArray<float, 4> initialArray, int length)
 {
     printf("Before:\n");
     for (int i = 0; i < length; i++)
@@ -210,10 +202,10 @@ void printInitialValues(float *initialArray, int length)
 }
 
 void dispatchComputation(
-    gfx::IDevice* device,
-    gfx::ITransientResourceHeap* transientHeap,
-    gfx::IPipelineState* pipelineState,
-    gfx::IResourceView* bufferView,
+    gfx::IDevice *device,
+    gfx::ITransientResourceHeap *transientHeap,
+    gfx::IPipelineState *pipelineState,
+    gfx::IResourceView *bufferView,
     unsigned int gridDimsX,
     unsigned int gridDimsY,
     unsigned int gridDimsZ)
@@ -257,68 +249,15 @@ bool printOutputValues(
     return true;
 }
 
-// Boilerplate functions to help the slang-generated file and types
-
-gfx_Device_0* createDevice_0()
-{
-     return (gfx_Device_0*)createDevice();
-}
-
-gfx_BufferResource_0* createStructuredBuffer_0(gfx_Device_0* _0, FixedArray<float, 4> _1)
-{
-    return (gfx_BufferResource_0*)createStructuredBuffer((gfx::IDevice*)_0, (float*)&_1);
-}
-
-gfx_ShaderProgram_0* loadShaderProgram_0(gfx_Device_0* _0, char* _1, char* _2)
-{
-    return (gfx_ShaderProgram_0*)loadShaderProgram((gfx::IDevice*)_0, _1, _2);
-}
-
-gfx_ResourceView_0* createBufferView_0(gfx_Device_0* _0, gfx_BufferResource_0* _1)
-{
-    return (gfx_ResourceView_0*)createBufferView((gfx::IDevice*)_0, (gfx::IBufferResource*)_1);
-}
-
-gfx_TransientResourceHeap_0* buildTransientHeap_0(gfx_Device_0* _0)
-{
-    return (gfx_TransientResourceHeap_0*)buildTransientHeap((gfx::IDevice*)_0);
-}
-
-gfx_PipelineState_0* buildPipelineState_0(gfx_Device_0* _0, gfx_ShaderProgram_0* _1)
-{
-    return (gfx_PipelineState_0*)buildPipelineState((gfx::IDevice*)_0, (gfx::IShaderProgram*)_1);
-}
-
-void printInitialValues_0(FixedArray<float, 4> _0, int32_t _1)
-{
-    printInitialValues((float*)&_0, _1);
-}
-
-void dispatchComputation_0(gfx_Device_0* _0, gfx_TransientResourceHeap_0* _1, gfx_PipelineState_0* _2, gfx_ResourceView_0* _3, unsigned int gridDimsX, unsigned int gridDimsY, unsigned int gridDimsZ)
-{
-    dispatchComputation(
-        (gfx::IDevice*)_0,
-        (gfx::ITransientResourceHeap*)_1,
-        (gfx::IPipelineState*)_2,
-        (gfx::IResourceView*)_3,
-        gridDimsX,
-        gridDimsY,
-        gridDimsZ);
-}
-
-RWStructuredBuffer<float> convertBuffer_0(gfx_BufferResource_0* _0) {
+RWStructuredBuffer<float> convertBuffer(gfx::IBufferResource* _0) {
     RWStructuredBuffer<float> result;
     result.data = (float*)_0;
     return result;
 }
 
-gfx_BufferResource_0* unconvertBuffer_0(RWStructuredBuffer<float> _0) {
-    return (gfx_BufferResource_0*)(_0.data);
-}
-
-bool printOutputValues_0(gfx_Device_0* _0, gfx_BufferResource_0* _1, int32_t _2)
+gfx::IBufferResource *unconvertBuffer(RWStructuredBuffer<float> _0)
 {
-    return printOutputValues((gfx::IDevice*)_0, (gfx::IBufferResource*)_1, _2);
+    return (gfx::IBufferResource *)(_0.data);
 }
 
 int main()
@@ -327,7 +266,7 @@ int main()
     // `struct` type, and then walk through the lifecyle
     // of the application.
 
-    if (!(executeComputation_0()))
+    if (!(executeComputation()))
     {
         return -1;
     }
