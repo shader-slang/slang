@@ -287,7 +287,7 @@ namespace Slang
         SLANG_UNUSED(index);
         SLANG_ASSERT(index == 0);
 
-        return m_nameOverride;
+        return m_name ? m_name->text : "";
     }
 
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
