@@ -4273,6 +4273,8 @@ namespace slang
 
     struct IEntryPoint : public IComponentType
     {
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL getRenamedEntryPoint(const char* newName, IEntryPoint** outEntryPoint) = 0;
+
         SLANG_COM_INTERFACE(0x8f241361, 0xf5bd, 0x4ca0, { 0xa3, 0xac, 0x2, 0xf7, 0xfa, 0x24, 0x2, 0xb8 })
     };
 

@@ -1247,6 +1247,7 @@ struct RayTracingPipelineFlags
 
 struct HitGroupDesc
 {
+    const char* hitGroupName = nullptr;
     const char* closestHitEntryPoint = nullptr;
     const char* anyHitEntryPoint = nullptr;
     const char* intersectionEntryPoint = nullptr;
@@ -1257,12 +1258,32 @@ struct RayTracingPipelineStateDesc
     IShaderProgram* program = nullptr;
     int32_t hitGroupCount;
     const HitGroupDesc* hitGroups;
-    int32_t shaderTableHitGroupCount;
-    int32_t* shaderTableHitGroupIndices;
     int maxRecursion;
     int maxRayPayloadSize;
     RayTracingPipelineFlags::Enum flags;
 };
+
+class IShaderTable : public ISlangUnknown
+{
+public:
+    struct Desc
+    {
+        uint32_t rayGenShaderCount;
+        const char** rayGenShaderEntryPointNames;
+
+        uint32_t missShaderCount;
+        const char** missShaderEntryPointNames;
+
+        uint32_t hitGroupCount;
+        const char** hitGroupNames;
+
+        IShaderProgram* program;
+    };
+};
+#define SLANG_UUID_IShaderTable                                                        \
+    {                                                                                  \
+        0xa721522c, 0xdf31, 0x4c2f, { 0xa5, 0xe7, 0x3b, 0xe0, 0x12, 0x4b, 0x31, 0x78 } \
+    }
 
 class IPipelineState : public ISlangUnknown
 {
@@ -1608,8 +1629,10 @@ public:
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
         ITextureResource* source,
+        ResourceState sourceState,
         SubresourceRange sourceRange,
         ITextureResource* dest,
+        ResourceState destState,
         SubresourceRange destRange) = 0;
 };
 
@@ -1657,10 +1680,10 @@ public:
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) = 0;
 
     /// Issues a dispatch command to start ray tracing workload with a ray tracing pipeline.
-    /// `rayGenShaderName` specifies the name of the ray generation shader to launch. Pass nullptr for
-    /// the first ray generation shader defined in `raytracingPipeline`.
+    /// `rayGenShaderIndex` specifies the index into the shader table that identifies the ray generation shader.
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-        const char* rayGenShaderName,
+        uint32_t rayGenShaderIndex,
+        IShaderTable* shaderTable,
         int32_t width,
         int32_t height,
         int32_t depth) = 0;
@@ -2152,6 +2175,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createMutableRootShaderObject(
         IShaderProgram* program,
         IShaderObject** outObject) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable) = 0;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createProgram(
         const IShaderProgram::Desc& desc,

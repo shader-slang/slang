@@ -125,6 +125,7 @@ struct IRBlock;
 struct IRDecoration;
 struct IRRate;
 struct IRType;
+struct IRAttr;
 
 // A double-linked list of instruction
 struct IRInstListBase
@@ -492,7 +493,7 @@ struct IRInst
     T* findDecoration();
 
         /// Get all the attributes attached to this instruction.
-    IROperandListBase getAllAttrs();
+    IROperandList<IRAttr> getAllAttrs();
 
         /// Find the first attribute of type `T` attached to this instruction.
     template<typename T>
@@ -1426,6 +1427,13 @@ struct IRConjunctionType : IRType
 
     Int getCaseCount() { return getOperandCount(); }
     IRType* getCaseType(Int index) { return (IRType*) getOperand(index); }
+};
+
+struct IRAttributedType : IRType
+{
+    IR_LEAF_ISA(AttributedType)
+
+    IRType* getBaseType() { return (IRType*) getOperand(0); }
 };
 
 /// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements

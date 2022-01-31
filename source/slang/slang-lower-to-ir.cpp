@@ -1777,6 +1777,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irType);
     }
 
+    LoweredValInfo visitModifiedType(ModifiedType* astType)
+    {
+        IRType* irBase = lowerType(context, astType->base);
+
+        List<IRAttr*> irAttrs;
+        for(auto astModifier : astType->modifiers)
+        {
+            IRAttr* irAttr = (IRAttr*) lowerSimpleVal(context, astModifier);
+            if(irAttr)
+                irAttrs.add(irAttr);
+        }
+
+        auto irType = getBuilder()->getAttributedType(irBase, irAttrs);
+        return LoweredValInfo::simple(irType);
+    }
+
+    LoweredValInfo visitUNormModifierVal(UNormModifierVal* astVal)
+    {
+        SLANG_UNUSED(astVal);
+        return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_UNormAttr));
+    }
+
+    LoweredValInfo visitSNormModifierVal(SNormModifierVal* astVal)
+    {
+        SLANG_UNUSED(astVal);
+        return LoweredValInfo::simple(getBuilder()->getAttr(kIROp_SNormAttr));
+    }
+
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
 #define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }
@@ -3620,6 +3648,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitModifierCastExpr(
+        ModifierCastExpr* expr)
+    {
+        return this->dispatch(expr->valueArg);
+    }
+
     LoweredValInfo subscriptValue(
         IRType*         type,
         LoweredValInfo  baseVal,
@@ -3701,6 +3735,12 @@ struct ExprLoweringVisitorBase : ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitAndTypeExpr(AndTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'&' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitModifiedTypeExpr(ModifiedTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 

@@ -119,6 +119,7 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
+    // TODO: Add implementation for createRayTracingPipelineState() - calls VkCreateRayTracingPipelinesKHR
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
@@ -561,6 +562,7 @@ public:
         VkAttachmentReference m_depthReference;
         bool m_hasDepthStencilAttachment;
         uint32_t m_renderTargetCount;
+        VkSampleCountFlagBits m_sampleCount = VK_SAMPLE_COUNT_1_BIT;
 
     public:
         ~FramebufferLayoutImpl()
@@ -601,6 +603,8 @@ public:
                 dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
                 dst.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+                m_sampleCount = Math::Max(dst.samples, m_sampleCount);
             }
 
             if (desc.depthStencil)
@@ -615,6 +619,8 @@ public:
                 dst.stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
                 dst.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 dst.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+                m_sampleCount = Math::Max(dst.samples, m_sampleCount);
             }
 
             Array<VkAttachmentReference, kMaxRenderTargets>& colorReferences = m_colorReferences;
@@ -4780,15 +4786,43 @@ public:
 
             virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
                 ITextureResource* source,
+                ResourceState sourceState,
                 SubresourceRange sourceRange,
                 ITextureResource* dest,
+                ResourceState destState,
                 SubresourceRange destRange) override
             {
-                SLANG_UNUSED(source);
-                SLANG_UNUSED(sourceRange);
-                SLANG_UNUSED(dest);
-                SLANG_UNUSED(destRange);
-                SLANG_UNIMPLEMENTED_X("resolveResource");
+                auto srcTexture = static_cast<TextureResourceImpl*>(source);
+                auto srcExtent = srcTexture->getDesc()->size;
+                auto dstTexture = static_cast<TextureResourceImpl*>(dest);
+
+                auto srcImage = srcTexture->m_image;
+                auto dstImage = dstTexture->m_image;
+
+                auto srcImageLayout = VulkanUtil::getImageLayoutFromState(sourceState);
+                auto dstImageLayout = VulkanUtil::getImageLayoutFromState(destState);
+
+                for (uint32_t layer = 0; layer < sourceRange.layerCount; ++layer)
+                {
+                    for (uint32_t mip = 0; mip < sourceRange.mipLevelCount; ++mip)
+                    {
+                        VkImageResolve region = {};
+                        region.srcSubresource.aspectMask = getAspectMask(sourceRange.aspectMask);
+                        region.srcSubresource.baseArrayLayer = layer + sourceRange.baseArrayLayer;
+                        region.srcSubresource.layerCount = 1;
+                        region.srcSubresource.mipLevel = mip + sourceRange.mipLevel;
+                        region.srcOffset = { 0, 0, 0 };
+                        region.dstSubresource.aspectMask = getAspectMask(destRange.aspectMask);
+                        region.dstSubresource.baseArrayLayer = layer + destRange.baseArrayLayer;
+                        region.dstSubresource.layerCount = 1;
+                        region.dstSubresource.mipLevel = mip + destRange.mipLevel;
+                        region.dstOffset = { 0, 0, 0 };
+                        region.extent = { (uint32_t)srcExtent.width, (uint32_t)srcExtent.height, (uint32_t)srcExtent.depth };
+
+                        auto& vkApi = m_commandBuffer->m_renderer->m_api;
+                        vkApi.vkCmdResolveImage(m_commandBuffer->m_commandBuffer, srcImage, srcImageLayout, dstImage, dstImageLayout, 1, &region);
+                    }
+                }
             }
 
             virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
@@ -5109,6 +5143,7 @@ public:
                 _memoryBarrier(count, structures, srcAccess, destAccess);
             }
 
+            // TODO: Bind ray tracing pipeline state
             virtual SLANG_NO_THROW void SLANG_MCALL
                 bindPipeline(IPipelineState* pipeline, IShaderObject** outRootObject) override
             {
@@ -5116,13 +5151,16 @@ public:
                 SLANG_UNUSED(outRootObject);
             }
 
+            // TODO: Implement after implementing createRayTracingPipelineState
             virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-                const char* rayGenShaderName,
+                uint32_t raygenShaderIndex,
+                IShaderTable* shaderTable,
                 int32_t width,
                 int32_t height,
                 int32_t depth) override
             {
-                SLANG_UNUSED(rayGenShaderName);
+                SLANG_UNUSED(raygenShaderIndex);
+                SLANG_UNUSED(shaderTable);
                 SLANG_UNUSED(width);
                 SLANG_UNUSED(height);
                 SLANG_UNUSED(depth);
@@ -7090,6 +7128,10 @@ static VkImageUsageFlagBits _calcImageUsageFlags(ResourceState state)
         return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     case ResourceState::CopyDestination:
         return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    case ResourceState::ResolveSource:
+        return VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    case ResourceState::ResolveDestination:
+        return VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     default:
         {
             assert(!"Unsupported");
@@ -7321,7 +7363,7 @@ Result VKDevice::getTextureAllocationInfo(
     imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, nullptr);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = (VkSampleCountFlagBits)desc.sampleDesc.numSamples;
 
     VkImage image;
     SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateImage(m_device, &imageInfo, nullptr, &image));
@@ -7400,7 +7442,7 @@ Result VKDevice::createTextureResource(const ITextureResource::Desc& descIn, con
     imageInfo.usage = _calcImageUsageFlags(desc.allowedStates, desc.memoryType, initData);
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         
-    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.samples = (VkSampleCountFlagBits)desc.sampleDesc.numSamples;
 
     VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = { VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO };
 #if SLANG_WINDOWS_FAMILY
@@ -8181,6 +8223,118 @@ Result VKDevice::createMutableRootShaderObject(
     return SLANG_OK;
 }
 
+VkSampleCountFlagBits translateSampleCount(uint32_t sampleCount)
+{
+    switch (sampleCount)
+    {
+    case 1:        return VK_SAMPLE_COUNT_1_BIT;
+    case 2:        return VK_SAMPLE_COUNT_2_BIT;
+    case 4:        return VK_SAMPLE_COUNT_4_BIT;
+    case 8:        return VK_SAMPLE_COUNT_8_BIT;
+    case 16:       return VK_SAMPLE_COUNT_16_BIT;
+    case 32:       return VK_SAMPLE_COUNT_32_BIT;
+    case 64:       return VK_SAMPLE_COUNT_64_BIT;
+    default:
+        assert(!"Unsupported sample count");
+        return VK_SAMPLE_COUNT_1_BIT;
+    }
+}
+
+VkCullModeFlags translateCullMode(CullMode cullMode)
+{
+    switch (cullMode)
+    {
+    case CullMode::None:        return VK_CULL_MODE_NONE;
+    case CullMode::Front:       return VK_CULL_MODE_FRONT_BIT;
+    case CullMode::Back:        return VK_CULL_MODE_BACK_BIT;
+    default:
+        assert(!"Unsupported cull mode");
+        return VK_CULL_MODE_NONE;
+    }
+}
+
+VkFrontFace translateFrontFaceMode(FrontFaceMode frontFaceMode)
+{
+    // TODO: May need to be reversed due to the viewport flip
+    switch (frontFaceMode)
+    {
+    case FrontFaceMode::CounterClockwise:       return VK_FRONT_FACE_CLOCKWISE;
+    case FrontFaceMode::Clockwise:              return VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    default:
+        assert(!"Unsupported front face mode");
+        return VK_FRONT_FACE_CLOCKWISE;
+    }
+}
+
+VkPolygonMode translateFillMode(FillMode fillMode)
+{
+    switch (fillMode)
+    {
+    case FillMode::Solid:        return VK_POLYGON_MODE_FILL;
+    case FillMode::Wireframe:    return VK_POLYGON_MODE_LINE;
+    default:
+        assert(!"Unsupported fill mode");
+        return VK_POLYGON_MODE_FILL;
+    }
+}
+
+VkBlendFactor translateBlendFactor(BlendFactor blendFactor)
+{
+    switch (blendFactor)
+    {
+    case BlendFactor::Zero:                     return VK_BLEND_FACTOR_ZERO;
+    case BlendFactor::One:                      return VK_BLEND_FACTOR_ONE;
+    case BlendFactor::SrcColor:                 return VK_BLEND_FACTOR_SRC_COLOR;
+    case BlendFactor::InvSrcColor:              return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+    case BlendFactor::SrcAlpha:                 return VK_BLEND_FACTOR_SRC_ALPHA;
+    case BlendFactor::InvSrcAlpha:              return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    case BlendFactor::DestAlpha:                return VK_BLEND_FACTOR_DST_ALPHA;
+    case BlendFactor::InvDestAlpha:             return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::DestColor:                return VK_BLEND_FACTOR_DST_COLOR;
+    case BlendFactor::InvDestColor:             return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+    case BlendFactor::SrcAlphaSaturate:         return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+    case BlendFactor::BlendColor:               return VK_BLEND_FACTOR_CONSTANT_COLOR;
+    case BlendFactor::InvBlendColor:            return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+    case BlendFactor::SecondarySrcColor:        return VK_BLEND_FACTOR_SRC1_COLOR;
+    case BlendFactor::InvSecondarySrcColor:     return VK_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR;
+    case BlendFactor::SecondarySrcAlpha:        return VK_BLEND_FACTOR_SRC1_ALPHA;
+    case BlendFactor::InvSecondarySrcAlpha:     return VK_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA;
+
+    default:
+        assert(!"Unsupported blend factor");
+        return VK_BLEND_FACTOR_ONE;
+    }
+}
+
+VkBlendOp translateBlendOp(BlendOp op)
+{
+    switch (op)
+    {
+    case BlendOp::Add:              return VK_BLEND_OP_ADD;
+    case BlendOp::Subtract:         return VK_BLEND_OP_SUBTRACT;
+    case BlendOp::ReverseSubtract:  return VK_BLEND_OP_REVERSE_SUBTRACT;
+    case BlendOp::Min:              return VK_BLEND_OP_MIN;
+    case BlendOp::Max:              return VK_BLEND_OP_MAX;
+    default:
+        assert(!"Unsupported blend op");
+        return VK_BLEND_OP_ADD;
+    }
+}
+
+VkPrimitiveTopology translatePrimitiveTypeToListTopology(PrimitiveType primitiveType)
+{
+    switch (primitiveType)
+    {
+    case PrimitiveType::Point:        return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    case PrimitiveType::Line:         return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case PrimitiveType::Triangle:     return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PrimitiveType::Patch:        return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+    default:
+        assert(!"unknown topology type.");
+        return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
+}
+
 Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& inDesc, IPipelineState** outState)
 {
     GraphicsPipelineStateDesc desc = inDesc;
@@ -8201,8 +8355,6 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     auto inputLayoutImpl = (InputLayoutImpl*) desc.inputLayout;
 
     // VertexBuffer/s
-    // Currently only handles one
-
     VkPipelineVertexInputStateCreateInfo vertexInputInfo = { VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexBindingDescriptionCount = 0;
@@ -8222,28 +8374,9 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
 
     VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
     inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-
-    // Use PRITIMVE_LIST topology for each primitive type here.
     // All other forms of primitive toplogies are specified via dynamic state.
-    switch (inDesc.primitiveType)
-    {
-    case PrimitiveType::Point:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        break;
-    case PrimitiveType::Line:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
-        break;
-    case PrimitiveType::Triangle:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        break;
-    case PrimitiveType::Patch:
-        inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
-        break;
-    default:
-        assert(!"unknown topology type.");
-        break;
-    }
-    inputAssembly.primitiveRestartEnable = VK_FALSE;
+    inputAssembly.topology = translatePrimitiveTypeToListTopology(inDesc.primitiveType);
+    inputAssembly.primitiveRestartEnable = VK_FALSE; // TODO: Currently unsupported
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -8266,41 +8399,87 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     viewportState.scissorCount = 1;
     viewportState.pScissors = &scissor;
 
+    auto rasterizerDesc = desc.rasterizer;
+
     VkPipelineRasterizationStateCreateInfo rasterizer = {};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer.depthClampEnable = VK_FALSE;
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_NONE;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.depthClampEnable = VK_TRUE; // TODO: Depth clipping and clamping are different between Vk and D3D12
+    rasterizer.rasterizerDiscardEnable = VK_FALSE; // TODO: Currently unsupported
+    rasterizer.polygonMode = translateFillMode(rasterizerDesc.fillMode);
+    rasterizer.cullMode = translateCullMode(rasterizerDesc.cullMode);
+    rasterizer.frontFace = translateFrontFaceMode(rasterizerDesc.frontFace);
+    rasterizer.depthBiasEnable = (rasterizerDesc.depthBias == 0) ? VK_FALSE : VK_TRUE;
+    rasterizer.depthBiasConstantFactor = (float)rasterizerDesc.depthBias;
+    rasterizer.depthBiasClamp = rasterizerDesc.depthBiasClamp;
+    rasterizer.depthBiasSlopeFactor = rasterizerDesc.slopeScaledDepthBias;
+    rasterizer.lineWidth = 1.0f; // TODO: Currently unsupported
+
+    auto framebufferLayoutImpl = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
+    auto forcedSampleCount = rasterizerDesc.forcedSampleCount;
+    auto blendDesc = desc.blend;
 
     VkPipelineMultisampleStateCreateInfo multisampling = {};
     multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples =
+        (forcedSampleCount == 0) ? framebufferLayoutImpl->m_sampleCount : translateSampleCount(forcedSampleCount);
+    multisampling.sampleShadingEnable = VK_FALSE; // TODO: Should check if fragment shader needs this
+    // TODO: Sample mask is dynamic in D3D12 but PSO state in Vulkan
+    multisampling.alphaToCoverageEnable = blendDesc.alphaToCoverageEnable;
+    multisampling.alphaToOneEnable = VK_FALSE;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    auto targetCount = blendDesc.targetCount;
+    List<VkPipelineColorBlendAttachmentState> colorBlendAttachments;
 
+    // Regardless of whether blending is enabled, Vulkan always applies the color write mask operation,
+    // so if there is no blending then we need to add an attachment that defines the color write mask
+    // to ensure colors are actually written.
+    if (targetCount == 0)
+    {
+        colorBlendAttachments.setCount(1);
+        auto& vkBlendDesc = colorBlendAttachments[0];
+        vkBlendDesc.blendEnable = VK_FALSE;
+        vkBlendDesc.colorWriteMask = (VkColorComponentFlags)RenderTargetWriteMask::EnableAll;
+    }
+    else
+    {
+        colorBlendAttachments.setCount(targetCount);
+        for (UInt i = 0; i < targetCount; ++i)
+        {
+            auto& gfxBlendDesc = blendDesc.targets[i];
+            auto& vkBlendDesc = colorBlendAttachments[i];
+
+            vkBlendDesc.blendEnable = gfxBlendDesc.enableBlend;
+            vkBlendDesc.srcColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.srcFactor);
+            vkBlendDesc.dstColorBlendFactor = translateBlendFactor(gfxBlendDesc.color.dstFactor);
+            vkBlendDesc.colorBlendOp = translateBlendOp(gfxBlendDesc.color.op);
+            vkBlendDesc.srcAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.srcFactor);
+            vkBlendDesc.dstAlphaBlendFactor = translateBlendFactor(gfxBlendDesc.alpha.dstFactor);
+            vkBlendDesc.alphaBlendOp = translateBlendOp(gfxBlendDesc.alpha.op);
+            vkBlendDesc.colorWriteMask = (VkColorComponentFlags)gfxBlendDesc.writeMask;
+        }
+    }
+    
     VkPipelineColorBlendStateCreateInfo colorBlending = {};
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
+    colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
+    colorBlending.attachmentCount = (targetCount == 0) ? 1 : targetCount;
+    colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
     colorBlending.blendConstants[2] = 0.0f;
     colorBlending.blendConstants[3] = 0.0f;
 
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+        VK_DYNAMIC_STATE_BLEND_CONSTANTS,
+        // TODO: Add VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY_EXT if supported
+    };
     VkPipelineDynamicStateCreateInfo dynamicStateInfo = {};
     dynamicStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicStateInfo.dynamicStateCount = 3;
-    VkDynamicState dynamicStates[] = {
-        VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_STENCIL_REFERENCE};
+    dynamicStateInfo.dynamicStateCount = SLANG_COUNT_OF(dynamicStates);
     dynamicStateInfo.pDynamicStates = dynamicStates;
 
     VkPipelineDepthStencilStateCreateInfo depthStencilStateInfo = {};
@@ -8312,7 +8491,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     depthStencilStateInfo.back.writeMask = inDesc.depthStencil.stencilWriteMask;
     depthStencilStateInfo.front.compareMask = inDesc.depthStencil.stencilReadMask;
     depthStencilStateInfo.front.writeMask = inDesc.depthStencil.stencilWriteMask;
-    depthStencilStateInfo.depthBoundsTestEnable = 0;
+    depthStencilStateInfo.depthBoundsTestEnable = 0; // TODO: Currently unsupported
     depthStencilStateInfo.depthCompareOp = translateComparisonFunc(inDesc.depthStencil.depthFunc);
     depthStencilStateInfo.depthWriteEnable = inDesc.depthStencil.depthWriteEnable ? 1 : 0;
     depthStencilStateInfo.stencilTestEnable = inDesc.depthStencil.stencilEnable ? 1 : 0;
@@ -8330,7 +8509,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.pDepthStencilState = &depthStencilStateInfo;
     pipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
-    pipelineInfo.renderPass = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout)->m_renderPass;
+    pipelineInfo.renderPass = framebufferLayoutImpl->m_renderPass;
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.pDynamicState = &dynamicStateInfo;

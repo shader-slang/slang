@@ -132,7 +132,6 @@ gfx::IShaderProgram* loadShaderProgram(gfx::IDevice *device, String entryPoint, 
     // We can create a `gfx::IShaderProgram` object from `composedProgram`
     // so it may be used by the graphics layer.
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.pipelineType = gfx::PipelineType::Compute;
     programDesc.slangProgram = composedProgram.get();
 
     gProgram = device->createProgram(programDesc);
@@ -158,7 +157,7 @@ gfx::IBufferResource* createStructuredBuffer(
                                                 ResourceState::CopyDestination,
                                                 ResourceState::CopySource);
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
-    bufferDesc.cpuAccessFlags = AccessFlag::Write | AccessFlag::Read;
+    bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     SlangResult result = device->createBufferResource(bufferDesc,
                                                       (void *)initialData,
@@ -237,7 +236,7 @@ void dispatchComputation(
     encoder->endEncoding();
     commandBuffer->close();
     gQueue->executeCommandBuffer(commandBuffer);
-    gQueue->wait();
+    gQueue->waitOnHost();
 }
 
 bool printOutputValues(

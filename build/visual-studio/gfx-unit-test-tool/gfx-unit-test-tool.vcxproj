@@ -165,7 +165,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
@@ -181,7 +181,7 @@
       <WarningLevel>Level3</WarningLevel>
       <PreprocessorDefinitions>_DEBUG;SLANG_SHARED_LIBRARY_TOOL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\..\..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
@@ -286,6 +286,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\resolve-resource-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\root-mutable-shader-object.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-buffers-tests.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\shared-textures-tests.cpp" />
@@ -299,6 +300,7 @@
     <None Include="..\..\..\tools\gfx-unit-test\graphics-smoke.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\mutable-shader-object.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\nested-parameter-block.slang" />
+    <None Include="..\..\..\tools\gfx-unit-test\resolve-resource-shader.slang" />
     <None Include="..\..\..\tools\gfx-unit-test\trivial-copy.slang" />
   </ItemGroup>
   <ItemGroup>

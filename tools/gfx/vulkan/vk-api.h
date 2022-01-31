@@ -98,6 +98,7 @@ namespace gfx {
     x(vkCmdCopyBufferToImage)\
     x(vkCmdCopyImage) \
     x(vkCmdCopyImageToBuffer) \
+    x(vkCmdResolveImage) \
     x(vkCmdPushConstants) \
     x(vkCmdSetStencilReference) \
     x(vkCmdWriteTimestamp) \

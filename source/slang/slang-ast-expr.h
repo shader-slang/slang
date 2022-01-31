@@ -240,12 +240,27 @@ class CastToSuperTypeExpr: public Expr
 
     /// The value being cast to a super type
     ///
-    /// The type being case from is `valueArg->type`.
+    /// The type being cast from is `valueArg->type`.
     ///
     Expr* valueArg = nullptr;
 
     /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`   
     Val* witnessArg = nullptr;
+};
+
+    /// A cast of a value to the same type, with different modifiers.
+    ///
+    /// The type being cast to is stored as this expression's `type`.
+    ///
+class ModifierCastExpr : public Expr
+{
+    SLANG_AST_CLASS(ModifierCastExpr)
+
+    /// The value being cast.
+    ///
+    /// The type being cast from is `valueArg->type`.
+    ///
+    Expr* valueArg = nullptr;
 };
 
 class SelectExpr: public OperatorExpr
@@ -338,6 +353,15 @@ class AndTypeExpr : public Expr
 
     TypeExp left;
     TypeExp right;
+};
+
+    /// A type exprssion that applies one or more modifiers to another type
+class ModifiedTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(ModifiedTypeExpr);
+
+    Modifiers modifiers;
+    TypeExp base;
 };
 
 } // namespace Slang

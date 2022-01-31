@@ -288,10 +288,82 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
     return type;
 }
 
+Type* ASTBuilder::getModifiedType(Type* base, Count modifierCount, Val* const* modifiers)
+{
+    auto type = create<ModifiedType>();
+    type->base = base;
+    type->modifiers.addRange(modifiers, modifierCount);
+    return type;
+}
+
+NodeBase* ASTBuilder::_getOrCreateImpl(NodeDesc const& desc, NodeCreateFunc createFunc, void* createFuncUserData)
+{
+    if(auto found = m_cachedNodes.TryGetValue(desc))
+        return *found;
+
+    auto node = createFunc(this, desc, createFuncUserData);
+
+    auto operandCount = desc.operandCount;
+    NodeBase** operandsCopy = m_arena.allocateAndZeroArray<NodeBase*>(desc.operandCount);
+    for(Index i = 0; i < operandCount; ++i)
+        operandsCopy[i] = desc.operands[i];
+
+    NodeDesc descCopy = desc;
+    descCopy.operands = operandsCopy;
+    m_cachedNodes.Add(descCopy, node);
+
+    return node;
+}
+
+
+Val* ASTBuilder::getUNormModifierVal()
+{
+    return _getOrCreate<UNormModifierVal>();
+}
+
+Val* ASTBuilder::getSNormModifierVal()
+{
+    return _getOrCreate<SNormModifierVal>();
+}
+
 TypeType* ASTBuilder::getTypeType(Type* type)
 {
     return create<TypeType>(type);
 }
 
+bool ASTBuilder::NodeDesc::operator==(NodeDesc const& that) const
+{
+    if(type != that.type) return false;
+    if(operandCount != that.operandCount) return false;
+    for(Index i = 0; i < operandCount; ++i)
+    {
+        // Note: we are comparing the operands directly for identity
+        // (pointer equality) rather than doing the `Val`-level
+        // equality check.
+        //
+        // The rationale here is that nodes that will be created
+        // via a `NodeDesc` *should* all be going through the
+        // deduplication path anyway, as should their operands.
+        // 
+        if(operands[i] != that.operands[i]) return false;
+    }
+    return true;
+}
+HashCode ASTBuilder::NodeDesc::getHashCode() const
+{
+    Hasher hasher;
+    hasher.hashValue(Int(type));
+    hasher.hashValue(operandCount);
+    for(Index i = 0; i < operandCount; ++i)
+    {
+        // Note: we are hashing the raw pointer value rather
+        // than the content of the value node. This is done
+        // to match the semantics implemented for `==` on
+        // `NodeDesc`.
+        //
+        hasher.hashValue((void*) operands[i]);
+    }
+    return hasher.getResult();
+}
 
 } // namespace Slang

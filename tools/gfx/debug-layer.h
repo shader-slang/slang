@@ -156,6 +156,15 @@ public:
         uint64_t timeout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureAllocationInfo(
         const ITextureResource::Desc& desc, size_t* outSize, size_t* outAlignment) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable) override;
+};
+
+class DebugShaderTable : public DebugObject<IShaderTable>
+{
+public:
+    SLANG_COM_OBJECT_IUNKNOWN_ALL;
+    IShaderTable* getInterface(const Slang::Guid& guid);
 };
 
 class DebugQueryPool : public DebugObject<IQueryPool>
@@ -454,8 +463,10 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
         ITextureResource* source,
+        ResourceState sourceState,
         SubresourceRange sourceRange,
         ITextureResource* dest,
+        ResourceState destState,
         SubresourceRange destRange) override;
 
     virtual SLANG_NO_THROW void SLANG_MCALL copyTextureToBuffer(
@@ -511,7 +522,8 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
         bindPipeline(IPipelineState* state, IShaderObject** outRootObject) override;
     virtual SLANG_NO_THROW void SLANG_MCALL dispatchRays(
-        const char* rayGenShaderName,
+        uint32_t rayGenShaderIndex,
+        IShaderTable* shaderTable,
         int32_t width,
         int32_t height,
         int32_t depth) override;

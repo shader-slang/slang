@@ -282,6 +282,14 @@ namespace Slang
         return m_mangledName;
     }
 
+    String EntryPoint::getEntryPointNameOverride(Index index)
+    {
+        SLANG_UNUSED(index);
+        SLANG_ASSERT(index == 0);
+
+        return m_nameOverride;
+    }
+
     void EntryPoint::acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
     {
         visitor->visitEntryPoint(this, as<EntryPointSpecializationInfo>(specializationInfo));
@@ -1211,7 +1219,11 @@ namespace Slang
 
             // Set the entry point name
             options.entryPointName = getText(entryPoint->getName());
-
+            auto entryPointNameOverride = program->getEntryPointNameOverride(entryPointIndex);
+            if (entryPointNameOverride.getLength() != 0)
+            {
+                options.entryPointName = entryPointNameOverride;
+            }
             if (compilerType == PassThroughMode::Dxc)
             {
                 // We will enable the flag to generate proper code for 16 - bit types

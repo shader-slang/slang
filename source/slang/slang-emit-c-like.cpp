@@ -170,6 +170,18 @@ void CLikeSourceEmitter::emitDeclarator(DeclaratorInfo* declarator)
         }
         break;
 
+    case DeclaratorInfo::Flavor::Attributed:
+        {
+            auto attributedDeclarator = (AttributedDeclaratorInfo*)declarator;
+            auto instWithAttributes = attributedDeclarator->instWithAttributes;
+            for(auto attr : instWithAttributes->getAllAttrs())
+            {
+                _emitPostfixTypeAttr(attr);
+            }
+            emitDeclarator(attributedDeclarator->next);
+        }
+        break;
+
 
     default:
         SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unknown declarator flavor");
@@ -249,16 +261,24 @@ List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(IRWi
     return sortedWitnessTableEntries;
 }
 
-void CLikeSourceEmitter::_emitArrayType(IRArrayType* arrayType, DeclaratorInfo* declarator)
+void CLikeSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
 {
-    SizedArrayDeclaratorInfo arrayDeclarator(declarator, arrayType->getElementCount());
-    _emitType(arrayType->getElementType(), &arrayDeclarator);
+    SLANG_UNUSED(attr);
+
+    // By defualt we will not emit any attributes.
+    //
+    // TODO: If `const` ever surfaces as a type attribute in our IR,
+    // we may need to handle it here.
 }
 
-void CLikeSourceEmitter::_emitUnsizedArrayType(IRUnsizedArrayType* arrayType, DeclaratorInfo* declarator)
+void CLikeSourceEmitter::_emitPostfixTypeAttr(IRAttr* attr)
 {
-    UnsizedArrayDeclaratorInfo arrayDeclarator(declarator);
-    _emitType(arrayType->getElementType(), &arrayDeclarator);
+    SLANG_UNUSED(attr);
+
+    // By defualt we will not emit any attributes.
+    //
+    // TODO: If `const` ever surfaces as a type attribute in our IR,
+    // we may need to handle it here.
 }
 
 void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
@@ -278,11 +298,31 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         break;
 
     case kIROp_ArrayType:
-        _emitArrayType(cast<IRArrayType>(type), declarator);
+        {
+            auto arrayType = cast<IRArrayType>(type);
+            SizedArrayDeclaratorInfo arrayDeclarator(declarator, arrayType->getElementCount());
+            _emitType(arrayType->getElementType(), &arrayDeclarator);
+        }
         break;
 
     case kIROp_UnsizedArrayType:
-        _emitUnsizedArrayType(cast<IRUnsizedArrayType>(type), declarator);
+        {
+            auto arrayType = cast<IRUnsizedArrayType>(type);
+            UnsizedArrayDeclaratorInfo arrayDeclarator(declarator);
+            _emitType(arrayType->getElementType(), &arrayDeclarator);
+        }
+        break;
+
+    case kIROp_AttributedType:
+        {
+            auto attributedType = cast<IRAttributedType>(type);
+            for(auto attr : attributedType->getAllAttrs())
+            {
+                _emitPrefixTypeAttr(attr);
+            }
+            AttributedDeclaratorInfo attributedDeclarator(declarator, attributedType);
+            _emitType(attributedType->getBaseType(), &attributedDeclarator);
+        }
         break;
     }
 

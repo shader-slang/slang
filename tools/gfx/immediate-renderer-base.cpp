@@ -385,13 +385,17 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
             ITextureResource* source,
+            ResourceState sourceState,
             SubresourceRange sourceRange,
             ITextureResource* dest,
+            ResourceState destState,
             SubresourceRange destRange) override
         {
             SLANG_UNUSED(source);
+            SLANG_UNUSED(sourceState);
             SLANG_UNUSED(sourceRange);
             SLANG_UNUSED(dest);
+            SLANG_UNUSED(destState);
             SLANG_UNUSED(destRange);
             SLANG_UNIMPLEMENTED_X("resolveResource");
         }
