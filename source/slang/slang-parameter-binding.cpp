@@ -2729,6 +2729,13 @@ struct CollectGlobalGenericArgumentsVisitor : ComponentTypeVisitor
 
     ParameterBindingContext* m_context;
 
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
     void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(entryPoint);
@@ -2887,6 +2894,13 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         context->stage = entryPoint->getStage();
 
         collectEntryPointParameters(context, entryPoint, specializationInfo);
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* renamedEntryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
@@ -3107,6 +3121,13 @@ struct CompleteBindingsVisitor : ComponentTypeVisitor
         completeBindingsForParameter(m_context, globalEntryPointInfo->parametersLayout);
     }
 
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* renamedEntryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         SLANG_UNUSED(specializationInfo);
@@ -3234,6 +3255,13 @@ struct FlushPendingDataVisitor : ComponentTypeVisitor
         // appeared in the entry-point parameter list.
         //
         _allocateBindingsForPendingData(m_context, globalEntryPointInfo->parametersLayout->pendingVarLayout);
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
