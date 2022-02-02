@@ -40,6 +40,7 @@ struct GfxGUID
     static const Slang::Guid IID_IAccelerationStructure;
     static const Slang::Guid IID_IFence;
     static const Slang::Guid IID_IShaderTable;
+    static const Slang::Guid IID_IPipelineCreationAPIDispatcher;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -1355,6 +1356,8 @@ protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
+    Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;
+
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;

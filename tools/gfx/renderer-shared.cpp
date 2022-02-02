@@ -33,6 +33,7 @@ const Slang::Guid GfxGUID::IID_IQueryPool = SLANG_UUID_IQueryPool;
 const Slang::Guid GfxGUID::IID_IAccelerationStructure = SLANG_UUID_IAccelerationStructure;
 const Slang::Guid GfxGUID::IID_IFence = SLANG_UUID_IFence;
 const Slang::Guid GfxGUID::IID_IShaderTable = SLANG_UUID_IShaderTable;
+const Slang::Guid GfxGUID::IID_IPipelineCreationAPIDispatcher = SLANG_UUID_IPipelineCreationAPIDispatcher;
 
 
 StageType translateStage(SlangStage slangStage)
@@ -296,6 +297,12 @@ IDevice* gfx::RendererBase::getInterface(const Guid& guid)
 
 SLANG_NO_THROW Result SLANG_MCALL RendererBase::initialize(const Desc& desc)
 {
+    if (desc.apiCommandDispatcher)
+    {
+        desc.apiCommandDispatcher->queryInterface(
+            GfxGUID::IID_IPipelineCreationAPIDispatcher,
+            (void**)m_pipelineCreationAPIDispatcher.writeRef());
+    }
     return SLANG_OK;
 }
 
