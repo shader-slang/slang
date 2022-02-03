@@ -469,7 +469,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_sampler);
+            outHandle->handleValue = (uint64_t)(m_sampler);
             return SLANG_OK;
         }
     };
@@ -511,7 +511,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_view);
+            outHandle->handleValue = (uint64_t)(m_view);
             return SLANG_OK;
         }
     };
@@ -532,7 +532,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_view);
+            outHandle->handleValue = (uint64_t)(m_view);
             return SLANG_OK;
         }
     };
@@ -570,7 +570,7 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
             outHandle->api = InteropHandleAPI::Vulkan;
-            outHandle->handleValue = reinterpret_cast<uint64_t>(m_vkHandle);
+            outHandle->handleValue = (uint64_t)(m_vkHandle);
             return SLANG_OK;
         }
         ~AccelerationStructureImpl()
