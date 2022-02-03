@@ -382,6 +382,12 @@ public:
         {
             m_allocator->free(m_descriptor);
         }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::D3D12CpuDescriptorHandle;
+            outHandle->handleValue = m_descriptor.cpuHandle.ptr;
+            return SLANG_OK;
+        }
     };
 
     class ResourceViewInternalImpl
@@ -398,6 +404,12 @@ public:
     {
     public:
         RefPtr<Resource> m_resource;
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::D3D12CpuDescriptorHandle;
+            outHandle->handleValue = m_descriptor.cpuHandle.ptr;
+            return SLANG_OK;
+        }
     };
 
     class FramebufferLayoutImpl : public FramebufferLayoutBase
@@ -461,6 +473,12 @@ public:
             pipelineDesc.compute = inDesc;
             initializeBase(pipelineDesc);
         }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::D3D12;
+            outHandle->handleValue = reinterpret_cast<uint64_t>(m_pipelineState.get());
+            return SLANG_OK;
+        }
     };
 
 #if SLANG_GFX_HAS_DXR_SUPPORT
@@ -474,6 +492,12 @@ public:
             pipelineDesc.type = PipelineType::RayTracing;
             pipelineDesc.rayTracing = inDesc;
             initializeBase(pipelineDesc);
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::D3D12;
+            outHandle->handleValue = reinterpret_cast<uint64_t>(m_stateObject.get());
+            return SLANG_OK;
         }
     };
 #endif
@@ -7258,7 +7282,10 @@ Result D3D12Device::createComputePipelineState(const ComputePipelineStateDesc& i
     {
         // Describe and create the compute pipeline state object
         D3D12_COMPUTE_PIPELINE_STATE_DESC computeDesc = {};
-        computeDesc.pRootSignature = programImpl->m_rootObjectLayout->m_rootSignature;
+        computeDesc.pRootSignature =
+            desc.d3d12RootSignatureOverride
+                ? static_cast<ID3D12RootSignature*>(desc.d3d12RootSignatureOverride)
+                : programImpl->m_rootObjectLayout->m_rootSignature;
         computeDesc.CS = {
             programImpl->m_shaders[0].code.getBuffer(),
             SIZE_T(programImpl->m_shaders[0].code.getCount())};
@@ -7480,6 +7507,13 @@ public:
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
     {
         return m_buffer->getDeviceAddress() + m_offset;
+    }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+    {
+        outHandle->api = InteropHandleAPI::DeviceAddress;
+        outHandle->handleValue = getDeviceAddress();
+        return SLANG_OK;
     }
 };
 

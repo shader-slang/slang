@@ -225,6 +225,7 @@ public:
 public:
     IResourceView* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) override;
 };
 
 class DebugAccelerationStructure : public DebugObject<IAccelerationStructure>
@@ -235,6 +236,8 @@ public:
 public:
     IAccelerationStructure* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(InteropHandle* outNativeHandle) override;
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override;
 };
 
@@ -245,7 +248,8 @@ public:
 
 public:
     ISamplerState* getInterface(const Slang::Guid& guid);
-};
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        getNativeHandle(InteropHandle* outNativeHandle) override;};
 
 struct ShaderOffsetKey
 {
@@ -635,6 +639,7 @@ public:
 
 public:
     IPipelineState* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
 class DebugRenderPassLayout : public DebugObject<IRenderPassLayout>

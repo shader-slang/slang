@@ -435,11 +435,13 @@ enum class MemoryType
 enum class InteropHandleAPI
 {
     Unknown,
-    D3D12,
-    Vulkan,
-    CUDA,
-    Win32,
-    FileDescriptor,
+    D3D12, // A D3D12 object pointer.
+    Vulkan, // A general Vulkan object handle.
+    CUDA, // A general CUDA object handle.
+    Win32, // A general Win32 HANDLE.
+    FileDescriptor, // A file descriptor.
+    DeviceAddress, // A device address.
+    D3D12CpuDescriptorHandle, // A D3D12_CPU_DESCRIPTOR_HANDLE value.
 };
 
 struct InteropHandle
@@ -720,6 +722,11 @@ public:
         float                   minLOD          = -FLT_MAX;
         float                   maxLOD          = FLT_MAX;
     };
+
+    /// Returns a native API handle representing this sampler state object.
+    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE.
+    /// When using Vulkan, this will be a VkSampler.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
 #define SLANG_UUID_ISamplerState                                                        \
     {                                                                                  \
@@ -762,6 +769,13 @@ public:
         uint32_t bufferElementSize; // 0 means raw buffer.
     };
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() = 0;
+
+    /// Returns a native API handle representing this resource view object.
+    /// When using D3D12, this will be a D3D12_CPU_DESCRIPTOR_HANDLE or a buffer device address depending
+    /// on the type of the resource view.
+    /// When using Vulkan, this will be a VkImageView, VkBufferView, VkAccelerationStructure or a VkBuffer
+    /// depending on the type of the resource view.
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
 #define SLANG_UUID_IResourceView                                                      \
     {                                                                                 \
@@ -1232,7 +1246,8 @@ struct GraphicsPipelineStateDesc
 
 struct ComputePipelineStateDesc
 {
-    IShaderProgram*  program;
+    IShaderProgram*  program = nullptr;
+    void* d3d12RootSignatureOverride = nullptr;
 };
 
 struct RayTracingPipelineFlags
@@ -1287,6 +1302,8 @@ public:
 
 class IPipelineState : public ISlangUnknown
 {
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 };
 #define SLANG_UUID_IPipelineState                                                      \
     {                                                                                 \

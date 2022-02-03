@@ -1841,11 +1841,32 @@ DeviceAddress DebugAccelerationStructure::getDeviceAddress()
     return baseObject->getDeviceAddress();
 }
 
+Result DebugAccelerationStructure::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
+}
+
 IResourceView::Desc* DebugResourceView::getViewDesc()
 {
     SLANG_GFX_API_FUNC;
 
     return baseObject->getViewDesc();
+}
+
+Result DebugResourceView::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
+}
+
+Result DebugSamplerState::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
 }
 
 IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
@@ -1882,6 +1903,12 @@ Result DebugFence::setCurrentValue(uint64_t value)
 DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
 {
     m_slangProgram = desc.slangProgram;
+}
+
+Result DebugPipelineState::getNativeHandle(InteropHandle* outHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getNativeHandle(outHandle);
 }
 
 } // namespace gfx
