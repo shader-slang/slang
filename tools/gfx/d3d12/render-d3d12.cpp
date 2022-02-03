@@ -4680,8 +4680,9 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL
             getNativeHandle(InteropHandle* outNativeHandle) override
         {
-            outNativeHandle->handleValue = 0;
-            return SLANG_FAIL;
+            outNativeHandle->api = gfx::InteropHandleAPI::D3D12;
+            outNativeHandle->handleValue = (uint64_t)m_fence.get();
+            return SLANG_OK;
         }
     };
 
