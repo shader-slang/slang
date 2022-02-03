@@ -293,6 +293,9 @@ namespace Slang
             SlangInt                        specializationArgCount,
             slang::IComponentType**         outSpecializedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
+        SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName,
+            slang::IComponentType** outEntryPoint) SLANG_OVERRIDE;
         SLANG_NO_THROW SlangResult SLANG_MCALL link(
             slang::IComponentType**         outLinkedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE;
@@ -654,6 +657,130 @@ namespace Slang
         List<RefPtr<ComponentType>> m_requirements;
     };
 
+    class RenamedEntryPointComponentType : public ComponentType
+    {
+    public:
+        using Super = ComponentType;
+
+        RenamedEntryPointComponentType(ComponentType* base, String newName);
+
+        ComponentType* getBase() { return m_base.Ptr(); }
+
+        // Forward `IComponentType` methods
+
+        SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() SLANG_OVERRIDE
+        {
+            return Super::getSession();
+        }
+
+        SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
+            getLayout(SlangInt targetIndex, slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getLayout(targetIndex, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
+            SlangInt entryPointIndex,
+            SlangInt targetIndex,
+            slang::IBlob** outCode,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointCode(entryPointIndex, targetIndex, outCode, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
+            slang::SpecializationArg const* specializationArgs,
+            SlangInt specializationArgCount,
+            slang::IComponentType** outSpecializedComponentType,
+            ISlangBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::specialize(
+                specializationArgs,
+                specializationArgCount,
+                outSpecializedComponentType,
+                outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName, slang::IComponentType** outEntryPoint) SLANG_OVERRIDE
+        {
+            return Super::renameEntryPoint(newName, outEntryPoint);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL link(
+            slang::IComponentType** outLinkedComponentType,
+            ISlangBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::link(outLinkedComponentType, outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
+            int entryPointIndex,
+            int targetIndex,
+            ISlangSharedLibrary** outSharedLibrary,
+            slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+        {
+            return Super::getEntryPointHostCallable(
+                entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
+        }
+
+        List<Module*> const& getModuleDependencies() SLANG_OVERRIDE
+        {
+            return m_base->getModuleDependencies();
+        }
+        List<String> const& getFilePathDependencies() SLANG_OVERRIDE
+        {
+            return m_base->getFilePathDependencies();
+        }
+
+        SLANG_NO_THROW Index SLANG_MCALL getSpecializationParamCount() SLANG_OVERRIDE
+        {
+            return m_base->getSpecializationParamCount();
+        }
+
+        SpecializationParam const& getSpecializationParam(Index index) SLANG_OVERRIDE
+        {
+            return m_base->getSpecializationParam(index);
+        }
+
+        Index getRequirementCount() SLANG_OVERRIDE { return m_base->getRequirementCount(); }
+        RefPtr<ComponentType> getRequirement(Index index) SLANG_OVERRIDE
+        {
+            return m_base->getRequirement(index);
+        }
+        Index getEntryPointCount() SLANG_OVERRIDE { return m_base->getEntryPointCount(); }
+        RefPtr<EntryPoint> getEntryPoint(Index index) SLANG_OVERRIDE
+        {
+            return m_base->getEntryPoint(index);
+        }
+        String getEntryPointMangledName(Index index) SLANG_OVERRIDE { return m_base->getEntryPointMangledName(index); }
+        String getEntryPointNameOverride(Index index) SLANG_OVERRIDE
+        {
+            SLANG_UNUSED(index);
+            SLANG_ASSERT(index == 0);
+            return m_entryPointNameOverride;
+        }
+
+        Index getShaderParamCount() SLANG_OVERRIDE { return m_base->getShaderParamCount(); }
+        ShaderParamInfo getShaderParam(Index index) SLANG_OVERRIDE
+        {
+            return m_base->getShaderParam(index);
+        }
+
+        void acceptVisitor(ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+            SLANG_OVERRIDE;
+    private:
+        RefPtr<ComponentType> m_base;
+        String m_entryPointNameOverride;
+
+    protected:
+        RefPtr<SpecializationInfo> _validateSpecializationArgsImpl(
+            SpecializationArg const* args, Index argCount, DiagnosticSink* sink) SLANG_OVERRIDE
+        {
+            return m_base->_validateSpecializationArgsImpl(args, argCount, sink);
+        }
+    };
+
         /// Describes an entry point for the purposes of layout and code generation.
         ///
         /// This class also tracks any generic arguments to the entry point,
@@ -710,6 +837,12 @@ namespace Slang
                 outDiagnostics);
         }
 
+        SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName, slang::IComponentType** outEntryPoint) SLANG_OVERRIDE
+        {
+            return Super::renameEntryPoint(newName, outEntryPoint);
+        }
+
         SLANG_NO_THROW SlangResult SLANG_MCALL link(
             slang::IComponentType**         outLinkedComponentType,
             ISlangBlob**                    outDiagnostics) SLANG_OVERRIDE
@@ -726,15 +859,6 @@ namespace Slang
             slang::IBlob**          outDiagnostics) SLANG_OVERRIDE
         {
             return Super::getEntryPointHostCallable(entryPointIndex, targetIndex, outSharedLibrary, outDiagnostics);
-        }
-
-        SLANG_NO_THROW SlangResult SLANG_MCALL getRenamedEntryPoint(const char* newName, IEntryPoint** outEntryPoint)
-            SLANG_OVERRIDE
-        {
-            RefPtr<EntryPoint> newEntryPoint = create(getLinkage(), m_funcDeclRef, m_profile);
-            newEntryPoint->m_nameOverride = newName;
-            *outEntryPoint = newEntryPoint.detach();
-            return SLANG_OK;
         }
 
             /// Create an entry point that refers to the given function.
@@ -848,9 +972,6 @@ namespace Slang
             /// The mangled name of the entry point function
         String m_mangledName;
 
-            /// The name of this entry point in the compiled code.
-        String m_nameOverride;
-
         SpecializationParams m_genericSpecializationParams;
         SpecializationParams m_existentialSpecializationParams;
 
@@ -920,6 +1041,12 @@ namespace Slang
                 specializationArgCount,
                 outSpecializedComponentType,
                 outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName, slang::IComponentType** outEntryPoint) SLANG_OVERRIDE
+        {
+            return Super::renameEntryPoint(newName, outEntryPoint);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL link(
@@ -1058,6 +1185,12 @@ namespace Slang
                 specializationArgCount,
                 outSpecializedComponentType,
                 outDiagnostics);
+        }
+
+        SLANG_NO_THROW SlangResult SLANG_MCALL renameEntryPoint(
+            const char* newName, slang::IComponentType** outEntryPoint) SLANG_OVERRIDE
+        {
+            return Super::renameEntryPoint(newName, outEntryPoint);
         }
 
         SLANG_NO_THROW SlangResult SLANG_MCALL link(
@@ -1919,6 +2052,9 @@ namespace Slang
         virtual void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) = 0;
         virtual void visitSpecialized(SpecializedComponentType* specialized) = 0;
         virtual void visitTypeConformance(TypeConformance* conformance) = 0;
+        virtual void visitRenamedEntryPoint(
+            RenamedEntryPointComponentType* renamedEntryPoint,
+            EntryPoint::EntryPointSpecializationInfo* specializationInfo) = 0;
 
     protected:
         // These helpers can be used to recurse into the logical children of a

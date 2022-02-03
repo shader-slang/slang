@@ -1947,6 +1947,8 @@ public:
         int requiredFeatureCount = 0;
         // Array of required feature names, whose size is `requiredFeatureCount`.
         const char** requiredFeatures = nullptr;
+        // A command dispatcher object that intercepts and handles actual low-level API call.
+        ISlangUnknown* apiCommandDispatcher = nullptr;
         // The slot (typically UAV) used to identify NVAPI intrinsics. If >=0 NVAPI is required.
         int nvapiExtnSlot = -1;
         // The file system for loading cached shader kernels. The layer does not maintain a strong reference to the object,
@@ -2267,6 +2269,31 @@ public:
     {                                                                                    \
           0x715bdf26, 0x5135, 0x11eb, { 0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 } \
     }
+
+
+class IPipelineCreationAPIDispatcher : public ISlangUnknown
+{
+public:
+    virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
+        IDevice* device,
+        slang::IComponentType* program,
+        void* pipelineDesc,
+        void** outPipelineState) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        beforeCreateRayTracingState(IDevice* device, slang::IComponentType* program) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+        afterCreateRayTracingState(IDevice* device, slang::IComponentType* program) = 0;
+};
+#define SLANG_UUID_IPipelineCreationAPIDispatcher                                     \
+    {                                                                                 \
+        0xc3d5f782, 0xeae1, 0x4da6, { 0xab, 0x40, 0x75, 0x32, 0x31, 0x2, 0xb7, 0xdc } \
+    }
+
 
 // Global public functions
 
