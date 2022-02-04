@@ -453,11 +453,19 @@ namespace Slang
         // forward to something else? E.g., what if we
         // are asked to mangle the name of a `typedef`?
 
+        auto decl = declRef.getDecl();
+
+        // Handle `__unmangled` modifier by simply emitting
+        // the given name.
+        if (decl->hasModifier<UnmangledModifier>())
+        {
+            emit(context, decl->getName()->text);
+            return;
+        }
+
         // We will start with a unique prefix to avoid
         // clashes with user-defined symbols:
         emitRaw(context, "_S");
-
-        auto decl = declRef.getDecl();
 
         // Next we will add a bit of info to register
         // the *kind* of declaration we are dealing with.
