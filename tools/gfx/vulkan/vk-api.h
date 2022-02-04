@@ -162,6 +162,7 @@ namespace gfx {
     x(vkGetSwapchainImagesKHR) \
     x(vkDestroySwapchainKHR) \
     x(vkAcquireNextImageKHR) \
+    x(vkCreateRayTracingPipelinesKHR) \
     /* */
 
 #if SLANG_WINDOWS_FAMILY
