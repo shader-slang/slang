@@ -60,6 +60,8 @@ public:
     // Renderer    implementation
     Result initVulkanInstanceAndDevice(const InteropHandle* handles, bool useValidationLayer);
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getFormatSupportedResourceStates(
+        Format format, ResourceStateSet* outStates) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createTransientResourceHeap(
         const ITransientResourceHeap::Desc& desc,
         ITransientResourceHeap** outHeap) override;
@@ -119,7 +121,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
         const ComputePipelineStateDesc& desc,
         IPipelineState** outState) override;
-    // TODO: Add implementation for createRayTracingPipelineState() - calls VkCreateRayTracingPipelinesKHR
+    virtual SLANG_NO_THROW Result SLANG_MCALL createRayTracingPipelineState(
+        const RayTracingPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
         const IQueryPool::Desc& desc,
         IQueryPool** outPool) override;
@@ -903,6 +907,13 @@ public:
             PipelineStateDesc pipelineDesc;
             pipelineDesc.type = PipelineType::Compute;
             pipelineDesc.compute = inDesc;
+            initializeBase(pipelineDesc);
+        }
+        void init(const RayTracingPipelineStateDesc& inDesc)
+        {
+            PipelineStateDesc pipelineDesc;
+            pipelineDesc.type = PipelineType::RayTracing;
+            pipelineDesc.rayTracing = inDesc;
             initializeBase(pipelineDesc);
         }
 
@@ -7956,6 +7967,78 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     return SLANG_OK;
 }
 
+// TODO: Buffer vs texture specific?
+Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
+{
+    VkFormatProperties supportedProperties;
+    m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, VulkanUtil::getVkFormat(format), &supportedProperties);
+
+    ResourceStateSet allowedStates;
+    // TODO: Currently only supports VK_IMAGE_TILING_OPTIMAL
+    auto imageFeatures = supportedProperties.optimalTilingFeatures;
+    auto bufferFeatures = supportedProperties.bufferFeatures;
+    // PreInitialized - Only supported for VK_IMAGE_TILING_LINEAR
+    // VertexBuffer
+    if (bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
+        allowedStates.add(ResourceState::VertexBuffer);
+    // IndexBuffer - Without extensions, Vulkan only supports two formats for index buffers.
+    switch (format)
+    {
+    case Format::R32_UINT:
+    case Format::R16_UINT:
+        allowedStates.add(ResourceState::IndexBuffer);
+        break;
+    default:
+        break;
+    }
+    // ConstantBuffer
+    allowedStates.add(ResourceState::ConstantBuffer);
+    // StreamOutput - TODO: Requires VK_EXT_transform_feedback
+    // ShaderResource
+    if (imageFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    if (bufferFeatures & VK_FORMAT_FEATURE_UNIFORM_TEXEL_BUFFER_BIT)
+        allowedStates.add(ResourceState::ShaderResource);
+    // UnorderedAccess
+    if (imageFeatures & (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    if (bufferFeatures & (VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT | VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_ATOMIC_BIT))
+        allowedStates.add(ResourceState::UnorderedAccess);
+    // RenderTarget
+    if (imageFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)
+        allowedStates.add(ResourceState::RenderTarget);
+    // DepthRead, DepthWrite
+    if (imageFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+    {
+        allowedStates.add(ResourceState::DepthRead);
+        allowedStates.add(ResourceState::DepthWrite);
+    }
+    // Present - TODO: Requires VK_GOOGLE_surfaceless_query and calling vkGetPhysicalDeviceSurfaceFormatsKHR
+    // IndirectArgument
+    allowedStates.add(ResourceState::IndirectArgument);
+    // CopySource, ResolveSource
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT)
+    {
+        allowedStates.add(ResourceState::CopySource);
+        allowedStates.add(ResourceState::ResolveSource);
+    }
+    // CopyDestination, ResolveDestination
+    if (imageFeatures & VK_FORMAT_FEATURE_TRANSFER_DST_BIT)
+    {
+        allowedStates.add(ResourceState::CopyDestination);
+        allowedStates.add(ResourceState::ResolveDestination);
+    }
+    // AccelerationStructure
+    if (bufferFeatures & VK_FORMAT_FEATURE_ACCELERATION_STRUCTURE_VERTEX_BUFFER_BIT_KHR)
+        allowedStates.add(ResourceState::AccelerationStructure);
+    // General - VK_IMAGE_LAYOUT_GENERAL supports all types of device access. Should only be set if everything else
+    // is included?
+    allowedStates.add(ResourceState::General);
+
+    *outStates = allowedStates;
+    return SLANG_OK;
+}
+
 Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
@@ -8463,7 +8546,7 @@ Result VKDevice::createGraphicsPipelineState(const GraphicsPipelineStateDesc& in
     colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlending.logicOpEnable = VK_FALSE; // TODO: D3D12 has per attachment logic op (and both have way more than one op)
     colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = (targetCount == 0) ? 1 : targetCount;
+    colorBlending.attachmentCount = (uint32_t)colorBlendAttachments.getCount();
     colorBlending.pAttachments = colorBlendAttachments.getBuffer();
     colorBlending.blendConstants[0] = 0.0f;
     colorBlending.blendConstants[1] = 0.0f;
@@ -8556,6 +8639,93 @@ Result VKDevice::createComputePipelineState(const ComputePipelineStateDesc& inDe
     pipelineStateImpl->init(desc);
     m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     pipelineStateImpl->establishStrongDeviceReference();
+    returnComPtr(outState, pipelineStateImpl);
+    return SLANG_OK;
+}
+
+VkPipelineCreateFlags translateFlags(RayTracingPipelineFlags::Enum flags)
+{
+    VkPipelineCreateFlags vkFlags = 0;
+    if (flags & RayTracingPipelineFlags::Enum::SkipTriangles)
+        vkFlags |= VK_PIPELINE_CREATE_RAY_TRACING_SKIP_TRIANGLES_BIT_KHR;
+    if (flags & RayTracingPipelineFlags::Enum::SkipProcedurals)
+        vkFlags |= VK_PIPELINE_CREATE_RAY_TRACING_SKIP_AABBS_BIT_KHR;
+
+    return vkFlags;
+}
+
+uint32_t findShaderIndexByName(const VkPipelineShaderStageCreateInfo* stageCreateInfos, size_t stageCount, const char* name)
+{
+    // TODO: Linear search is inefficient, use a Dictionary?
+    for (size_t i = 0; i < stageCount; ++i)
+    {
+        if (strcmp(stageCreateInfos[i].pName, name)) return (uint32_t)i;
+    }
+    return VK_SHADER_UNUSED_KHR;
+}
+
+Result VKDevice::createRayTracingPipelineState(const RayTracingPipelineStateDesc& desc, IPipelineState** outState)
+{
+    auto programImpl = static_cast<ShaderProgramImpl*>(desc.program);
+    if (!programImpl->m_rootObjectLayout->m_pipelineLayout)
+    {
+        RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+        pipelineStateImpl->init(desc);
+        m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
+        pipelineStateImpl->establishStrongDeviceReference();
+        returnComPtr(outState, pipelineStateImpl);
+        return SLANG_OK;
+    }
+
+    VkRayTracingPipelineCreateInfoKHR raytracingPipelineInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR };
+    raytracingPipelineInfo.pNext = nullptr;
+    raytracingPipelineInfo.flags = translateFlags(desc.flags);
+
+    VkPipelineShaderStageCreateInfo shaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    raytracingPipelineInfo.stageCount = (uint32_t)programImpl->m_stageCreateInfos.getCount();
+    raytracingPipelineInfo.pStages = programImpl->m_stageCreateInfos.getBuffer();
+
+    List<VkRayTracingShaderGroupCreateInfoKHR> shaderGroupInfos;
+    for (int32_t i = 0; i < desc.hitGroupCount; ++i)
+    {
+        VkRayTracingShaderGroupCreateInfoKHR shaderGroupInfo = { VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+        auto& groupDesc = desc.hitGroups[i];
+
+        shaderGroupInfo.pNext = nullptr;
+        shaderGroupInfo.type = (groupDesc.intersectionEntryPoint)
+            ? VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR : VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+        shaderGroupInfo.generalShader = VK_SHADER_UNUSED_KHR;
+        shaderGroupInfo.closestHitShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.closestHitEntryPoint);
+        shaderGroupInfo.anyHitShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.anyHitEntryPoint);
+        shaderGroupInfo.intersectionShader = findShaderIndexByName(raytracingPipelineInfo.pStages, raytracingPipelineInfo.stageCount, groupDesc.intersectionEntryPoint);
+        shaderGroupInfo.pShaderGroupCaptureReplayHandle = nullptr;
+
+        shaderGroupInfos.add(shaderGroupInfo);
+    }
+    
+    raytracingPipelineInfo.groupCount = (uint32_t)shaderGroupInfos.getCount();
+    raytracingPipelineInfo.pGroups = shaderGroupInfos.getBuffer();
+
+    raytracingPipelineInfo.maxPipelineRayRecursionDepth = (uint32_t)desc.maxRecursion;
+
+    raytracingPipelineInfo.pLibraryInfo = nullptr;
+    raytracingPipelineInfo.pLibraryInterface = nullptr;
+
+    raytracingPipelineInfo.pDynamicState = nullptr;
+
+    raytracingPipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
+    raytracingPipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    raytracingPipelineInfo.basePipelineIndex = 0;
+
+    VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+    VkPipeline pipeline = VK_NULL_HANDLE;
+    SLANG_VK_CHECK(m_api.vkCreateRayTracingPipelinesKHR(m_device, VK_NULL_HANDLE, pipelineCache, 1, &raytracingPipelineInfo, nullptr, &pipeline));
+
+    RefPtr<PipelineStateImpl> pipelineStateImpl = new PipelineStateImpl(this);
+    pipelineStateImpl->m_pipeline = pipeline;
+    pipelineStateImpl->init(desc);
+    pipelineStateImpl->establishStrongDeviceReference();
+    m_deviceObjectsWithPotentialBackReferences.add(pipelineStateImpl);
     returnComPtr(outState, pipelineStateImpl);
     return SLANG_OK;
 }

@@ -3160,6 +3160,15 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL
+    ComponentType::renameEntryPoint(const char* newName, IComponentType** outEntryPoint)
+{
+    RefPtr<RenamedEntryPointComponentType> result =
+        new RenamedEntryPointComponentType(this, newName);
+    *outEntryPoint = result.detach();
+    return SLANG_OK;
+}
+
 RefPtr<ComponentType> fillRequirements(
     ComponentType* inComponentType);
 
@@ -3194,6 +3203,13 @@ struct EnumerateModulesVisitor : ComponentTypeVisitor
     void* m_userData;
 
     void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) SLANG_OVERRIDE {}
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
     {
@@ -3235,6 +3251,13 @@ struct EnumerateIRModulesVisitor : ComponentTypeVisitor
     void* m_userData;
 
     void visitEntryPoint(EntryPoint*, EntryPoint::EntryPointSpecializationInfo*) SLANG_OVERRIDE {}
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
     {
@@ -3427,7 +3450,6 @@ void CompositeComponentType::acceptVisitor(ComponentTypeVisitor* visitor, Specia
     visitor->visitComposite(this, as<CompositeSpecializationInfo>(specializationInfo));
 }
 
-
 RefPtr<ComponentType::SpecializationInfo> CompositeComponentType::_validateSpecializationArgsImpl(
     SpecializationArg const*    args,
     Index                       argCount,
@@ -3560,6 +3582,13 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
 
         collectReferencedModules(specializationInfo->specializedFuncDeclRef);
         collectReferencedModules(specializationInfo->existentialSpecializationArgs);
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
@@ -3801,6 +3830,14 @@ SpecializedComponentType::SpecializedComponentType(
             (*entryPointNameOverrides).add(entryPoint->getEntryPointNameOverride(0));
         }
 
+        void visitRenamedEntryPoint(
+            RenamedEntryPointComponentType* entryPoint,
+            EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+        {
+            entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+            (*entryPointNameOverrides).getLast() = entryPoint->getEntryPointNameOverride(0);
+        }
+
         void visitModule(Module*, Module::ModuleSpecializationInfo*) SLANG_OVERRIDE
         {}
         void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
@@ -3852,6 +3889,23 @@ String SpecializedComponentType::getEntryPointMangledName(Index index)
 String SpecializedComponentType::getEntryPointNameOverride(Index index)
 {
     return m_entryPointNameOverrides[index];
+}
+
+// RenamedEntryPointComponentType
+
+RenamedEntryPointComponentType::RenamedEntryPointComponentType(
+    ComponentType* base, String newName)
+    : ComponentType(base->getLinkage())
+    , m_base(base)
+    , m_entryPointNameOverride(newName)
+{
+}
+
+void RenamedEntryPointComponentType::acceptVisitor(
+    ComponentTypeVisitor* visitor, SpecializationInfo* specializationInfo)
+{
+    visitor->visitRenamedEntryPoint(
+        this, as<EntryPoint::EntryPointSpecializationInfo>(specializationInfo));
 }
 
 void ComponentTypeVisitor::visitChildren(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo)

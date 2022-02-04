@@ -8255,6 +8255,13 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         lowerProgramEntryPointToIR(context, entryPoint, specializationInfo);
     }
 
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
+    }
+
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // We've hit a leaf module, so we should be able to bind any global
