@@ -740,6 +740,28 @@ String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)
 
 String CLikeSourceEmitter::generateName(IRInst* inst)
 {
+    // Handle `__exportDirectly` decoration before all else
+    if (inst->findDecoration<IR__exportDirectly>())
+    {
+        // If instruction has a NameHint, we naively emit it as a namespace
+        // This is automatically handled in `getNameforNameHint` when the
+        // `__exportDirectly` decoration is found, so we can just return it.
+        // TODO: This is a very hacky solution.
+        // 
+        // Another option would be to have two separate decorations, one that
+        // handles this namespace, and a separate decoration for unmangled names.
+        if (auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
+        {
+            return nameHintDecoration->getName();
+        }
+        // Otherwise, we just want the instruction to not be mangled, which is
+        // similarly handled in `getMangledName`.
+        if (auto linkageDecoration = inst->findDecoration<IRLinkageDecoration>())
+        {
+            return linkageDecoration->getMangledName();
+        }
+    }
+
     // If the instruction names something
     // that should be emitted as a target intrinsic,
     // then use that name instead.
@@ -2897,6 +2919,13 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
     // If the selected `struct` type is actually an intrinsic
     // on our target, then we don't want to emit anything at all.
     if(auto intrinsicDecoration = findBestTargetIntrinsicDecoration(structType))
+    {
+        return;
+    }
+
+    // If the selected `struct` type is externally defined
+    // then we also don't want to emit anything.
+    if (auto externLibDecoration = structType->findDecoration<IR__externLib>())
     {
         return;
     }
