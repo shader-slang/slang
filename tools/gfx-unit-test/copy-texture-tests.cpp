@@ -222,9 +222,9 @@ namespace gfx_test
         RefPtr<TextureStuff> generateTextureData(int width, int height, uint32_t mipLevels, uint32_t arrayLayers)
         {
             RefPtr<TextureStuff> texture = new TextureStuff();
-            for (int layer = 0; layer < arrayLayers; ++layer)
+            for (uint32_t layer = 0; layer < arrayLayers; ++layer)
             {
-                for (int mip = 0; mip < mipLevels; ++mip)
+                for (uint32_t mip = 0; mip < mipLevels; ++mip)
                 {
                     RefPtr<SubresourceStuff> subresource = new SubresourceStuff();
                     texture->subresourceObjects.add(subresource);
@@ -239,10 +239,10 @@ namespace gfx_test
                         for (int w = 0; w < mipWidth; ++w)
                         {
                             // 4 channels per pixel
-                            subresource->texels[h * mipWidth + w].channels[0] = w;
-                            subresource->texels[h * mipWidth + w].channels[1] = h;
-                            subresource->texels[h * mipWidth + w].channels[2] = mip;
-                            subresource->texels[h * mipWidth + w].channels[3] = layer;
+                            subresource->texels[h * mipWidth + w].channels[0] = (float)w;
+                            subresource->texels[h * mipWidth + w].channels[1] = (float)h;
+                            subresource->texels[h * mipWidth + w].channels[2] = (float)mip;
+                            subresource->texels[h * mipWidth + w].channels[3] = (float)layer;
                         }
                     }
 

@@ -293,6 +293,7 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IResourceView* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
 class SamplerStateBase : public ISamplerState, public Slang::ComObject
@@ -300,6 +301,7 @@ class SamplerStateBase : public ISamplerState, public Slang::ComObject
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     ISamplerState* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
 class AccelerationStructureBase
@@ -1066,6 +1068,8 @@ public:
     {
         return static_cast<TProgram*>(m_program.Ptr());
     }
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);

@@ -155,11 +155,25 @@ IResourceView* ResourceViewBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
+Result ResourceViewBase::getNativeHandle(InteropHandle* outHandle)
+{
+    outHandle->api = InteropHandleAPI::Unknown;
+    outHandle->handleValue = 0;
+    return SLANG_E_NOT_IMPLEMENTED;
+}
+
 ISamplerState* SamplerStateBase::getInterface(const Slang::Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_ISamplerState)
         return static_cast<ISamplerState*>(this);
     return nullptr;
+}
+
+Result SamplerStateBase::getNativeHandle(InteropHandle* outHandle)
+{
+    outHandle->api = InteropHandleAPI::Unknown;
+    outHandle->handleValue = 0;
+    return SLANG_E_NOT_IMPLEMENTED;
 }
 
 IAccelerationStructure* AccelerationStructureBase::getInterface(const Slang::Guid& guid)
@@ -264,11 +278,18 @@ IQueryPool* QueryPoolBase::getInterface(const Guid& guid)
     return nullptr;
 }
 
-IPipelineState* gfx::PipelineStateBase::getInterface(const Guid& guid)
+IPipelineState* PipelineStateBase::getInterface(const Guid& guid)
 {
     if (guid == GfxGUID::IID_ISlangUnknown || guid == GfxGUID::IID_IPipelineState)
         return static_cast<IPipelineState*>(this);
     return nullptr;
+}
+
+Result PipelineStateBase::getNativeHandle(InteropHandle* outHandle)
+{
+    outHandle->api = InteropHandleAPI::Unknown;
+    outHandle->handleValue = 0;
+    return SLANG_E_NOT_IMPLEMENTED;
 }
 
 void PipelineStateBase::initializeBase(const PipelineStateDesc& inDesc)

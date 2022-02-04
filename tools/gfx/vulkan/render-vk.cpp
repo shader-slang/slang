@@ -470,6 +470,12 @@ public:
         {
             m_device->m_api.vkDestroySampler(m_device->m_api.m_device, m_sampler, nullptr);
         }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_sampler);
+            return SLANG_OK;
+        }
     };
 
     class ResourceViewImpl : public ResourceViewBase
@@ -505,6 +511,13 @@ public:
         RefPtr<TextureResourceImpl> m_texture;
         VkImageView                 m_view;
         VkImageLayout               m_layout;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_view);
+            return SLANG_OK;
+        }
     };
 
     class TexelBufferResourceViewImpl : public ResourceViewImpl
@@ -520,6 +533,12 @@ public:
         }
         RefPtr<BufferResourceImpl>  m_buffer;
         VkBufferView m_view;
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_view);
+            return SLANG_OK;
+        }
     };
 
     class PlainBufferResourceViewImpl : public ResourceViewImpl
@@ -532,6 +551,11 @@ public:
         RefPtr<BufferResourceImpl>  m_buffer;
         VkDeviceSize                offset;
         VkDeviceSize                size;
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            return m_buffer->getNativeResourceHandle(outHandle);
+        }
     };
 
     class AccelerationStructureImpl : public AccelerationStructureBase
@@ -546,6 +570,12 @@ public:
         virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() override
         {
             return m_buffer->getDeviceAddress() + m_offset;
+        }
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
+        {
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)(m_vkHandle);
+            return SLANG_OK;
         }
         ~AccelerationStructureImpl()
         {
@@ -3798,6 +3828,10 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            return SLANG_OK;
+        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
@@ -4552,13 +4586,14 @@ public:
                     {
                         VkImageCopy region = {};
                         region.srcSubresource.aspectMask = getAspectMask(srcSubresource.aspectMask);
-                        region.srcSubresource.baseArrayLayer = layer + srcSubresource.baseArrayLayer;
-                        region.srcSubresource.mipLevel = mipId + srcSubresource.mipLevel;
+                        region.srcSubresource.baseArrayLayer = (uint32_t)(layer + srcSubresource.baseArrayLayer);
+                        region.srcSubresource.mipLevel = (uint32_t)(mipId + srcSubresource.mipLevel);
                         region.srcSubresource.layerCount = 1;
                         region.srcOffset = { (int32_t)srcOffset.x, (int32_t)srcOffset.y, (int32_t)srcOffset.z };
                         region.dstSubresource.aspectMask = getAspectMask(dstSubresource.aspectMask);
-                        region.dstSubresource.baseArrayLayer = layer + dstSubresource.baseArrayLayer;
-                        region.dstSubresource.mipLevel = mipId + dstSubresource.mipLevel;
+                        region.dstSubresource.baseArrayLayer =
+                            (uint32_t)(layer + dstSubresource.baseArrayLayer);
+                        region.dstSubresource.mipLevel = (uint32_t)(mipId + dstSubresource.mipLevel);
                         region.dstSubresource.layerCount = 1;
                         region.dstOffset = { (int32_t)dstOffset.x, (int32_t)dstOffset.y, (int32_t)dstOffset.z };
                         region.extent = { (uint32_t)extent.width, (uint32_t)extent.height, (uint32_t)extent.depth };
@@ -5235,10 +5270,10 @@ public:
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_commandBuffer;
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)m_commandBuffer;
             return SLANG_OK;
         }
     };
@@ -5297,10 +5332,10 @@ public:
             vkAPI.vkQueueWaitIdle(m_queue);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_queue;
+            outHandle->api = InteropHandleAPI::D3D12;
+            outHandle->handleValue = (uint64_t)m_queue;
             return SLANG_OK;
         }
 
