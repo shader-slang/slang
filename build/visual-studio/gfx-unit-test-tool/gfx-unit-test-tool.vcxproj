@@ -281,6 +281,7 @@
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-buffer-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-buffer-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-cmd-queue-handle-test.cpp" />
+    <ClCompile Include="..\..\..\tools\gfx-unit-test\get-supported-resource-states-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\get-texture-resource-handle-test.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\gfx-test-util.cpp" />
     <ClCompile Include="..\..\..\tools\gfx-unit-test\instanced-draw-tests.cpp" />
