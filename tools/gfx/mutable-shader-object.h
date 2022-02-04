@@ -112,6 +112,10 @@ namespace gfx
             this->m_layout = layoutImpl;
             Slang::Index subObjectCount = layoutImpl->getSubObjectCount();
             this->m_objects.setCount(subObjectCount);
+            auto dataSize = layoutImpl->getElementTypeLayout()->getSize();
+            assert(dataSize >= 0);
+            this->m_data.setCount(dataSize);
+            memset(this->m_data.getBuffer(), 0, dataSize);
             return SLANG_OK;
         }
     public:

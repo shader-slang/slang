@@ -3817,6 +3817,10 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            return SLANG_OK;
+        }
     public:
         VkCommandBuffer m_commandBuffer;
         VkCommandBuffer m_preCommandBuffer = VK_NULL_HANDLE;
@@ -5255,10 +5259,10 @@ public:
             vkAPI.vkEndCommandBuffer(m_commandBuffer);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_commandBuffer;
+            outHandle->api = InteropHandleAPI::Vulkan;
+            outHandle->handleValue = (uint64_t)m_commandBuffer;
             return SLANG_OK;
         }
     };
@@ -5317,10 +5321,10 @@ public:
             vkAPI.vkQueueWaitIdle(m_queue);
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)m_queue;
+            outHandle->api = InteropHandleAPI::D3D12;
+            outHandle->handleValue = (uint64_t)m_queue;
             return SLANG_OK;
         }
 

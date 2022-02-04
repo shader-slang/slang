@@ -3382,6 +3382,20 @@ public:
             return nullptr;
         }
         virtual void comFree() override { m_transientHeap.breakStrongReference(); }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* handle) override
+        {
+            handle->api = InteropHandleAPI::D3D12;
+            handle->handleValue = (uint64_t)m_cmdList.get();
+            return SLANG_OK;
+        }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            bindDescriptorHeaps();
+            return SLANG_OK;
+        }
+
     public:
         ComPtr<ID3D12GraphicsCommandList> m_cmdList;
         ComPtr<ID3D12GraphicsCommandList1> m_cmdList1;
@@ -3473,29 +3487,36 @@ public:
                     framebuffer->depthStencilView ? &framebuffer->depthStencilDescriptor : nullptr);
 
                 // Issue clear commands based on render pass set up.
-                for (Index i = 0; i < renderPass->m_renderTargetAccesses.getCount(); i++)
+                for (Index i = 0; i < framebuffer->renderTargetViews.getCount(); i++)
                 {
+                    if (i >= renderPass->m_renderTargetAccesses.getCount())
+                        continue;
+
                     auto& access = renderPass->m_renderTargetAccesses[i];
 
                     // Transit resource states.
                     {
                         D3D12BarrierSubmitter submitter(m_d3dCmdList);
                         auto resourceViewImpl = framebuffer->renderTargetViews[i].Ptr();
-                        auto textureResource =
-                            static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
-                        D3D12_RESOURCE_STATES initialState;
-                        if (access.initialState == ResourceState::Undefined)
+                        if (resourceViewImpl)
                         {
-                            initialState = textureResource->m_defaultState;
+                            auto textureResource = static_cast<TextureResourceImpl*>(
+                                resourceViewImpl->m_resource.Ptr());
+                            if (textureResource)
+                            {
+                                D3D12_RESOURCE_STATES initialState;
+                                if (access.initialState == ResourceState::Undefined)
+                                {
+                                    initialState = textureResource->m_defaultState;
+                                }
+                                else
+                                {
+                                    initialState = D3DUtil::getResourceState(access.initialState);
+                                }
+                                textureResource->m_resource.transition(
+                                    initialState, D3D12_RESOURCE_STATE_RENDER_TARGET, submitter);
+                            }
                         }
-                        else
-                        {
-                            initialState = D3DUtil::getResourceState(access.initialState);
-                        }
-                        textureResource->m_resource.transition(
-                            initialState,
-                            D3D12_RESOURCE_STATE_RENDER_TARGET,
-                            submitter);
                     }
                     // Clear.
                     if (access.loadOp == IRenderPassLayout::AttachmentLoadOp::Clear)
@@ -3731,12 +3752,17 @@ public:
                     {
                         D3D12BarrierSubmitter submitter(m_d3dCmdList);
                         auto resourceViewImpl = m_framebuffer->renderTargetViews[i].Ptr();
+                        if (!resourceViewImpl)
+                            continue;
                         auto textureResource =
                             static_cast<TextureResourceImpl*>(resourceViewImpl->m_resource.Ptr());
-                        textureResource->m_resource.transition(
-                            D3D12_RESOURCE_STATE_RENDER_TARGET,
-                            D3DUtil::getResourceState(access.finalState),
-                            submitter);
+                        if (textureResource)
+                        {
+                            textureResource->m_resource.transition(
+                                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                                D3DUtil::getResourceState(access.finalState),
+                                submitter);
+                        }
                     }
                 }
 
@@ -4617,13 +4643,6 @@ public:
 #endif
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override { m_cmdList->Close(); }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_cmdList.get();
-            return SLANG_OK;
-        }
     };
 
     class FenceImpl : public FenceBase
@@ -4700,6 +4719,12 @@ public:
         }
         void breakStrongReferenceToDevice() { m_renderer.breakStrongReference(); }
 
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* handle) override
+        {
+            handle->api = InteropHandleAPI::D3D12;
+            handle->handleValue = (uint64_t)m_d3dQueue.get();
+            return SLANG_OK;
+        }
     public:
         BreakableReference<D3D12Device> m_renderer;
         ComPtr<ID3D12Device> m_device;
@@ -4790,13 +4815,6 @@ public:
                     fenceImpl->m_fence.get(),
                     waitValues[i]);
             }
-            return SLANG_OK;
-        }
-
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
-        {
-            *outHandle = (uint64_t)m_d3dQueue.get();
             return SLANG_OK;
         }
     };
@@ -6475,7 +6493,8 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
     RefPtr<ResourceViewImpl> viewImpl = new ResourceViewImpl();
     viewImpl->m_resource = resourceImpl;
     viewImpl->m_desc = desc;
-    bool isArray = resourceImpl->getDesc()->arraySize != 0;
+    bool isArray = resourceImpl ? resourceImpl->getDesc()->arraySize != 0 : false;
+    bool isMultiSample = resourceImpl ? resourceImpl->getDesc()->sampleDesc.numSamples > 1: false;
     switch (desc.type)
     {
     default:
@@ -6496,7 +6515,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 rtvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
                 break;
             case IResource::Type::Texture2D:
-                if (resourceImpl->getDesc()->sampleDesc.numSamples > 1)
+                if (isMultiSample)
                 {
                     rtvDesc.ViewDimension = isArray ? D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY
                                                     : D3D12_RTV_DIMENSION_TEXTURE2DMS;
@@ -6519,11 +6538,16 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 rtvDesc.Texture3D.FirstWSlice = desc.renderTarget.arrayIndex;
                 rtvDesc.Texture3D.WSize = desc.renderTarget.arraySize;
                 break;
+            case IResource::Type::Buffer:
+                rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_BUFFER;
+                break;
             default:
                 return SLANG_FAIL;
             }
             m_device->CreateRenderTargetView(
-                resourceImpl->m_resource, &rtvDesc, viewImpl->m_descriptor.cpuHandle);
+                resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
+                &rtvDesc,
+                viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
@@ -6541,7 +6565,7 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 dsvDesc.Texture1D.MipSlice = desc.renderTarget.mipSlice;
                 break;
             case IResource::Type::Texture2D:
-                if (resourceImpl->getDesc()->sampleDesc.numSamples > 1)
+                if (isMultiSample)
                 {
                     dsvDesc.ViewDimension = isArray ? D3D12_DSV_DIMENSION_TEXTURE2DMSARRAY
                                                     : D3D12_DSV_DIMENSION_TEXTURE2DMS;
@@ -6561,7 +6585,9 @@ Result D3D12Device::createTextureView(ITextureResource* texture, IResourceView::
                 return SLANG_FAIL;
             }
             m_device->CreateDepthStencilView(
-                resourceImpl->m_resource, &dsvDesc, viewImpl->m_descriptor.cpuHandle);
+                resourceImpl ? resourceImpl->m_resource.getResource() : nullptr,
+                &dsvDesc,
+                viewImpl->m_descriptor.cpuHandle);
         }
         break;
 
@@ -6805,14 +6831,21 @@ Result D3D12Device::createFramebuffer(IFramebuffer::Desc const& desc, IFramebuff
     for (uint32_t i = 0; i < desc.renderTargetCount; i++)
     {
         framebuffer->renderTargetViews[i] = static_cast<ResourceViewImpl*>(desc.renderTargetViews[i]);
-        framebuffer->renderTargetDescriptors[i] =
-            framebuffer->renderTargetViews[i]->m_descriptor.cpuHandle;
-        auto clearValue =
-            static_cast<TextureResourceImpl*>(
-                static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
-                ->getDesc()
-                ->optimalClearValue.color;
-        memcpy(&framebuffer->renderTargetClearValues[i], &clearValue, sizeof(ColorClearValue));
+            framebuffer->renderTargetDescriptors[i] =
+                framebuffer->renderTargetViews[i]->m_descriptor.cpuHandle;
+        if (static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
+        {
+            auto clearValue =
+                static_cast<TextureResourceImpl*>(
+                    static_cast<ResourceViewImpl*>(desc.renderTargetViews[i])->m_resource.Ptr())
+                    ->getDesc()
+                    ->optimalClearValue.color;
+            memcpy(&framebuffer->renderTargetClearValues[i], &clearValue, sizeof(ColorClearValue));
+        }
+        else
+        {
+            memset(&framebuffer->renderTargetClearValues[i], 0, sizeof(ColorClearValue));
+        }
     }
     framebuffer->depthStencilView = static_cast<ResourceViewImpl*>(desc.depthStencilView);
     if (desc.depthStencilView)

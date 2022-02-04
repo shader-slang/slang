@@ -1713,9 +1713,6 @@ public:
 class ICommandBuffer : public ISlangUnknown
 {
 public:
-    // For D3D12, this is the pointer to the buffer. For Vulkan, this is the buffer itself.
-    typedef uint64_t NativeHandle;
-
     // Only one encoder may be open at a time. User must call `ICommandEncoder::endEncoding`
     // before calling other `encode*Commands` methods.
     // Once `endEncoding` is called, the `ICommandEncoder` object becomes obsolete and is
@@ -1762,7 +1759,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL close() = 0;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() = 0;
 };
 #define SLANG_UUID_ICommandBuffer                                                      \
     {                                                                                  \
@@ -1797,7 +1796,7 @@ public:
         executeCommandBuffers(1, &commandBuffer, fenceToSignal, newFenceValue);
     }
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(NativeHandle* outHandle) = 0;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL waitOnHost() = 0;
 

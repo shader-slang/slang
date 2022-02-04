@@ -1007,9 +1007,16 @@ void DebugCommandBuffer::close()
     baseObject->close();
 }
 
-Result DebugCommandBuffer::getNativeHandle(NativeHandle* outHandle)
+Result DebugCommandBuffer::getNativeHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
+}
+
+Result DebugCommandBuffer::resetDescriptorHeaps()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->resetDescriptorHeaps();
 }
 
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
@@ -1552,7 +1559,7 @@ Result DebugCommandQueue::waitForFenceValuesOnDevice(
     return baseObject->waitForFenceValuesOnDevice(fenceCount, innerFences.getBuffer(), waitValues);
 }
 
-Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
+Result DebugCommandQueue::getNativeHandle(InteropHandle* outHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
