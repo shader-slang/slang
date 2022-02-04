@@ -944,6 +944,12 @@ public:
                 return static_cast<ICommandBuffer*>(this);
             return nullptr;
         }
+
+        virtual SLANG_NO_THROW Result SLANG_MCALL resetDescriptorHeaps() override
+        {
+            return SLANG_OK;
+        }
+
     public:
         CUDADevice* m_device;
 
@@ -1178,11 +1184,9 @@ public:
 
         virtual SLANG_NO_THROW void SLANG_MCALL close() override {}
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = 0;
-            return SLANG_OK;
+            return SLANG_FAIL;
         }
     };
 
@@ -1251,11 +1255,9 @@ public:
             return SLANG_FAIL;
         }
 
-        virtual SLANG_NO_THROW Result SLANG_MCALL
-            getNativeHandle(NativeHandle* outHandle) override
+        virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override
         {
-            *outHandle = (uint64_t)stream;
-            return SLANG_OK;
+            return SLANG_FAIL;
         }
 
     public:
