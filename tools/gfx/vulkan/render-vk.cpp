@@ -7990,7 +7990,6 @@ Result VKDevice::createTextureView(ITextureResource* texture, IResourceView::Des
     return SLANG_OK;
 }
 
-// TODO: Buffer vs texture specific?
 Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSet* outStates)
 {
     // TODO: Add variables to VkDevice to track supported surface presentable formats
