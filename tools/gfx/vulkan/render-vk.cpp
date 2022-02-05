@@ -6296,7 +6296,7 @@ Result VKDevice::initVulkanInstanceAndDevice(const InteropHandle* handles, bool 
         if (!m_api.m_module->isSoftware())
         {
             instanceExtensions.add(VK_KHR_SURFACE_EXTENSION_NAME);
-            //instanceExtensions.add("VK_GOOGLE_surfaceless_query");
+            instanceExtensions.add("VK_GOOGLE_surfaceless_query");
 #if SLANG_WINDOWS_FAMILY
             instanceExtensions.add(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 #elif defined(SLANG_ENABLE_XLIB)
@@ -7314,7 +7314,6 @@ void VKDevice::_transitionImageLayout(
     barrier.srcAccessMask = calcAccessFlagsFromImageLayout(oldLayout);
     barrier.dstAccessMask = calcAccessFlagsFromImageLayout(newLayout);
 
-    // TODO: Top of pipe vs bottom of pipe?
     VkPipelineStageFlags sourceStage = calcPipelineStageFlagsFromImageLayout(oldLayout);
     VkPipelineStageFlags destinationStage = calcPipelineStageFlagsFromImageLayout(newLayout);
 
@@ -7999,18 +7998,18 @@ Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSe
     VkFormatProperties supportedProperties;
     m_api.vkGetPhysicalDeviceFormatProperties(m_api.m_physicalDevice, vkFormat, &supportedProperties);
 
-//     uint32_t surfaceFormatCount = 0;
-//     m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, nullptr);
-// 
-//     List<VkSurfaceFormatKHR> surfaceFormats;
-//     surfaceFormats.setCount(surfaceFormatCount);
-//     m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
-// 
-//     HashSet<VkFormat> presentableFormats;
-//     for (auto surfaceFormat : surfaceFormats)
-//     {
-//         presentableFormats.Add(surfaceFormat.format);
-//     }
+    uint32_t surfaceFormatCount = 0;
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, nullptr);
+
+    List<VkSurfaceFormatKHR> surfaceFormats;
+    surfaceFormats.setCount(surfaceFormatCount);
+    m_api.vkGetPhysicalDeviceSurfaceFormatsKHR(m_api.m_physicalDevice, VK_NULL_HANDLE, &surfaceFormatCount, surfaceFormats.getBuffer());
+
+    HashSet<VkFormat> presentableFormats;
+    for (auto surfaceFormat : surfaceFormats)
+    {
+        presentableFormats.Add(surfaceFormat.format);
+    }
 
     ResourceStateSet allowedStates;
     // TODO: Currently only supports VK_IMAGE_TILING_OPTIMAL
@@ -8053,8 +8052,8 @@ Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSe
         allowedStates.add(ResourceState::DepthWrite);
     }
     // Present
-//     if (presentableFormats.Contains(vkFormat))
-//         allowedStates.add(ResourceState::Present);
+    if (presentableFormats.Contains(vkFormat))
+        allowedStates.add(ResourceState::Present);
     // IndirectArgument
     allowedStates.add(ResourceState::IndirectArgument);
     // CopySource, ResolveSource
