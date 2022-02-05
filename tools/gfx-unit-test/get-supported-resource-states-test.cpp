@@ -34,6 +34,39 @@ namespace
             this->context = context;
         }
 
+        Format convertTypelessFormat(Format format)
+        {
+            switch (format)
+            {
+            case Format::R32G32B32A32_TYPELESS:
+                return Format::R32G32B32A32_FLOAT;
+            case Format::R32G32B32_TYPELESS:
+                return Format::R32G32B32_FLOAT;
+            case Format::R32G32_TYPELESS:
+                return Format::R32G32_FLOAT;
+            case Format::R32_TYPELESS:
+                return Format::R32_FLOAT;
+            case Format::R16G16B16A16_TYPELESS:
+                return Format::R16G16B16A16_FLOAT;
+            case Format::R16G16_TYPELESS:
+                return Format::R16G16_FLOAT;
+            case Format::R16_TYPELESS:
+                return Format::R16_FLOAT;
+            case Format::R8G8B8A8_TYPELESS:
+                return Format::R8G8B8A8_UNORM;
+            case Format::R8G8_TYPELESS:
+                return Format::R8G8_UNORM;
+            case Format::R8_TYPELESS:
+                return Format::R8_UNORM;
+            case Format::B8G8R8A8_TYPELESS:
+                return Format::B8G8R8A8_UNORM;
+            case Format::R10G10B10A2_TYPELESS:
+                return Format::R10G10B10A2_UINT;
+            default:
+                return Format::Unknown;
+            }
+        }
+
         void transitionResourceStates(IDevice* device)
         {
             Slang::ComPtr<ITransientResourceHeap> transientHeap;
@@ -75,73 +108,75 @@ namespace
 
         void run()
         {
-            Format format = Format::R32G32B32A32_FLOAT;
-            GFX_CHECK_CALL_ABORT(device->getFormatSupportedResourceStates(format, &formatSupportedStates));
+            // Skip Format::Unknown
+            for (uint32_t i = 1; i < (uint32_t)Format::CountOf; ++i)
+            {
+                auto baseFormat = (Format)i;
+                auto format = gfxIsTypelessFormat(baseFormat) ? convertTypelessFormat(baseFormat) : baseFormat;
+                GFX_CHECK_CALL_ABORT(device->getFormatSupportedResourceStates(format, &formatSupportedStates));
 
-            textureAllowedStates.add(
-                ResourceState::RenderTarget,
-                ResourceState::DepthRead,
-                ResourceState::DepthWrite,
-                ResourceState::Present,
-                ResourceState::ResolveSource,
-                ResourceState::ResolveDestination,
-                ResourceState::Undefined,
-                ResourceState::ShaderResource,
-                ResourceState::UnorderedAccess,
-                ResourceState::CopySource,
-                ResourceState::CopyDestination);
+                textureAllowedStates.add(
+                    ResourceState::RenderTarget,
+                    ResourceState::DepthRead,
+                    ResourceState::DepthWrite,
+                    ResourceState::Present,
+                    ResourceState::ResolveSource,
+                    ResourceState::ResolveDestination,
+                    ResourceState::Undefined,
+                    ResourceState::ShaderResource,
+                    ResourceState::UnorderedAccess,
+                    ResourceState::CopySource,
+                    ResourceState::CopyDestination);
 
-            bufferAllowedStates.add(
-                ResourceState::VertexBuffer,
-                ResourceState::IndexBuffer,
-                ResourceState::ConstantBuffer,
-                ResourceState::StreamOutput,
-                ResourceState::IndirectArgument,
-                ResourceState::AccelerationStructure,
-                ResourceState::Undefined,
-                ResourceState::ShaderResource,
-                ResourceState::UnorderedAccess,
-                ResourceState::CopySource,
-                ResourceState::CopyDestination);
+                bufferAllowedStates.add(
+                    ResourceState::VertexBuffer,
+                    ResourceState::IndexBuffer,
+                    ResourceState::ConstantBuffer,
+                    ResourceState::StreamOutput,
+                    ResourceState::IndirectArgument,
+                    ResourceState::AccelerationStructure,
+                    ResourceState::Undefined,
+                    ResourceState::ShaderResource,
+                    ResourceState::UnorderedAccess,
+                    ResourceState::CopySource,
+                    ResourceState::CopyDestination);
 
-            ResourceState currentState = ResourceState::UnorderedAccess;
-            ITextureResource::Size extent;
-            extent.width = 2;
-            extent.height = 2;
-            extent.depth = 1;
+                ResourceState currentState = ResourceState::CopySource;
+                ITextureResource::Size extent;
+                extent.width = 4;
+                extent.height = 4;
+                extent.depth = 1;
 
-            float initialData[] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-            ITextureResource::SubresourceData subdata = { (void*)initialData, 32, 0 };
+                ITextureResource::Desc texDesc = {};
+                texDesc.type = IResource::Type::Texture2D;
+                texDesc.numMipLevels = 1;
+                texDesc.arraySize = 1;
+                texDesc.size = extent;
+                texDesc.defaultState = currentState;
+                texDesc.allowedStates = formatSupportedStates & textureAllowedStates;
+                texDesc.memoryType = MemoryType::DeviceLocal;
+                texDesc.format = format;
 
-            ITextureResource::Desc texDesc = {};
-            texDesc.type = IResource::Type::Texture2D;
-            texDesc.numMipLevels = 1;
-            texDesc.arraySize = 1;
-            texDesc.size = extent;
-            texDesc.defaultState = currentState;
-            texDesc.allowedStates = formatSupportedStates & textureAllowedStates;
-            texDesc.memoryType = MemoryType::DeviceLocal;
-            texDesc.format = format;
+                GFX_CHECK_CALL_ABORT(device->createTextureResource(
+                    texDesc,
+                    nullptr,
+                    texture.writeRef()));
 
-            GFX_CHECK_CALL_ABORT(device->createTextureResource(
-                texDesc,
-                nullptr,
-                texture.writeRef()));
+                IBufferResource::Desc bufferDesc = {};
+                bufferDesc.sizeInBytes = 256;
+                bufferDesc.format = gfx::Format::Unknown;
+                bufferDesc.elementSize = sizeof(float);
+                bufferDesc.allowedStates = formatSupportedStates & bufferAllowedStates;
+                bufferDesc.defaultState = currentState;
+                bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-            IBufferResource::Desc bufferDesc = {};
-            bufferDesc.sizeInBytes = 256;
-            bufferDesc.format = gfx::Format::Unknown;
-            bufferDesc.elementSize = sizeof(float);
-            bufferDesc.allowedStates = formatSupportedStates & bufferAllowedStates;
-            bufferDesc.defaultState = currentState;
-            bufferDesc.memoryType = MemoryType::DeviceLocal;
-            
-            GFX_CHECK_CALL_ABORT(device->createBufferResource(
-                bufferDesc,
-                nullptr,
-                buffer.writeRef()));
+                GFX_CHECK_CALL_ABORT(device->createBufferResource(
+                    bufferDesc,
+                    nullptr,
+                    buffer.writeRef()));
 
-            transitionResourceStates(device);
+                transitionResourceStates(device);
+            }
         }
     };
 
