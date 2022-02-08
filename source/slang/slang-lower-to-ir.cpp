@@ -1034,7 +1034,7 @@ static void addLinkageDecoration(
         inst = outerGeneric;
     }
 
-    if(isImportedDecl(context, decl))
+    if (isImportedDecl(context, decl))
     {
         builder->addImportDecoration(inst, mangledName);
     }
@@ -1046,6 +1046,14 @@ static void addLinkageDecoration(
     {
         builder->addPublicDecoration(inst);
         builder->addKeepAliveDecoration(inst);
+    }
+    if (decl->findModifier<__exportDirectly>())
+    {
+        builder->addExportDirectlyDecoration(inst);
+    }
+    if (decl->findModifier<__externLib>())
+    {
+        builder->addExternLibDecoration(inst);
     }
 }
 
@@ -1986,7 +1994,12 @@ static String getNameForNameHint(
 
     StringBuilder sb;
     sb.append(parentName);
-    sb.append(".");
+    if (decl->hasModifier<__exportDirectly>()) {
+        sb.append("::");
+    }
+    else {
+        sb.append(".");
+    }
     sb.append(leafName->text);
 
     return sb.ProduceString();
@@ -8240,6 +8253,13 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         // point is being specialized.
         //
         lowerProgramEntryPointToIR(context, entryPoint, specializationInfo);
+    }
+
+    void visitRenamedEntryPoint(
+        RenamedEntryPointComponentType* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    {
+        entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE

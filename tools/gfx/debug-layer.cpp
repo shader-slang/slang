@@ -1007,9 +1007,16 @@ void DebugCommandBuffer::close()
     baseObject->close();
 }
 
-Result DebugCommandBuffer::getNativeHandle(NativeHandle* outHandle)
+Result DebugCommandBuffer::getNativeHandle(InteropHandle* outHandle)
 {
+    SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
+}
+
+Result DebugCommandBuffer::resetDescriptorHeaps()
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->resetDescriptorHeaps();
 }
 
 void DebugCommandBuffer::checkEncodersClosedBeforeNewEncoder()
@@ -1552,7 +1559,7 @@ Result DebugCommandQueue::waitForFenceValuesOnDevice(
     return baseObject->waitForFenceValuesOnDevice(fenceCount, innerFences.getBuffer(), waitValues);
 }
 
-Result DebugCommandQueue::getNativeHandle(NativeHandle* outHandle)
+Result DebugCommandQueue::getNativeHandle(InteropHandle* outHandle)
 {
     SLANG_GFX_API_FUNC;
     return baseObject->getNativeHandle(outHandle);
@@ -1841,11 +1848,32 @@ DeviceAddress DebugAccelerationStructure::getDeviceAddress()
     return baseObject->getDeviceAddress();
 }
 
+Result DebugAccelerationStructure::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
+}
+
 IResourceView::Desc* DebugResourceView::getViewDesc()
 {
     SLANG_GFX_API_FUNC;
 
     return baseObject->getViewDesc();
+}
+
+Result DebugResourceView::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
+}
+
+Result DebugSamplerState::getNativeHandle(InteropHandle* outNativeHandle)
+{
+    SLANG_GFX_API_FUNC;
+
+    return baseObject->getNativeHandle(outNativeHandle);
 }
 
 IResourceView::Desc* DebugAccelerationStructure::getViewDesc()
@@ -1882,6 +1910,12 @@ Result DebugFence::setCurrentValue(uint64_t value)
 DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
 {
     m_slangProgram = desc.slangProgram;
+}
+
+Result DebugPipelineState::getNativeHandle(InteropHandle* outHandle)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getNativeHandle(outHandle);
 }
 
 } // namespace gfx

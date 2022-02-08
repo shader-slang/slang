@@ -1,7 +1,7 @@
 // shader.slang
 
 //TEST_INPUT:ubuffer(random(float, 4096, -1.0, 1.0), stride=4):name=ioBuffer
-RWStructuredBuffer<float> convertBuffer(Ptr<gfx::BufferResource> x);
+__unmangled __exportDirectly RWStructuredBuffer<float> convertBuffer(Ptr<gfx::IBufferResource> x);
 
 [shader("compute")]
 [numthreads(4, 1, 1)]
@@ -15,44 +15,49 @@ void computeMain(uniform RWStructuredBuffer<float> ioBuffer, uint3 dispatchThrea
     ioBuffer[tid] = o;
 }
 
+
+
 // Forward declarations of gfx types
 //
 namespace gfx {
-    struct Device{};
-    struct BufferResource{};
-    struct ResourceView{};
-    struct TransientResourceHeap{};
-    struct PipelineState{};
-    struct ShaderProgram{};
+    __externLib __exportDirectly struct IDevice{};
+    __externLib __exportDirectly struct IBufferResource{};
+    __exportDirectly struct ITransientResourceHeap{};
+    __exportDirectly struct IPipelineState{};
+    __exportDirectly struct IShaderProgram{};
+    __exportDirectly struct IResourceView{};
 }
 
 // Forward declarations of cpp functions
 //
-Ptr<gfx::Device> createDevice();
-Ptr<gfx::ShaderProgram> loadShaderProgram(Ptr<gfx::Device> device, String entryPoint, String module);
-Ptr<gfx::BufferResource> createStructuredBuffer(
-    Ptr<gfx::Device> device,
+__unmangled __exportDirectly Ptr<gfx::IDevice> createDevice();
+__unmangled __exportDirectly Ptr<gfx::IShaderProgram> loadShaderProgram(
+    Ptr<gfx::IDevice> device, 
+    String entryPoint, 
+    String module);
+__unmangled __exportDirectly Ptr<gfx::IBufferResource> createStructuredBuffer(
+    Ptr<gfx::IDevice> device,
     float[4] initialData);
-Ptr<gfx::ResourceView> createBufferView(
-    Ptr<gfx::Device> device,
-    Ptr<gfx::BufferResource> buffer);
-Ptr<gfx::TransientResourceHeap> buildTransientHeap(
-    Ptr<gfx::Device> device);
-Ptr<gfx::PipelineState> buildPipelineState(
-    Ptr<gfx::Device> device,
-    Ptr<gfx::ShaderProgram> shaderProgram);
-void printInitialValues(float[4] initialArray, int length);
-void dispatchComputation(
-    Ptr<gfx::Device> device,
-    Ptr<gfx::TransientResourceHeap> transientHeap,
-    Ptr<gfx::PipelineState> pipelineState,
-    Ptr<gfx::ResourceView> bufferView);
-bool printOutputValues(
-    Ptr<gfx::Device> device,
-    Ptr<gfx::BufferResource> buffer,
+__unmangled __exportDirectly Ptr<gfx::IResourceView> createBufferView(
+    Ptr<gfx::IDevice> device,
+    Ptr<gfx::IBufferResource> buffer);
+__unmangled __exportDirectly Ptr<gfx::ITransientResourceHeap> buildTransientHeap(
+    Ptr<gfx::IDevice> device);
+__unmangled __exportDirectly Ptr<gfx::IPipelineState> buildPipelineState(
+    Ptr<gfx::IDevice> device,
+    Ptr<gfx::IShaderProgram> shaderProgram);
+__unmangled __exportDirectly void printInitialValues(float[4] initialArray, int length);
+__unmangled __exportDirectly void dispatchComputation(
+    Ptr<gfx::IDevice> device,
+    Ptr<gfx::ITransientResourceHeap> transientHeap,
+    Ptr<gfx::IPipelineState> pipelineState,
+    Ptr<gfx::IResourceView> bufferView);
+__unmangled __exportDirectly bool printOutputValues(
+    Ptr<gfx::IDevice> device,
+    Ptr<gfx::IBufferResource> buffer,
     int length);
 
-public bool executeComputation() {
+public __unmangled __exportDirectly bool executeComputation() {
     // We will hard-code the size of our initial array.
     //
     float   initialArray[4] = { 3.0f, -20.0f, -6.0f, 8.0f };
@@ -60,7 +65,7 @@ public bool executeComputation() {
     // Declare functions
     let device = createDevice();
     let structuredBuffer = createStructuredBuffer(device, initialArray);
-    let bufferView = createBufferView(device, structuredBuffer);
+    // let bufferView = createBufferView(device, structuredBuffer);
     __GPU_FOREACH(device, uint3(4, 1, 1), LAMBDA(uint3 dispatchThreadID)
         { computeMain(convertBuffer(structuredBuffer), dispatchThreadID) ; });
     printInitialValues(initialArray, 4);

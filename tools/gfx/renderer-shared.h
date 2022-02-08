@@ -40,6 +40,7 @@ struct GfxGUID
     static const Slang::Guid IID_IAccelerationStructure;
     static const Slang::Guid IID_IFence;
     static const Slang::Guid IID_IShaderTable;
+    static const Slang::Guid IID_IPipelineCreationAPIDispatcher;
 };
 
 // We use a `BreakableReference` to avoid the cyclic reference situation in gfx implementation.
@@ -292,6 +293,7 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IResourceView* getInterface(const Slang::Guid& guid);
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getViewDesc() override { return &m_desc; }
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
 class SamplerStateBase : public ISamplerState, public Slang::ComObject
@@ -299,6 +301,7 @@ class SamplerStateBase : public ISamplerState, public Slang::ComObject
 public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     ISamplerState* getInterface(const Slang::Guid& guid);
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
 };
 
 class AccelerationStructureBase
@@ -1066,6 +1069,8 @@ public:
         return static_cast<TProgram*>(m_program.Ptr());
     }
 
+    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) override;
+
 protected:
     void initializeBase(const PipelineStateDesc& inDesc);
 };
@@ -1355,6 +1360,8 @@ protected:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL initialize(const Desc& desc);
 protected:
     Slang::List<Slang::String> m_features;
+    Slang::ComPtr<IPipelineCreationAPIDispatcher> m_pipelineCreationAPIDispatcher;
+
 public:
     SlangContext slangContext;
     ShaderCache shaderCache;
