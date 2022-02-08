@@ -110,9 +110,33 @@ class ITransientResourceHeap;
 class IShaderProgram: public ISlangUnknown
 {
 public:
+    // Defines how linking should be performed for a shader program.
+    enum class LinkingStyle
+    {
+        // Compose all entry-points in a single program, then compile all entry-points together with the same
+        // set of root shader arguments.
+        SingleProgram,
+
+        // Link and compile each entry-point individually, potentially with different specializations.
+        SeparateEntryPointCompilation
+    };
+
     struct Desc
     {
-        slang::IComponentType*  slangProgram;
+        // The linking style of this program.
+        LinkingStyle linkingStyle = LinkingStyle::SingleProgram;
+
+        // The global scope or a Slang composite component that represents the entire program.
+        slang::IComponentType*  slangGlobalScope;
+
+        // Number of separate entry point components in the `slangEntryPoints` array to link in.
+        // If set to 0, then `slangGlobalScope` must contain Slang EntryPoint components.
+        // If not 0, then `slangGlobalScope` must not contain any EntryPoint components.
+        uint32_t entryPointCount = 0;
+
+        // An array of Slang entry points. The size of the array must be `entryPointCount`.
+        // Each element must define only 1 Slang EntryPoint.
+        slang::IComponentType** slangEntryPoints = nullptr;
     };
 };
 #define SLANG_UUID_IShaderProgram                                                       \
@@ -551,8 +575,8 @@ struct ClearValue
 
 struct BufferRange
 {
-    uint32_t firstElement;
-    uint32_t elementCount;
+    uint64_t firstElement;
+    uint64_t elementCount;
 };
 
 enum class TextureAspect : uint32_t
@@ -1271,11 +1295,12 @@ struct HitGroupDesc
 struct RayTracingPipelineStateDesc
 {
     IShaderProgram* program = nullptr;
-    int32_t hitGroupCount;
-    const HitGroupDesc* hitGroups;
-    int maxRecursion;
-    int maxRayPayloadSize;
-    RayTracingPipelineFlags::Enum flags;
+    int32_t hitGroupCount = 0;
+    const HitGroupDesc* hitGroups = nullptr;
+    int maxRecursion = 0;
+    int maxRayPayloadSize = 0;
+    int maxAttributeSizeInBytes = 8;
+    RayTracingPipelineFlags::Enum flags = RayTracingPipelineFlags::None;
 };
 
 class IShaderTable : public ISlangUnknown
@@ -2089,12 +2114,16 @@ public:
     }
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) = 0;
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) = 0;
 
-    inline ComPtr<IResourceView> createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc)
+    inline ComPtr<IResourceView> createBufferView(
+        IBufferResource* buffer, IBufferResource* counterBuffer, IResourceView::Desc const& desc)
     {
         ComPtr<IResourceView> view;
-        SLANG_RETURN_NULL_ON_FAIL(createBufferView(buffer, desc, view.writeRef()));
+        SLANG_RETURN_NULL_ON_FAIL(createBufferView(buffer, counterBuffer, desc, view.writeRef()));
         return view;
     }
 

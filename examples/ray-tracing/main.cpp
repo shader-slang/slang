@@ -193,7 +193,7 @@ gfx::Result loadShaderProgram(
     SLANG_RETURN_ON_FAIL(result);
 
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangProgram = linkedProgram;
+    programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
     return SLANG_OK;
@@ -318,7 +318,7 @@ Slang::Result initialize()
     primitiveSRVDesc.format = Format::Unknown;
     primitiveSRVDesc.type = IResourceView::Type::ShaderResource;
     primitiveSRVDesc.bufferElementSize = sizeof(Primitive);
-    gPrimitiveBufferSRV = gDevice->createBufferView(gPrimitiveBuffer, primitiveSRVDesc);
+    gPrimitiveBufferSRV = gDevice->createBufferView(gPrimitiveBuffer, nullptr, primitiveSRVDesc);
 
     IBufferResource::Desc transformBufferDesc;
     transformBufferDesc.type = IResource::Type::Buffer;

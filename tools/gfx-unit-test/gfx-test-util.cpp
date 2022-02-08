@@ -57,7 +57,7 @@ namespace gfx_test
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
-        programDesc.slangProgram = composedProgram.get();
+        programDesc.slangGlobalScope = composedProgram.get();
 
         auto shaderProgram = device->createProgram(programDesc);
 
@@ -105,7 +105,7 @@ namespace gfx_test
         slangReflection = composedProgram->getLayout();
 
         gfx::IShaderProgram::Desc programDesc = {};
-        programDesc.slangProgram = composedProgram.get();
+        programDesc.slangGlobalScope = composedProgram.get();
 
         auto shaderProgram = device->createProgram(programDesc);
 

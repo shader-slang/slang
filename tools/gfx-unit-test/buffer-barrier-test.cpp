@@ -48,7 +48,8 @@ namespace gfx_test
         viewDesc.type = unorderedAccess ? IResourceView::Type::UnorderedAccess : IResourceView::Type::ShaderResource;
         viewDesc.format = Format::Unknown;
         viewDesc.bufferElementSize = sizeof(float);
-        GFX_CHECK_CALL_ABORT(device->createBufferView(outBuffer.buffer, viewDesc, outBuffer.view.writeRef()));
+        GFX_CHECK_CALL_ABORT(device->createBufferView(
+            outBuffer.buffer, nullptr, viewDesc, outBuffer.view.writeRef()));
     }
 
     void barrierTestImpl(IDevice* device, UnitTestContext* context)

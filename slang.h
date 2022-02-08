@@ -2114,6 +2114,9 @@ extern "C"
     SLANG_API char const* spReflectionEntryPoint_getName(
         SlangReflectionEntryPoint* entryPoint);
 
+    SLANG_API char const* spReflectionEntryPoint_getNameOverride(
+        SlangReflectionEntryPoint* entryPoint);
+
     SLANG_API unsigned spReflectionEntryPoint_getParameterCount(
         SlangReflectionEntryPoint* entryPoint);
 
@@ -2878,6 +2881,11 @@ namespace slang
         char const* getName()
         {
             return spReflectionEntryPoint_getName((SlangReflectionEntryPoint*) this);
+        }
+
+        char const* getNameOverride()
+        {
+            return spReflectionEntryPoint_getNameOverride((SlangReflectionEntryPoint*)this);
         }
 
         unsigned getParameterCount()

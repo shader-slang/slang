@@ -973,7 +973,35 @@ public:
     SLANG_COM_OBJECT_IUNKNOWN_ALL
     IShaderProgram* getInterface(const Slang::Guid& guid);
 
-    ComPtr<slang::IComponentType> slangProgram;
+    Desc desc;
+
+    Slang::ComPtr<slang::IComponentType> slangGlobalScope;
+    Slang::List<ComPtr<slang::IComponentType>> slangEntryPoints;
+
+    // Linked program when linkingStyle is GraphicsCompute, or the original global scope
+    // when linking style is RayTracing.
+    Slang::ComPtr<slang::IComponentType> linkedProgram;
+
+    // Linked program for each entry point when linkingStyle is RayTracing.
+    Slang::List<Slang::ComPtr<slang::IComponentType>> linkedEntryPoints;
+
+    void init(const IShaderProgram::Desc& desc);
+
+    bool isSpecializable()
+    {
+        if (slangGlobalScope->getSpecializationParamCount() != 0)
+        {
+            return true;
+        }
+        for (auto& entryPoint : slangEntryPoints)
+        {
+            if (entryPoint->getSpecializationParamCount() != 0)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 };
 
 class InputLayoutBase
@@ -1368,6 +1396,8 @@ public:
 
     Slang::Dictionary<slang::TypeReflection*, Slang::RefPtr<ShaderObjectLayoutBase>> m_shaderObjectLayoutCache;
 };
+
+bool isDepthFormat(Format format);
 
 IDebugCallback*& _getDebugCallback();
 IDebugCallback* _getNullDebugCallback();

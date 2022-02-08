@@ -130,7 +130,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         IInputLayout::Desc const& desc,
@@ -2546,7 +2549,10 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureView(
 }
 
 SLANG_NO_THROW Result SLANG_MCALL GLDevice::createBufferView(
-    IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
+    IBufferResource* buffer,
+    IBufferResource* counterBuffer,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
@@ -2759,23 +2765,23 @@ void GLDevice::dispatchCompute(int x, int y, int z)
 Result GLDevice::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
-    if (desc.slangProgram->getSpecializationParamCount() != 0)
+    if (desc.slangGlobalScope->getSpecializationParamCount() != 0)
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(m_weakRenderer, 0);
-        shaderProgram->slangProgram = desc.slangProgram;
+        shaderProgram->init(desc);
         returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
 
     auto programID = glCreateProgram();
-    auto programLayout = desc.slangProgram->getLayout();
+    auto programLayout = desc.slangGlobalScope->getLayout();
     ShortList<GLuint> shaderIDs;
     for (SlangUInt i = 0; i < programLayout->getEntryPointCount(); i++)
     {
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangProgram->getEntryPointCode(
+        auto compileResult = desc.slangGlobalScope->getEntryPointCode(
             i, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
@@ -2844,7 +2850,7 @@ Result GLDevice::createProgram(
     }
 
     RefPtr<ShaderProgramImpl> program = new ShaderProgramImpl(m_weakRenderer, programID);
-    program->slangProgram = desc.slangProgram;
+    program->slangGlobalScope = desc.slangGlobalScope;
     returnComPtr(outProgram, program);
     return SLANG_OK;
 }
@@ -2913,7 +2919,7 @@ Result GLDevice::createRootShaderObject(IShaderProgram* program, ShaderObjectBas
     RefPtr<RootShaderObjectImpl> shaderObject;
     RefPtr<RootShaderObjectLayoutImpl> rootLayout;
     SLANG_RETURN_ON_FAIL(RootShaderObjectLayoutImpl::create(
-        this, programImpl->slangProgram, programImpl->slangProgram->getLayout(), rootLayout.writeRef()));
+        this, programImpl->slangGlobalScope, programImpl->slangGlobalScope->getLayout(), rootLayout.writeRef()));
     SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
         this, rootLayout.Ptr(), shaderObject.writeRef()));
     returnRefPtrMove(outObject, shaderObject);
