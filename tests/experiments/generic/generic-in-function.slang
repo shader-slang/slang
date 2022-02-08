@@ -1,5 +1,15 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
 
+/* It appears the use of a generic defined within a function appears to trigger a crash
+
+
+```
+void Type::accept(ITypeVisitor* visitor, void* extra)
+```
+
+As this is nullptr.
+*/
+
 RWStructuredBuffer<float> outputBuffer;
 
 int doThing()
