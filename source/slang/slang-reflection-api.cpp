@@ -1469,7 +1469,7 @@ namespace Slang
                     fieldVarLayout->bindingRangeOffset = fieldBindingRangeIndex - structBindingRangeIndex;
 
                     auto fieldTypeLayout = fieldVarLayout->getTypeLayout();
-                    
+
                     ExtendedBindingRangePath fieldPath(path, fieldVarLayout);
                     addRangesRec(fieldTypeLayout, fieldPath, multiplier);
                 }

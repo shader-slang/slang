@@ -22,8 +22,6 @@ struct S0
 ParameterBlock<S0> g;
 [root] RWStructuredBuffer<uint> buffer;
 
-// Main entry-point. Applies the transformation encoded by `transformer`
-// to all elements in `buffer`.
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain(
