@@ -442,6 +442,13 @@ public:
         add(states...);
     }
 
+    ResourceStateSet operator&(const ResourceStateSet& that) const
+    {
+        ResourceStateSet result;
+        result.m_bitFields = this->m_bitFields & that.m_bitFields;
+        return result;
+    }
+
 private:
     uint64_t m_bitFields = 0;
     void add() {}
@@ -1657,6 +1664,10 @@ public:
         ITextureResource* const* textures,
         ResourceState src,
         ResourceState dst) = 0;
+    void textureBarrier(ITextureResource* texture, ResourceState src, ResourceState dst)
+    {
+        textureBarrier(1, &texture, src, dst);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL textureSubresourceBarrier(
         ITextureResource* texture,
         SubresourceRange subresourceRange,
@@ -1667,6 +1678,10 @@ public:
         IBufferResource* const* buffers,
         ResourceState src,
         ResourceState dst) = 0;
+    void bufferBarrier(IBufferResource* buffer, ResourceState src, ResourceState dst)
+    {
+        bufferBarrier(1, &buffer, src, dst);
+    }
     virtual SLANG_NO_THROW void SLANG_MCALL clearResourceView(
         IResourceView* view, ClearValue* clearValue, ClearResourceViewFlags::Enum flags) = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL resolveResource(
