@@ -93,6 +93,7 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
         IBufferResource* buffer,
+        IBufferResource* counterBuffer,
         IResourceView::Desc const& desc,
         IResourceView** outView) override;
 
@@ -3008,7 +3009,11 @@ Result D3D11Device::createTextureView(ITextureResource* texture, IResourceView::
     }
 }
 
-Result D3D11Device::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
+Result D3D11Device::createBufferView(
+    IBufferResource* buffer,
+    IBufferResource* counterBuffer,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
     auto resourceDesc = *resourceImpl->getDesc();
@@ -3483,21 +3488,21 @@ void D3D11Device::drawIndexedInstanced(
 Result D3D11Device::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
-    SLANG_ASSERT(desc.slangProgram);
+    SLANG_ASSERT(desc.slangGlobalScope);
 
-    if (desc.slangProgram->getSpecializationParamCount() != 0)
+    if (desc.slangGlobalScope->getSpecializationParamCount() != 0)
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
         RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
-        shaderProgram->slangProgram = desc.slangProgram;
+        shaderProgram->init(desc);
         returnComPtr(outProgram, shaderProgram);
         return SLANG_OK;
     }
 
     // If the program is already specialized, compile and create shader kernels now.
     SlangInt targetIndex = 0;
-    auto slangProgram = desc.slangProgram;
-    auto programLayout = slangProgram->getLayout(targetIndex);
+    auto slangGlobalScope = desc.slangGlobalScope;
+    auto programLayout = slangGlobalScope->getLayout(targetIndex);
     if (!programLayout)
         return SLANG_FAIL;
     SlangUInt entryPointCount = programLayout->getEntryPointCount();
@@ -3505,7 +3510,7 @@ Result D3D11Device::createProgram(
         return SLANG_FAIL;
 
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl();
-    shaderProgram->slangProgram = desc.slangProgram;
+    shaderProgram->slangGlobalScope = desc.slangGlobalScope;
 
     ScopeNVAPI scopeNVAPI;
     SLANG_RETURN_ON_FAIL(scopeNVAPI.init(this, 0));
@@ -3514,7 +3519,7 @@ Result D3D11Device::createProgram(
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
 
-        auto compileResult = slangProgram->getEntryPointCode(
+        auto compileResult = slangGlobalScope->getEntryPointCode(
             (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
 
         if (diagnostics)
@@ -3728,7 +3733,7 @@ Result D3D11Device::createRootShaderObject(IShaderProgram* program, ShaderObject
     RefPtr<RootShaderObjectImpl> shaderObject;
     RefPtr<RootShaderObjectLayoutImpl> rootLayout;
     SLANG_RETURN_ON_FAIL(RootShaderObjectLayoutImpl::create(
-        this, programImpl->slangProgram, programImpl->slangProgram->getLayout(), rootLayout.writeRef()));
+        this, programImpl->slangGlobalScope, programImpl->slangGlobalScope->getLayout(), rootLayout.writeRef()));
     SLANG_RETURN_ON_FAIL(RootShaderObjectImpl::create(
         this, rootLayout.Ptr(), shaderObject.writeRef()));
     returnRefPtrMove(outObject, shaderObject);

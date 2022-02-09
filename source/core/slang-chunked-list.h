@@ -243,6 +243,7 @@ private:
         {
             auto nextChunk = chunk->next;
             freeChunk(chunk);
+            chunk = nextChunk;
         }
         m_firstChunk.next = 0;
         m_firstChunk.size = 0;

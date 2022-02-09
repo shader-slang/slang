@@ -70,7 +70,7 @@ namespace gfx_test
             srvDesc.bufferElementSize = sizeof(uint32_t) * 4;
             srvDesc.bufferRange.elementCount = 4;
             srvDesc.bufferRange.firstElement = 0;
-            srvs.add(device->createBufferView(srvBuffers[i], srvDesc));
+            srvs.add(device->createBufferView(srvBuffers[i], nullptr, srvDesc));
         }
         Slang::ComPtr<IBufferResource> resultBuffer =
             createBuffer(device, 0, gfx::ResourceState::UnorderedAccess);
@@ -82,7 +82,7 @@ namespace gfx_test
         resultBufferViewDesc.bufferRange.firstElement = 0;
         Slang::ComPtr<IResourceView> resultBufferView;
         SLANG_CHECK(SLANG_SUCCEEDED(device->createBufferView(
-            resultBuffer, resultBufferViewDesc, resultBufferView.writeRef())));
+            resultBuffer, nullptr, resultBufferViewDesc, resultBufferView.writeRef())));
 
         Slang::ComPtr<IShaderObject> materialObject;
         SLANG_CHECK(SLANG_SUCCEEDED(device->createMutableShaderObject(

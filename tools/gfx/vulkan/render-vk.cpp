@@ -94,7 +94,10 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture, IResourceView::Desc const& desc, IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
-        IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView) override;
+        IBufferResource* buffer,
+        IBufferResource* counterBuffer,
+        IResourceView::Desc const& desc,
+        IResourceView** outView) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
         IInputLayout::Desc const& desc,
@@ -8075,7 +8078,11 @@ Result VKDevice::getFormatSupportedResourceStates(Format format, ResourceStateSe
     return SLANG_OK;
 }
 
-Result VKDevice::createBufferView(IBufferResource* buffer, IResourceView::Desc const& desc, IResourceView** outView)
+Result VKDevice::createBufferView(
+    IBufferResource* buffer,
+    IBufferResource* counterBuffer,
+    IResourceView::Desc const& desc,
+    IResourceView** outView)
 {
     auto resourceImpl = (BufferResourceImpl*) buffer;
 
@@ -8244,15 +8251,16 @@ Result VKDevice::createProgram(
     const IShaderProgram::Desc& desc, IShaderProgram** outProgram, ISlangBlob** outDiagnosticBlob)
 {
     RefPtr<ShaderProgramImpl> shaderProgram = new ShaderProgramImpl(this);
-    shaderProgram->slangProgram = desc.slangProgram;
+    shaderProgram->init(desc);
+
     m_deviceObjectsWithPotentialBackReferences.add(shaderProgram);
 
     RootShaderObjectLayout::create(
         this,
-        desc.slangProgram,
-        desc.slangProgram->getLayout(),
+        shaderProgram->linkedProgram,
+        shaderProgram->linkedProgram->getLayout(),
         shaderProgram->m_rootObjectLayout.writeRef());
-    if (desc.slangProgram->getSpecializationParamCount() != 0)
+    if (shaderProgram->isSpecializable())
     {
         // For a specializable program, we don't invoke any actual slang compilation yet.
         returnComPtr(outProgram, shaderProgram);
@@ -8260,15 +8268,15 @@ Result VKDevice::createProgram(
     }
 
     // For a fully specialized program, create `VkShaderModule`s for each shader stage.
-    auto programReflection = desc.slangProgram->getLayout();
-    for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
+    auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
+                             slang::IComponentType* component,
+                             SlangInt entryPointIndex)
     {
-        auto entryPointInfo = programReflection->getEntryPointByIndex(i);
         auto stage = entryPointInfo->getStage();
         ComPtr<ISlangBlob> kernelCode;
         ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = desc.slangProgram->getEntryPointCode(
-            (SlangInt)i, 0, kernelCode.writeRef(), diagnostics.writeRef());
+        auto compileResult = component->getEntryPointCode(
+            entryPointIndex, 0, kernelCode.writeRef(), diagnostics.writeRef());
         if (diagnostics)
         {
             getDebugCallback()->handleMessage(
@@ -8295,6 +8303,27 @@ Result VKDevice::createProgram(
             (VkShaderStageFlagBits)VulkanUtil::getShaderStage(stage),
             shaderModule));
         shaderProgram->m_modules.add(shaderModule);
+        return SLANG_OK;
+    };
+    if (shaderProgram->linkedEntryPoints.getCount() == 0)
+    {
+        // If the user does not explicitly specify entry point components, find them from
+        // `linkedEntryPoints`.
+        auto programReflection = shaderProgram->linkedProgram->getLayout();
+        for (SlangUInt i = 0; i < programReflection->getEntryPointCount(); i++)
+        {
+            auto entryPointInfo = programReflection->getEntryPointByIndex(i);
+            SLANG_RETURN_ON_FAIL(compileShader(entryPointInfo, shaderProgram->linkedProgram, (SlangInt)i));
+        }
+    }
+    else
+    {
+        // If the user specifies entry point components via the separated entry point array, compile
+        // code from there.
+        for (auto& entryPoint : shaderProgram->linkedEntryPoints)
+        {
+            SLANG_RETURN_ON_FAIL(compileShader(entryPoint->getLayout()->getEntryPointByIndex(0), entryPoint, 0));
+        }
     }
     returnComPtr(outProgram, shaderProgram);
     return SLANG_OK;

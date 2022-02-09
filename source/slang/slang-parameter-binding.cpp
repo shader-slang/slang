@@ -2477,6 +2477,7 @@ static void removePerEntryPointParameterKinds(
 static RefPtr<EntryPointLayout> collectEntryPointParameters(
     ParameterBindingContext*                    context,
     EntryPoint*                                 entryPoint,
+    String                                      entryPointNameOverride,
     EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
 {
     auto astBuilder = context->getASTBuilder();
@@ -2487,6 +2488,7 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     RefPtr<EntryPointLayout> entryPointLayout = new EntryPointLayout();
     entryPointLayout->profile = entryPoint->getProfile();
     entryPointLayout->name = entryPoint->getName();
+    entryPointLayout->nameOverride = entryPointNameOverride;
 
     // The entry point layout must be added to the output
     // program layout so that it can be accessed by reflection.
@@ -2836,6 +2838,7 @@ struct CollectParametersVisitor : ComponentTypeVisitor
     {}
 
     ParameterBindingContext* m_context;
+    String m_currentEntryPointNameOverride;
 
     void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
@@ -2892,15 +2895,18 @@ struct CollectParametersVisitor : ComponentTypeVisitor
         ParameterBindingContext contextData = *m_context;
         auto context = &contextData;
         context->stage = entryPoint->getStage();
-
-        collectEntryPointParameters(context, entryPoint, specializationInfo);
+        collectEntryPointParameters(
+            context, entryPoint, m_currentEntryPointNameOverride, specializationInfo);
     }
 
     void visitRenamedEntryPoint(
         RenamedEntryPointComponentType* renamedEntryPoint,
         EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
+        auto lastNameOverride = m_currentEntryPointNameOverride;
+        m_currentEntryPointNameOverride = renamedEntryPoint->getEntryPointNameOverride(0);
         renamedEntryPoint->getBase()->acceptVisitor(this, specializationInfo);
+        m_currentEntryPointNameOverride = lastNameOverride;
     }
 
     void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE

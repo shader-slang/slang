@@ -85,6 +85,7 @@ public:
         IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createBufferView(
         IBufferResource* buffer,
+        IBufferResource* counterBuffer,
         IResourceView::Desc const& desc,
         IResourceView** outView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL getAccelerationStructurePrebuildInfo(

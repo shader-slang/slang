@@ -130,7 +130,8 @@ namespace gfx_test
         IResourceView::Desc viewDesc = {};
         viewDesc.type = IResourceView::Type::UnorderedAccess;
         viewDesc.format = Format::Unknown;
-        GFX_CHECK_CALL_ABORT(device->createBufferView(outBuffer, viewDesc, bufferView.writeRef()));
+        GFX_CHECK_CALL_ABORT(
+            device->createBufferView(outBuffer, nullptr, viewDesc, bufferView.writeRef()));
         return bufferView;
     }
 

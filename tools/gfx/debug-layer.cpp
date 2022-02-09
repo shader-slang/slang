@@ -464,6 +464,7 @@ Result DebugDevice::createTextureView(
 
 Result DebugDevice::createBufferView(
     IBufferResource* buffer,
+    IBufferResource* counterBuffer,
     IResourceView::Desc const& desc,
     IResourceView** outView)
 {
@@ -472,6 +473,7 @@ Result DebugDevice::createBufferView(
     RefPtr<DebugResourceView> outObject = new DebugResourceView();
     auto result = baseObject->createBufferView(
         static_cast<DebugBufferResource*>(buffer)->baseObject,
+        counterBuffer ? static_cast<DebugBufferResource*>(counterBuffer)->baseObject : nullptr,
         desc,
         outObject->baseObject.writeRef());
     if (SLANG_FAILED(result))
@@ -1909,7 +1911,7 @@ Result DebugFence::setCurrentValue(uint64_t value)
 
 DebugShaderProgram::DebugShaderProgram(const IShaderProgram::Desc& desc)
 {
-    m_slangProgram = desc.slangProgram;
+    m_slangProgram = desc.slangGlobalScope;
 }
 
 Result DebugPipelineState::getNativeHandle(InteropHandle* outHandle)

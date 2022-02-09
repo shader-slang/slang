@@ -181,7 +181,7 @@ gfx::Result loadShaderProgram(
     // program representation.
     //
     gfx::IShaderProgram::Desc programDesc = {};
-    programDesc.slangProgram = linkedProgram;
+    programDesc.slangGlobalScope = linkedProgram;
     SLANG_RETURN_ON_FAIL(device->createProgram(programDesc, outProgram));
 
     return SLANG_OK;
