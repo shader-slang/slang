@@ -87,6 +87,13 @@ namespace gfx_test
         {
             SLANG_IGNORE_TEST
         }
+#if SLANG_WIN32
+        // Skip d3d12 tests on x86 now since dxc doesn't function correctly there on Windows 11.
+        if (api == Slang::RenderApiFlag::D3D12)
+        {
+            SLANG_IGNORE_TEST
+        }
+#endif
         try
         {
             renderDocBeginFrame();
