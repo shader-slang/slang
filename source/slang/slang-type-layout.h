@@ -431,6 +431,7 @@ public:
 
         struct BindingRangeInfo
         {
+            VarDeclBase*        variable;
             TypeLayout*         leafTypeLayout;
             SlangBindingType    bindingType;
             LayoutSize          count;

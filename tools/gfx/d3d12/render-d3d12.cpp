@@ -228,6 +228,8 @@ public:
     struct Submitter
     {
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+        virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
+        virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) = 0;
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor) = 0;
         virtual void setRootSignature(ID3D12RootSignature* rootSignature) = 0;
         virtual void setRootConstants(Index rootParamIndex, Index dstOffsetIn32BitValues, Index countOf32BitValues, void const* srcData) = 0;
@@ -398,7 +400,11 @@ public:
     public:
         D3D12Descriptor m_descriptor;
         RefPtr<D3D12GeneralExpandingDescriptorHeap> m_allocator;
-        ~ResourceViewInternalImpl() { m_allocator->free(m_descriptor); }
+        ~ResourceViewInternalImpl()
+        {
+            if (m_descriptor.cpuHandle.ptr)
+                m_allocator->free(m_descriptor);
+        }
     };
 
     class ResourceViewImpl
@@ -653,6 +659,14 @@ public:
         {
             m_commandList->SetGraphicsRootConstantBufferView(index, gpuBufferLocation);
         }
+        virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+        {
+            m_commandList->SetGraphicsRootUnorderedAccessView(index, gpuBufferLocation);
+        }
+        virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+        {
+            m_commandList->SetGraphicsRootShaderResourceView(index, gpuBufferLocation);
+        }
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override
         {
             m_commandList->SetGraphicsRootDescriptorTable(index, baseDescriptor);
@@ -688,6 +702,14 @@ public:
         virtual void setRootConstantBufferView(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
         {
             m_commandList->SetComputeRootConstantBufferView(index, gpuBufferLocation);
+        }
+        virtual void setRootUAV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+        {
+            m_commandList->SetComputeRootUnorderedAccessView(index, gpuBufferLocation);
+        }
+        virtual void setRootSRV(int index, D3D12_GPU_VIRTUAL_ADDRESS gpuBufferLocation) override
+        {
+            m_commandList->SetComputeRootShaderResourceView(index, gpuBufferLocation);
         }
         virtual void setRootDescriptorTable(int index, D3D12_GPU_DESCRIPTOR_HANDLE baseDescriptor) override
         {
@@ -1136,6 +1158,8 @@ public:
                 /// An index into the sub-object array if this binding range is treated
                 /// as a sub-object.
             uint32_t subObjectIndex;
+
+            bool isRootParameter;
         };
 
             /// Offset information for a sub-object range
@@ -1192,8 +1216,29 @@ public:
 
         struct RootParameterInfo
         {
-            D3D12_ROOT_PARAMETER rootParameter;
+            IResourceView::Type type;
         };
+
+        static bool isBindingRangeRootParameter(
+            SlangSession* globalSession,
+            const char* rootParameterAttributeName,
+            slang::TypeLayoutReflection* typeLayout,
+            Index bindingRangeIndex)
+        {
+            bool isRootParameter = false;
+            if (rootParameterAttributeName)
+            {
+                if (auto variable = typeLayout->getBindingRangeVariable(bindingRangeIndex))
+                {
+                    if (variable->findUserAttributeByName(
+                            globalSession, rootParameterAttributeName))
+                    {
+                        isRootParameter = true;
+                    }
+                }
+            }
+            return isRootParameter;
+        }
 
         struct Builder
         {
@@ -1206,6 +1251,7 @@ public:
             slang::TypeLayoutReflection* m_elementTypeLayout;
             List<BindingRangeInfo> m_bindingRanges;
             List<SubObjectRangeInfo> m_subObjectRanges;
+            List<RootParameterInfo> m_rootParamsInfo;
 
                 /// The number of sub-objects (not just sub-object *ranges*) stored in instances of this layout
             uint32_t m_subObjectCount = 0;
@@ -1266,45 +1312,76 @@ public:
                     bindingRangeInfo.bindingType = slangBindingType;
                     bindingRangeInfo.resourceShape = slangLeafTypeLayout->getResourceShape();
                     bindingRangeInfo.count = count;
-
-                    switch (slangBindingType)
+                    bindingRangeInfo.isRootParameter = isBindingRangeRootParameter(
+                        m_renderer->slangContext.globalSession,
+                        static_cast<D3D12Device*>(m_renderer)
+                            ->m_extendedDesc.rootParameterShaderAttributeName,
+                        typeLayout,
+                        r);
+                    if (bindingRangeInfo.isRootParameter)
                     {
-                    case slang::BindingType::ConstantBuffer:
-                    case slang::BindingType::ParameterBlock:
-                    case slang::BindingType::ExistentialValue:
-                        bindingRangeInfo.baseIndex = m_subObjectCount;
-                        bindingRangeInfo.subObjectIndex = m_subObjectCount;
-                        m_subObjectCount += count;
-                        break;
-                    case slang::BindingType::RawBuffer:
-                    case slang::BindingType::MutableRawBuffer:
-                        if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
+                        RootParameterInfo rootInfo = {};
+                        switch (slangBindingType)
                         {
-                            // A structured buffer occupies both a resource slot and
-                            // a sub-object slot.
+                        case slang::BindingType::RayTracingAccelerationStructure:
+                            rootInfo.type = IResourceView::Type::AccelerationStructure;
+                            break;
+                        case slang::BindingType::RawBuffer:
+                        case slang::BindingType::TypedBuffer:
+                            rootInfo.type = IResourceView::Type::ShaderResource;
+                            break;
+                        case slang::BindingType::MutableRawBuffer:
+                        case slang::BindingType::MutableTypedBuffer:
+                            rootInfo.type = IResourceView::Type::UnorderedAccess;
+                            break;
+                        }
+                        bindingRangeInfo.baseIndex = (uint32_t)m_rootParamsInfo.getCount();
+                        for (uint32_t i = 0; i < count; i++)
+                        {
+                            m_rootParamsInfo.add(rootInfo);
+                        }
+                    }
+                    else
+                    {
+                        switch (slangBindingType)
+                        {
+                        case slang::BindingType::ConstantBuffer:
+                        case slang::BindingType::ParameterBlock:
+                        case slang::BindingType::ExistentialValue:
+                            bindingRangeInfo.baseIndex = m_subObjectCount;
                             bindingRangeInfo.subObjectIndex = m_subObjectCount;
                             m_subObjectCount += count;
+                            break;
+                        case slang::BindingType::RawBuffer:
+                        case slang::BindingType::MutableRawBuffer:
+                            if (slangLeafTypeLayout->getType()->getElementType() != nullptr)
+                            {
+                                // A structured buffer occupies both a resource slot and
+                                // a sub-object slot.
+                                bindingRangeInfo.subObjectIndex = m_subObjectCount;
+                                m_subObjectCount += count;
+                            }
+                            bindingRangeInfo.baseIndex = m_ownCounts.resource;
+                            m_ownCounts.resource += count;
+                            break;
+                        case slang::BindingType::Sampler:
+                            bindingRangeInfo.baseIndex = m_ownCounts.sampler;
+                            m_ownCounts.sampler += count;
+                            break;
+
+                        case slang::BindingType::CombinedTextureSampler:
+                            // TODO: support this case...
+                            break;
+
+                        case slang::BindingType::VaryingInput:
+                        case slang::BindingType::VaryingOutput:
+                            break;
+
+                        default:
+                            bindingRangeInfo.baseIndex = m_ownCounts.resource;
+                            m_ownCounts.resource += count;
+                            break;
                         }
-                        bindingRangeInfo.baseIndex = m_ownCounts.resource;
-                        m_ownCounts.resource += count;
-                        break;
-                    case slang::BindingType::Sampler:
-                        bindingRangeInfo.baseIndex = m_ownCounts.sampler;
-                        m_ownCounts.sampler += count;
-                        break;
-
-                    case slang::BindingType::CombinedTextureSampler:
-                        // TODO: support this case...
-                        break;
-
-                    case slang::BindingType::VaryingInput:
-                    case slang::BindingType::VaryingOutput:
-                        break;
-
-                    default:
-                        bindingRangeInfo.baseIndex = m_ownCounts.resource;
-                        m_ownCounts.resource += count;
-                        break;
                     }
                     m_bindingRanges.add(bindingRangeInfo);
                 }
@@ -1423,7 +1500,7 @@ public:
                             // The only resource usage that leaks into the surrounding context
                             // is the number of root parameters consumed.
                             //
-                            objectCounts.rootParam  = subObjectRange.layout->getTotalRootParameterCount();
+                            objectCounts.rootParam  = subObjectRange.layout->getTotalRootTableParameterCount();
                         }
                         break;
 
@@ -1540,7 +1617,8 @@ public:
 
         uint32_t getTotalResourceDescriptorCountWithoutOrdinaryDataBuffer() { return m_totalCounts.resource - getOrdinaryDataBufferCount(); }
 
-        uint32_t getTotalRootParameterCount() { return m_totalCounts.rootParam; }
+        uint32_t getOwnUserRootParameterCount() { return (uint32_t)m_rootParamsInfo.getCount(); }
+        uint32_t getTotalRootTableParameterCount() { return m_totalCounts.rootParam; }
         uint32_t getChildRootParameterCount() { return m_childRootParameterCount; }
 
         uint32_t getTotalOrdinaryDataSize() const { return m_totalOrdinaryDataSize; }
@@ -1555,6 +1633,11 @@ public:
 
         slang::TypeReflection* getType() { return m_elementTypeLayout->getType(); }
 
+        const RootParameterInfo& getRootParameterInfo(Index index)
+        {
+            return m_rootParamsInfo[index];
+        }
+
     protected:
         Result _init(Builder* builder)
         {
@@ -1565,7 +1648,8 @@ public:
             m_containerType = builder->m_containerType;
 
             m_bindingRanges = _Move(builder->m_bindingRanges);
-            m_subObjectRanges = builder->m_subObjectRanges;
+            m_subObjectRanges = _Move(builder->m_subObjectRanges);
+            m_rootParamsInfo = _Move(builder->m_rootParamsInfo);
 
             m_ownCounts = builder->m_ownCounts;
             m_totalCounts = builder->m_totalCounts;
@@ -1578,6 +1662,7 @@ public:
 
         List<BindingRangeInfo> m_bindingRanges;
         List<SubObjectRangeInfo> m_subObjectRanges;
+        List<RootParameterInfo> m_rootParamsInfo;
 
         BindingOffset m_ownCounts;
         BindingOffset m_totalCounts;
@@ -1661,6 +1746,12 @@ public:
 
         struct RootSignatureDescBuilder
         {
+            D3D12Device* m_device;
+
+            RootSignatureDescBuilder(D3D12Device* device)
+                : m_device(device)
+            {}
+
             // We will use one descriptor set for the global scope and one additional
             // descriptor set for each `ParameterBlock` binding range in the shader object
             // hierarchy, regardless of the shader's `space` indices.
@@ -1767,14 +1858,6 @@ public:
                     pending += other.pending;
                 }
             };
-
-            Index reserveRootParameters(Index count)
-            {
-                Index result = m_rootParameters.getCount();
-                m_rootParameters.setCount(result + count);
-                return result;
-            }
-
                 /// Add a new descriptor set to the layout being computed.
                 ///
                 /// Note that a "descriptor set" in the layout may amount to
@@ -1797,8 +1880,34 @@ public:
                 D3D12_DESCRIPTOR_RANGE_TYPE rangeType,
                 UINT registerIndex,
                 UINT spaceIndex,
-                UINT count)
+                UINT count,
+                bool isRootParameter)
             {
+                if (isRootParameter)
+                {
+                    D3D12_ROOT_PARAMETER rootParam = {};
+                    switch (rangeType)
+                    {
+                    case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+                        rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+                        break;
+                    case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+                        rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+                        break;
+                    default:
+                        getDebugCallback()->handleMessage(
+                            DebugMessageType::Error,
+                            DebugMessageSource::Layer,
+                            "A shader parameter marked as root parameter is neither SRV nor UAV.");
+                        return SLANG_FAIL;
+                    }
+                    rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    rootParam.Descriptor.RegisterSpace = spaceIndex;
+                    rootParam.Descriptor.ShaderRegister = registerIndex;
+                    m_rootParameters.add(rootParam);
+                    return SLANG_OK;
+                }
+
                 auto& descriptorSet = m_descriptorSets[physicalDescriptorSetIndex];
 
                 D3D12_DESCRIPTOR_RANGE range = {};
@@ -1843,7 +1952,8 @@ public:
                 BindingRegisterOffset const&    containerOffset,
                 BindingRegisterOffset const&    elementOffset,
                 Index                           logicalDescriptorSetIndex,
-                Index                           descriptorRangeIndex)
+                Index                           descriptorRangeIndex,
+                bool                            isRootParameter)
             {
                 auto bindingType = typeLayout->getDescriptorSetDescriptorRangeType(logicalDescriptorSetIndex, descriptorRangeIndex);
                 auto count = typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(logicalDescriptorSetIndex, descriptorRangeIndex);
@@ -1858,7 +1968,8 @@ public:
                     rangeType,
                     (UINT)index + elementOffset[rangeType],
                     (UINT)space + containerOffset.spaceOffset,
-                    (UINT)count);
+                    (UINT)count,
+                    isRootParameter);
             }
 
                 /// Add one binding range to the computed layout.
@@ -1884,6 +1995,11 @@ public:
                 auto logicalDescriptorSetIndex  = typeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
                 auto firstDescriptorRangeIndex  = typeLayout->getBindingRangeFirstDescriptorRangeIndex(bindingRangeIndex);
                 Index descriptorRangeCount      = typeLayout->getBindingRangeDescriptorRangeCount(bindingRangeIndex);
+                bool isRootParameter = isBindingRangeRootParameter(
+                    m_device->slangContext.globalSession,
+                    m_device->m_extendedDesc.rootParameterShaderAttributeName,
+                    typeLayout,
+                    bindingRangeIndex);
                 for( Index i = 0; i < descriptorRangeCount; ++i )
                 {
                     auto descriptorRangeIndex = firstDescriptorRangeIndex + i;
@@ -1898,7 +2014,8 @@ public:
                         containerOffset,
                         elementOffset,
                         logicalDescriptorSetIndex,
-                        descriptorRangeIndex);
+                        descriptorRangeIndex,
+                        isRootParameter);
                 }
             }
 
@@ -1938,7 +2055,8 @@ public:
                         descriptorRangeType,
                         offsetForRangeType,
                         containerOffset.primary.spaceOffset,
-                        1);
+                        1,
+                        false);
                 }
 
                 addAsValue(typeLayout, physicalDescriptorSetIndex, containerOffset, elementOffset);
@@ -2140,7 +2258,7 @@ public:
             // binding/descritpor ranges and nested parameter blocks
             // based on the computed layout information for `program`.
             //
-            RootSignatureDescBuilder builder;
+            RootSignatureDescBuilder builder(device);
             auto layout = program->getLayout();
 
             // The layout information computed by Slang breaks up shader
@@ -2459,7 +2577,11 @@ public:
                 m_data.setCount(uniformSize);
                 memset(m_data.getBuffer(), 0, uniformSize);
             }
-
+            m_rootArguments.setCount(layout->getOwnUserRootParameterCount());
+            memset(
+                m_rootArguments.getBuffer(),
+                0,
+                sizeof(D3D12_GPU_VIRTUAL_ADDRESS) * m_rootArguments.getCount());
             // Each shader object will own CPU descriptor heap memory
             // for any resource or sampler descriptors it might store
             // as part of its value.
@@ -2981,12 +3103,36 @@ public:
             return SLANG_OK;
         }
 
-
+        Result bindRootArguments(BindingContext* context, uint32_t& index)
+        {
+            auto layoutImpl = getLayout();
+            for (uint32_t i = 0; i < m_rootArguments.getCount(); i++)
+            {
+                switch (layoutImpl->getRootParameterInfo(i).type)
+                {
+                case IResourceView::Type::ShaderResource:
+                case IResourceView::Type::AccelerationStructure:
+                    context->submitter->setRootSRV(index, m_rootArguments[i]);
+                    break;
+                case IResourceView::Type::UnorderedAccess:
+                    context->submitter->setRootUAV(index, m_rootArguments[i]);
+                    break;
+                default:
+                    continue;
+                }
+                index++;
+            }
+            for (auto& subObject : m_objects)
+            {
+                SLANG_RETURN_ON_FAIL(subObject->bindRootArguments(context, index));
+            }
+            return SLANG_OK;
+        }
             /// A CPU-memory descriptor set holding any descriptors used to represent the resources/samplers in this object's state
         DescriptorSet m_descriptorSet;
 
         ShortList<RefPtr<Resource>, 8> m_boundResources;
-
+        List<D3D12_GPU_VIRTUAL_ADDRESS> m_rootArguments;
         /// A constant buffer used to stored ordinary data for this object
         /// and existential-type sub-objects.
         ///
@@ -3106,8 +3252,12 @@ public:
             // Note: We do not direclty use `bindAsParameterBlock` here because we also
             // need to bind the entry points into the same descriptor set that is
             // being used for the root object.
-            //
+            
             BindingOffset rootOffset;
+
+            // Bind all root parameters first.
+            Super::bindRootArguments(context, rootOffset.rootParam);
+            
             DescriptorSet descriptorSet;
             SLANG_RETURN_ON_FAIL(prepareToBindAsParameterBlock(
                 context, /* inout */ rootOffset, specializedLayout, descriptorSet));
@@ -4984,6 +5134,7 @@ public:
     // D3D12Device members.
 
     Desc m_desc;
+    D3D12DeviceExtendedDesc m_extendedDesc;
 
     gfx::DeviceInfo m_info;
     String m_adapterName;
@@ -5551,9 +5702,11 @@ Result D3D12Device::_createDevice(DeviceCheckFlags deviceCheckFlags, const Unown
         {
             // Make break 
             infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-            infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-            // infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
-
+            if (m_extendedDesc.debugBreakOnD3D12Error)
+            {
+                infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+            }
+            
             // Apparently there is a problem with sm 6.3 with spurious errors, with debug layer enabled
             D3D12_FEATURE_DATA_SHADER_MODEL featureShaderModel;
             featureShaderModel.HighestShaderModel = D3D_SHADER_MODEL(0x63);
@@ -5625,8 +5778,18 @@ static bool _isSupportedNVAPIOp(ID3D12Device* dev, uint32_t op)
 
 Result D3D12Device::initialize(const Desc& desc)
 {
-
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
+
+    // Find extended desc.
+    for (uint32_t i = 0; i < desc.extendedDescCount; i++)
+    {
+        StructType stype;
+        memcpy(&stype, desc.extendedDescs[i], sizeof(stype));
+        if (stype == StructType::D3D12ExtendedDesc)
+        {
+            memcpy(&m_extendedDesc, desc.extendedDescs[i], sizeof(m_extendedDesc));
+        }
+    }
 
     // Initialize queue index allocator.
     // Support max 32 queues.
@@ -6855,6 +7018,7 @@ Result D3D12Device::createBufferView(
             uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
             uavDesc.Format = D3DUtil::getMapFormat(desc.format);
             uavDesc.Buffer.FirstElement = desc.bufferRange.firstElement;
+            uint64_t viewSize = 0;
             if (desc.bufferElementSize)
             {
                 uavDesc.Buffer.StructureByteStride = desc.bufferElementSize;
@@ -6862,6 +7026,7 @@ Result D3D12Device::createBufferView(
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / desc.bufferElementSize)
                         : (UINT)desc.bufferRange.elementCount;
+                viewSize = (uint64_t)desc.bufferElementSize * uavDesc.Buffer.NumElements;
             }
             else if(desc.format == Format::Unknown)
             {
@@ -6870,6 +7035,7 @@ Result D3D12Device::createBufferView(
                                                  ? UINT(resourceDesc.sizeInBytes / 4)
                                                  : UINT(desc.bufferRange.elementCount / 4);
                 uavDesc.Buffer.Flags |= D3D12_BUFFER_UAV_FLAG_RAW;
+                viewSize = 4ull * uavDesc.Buffer.NumElements;
             }
             else
             {
@@ -6880,15 +7046,28 @@ Result D3D12Device::createBufferView(
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / sizeInfo.blockSizeInBytes)
                         : (UINT)desc.bufferRange.elementCount;
+                viewSize = (uint64_t)uavDesc.Buffer.NumElements * sizeInfo.blockSizeInBytes;
             }
-            auto counterResourceImpl = static_cast<BufferResourceImpl*>(counterBuffer);
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = m_cpuViewHeap;
-            m_device->CreateUnorderedAccessView(
-                resourceImpl->m_resource,
-                counterResourceImpl ? counterResourceImpl->m_resource.getResource() : nullptr,
-                &uavDesc,
-                viewImpl->m_descriptor.cpuHandle);
+
+            if (viewSize >= (1ull << 32) - 8)
+            {
+                // D3D12 does not support view descriptors that has size near 4GB.
+                // We will not create actual SRV/UAVs for such large buffers.
+                // However, a buffer this large can still be bound as root parameter.
+                // So instead of failing, we quietly ignore descriptor creation.
+                viewImpl->m_descriptor.cpuHandle.ptr = 0;
+            }
+            else
+            {
+                auto counterResourceImpl = static_cast<BufferResourceImpl*>(counterBuffer);
+                SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+                viewImpl->m_allocator = m_cpuViewHeap;
+                m_device->CreateUnorderedAccessView(
+                    resourceImpl->m_resource,
+                    counterResourceImpl ? counterResourceImpl->m_resource.getResource() : nullptr,
+                    &uavDesc,
+                    viewImpl->m_descriptor.cpuHandle);
+            }
         }
         break;
 
@@ -6900,6 +7079,7 @@ Result D3D12Device::createBufferView(
             srvDesc.Buffer.StructureByteStride = 0;
             srvDesc.Buffer.FirstElement = desc.bufferRange.firstElement;
             srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+            uint64_t viewSize = 0;
             if (desc.bufferElementSize)
             {
                 srvDesc.Buffer.StructureByteStride = desc.bufferElementSize;
@@ -6907,6 +7087,7 @@ Result D3D12Device::createBufferView(
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / desc.bufferElementSize)
                         : (UINT)desc.bufferRange.elementCount;
+                viewSize = (uint64_t)desc.bufferElementSize * srvDesc.Buffer.NumElements;
             }
             else if (desc.format == Format::Unknown)
             {
@@ -6915,6 +7096,7 @@ Result D3D12Device::createBufferView(
                                                  ? UINT(resourceDesc.sizeInBytes / 4)
                                                  : UINT(desc.bufferRange.elementCount / 4);
                 srvDesc.Buffer.Flags |= D3D12_BUFFER_SRV_FLAG_RAW;
+                viewSize = 4ull * srvDesc.Buffer.NumElements;
             }
             else
             {
@@ -6925,11 +7107,23 @@ Result D3D12Device::createBufferView(
                     desc.bufferRange.elementCount == 0
                         ? UINT(resourceDesc.sizeInBytes / sizeInfo.blockSizeInBytes)
                         : (UINT)desc.bufferRange.elementCount;
+                viewSize = (uint64_t)srvDesc.Buffer.NumElements * sizeInfo.blockSizeInBytes;
             }
-
-            SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
-            viewImpl->m_allocator = m_cpuViewHeap;
-            m_device->CreateShaderResourceView(resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
+            if (viewSize >= (1ull << 32) - 8)
+            {
+                // D3D12 does not support view descriptors that has size near 4GB.
+                // We will not create actual SRV/UAVs for such large buffers.
+                // However, a buffer this large can still be bound as root parameter.
+                // So instead of failing, we quietly ignore descriptor creation.
+                viewImpl->m_descriptor.cpuHandle.ptr = 0;
+            }
+            else
+            {
+                SLANG_RETURN_ON_FAIL(m_cpuViewHeap->allocate(&viewImpl->m_descriptor));
+                viewImpl->m_allocator = m_cpuViewHeap;
+                m_device->CreateShaderResourceView(
+                    resourceImpl->m_resource, &srvDesc, viewImpl->m_descriptor.cpuHandle);
+            }
         }
         break;
     }
@@ -8232,6 +8426,41 @@ Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IR
 
     auto& bindingRange = layout->getBindingRange(offset.bindingRangeIndex);
 
+    if (bindingRange.isRootParameter && resourceView)
+    {
+        auto& rootArg = m_rootArguments[bindingRange.baseIndex];
+        switch (resourceView->getViewDesc()->type)
+        {
+        case IResourceView::Type::AccelerationStructure:
+            {
+                auto resourceViewImpl = static_cast<D3D12AccelerationStructureImpl*>(resourceView);
+                rootArg = resourceViewImpl->getDeviceAddress();
+            }
+            break;
+        case IResourceView::Type::ShaderResource:
+        case IResourceView::Type::UnorderedAccess:
+            {
+                auto resourceViewImpl = static_cast<ResourceViewImpl*>(resourceView);
+                if (resourceViewImpl->m_resource->isBuffer())
+                {
+                    rootArg = static_cast<BufferResourceImpl*>(resourceViewImpl->m_resource.Ptr())
+                                  ->getDeviceAddress();
+                }
+                else
+                {
+                    getDebugCallback()->handleMessage(
+                        DebugMessageType::Error,
+                        DebugMessageSource::Layer,
+                        "The shader parameter at the specified offset is a root parameter, and "
+                        "therefore can only be a buffer view.");
+                    return SLANG_FAIL;
+                }
+            }
+            break;
+        }
+        return SLANG_OK;
+    }
+
     if (resourceView == nullptr)
     {
         // Create null descriptor for the binding.
@@ -8265,12 +8494,24 @@ Result D3D12Device::ShaderObjectImpl::setResource(ShaderOffset const& offset, IR
     }
 
     auto descriptorSlotIndex = bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex;
-    d3dDevice->CopyDescriptorsSimple(
-        1,
-        m_descriptorSet.resourceTable.getCpuHandle(
-            bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
-        internalResourceView->m_descriptor.cpuHandle,
-        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    if (internalResourceView->m_descriptor.cpuHandle.ptr)
+    {
+        d3dDevice->CopyDescriptorsSimple(
+            1,
+            m_descriptorSet.resourceTable.getCpuHandle(
+                bindingRange.baseIndex + (int32_t)offset.bindingArrayIndex),
+            internalResourceView->m_descriptor.cpuHandle,
+            D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+    else
+    {
+        getDebugCallback()->handleMessage(
+            DebugMessageType::Error,
+            DebugMessageSource::Layer,
+            "IShaderObject::setResource: the resource view cannot be set to this shader parameter. "
+            "A possible reason is that the view is too large to be supported by D3D12.");
+        return SLANG_FAIL;
+    }
     return SLANG_OK;
 }
 

@@ -44,6 +44,11 @@ typedef uint64_t DeviceAddress;
 
 const uint64_t kTimeoutInfinite = 0xFFFFFFFFFFFFFFFF;
 
+enum class StructType
+{
+    D3D12ExtendedDesc,
+};
+
 enum class StageType
 {
     Unknown,
@@ -1997,6 +2002,9 @@ public:
         ISlangFileSystem* shaderCacheFileSystem = nullptr;
         // Configurations for Slang compiler.
         SlangDesc slang = {};
+
+        uint32_t extendedDescCount = 0;
+        void** extendedDescs = nullptr;
     };
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeDeviceHandles(InteropHandles* outHandles) = 0;
@@ -2369,4 +2377,12 @@ extern "C"
     SLANG_GFX_API const char* SLANG_MCALL gfxGetDeviceTypeName(DeviceType type);
 }
 
-}// renderer_test
+// Extended descs.
+struct D3D12DeviceExtendedDesc
+{
+    StructType structType = StructType::D3D12ExtendedDesc;
+    const char* rootParameterShaderAttributeName = nullptr;
+    bool debugBreakOnD3D12Error = false;
+};
+
+}
