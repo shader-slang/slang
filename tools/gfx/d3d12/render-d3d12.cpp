@@ -3470,7 +3470,7 @@ public:
             void* stagingPtr = nullptr;
             stagingBuffer->map(nullptr, &stagingPtr);
 
-            auto copyShaderIdInto = [&](void* dest, String& name)
+            auto copyShaderIdInto = [&](void* dest, String& name, const ShaderRecordOverwrite& overwrite)
             {
                 if (name.getLength())
                 {
@@ -3481,6 +3481,10 @@ public:
                 {
                     memset(dest, 0, D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
                 }
+                if (overwrite.size)
+                {
+                    memcpy((uint8_t*)dest + overwrite.offset, overwrite.data, overwrite.size);
+                }
             };
 
             uint8_t* stagingBufferPtr = (uint8_t*)stagingPtr;
@@ -3489,21 +3493,24 @@ public:
                 copyShaderIdInto(
                     stagingBufferPtr + m_rayGenTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[i]);
+                    m_entryPointNames[i],
+                    m_recordOverwrites[i]);
             }
             for (uint32_t i = 0; i < m_missShaderCount; i++)
             {
                 copyShaderIdInto(
                     stagingBufferPtr + m_missTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + i]);
+                    m_entryPointNames[m_rayGenShaderCount + i],
+                    m_recordOverwrites[m_rayGenShaderCount + i]);
             }
             for (uint32_t i = 0; i < m_hitGroupCount; i++)
             {
                 copyShaderIdInto(
                     stagingBufferPtr + m_hitGroupTableOffset +
                         D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES * i,
-                    m_entryPointNames[m_rayGenShaderCount + m_missShaderCount + i]);
+                    m_entryPointNames[m_rayGenShaderCount + m_missShaderCount + i],
+                    m_recordOverwrites[m_rayGenShaderCount + m_missShaderCount + i]);
             }
 
             stagingBuffer->unmap(nullptr);
