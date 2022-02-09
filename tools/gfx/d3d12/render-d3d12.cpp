@@ -519,7 +519,13 @@ public:
         virtual SLANG_NO_THROW Result SLANG_MCALL getResult(SlangInt queryIndex, SlangInt count, uint64_t* data) override
         {
             m_commandList->Reset(m_commandAllocator, nullptr);
-            m_commandList->ResolveQueryData(m_queryHeap, m_queryType, (UINT)queryIndex, (UINT)count, m_readBackBuffer, 0);
+            m_commandList->ResolveQueryData(
+                m_queryHeap,
+                m_queryType,
+                (UINT)queryIndex,
+                (UINT)count,
+                m_readBackBuffer,
+                sizeof(uint64_t) * queryIndex);
             m_commandList->Close();
             ID3D12CommandList* cmdList = m_commandList;
             m_commandQueue->ExecuteCommandLists(1, &cmdList);
@@ -529,7 +535,7 @@ public:
             WaitForSingleObject(m_waitEvent, INFINITE);
 
             int8_t* mappedData = nullptr;
-            D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex,sizeof(uint64_t) * (queryIndex + count) };
+            D3D12_RANGE readRange = { sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * (queryIndex + count) };
             m_readBackBuffer.getResource()->Map(0, &readRange, (void**)&mappedData);
             memcpy(data, mappedData + sizeof(uint64_t) * queryIndex, sizeof(uint64_t) * count);
             m_readBackBuffer.getResource()->Unmap(0, nullptr);
