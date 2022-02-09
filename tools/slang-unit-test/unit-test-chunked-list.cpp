@@ -33,7 +33,7 @@ SLANG_UNIT_TEST(chunkedList)
         ptrs.clear();
         for (int i = 0; i < 64; i++)
         {
-            stringList.add(String(i));
+            ptrs.add(stringList.add(String(i)));
         }
         SLANG_CHECK(stringList.getCount() == 64);
         SLANG_CHECK(*(ptrs[32]) == "32");
