@@ -3106,7 +3106,7 @@ public:
         Result bindRootArguments(BindingContext* context, uint32_t& index)
         {
             auto layoutImpl = getLayout();
-            for (uint32_t i = 0; i < m_rootArguments.getCount(); i++)
+            for (Index i = 0; i < m_rootArguments.getCount(); i++)
             {
                 switch (layoutImpl->getRootParameterInfo(i).type)
                 {

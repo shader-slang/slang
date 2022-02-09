@@ -262,7 +262,7 @@ public:
             if (descriptor.cpuHandle.ptr >= subHeap->getCpuHandle(0).ptr)
             {
                 auto subIndex = descriptor.cpuHandle.ptr - subHeap->getCpuHandle(0).ptr;
-                if (subIndex < subHeap->getSize())
+                if (subIndex < (SIZE_T)subHeap->getSize())
                 {
                     subHeap->free(descriptor);
                     break;
