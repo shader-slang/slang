@@ -2,7 +2,9 @@
 
 /* A test for equality around interface types
 
-This style is discussed in the documentation here:
+This style is discussed in the documentation here (on This type):
+
+https://github.com/shader-slang/slang/blob/master/docs/user-guide/04-interfaces-generics.md
 
 Still has limitiation that it only works for an an implementation of an interface.  
  */
