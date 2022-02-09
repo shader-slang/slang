@@ -1559,7 +1559,7 @@ namespace Slang
 
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary->var->getVariable();
+                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = bindingType;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = -1;
@@ -1746,7 +1746,7 @@ namespace Slang
                 //
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary->var->getVariable();
+                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = SLANG_BINDING_TYPE_EXISTENTIAL_VALUE;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = 0;
@@ -1819,7 +1819,7 @@ namespace Slang
                 //
                 TypeLayout::ExtendedInfo::BindingRangeInfo bindingRange;
                 bindingRange.leafTypeLayout = typeLayout;
-                bindingRange.variable = path.primary->var->getVariable();
+                bindingRange.variable = path.primary ? path.primary->var->getVariable() : nullptr;
                 bindingRange.bindingType = bindingType;
                 bindingRange.count = multiplier;
                 bindingRange.descriptorSetIndex = 0;
