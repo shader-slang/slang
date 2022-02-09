@@ -20,22 +20,22 @@ static bool _checkArrayView(ArrayView<T> v0, ArrayView<T> v1)
 SLANG_UNIT_TEST(chunkedList)
 {
     {
-        ChunkedList<OSString> stringList;
-        List<OSString*> ptrs;
+        ChunkedList<String> stringList;
+        List<String*> ptrs;
         for (int i = 0; i < 256; i++)
         {
-            ptrs.add(stringList.add(String(i).toWString()));
+            ptrs.add(stringList.add(String(i)));
         }
         SLANG_CHECK(stringList.getCount() == 256);
-        SLANG_CHECK(*(ptrs[128]) == L"128");
+        SLANG_CHECK(*(ptrs[128]) == "128");
 
         stringList.clearAndDeallocate();
         ptrs.clear();
         for (int i = 0; i < 64; i++)
         {
-            stringList.add(String(i).toWString());
+            stringList.add(String(i));
         }
         SLANG_CHECK(stringList.getCount() == 64);
-        SLANG_CHECK(*(ptrs[32]) == L"32");
+        SLANG_CHECK(*(ptrs[32]) == "32");
     }
 }
