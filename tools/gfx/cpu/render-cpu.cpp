@@ -1269,14 +1269,10 @@ public:
         ISlangBlob** outDiagnosticBlob) override
     {
         RefPtr<CPUShaderProgram> cpuProgram = new CPUShaderProgram();
-
-        // TODO: stuff?
-
-        auto slangGlobalScope = desc.slangGlobalScope;
+        cpuProgram->init(desc);
+        auto slangGlobalScope = cpuProgram->linkedProgram;
         if( slangGlobalScope )
         {
-            cpuProgram->slangGlobalScope = slangGlobalScope;
-
             auto slangProgramLayout = slangGlobalScope->getLayout();
             if(!slangProgramLayout)
                 return SLANG_FAIL;

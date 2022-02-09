@@ -5215,7 +5215,7 @@ static void _initSrvDesc(
         case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
             descOut.Texture1D.MipLevels = subresourceRange.mipLevelCount == 0
-                                              ? desc.MipLevels
+                                              ? desc.MipLevels - subresourceRange.mipLevel
                                               : subresourceRange.mipLevelCount;
             descOut.Texture1D.MostDetailedMip = subresourceRange.mipLevel;
             break;
@@ -5225,18 +5225,19 @@ static void _initSrvDesc(
                 D3DUtil::getPlaneSlice(descOut.Format, subresourceRange.aspectMask);
             descOut.Texture2D.ResourceMinLODClamp = 0.0f;
             descOut.Texture2D.MipLevels = subresourceRange.mipLevelCount == 0
-                                              ? desc.MipLevels
+                                              ? desc.MipLevels - subresourceRange.mipLevel
                                               : subresourceRange.mipLevelCount;
             descOut.Texture2D.MostDetailedMip = subresourceRange.mipLevel;
             break;
         case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
             descOut.Texture3D.MipLevels = subresourceRange.mipLevelCount == 0
-                                              ? desc.MipLevels
+                                              ? desc.MipLevels - subresourceRange.mipLevel
                                               : subresourceRange.mipLevelCount;
             descOut.Texture3D.MostDetailedMip = subresourceRange.mipLevel;
             break;
-            default: assert(!"Unknown dimension");
+        default:
+            assert(!"Unknown dimension");
         }
 
     }
@@ -5251,7 +5252,7 @@ static void _initSrvDesc(
                                                     : subresourceRange.layerCount / 6;
             descOut.TextureCubeArray.First2DArrayFace = subresourceRange.baseArrayLayer;
             descOut.TextureCubeArray.MipLevels = subresourceRange.mipLevelCount == 0
-                                                     ? desc.MipLevels
+                                                     ? desc.MipLevels - subresourceRange.mipLevel
                                                      : subresourceRange.mipLevelCount;
             descOut.TextureCubeArray.MostDetailedMip = subresourceRange.mipLevel;
             descOut.TextureCubeArray.ResourceMinLODClamp = 0;
@@ -5261,7 +5262,7 @@ static void _initSrvDesc(
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
 
             descOut.TextureCube.MipLevels = subresourceRange.mipLevelCount == 0
-                                                ? desc.MipLevels
+                                                ? desc.MipLevels - subresourceRange.mipLevel
                                                 : subresourceRange.mipLevelCount;
             descOut.TextureCube.MostDetailedMip = subresourceRange.mipLevel;
             descOut.TextureCube.ResourceMinLODClamp = 0;
@@ -5279,6 +5280,15 @@ static void _initSrvDesc(
             descOut.Texture1D.MipLevels = subresourceRange.mipLevelCount == 0
                                               ? desc.MipLevels
                                               : subresourceRange.mipLevelCount;
+            descOut.Texture1DArray.ArraySize = subresourceRange.layerCount == 0
+                                                   ? desc.DepthOrArraySize
+                                                   : subresourceRange.layerCount;
+            descOut.Texture1DArray.FirstArraySlice = subresourceRange.baseArrayLayer;
+            descOut.Texture1DArray.ResourceMinLODClamp = 0;
+            descOut.Texture1DArray.MostDetailedMip = subresourceRange.mipLevel;
+            descOut.Texture1DArray.MipLevels = subresourceRange.mipLevelCount == 0
+                                                   ? desc.MipLevels - subresourceRange.mipLevel
+                                                   : subresourceRange.mipLevelCount;
             break;
         case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
@@ -5289,8 +5299,9 @@ static void _initSrvDesc(
                 D3DUtil::getPlaneSlice(descOut.Format, subresourceRange.aspectMask);
             descOut.Texture2DArray.ResourceMinLODClamp = 0;
             descOut.Texture2DArray.MostDetailedMip = subresourceRange.mipLevel;
-            descOut.Texture2DArray.MipLevels =
-                subresourceRange.mipLevelCount == 0 ? desc.MipLevels : subresourceRange.mipLevelCount;
+            descOut.Texture2DArray.MipLevels = subresourceRange.mipLevelCount == 0
+                                                   ? desc.MipLevels - subresourceRange.mipLevel
+                                                   : subresourceRange.mipLevelCount;
             break;
         case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
             descOut.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE3D;
