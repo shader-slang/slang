@@ -203,9 +203,10 @@ newoption {
  
  -- TODO(JS): What's the point in the enable-xlib command line option if it's just overridden here?
  
- if targetInfo.isWindows then
+ if targetInfo.isWindows or os.target() == "macosx" then
      enableXlib = false
  end
+ 
  -- Even if we have the nvapi path, we only want to currently enable on windows targets
  
  enableNvapi = not not (os.isdir(nvapiPath) and targetInfo.isWindows and _OPTIONS["enable-nvapi"] == "true")
@@ -1111,7 +1112,7 @@ newoption {
      filter(f)
  
      buildmessage "slang-embed %{file.relpath}"
-     buildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
+     prebuildcommands { '"' .. builddir .. '/slang-embed" %{file.relpath}' }
      buildoutputs { "%{file.abspath}.cpp" }
      buildinputs { builddir .. "/slang-embed" .. getExecutableSuffix() }
  end
@@ -1234,12 +1235,12 @@ newoption {
          local f = getWinArm64Filter(true)
          filter(f)
              buildinputs { getWinArm64BuildDir(true) .. '/slangc-bootstrap' .. executableSuffix }
-             buildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
+             prebuildcommands {'"' .. getWinArm64BuildDir(true) .. '/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
              
          f = getWinArm64Filter(false)
          filter(f)
              buildinputs { "%{cfg.targetdir}/slangc-bootstrap" .. executableSuffix }
-             buildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
+             prebuildcommands { '"%{cfg.targetdir}/slangc-bootstrap" -archive-type riff-lz4 -save-stdlib-bin-source "%{file.directory}/slang-stdlib-generated.h"' }
  end
  
  
